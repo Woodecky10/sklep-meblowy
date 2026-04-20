@@ -60,28 +60,47 @@ export type OrderItem = {
   product?: Product;
 };
 
+type OrderInsert = {
+  user_id: string;
+  total: number;
+  shipping_address: Address;
+  status?: OrderStatus;
+  stripe_payment_intent?: string | null;
+};
+
+type OrderItemInsert = {
+  order_id: string;
+  product_id: string;
+  quantity: number;
+  price: number;
+};
+
 export type Database = {
   public: {
     Tables: {
       products: {
         Row: Product;
-        Insert: Omit<Product, "id" | "created_at">;
+        Insert: Omit<Product, "id" | "created_at"> & { id?: string; created_at?: string };
         Update: Partial<Omit<Product, "id" | "created_at">>;
+        Relationships: [];
       };
       profiles: {
         Row: Profile;
-        Insert: Omit<Profile, "created_at">;
+        Insert: Omit<Profile, "created_at"> & { created_at?: string };
         Update: Partial<Omit<Profile, "id" | "created_at">>;
+        Relationships: [];
       };
       orders: {
-        Row: Order;
-        Insert: Omit<Order, "id" | "created_at" | "items">;
-        Update: Partial<Omit<Order, "id" | "created_at" | "items">>;
+        Row: Omit<Order, "items">;
+        Insert: OrderInsert;
+        Update: Partial<OrderInsert>;
+        Relationships: [];
       };
       order_items: {
-        Row: OrderItem;
-        Insert: Omit<OrderItem, "id">;
-        Update: Partial<Omit<OrderItem, "id">>;
+        Row: Omit<OrderItem, "product">;
+        Insert: OrderItemInsert;
+        Update: Partial<OrderItemInsert>;
+        Relationships: [];
       };
     };
   };

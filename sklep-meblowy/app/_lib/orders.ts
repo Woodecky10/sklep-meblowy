@@ -11,19 +11,25 @@ export async function createOrder(
 
   const { data: order, error: orderErr } = await supabase
     .from("orders")
-    .insert({ user_id: userId, total, shipping_address: shippingAddress })
+    .insert({
+      user_id: userId,
+      total,
+      shipping_address: shippingAddress as unknown as Record<string, unknown>,
+    } as never)
     .select()
     .single();
 
   if (orderErr || !order) throw orderErr ?? new Error("Failed to create order");
 
-  const { error: itemsErr } = await supabase.from("order_items").insert(
-    items.map((item) => ({ ...item, order_id: order.id }))
-  );
+  const { error: itemsErr } = await supabase
+    .from("order_items")
+    .insert(
+      items.map((item) => ({ ...item, order_id: (order as unknown as Order).id })) as never[]
+    );
 
   if (itemsErr) throw itemsErr;
 
-  return order as Order;
+  return order as unknown as Order;
 }
 
 export async function getUserOrders(userId: string) {
@@ -35,7 +41,7 @@ export async function getUserOrders(userId: string) {
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-  return (data ?? []) as (Order & { items: OrderItem[] })[];
+  return (data ?? []) as unknown as (Order & { items: OrderItem[] })[];
 }
 
 export async function updateOrderPayment(
@@ -45,7 +51,7 @@ export async function updateOrderPayment(
   const supabase = await createClient();
   const { error } = await supabase
     .from("orders")
-    .update({ stripe_payment_intent: paymentIntentId, status: "paid" })
+    .update({ stripe_payment_intent: paymentIntentId, status: "paid" } as never)
     .eq("id", orderId);
 
   if (error) throw error;
