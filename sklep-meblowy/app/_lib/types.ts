@@ -42,7 +42,8 @@ export type OrderStatus =
 
 export type Order = {
   id: string;
-  user_id: string;
+  user_id: string | null;
+  guest_email: string | null;
   status: OrderStatus;
   total: number;
   shipping_address: Address;
@@ -61,7 +62,8 @@ export type OrderItem = {
 };
 
 type OrderInsert = {
-  user_id: string;
+  user_id?: string | null;
+  guest_email?: string | null;
   total: number;
   shipping_address: Address;
   status?: OrderStatus;

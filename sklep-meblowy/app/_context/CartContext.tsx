@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useReducer } from "react";
+import { createContext, useContext, useMemo, useReducer, useCallback } from "react";
 
 export type CartItem = {
   id: string;
@@ -52,7 +52,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         ),
       };
     case "CLEAR":
-      return { items: [] };
+      return state.items.length === 0 ? state : { items: [] };
     default:
       return state;
   }
@@ -73,25 +73,33 @@ const CartContext = createContext<CartContextValue | null>(null);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { items: [] });
 
-  const total = state.items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const count = state.items.reduce((s, i) => s + i.quantity, 0);
-
-  return (
-    <CartContext.Provider
-      value={{
-        items: state.items,
-        total,
-        count,
-        add: (item) => dispatch({ type: "ADD", item }),
-        remove: (id, variant) => dispatch({ type: "REMOVE", id, variant }),
-        updateQty: (id, quantity, variant) =>
-          dispatch({ type: "UPDATE_QTY", id, variant, quantity }),
-        clear: () => dispatch({ type: "CLEAR" }),
-      }}
-    >
-      {children}
-    </CartContext.Provider>
+  const add = useCallback((item: CartItem) => dispatch({ type: "ADD", item }), []);
+  const remove = useCallback(
+    (id: string, variant?: string) => dispatch({ type: "REMOVE", id, variant }),
+    []
   );
+  const updateQty = useCallback(
+    (id: string, quantity: number, variant?: string) =>
+      dispatch({ type: "UPDATE_QTY", id, variant, quantity }),
+    []
+  );
+  const clear = useCallback(() => dispatch({ type: "CLEAR" }), []);
+
+  const value = useMemo<CartContextValue>(() => {
+    const total = state.items.reduce((s, i) => s + i.price * i.quantity, 0);
+    const count = state.items.reduce((s, i) => s + i.quantity, 0);
+    return {
+      items: state.items,
+      total,
+      count,
+      add,
+      remove,
+      updateQty,
+      clear,
+    };
+  }, [state.items, add, remove, updateQty, clear]);
+
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
 export function useCart() {
