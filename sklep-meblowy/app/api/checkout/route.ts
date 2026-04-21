@@ -127,10 +127,10 @@ export async function POST(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
 
-    // Utwórz wstępne zamówienie
+    // Utwórz wstępne zamówienie (email gościa lowercase — spójne z linkowaniem)
     const order = await createOrder({
       userId: user?.id ?? null,
-      guestEmail: user ? null : body.email,
+      guestEmail: user ? null : body.email.trim().toLowerCase(),
       items: orderItems,
       total,
       shippingAddress: body.address,

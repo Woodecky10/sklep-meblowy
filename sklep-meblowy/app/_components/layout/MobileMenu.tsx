@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { signOut } from "@/app/_lib/auth-actions";
 
 const links = [
   { href: "/sklep?kategoria=kanapy", label: "Kanapy" },
@@ -10,7 +11,7 @@ const links = [
   { href: "/sklep?kategoria=pufy", label: "Pufy" },
 ];
 
-export default function MobileMenu() {
+export default function MobileMenu({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -42,6 +43,51 @@ export default function MobileMenu() {
                 {l.label}
               </Link>
             ))}
+            <div className="border-t border-[var(--border)] pt-4 flex flex-col gap-4">
+              {isLoggedIn ? (
+                <>
+                  <Link
+                    href="/konto"
+                    onClick={() => setOpen(false)}
+                    className="font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors"
+                  >
+                    Moje konto
+                  </Link>
+                  <Link
+                    href="/konto/zamowienia"
+                    onClick={() => setOpen(false)}
+                    className="font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors"
+                  >
+                    Zamówienia
+                  </Link>
+                  <form action={signOut}>
+                    <button
+                      type="submit"
+                      className="font-sans text-sm uppercase tracking-widest text-red-600 hover:text-red-700 transition-colors text-left"
+                    >
+                      Wyloguj
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/logowanie"
+                    onClick={() => setOpen(false)}
+                    className="font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors"
+                  >
+                    Zaloguj się
+                  </Link>
+                  <Link
+                    href="/rejestracja"
+                    onClick={() => setOpen(false)}
+                    className="font-sans text-sm uppercase tracking-widest text-[var(--color-gold)] font-semibold transition-colors"
+                  >
+                    Zarejestruj się
+                  </Link>
+                </>
+              )}
+            </div>
           </nav>
         </div>
       )}

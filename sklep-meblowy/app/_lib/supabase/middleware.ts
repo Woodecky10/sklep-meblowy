@@ -25,7 +25,27 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const path = request.nextUrl.pathname;
+
+  // Niezalogowany → /konto/* przekieruj na logowanie
+  if (!user && path.startsWith("/konto")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/logowanie";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  // Zalogowany → /logowanie i /rejestracja przekieruj na konto
+  if (user && (path === "/logowanie" || path === "/rejestracja")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/konto";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
 
   return supabaseResponse;
 }
