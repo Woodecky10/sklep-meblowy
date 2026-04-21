@@ -2,6 +2,8 @@ import Link from "next/link";
 import ThemeToggle from "./ThemeToggle";
 import CartIcon from "./CartIcon";
 import MobileMenu from "./MobileMenu";
+import UserMenu from "./UserMenu";
+import { createClient } from "@/app/_lib/supabase/server";
 
 const categories = [
   { href: "/sklep?kategoria=kanapy", label: "Kanapy" },
@@ -10,7 +12,12 @@ const categories = [
   { href: "/sklep?kategoria=pufy", label: "Pufy" },
 ];
 
-export default function Navbar() {
+export default async function Navbar() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
     <header className="sticky top-0 z-50 bg-[var(--card-bg)] border-b border-[var(--border)] backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between relative">
@@ -35,8 +42,9 @@ export default function Navbar() {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
+          <UserMenu />
           <CartIcon />
-          <MobileMenu />
+          <MobileMenu isLoggedIn={!!user} />
         </div>
       </div>
     </header>
