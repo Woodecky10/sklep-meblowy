@@ -45,7 +45,10 @@ create table if not exists public.products (
   name        text not null,
   description text not null default '',
   price       numeric(10, 2) not null check (price >= 0),
-  category    text not null check (category in ('kanapy', 'lozka', 'fotele', 'pufy')),
+  category    text not null check (category in (
+    'sofy', 'naroznik-l', 'naroznik-u', 'fotele', 'pufy',
+    'lozko-kontynentalne', 'lozko-tapicerowane', 'materace'
+  )),
   images      text[] not null default '{}',
   stock       integer not null default 0 check (stock >= 0),
   variants    jsonb,
@@ -171,7 +174,7 @@ insert into public.products (name, description, price, category, images, stock, 
   (
     'Sofa Velvet Midnight',
     'Luksusowa sofa tapicerowana aksamitem w kolorze głębokiego granatu. Rama z litego dębu, poduszki wypełnione puchem. Idealna do eleganckich salonów.',
-    4299.00, 'kanapy',
+    4299.00, 'sofy',
     array['https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800'],
     8,
     '[{"name":"Kolor","value":"Granat"},{"name":"Kolor","value":"Szary"},{"name":"Kolor","value":"Beż"}]'::jsonb
@@ -179,14 +182,14 @@ insert into public.products (name, description, price, category, images, stock, 
   (
     'Sofa Porto Modular',
     'Modułowa sofa narożna z możliwością konfiguracji. Tkanina odporna na zabrudzenia, idealna dla rodzin z dziećmi.',
-    6799.00, 'kanapy',
+    6799.00, 'sofy',
     array['https://images.unsplash.com/photo-1567016432779-094069958ea5?w=800'],
     4, null
   ),
   (
     'Łóżko Aurelia 180',
     'Majestatyczne łóżko z tapicerowanym zagłówkiem w jodełkę. Stelaż z buk, opcjonalne pojemniki na pościel.',
-    5899.00, 'lozka',
+    5899.00, 'lozko-tapicerowane',
     array['https://images.unsplash.com/photo-1505693314120-0d443867891c?w=800'],
     6,
     '[{"name":"Rozmiar","value":"160x200"},{"name":"Rozmiar","value":"180x200"},{"name":"Rozmiar","value":"200x200"}]'::jsonb
@@ -194,7 +197,7 @@ insert into public.products (name, description, price, category, images, stock, 
   (
     'Łóżko Zen Minimalist',
     'Nowoczesne łóżko o niskiej bryle, inspirowane japońskim minimalizmem. Naturalne drewno dębowe.',
-    4199.00, 'lozka',
+    4199.00, 'lozko-tapicerowane',
     array['https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800'],
     10, null
   ),

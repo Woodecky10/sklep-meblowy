@@ -1,4 +1,6 @@
-export type Category = "kanapy" | "lozka" | "fotele" | "pufy";
+// Eksportowane z _lib/categories.ts — single source of truth.
+import type { CategorySlug } from "./categories";
+export type Category = CategorySlug;
 
 export type Product = {
   id: string;
