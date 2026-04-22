@@ -2,14 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-
-const CATEGORIES = [
-  { value: "", label: "Wszystkie" },
-  { value: "kanapy", label: "Kanapy" },
-  { value: "lozka", label: "Łóżka" },
-  { value: "fotele", label: "Fotele" },
-  { value: "pufy", label: "Pufy" },
-];
+import { SECTIONS, getCategoriesBySection } from "@/app/_lib/categories";
 
 const SORTS = [
   { value: "newest", label: "Najnowsze" },
@@ -93,24 +86,44 @@ export default function FilterBar({ colors, materials }: Props) {
 
   return (
     <div className="mb-10 space-y-5">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex flex-wrap gap-2">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c.value}
-              onClick={() => update("kategoria", c.value)}
-              className={`px-4 py-2 rounded-full text-xs font-sans uppercase tracking-widest transition-colors ${
-                category === c.value
-                  ? "bg-[var(--color-navy)] text-white"
-                  : "border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="flex flex-col gap-3 flex-1">
+          <button
+            onClick={() => update("kategoria", "")}
+            className={`self-start px-4 py-2 rounded-full text-xs font-sans uppercase tracking-widest transition-colors ${
+              category === ""
+                ? "bg-[var(--color-navy)] text-white"
+                : "border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
+            }`}
+          >
+            Wszystkie
+          </button>
+          {SECTIONS.map((section) => {
+            const cats = getCategoriesBySection(section.slug);
+            return (
+              <div key={section.slug} className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mr-1">
+                  {section.label}:
+                </span>
+                {cats.map((c) => (
+                  <button
+                    key={c.slug}
+                    onClick={() => update("kategoria", c.slug)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-sans transition-colors ${
+                      category === c.slug
+                        ? "bg-[var(--color-navy)] text-white"
+                        : "border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
         </div>
 
-        <div className="ml-auto">
+        <div>
           <select
             value={sort}
             onChange={(e) => update("sortuj", e.target.value)}

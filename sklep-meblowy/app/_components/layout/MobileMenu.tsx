@@ -3,16 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { signOut } from "@/app/_lib/auth-actions";
-
-const links = [
-  { href: "/sklep?kategoria=kanapy", label: "Kanapy" },
-  { href: "/sklep?kategoria=lozka", label: "Łóżka" },
-  { href: "/sklep?kategoria=fotele", label: "Fotele" },
-  { href: "/sklep?kategoria=pufy", label: "Pufy" },
-];
+import { SECTIONS, getCategoriesBySection } from "@/app/_lib/categories";
 
 export default function MobileMenu({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
   const [open, setOpen] = useState(false);
+  const [openSection, setOpenSection] = useState<string | null>(null);
+
   return (
     <>
       <button
@@ -32,18 +28,49 @@ export default function MobileMenu({ isLoggedIn = false }: { isLoggedIn?: boolea
       </button>
       {open && (
         <div className="absolute top-full left-0 right-0 bg-[var(--card-bg)] border-b border-[var(--border)] shadow-lg md:hidden">
-          <nav className="flex flex-col px-6 py-4 gap-4">
-            {links.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                onClick={() => setOpen(false)}
-                className="font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors"
-              >
-                {l.label}
-              </Link>
-            ))}
-            <div className="border-t border-[var(--border)] pt-4 flex flex-col gap-4">
+          <nav className="flex flex-col px-6 py-4 gap-3">
+            {SECTIONS.map((section) => {
+              const cats = getCategoriesBySection(section.slug);
+              const isOpen = openSection === section.slug;
+              return (
+                <div key={section.slug}>
+                  <button
+                    onClick={() => setOpenSection(isOpen ? null : section.slug)}
+                    className="w-full flex items-center justify-between font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors py-1"
+                  >
+                    <span>{section.label}</span>
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+                  {isOpen && (
+                    <div className="flex flex-col gap-2 mt-2 pl-4 border-l border-[var(--border)]">
+                      {cats.map((c) => (
+                        <Link
+                          key={c.slug}
+                          href={`/sklep?kategoria=${c.slug}`}
+                          onClick={() => setOpen(false)}
+                          className="text-sm text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors"
+                        >
+                          {c.label}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            <div className="border-t border-[var(--border)] pt-4 mt-2 flex flex-col gap-4">
               {isLoggedIn ? (
                 <>
                   <Link

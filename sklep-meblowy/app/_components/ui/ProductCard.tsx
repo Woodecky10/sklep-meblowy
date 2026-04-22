@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { Product } from "@/app/_lib/types";
+import { getCategoryLabel } from "@/app/_lib/categories";
 import AddToCartButton from "./AddToCartButton";
 
 export default function ProductCard({ product }: { product: Product }) {
@@ -31,8 +32,8 @@ export default function ProductCard({ product }: { product: Product }) {
         </div>
       </Link>
 
-      <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-1 capitalize">
-        {product.category === "lozka" ? "Łóżka" : product.category}
+      <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-1">
+        {getCategoryLabel(product.category) ?? product.category}
       </p>
       <Link href={`/produkt/${product.id}`}>
         <p className="font-display text-lg font-semibold text-[var(--fg)] group-hover:text-[var(--color-gold)] transition-colors mb-2 leading-snug">

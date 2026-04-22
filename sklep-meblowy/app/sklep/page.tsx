@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { getProducts, getFilterFacets } from "@/app/_lib/products";
 import type { Category } from "@/app/_lib/types";
+import { getCategoryLabel, isCategorySlug } from "@/app/_lib/categories";
 import ProductCard from "@/app/_components/ui/ProductCard";
 import FilterBar from "@/app/_components/ui/FilterBar";
 import Pagination from "@/app/_components/ui/Pagination";
@@ -20,13 +21,6 @@ type SearchParams = Promise<{
   material?: string;
 }>;
 
-const CATEGORY_LABELS: Record<string, string> = {
-  kanapy: "Kanapy",
-  lozka: "Łóżka",
-  fotele: "Fotele",
-  pufy: "Pufy",
-};
-
 function parsePositiveNumber(value: string | undefined) {
   if (!value) return undefined;
   const n = Number(value);
@@ -39,7 +33,7 @@ export default async function SklepPage({
   searchParams: SearchParams;
 }) {
   const sp = await searchParams;
-  const category = sp.kategoria as Category | undefined;
+  const category = isCategorySlug(sp.kategoria) ? (sp.kategoria as Category) : undefined;
   const sort = (sp.sortuj as "price_asc" | "price_desc" | "newest") ?? "newest";
   const page = Number(sp.strona ?? 1);
   const search = sp.q?.trim() || undefined;
@@ -78,7 +72,7 @@ export default async function SklepPage({
   const heading = search
     ? `Wyniki: „${search}”`
     : category
-      ? CATEGORY_LABELS[category] ?? "Sklep"
+      ? getCategoryLabel(category) ?? "Sklep"
       : "Wszystkie produkty";
 
   return (

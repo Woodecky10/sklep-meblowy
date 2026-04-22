@@ -7,14 +7,14 @@ export const metadata: Metadata = {
 
 const categories = [
   {
-    name: "Kanapy",
-    slug: "kanapy",
+    name: "Sofy",
+    slug: "sofy",
     description: "Komfort i elegancja w każdym salonie",
     bg: "bg-stone-100 dark:bg-stone-900",
   },
   {
-    name: "Łóżka",
-    slug: "lozka",
+    name: "Łóżka tapicerowane",
+    slug: "lozko-tapicerowane",
     description: "Sypialnia marzeń, sen doskonały",
     bg: "bg-slate-100 dark:bg-slate-900",
   },
@@ -37,14 +37,14 @@ const featured = [
     id: "1",
     name: "Sofa Velvet Midnight",
     price: 4299,
-    category: "Kanapy",
+    category: "Sofy",
     badge: "Bestseller",
   },
   {
     id: "2",
     name: "Łóżko Aurelia 180",
     price: 5899,
-    category: "Łóżka",
+    category: "Łóżka tapicerowane",
     badge: "Nowość",
   },
   {

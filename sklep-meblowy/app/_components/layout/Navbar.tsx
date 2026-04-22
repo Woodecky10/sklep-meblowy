@@ -6,13 +6,7 @@ import MobileMenu from "./MobileMenu";
 import UserMenu from "./UserMenu";
 import SearchBox from "./SearchBox";
 import { createClient } from "@/app/_lib/supabase/server";
-
-const categories = [
-  { href: "/sklep?kategoria=kanapy", label: "Kanapy" },
-  { href: "/sklep?kategoria=lozka", label: "Łóżka" },
-  { href: "/sklep?kategoria=fotele", label: "Fotele" },
-  { href: "/sklep?kategoria=pufy", label: "Pufy" },
-];
+import { SECTIONS, getCategoriesBySection } from "@/app/_lib/categories";
 
 export default async function Navbar() {
   const supabase = await createClient();
@@ -31,15 +25,39 @@ export default async function Navbar() {
         </Link>
 
         <nav className="hidden md:flex items-center gap-8">
-          {categories.map((c) => (
-            <Link
-              key={c.href}
-              href={c.href}
-              className="font-sans text-xs uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors"
-            >
-              {c.label}
-            </Link>
-          ))}
+          {SECTIONS.map((section) => {
+            const cats = getCategoriesBySection(section.slug);
+            return (
+              <div key={section.slug} className="relative group">
+                <button className="font-sans text-xs uppercase tracking-widest text-[var(--muted)] group-hover:text-[var(--color-gold)] transition-colors flex items-center gap-1 h-16">
+                  {section.label}
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+                <div className="absolute top-full left-1/2 -translate-x-1/2 min-w-[220px] bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-2xl py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                  {cats.map((c) => (
+                    <Link
+                      key={c.slug}
+                      href={`/sklep?kategoria=${c.slug}`}
+                      className="block px-5 py-2.5 text-sm text-[var(--fg)] hover:bg-[var(--bg)] hover:text-[var(--color-gold)] transition-colors"
+                    >
+                      {c.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </nav>
 
         <div className="flex items-center gap-2">

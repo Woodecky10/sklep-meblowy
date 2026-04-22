@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getProduct, getRelatedProducts } from "@/app/_lib/products";
+import { getCategoryLabel } from "@/app/_lib/categories";
 import ImageGallery from "@/app/_components/ui/ImageGallery";
 import ProductActions from "@/app/_components/ui/ProductActions";
 import ProductCard from "@/app/_components/ui/ProductCard";
@@ -19,13 +20,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
   };
 }
-
-const CATEGORY_LABELS: Record<string, string> = {
-  kanapy: "Kanapy",
-  lozka: "Łóżka",
-  fotele: "Fotele",
-  pufy: "Pufy",
-};
 
 export default async function ProduktPage({ params }: Props) {
   const { id } = await params;
@@ -46,7 +40,7 @@ export default async function ProduktPage({ params }: Props) {
           href={`/sklep?kategoria=${product.category}`}
           className="hover:text-[var(--color-gold)] transition-colors"
         >
-          {CATEGORY_LABELS[product.category] ?? product.category}
+          {getCategoryLabel(product.category) ?? product.category}
         </a>
         <span>/</span>
         <span className="text-[var(--fg)] normal-case tracking-normal">{product.name}</span>
@@ -59,7 +53,7 @@ export default async function ProduktPage({ params }: Props) {
         <div className="flex flex-col gap-8">
           <div>
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-3">
-              {CATEGORY_LABELS[product.category]}
+              {getCategoryLabel(product.category) ?? product.category}
             </p>
             <h1 className="font-display text-4xl font-bold text-[var(--fg)] leading-tight mb-4">
               {product.name}
