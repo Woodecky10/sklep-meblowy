@@ -6,15 +6,45 @@ export type ProductFilters = {
   sort?: "price_asc" | "price_desc" | "newest";
   page?: number;
   limit?: number;
+  search?: string;
+  priceMin?: number;
+  priceMax?: number;
+  inStockOnly?: boolean;
+  colors?: string[];
+  materials?: string[];
 };
 
 export async function getProducts(filters: ProductFilters = {}) {
   const supabase = await createClient();
-  const { category, sort = "newest", page = 1, limit = 12 } = filters;
+  const {
+    category,
+    sort = "newest",
+    page = 1,
+    limit = 12,
+    search,
+    priceMin,
+    priceMax,
+    inStockOnly,
+    colors,
+    materials,
+  } = filters;
 
   let query = supabase.from("products").select("*", { count: "exact" });
 
   if (category) query = query.eq("category", category);
+
+  if (search && search.trim()) {
+    const term = search.trim().replace(/[%_]/g, "\\$&");
+    query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%`);
+  }
+
+  if (typeof priceMin === "number") query = query.gte("price", priceMin);
+  if (typeof priceMax === "number") query = query.lte("price", priceMax);
+
+  if (inStockOnly) query = query.gt("stock", 0);
+
+  if (colors?.length) query = query.in("color", colors);
+  if (materials?.length) query = query.in("material", materials);
 
   if (sort === "price_asc") query = query.order("price", { ascending: true });
   else if (sort === "price_desc") query = query.order("price", { ascending: false });
@@ -66,4 +96,24 @@ export async function getRelatedProducts(productId: string, category: Category, 
     .limit(limit);
 
   return (data ?? []) as Product[];
+}
+
+// Pobiera unikalne wartości color/material — użyte do dynamicznego budowania filtrów.
+// Dwa zapytania, bo distinct po jednej kolumnie naraz.
+export async function getFilterFacets() {
+  const supabase = await createClient();
+
+  const [{ data: colorsData }, { data: materialsData }] = await Promise.all([
+    supabase.from("products").select("color").not("color", "is", null),
+    supabase.from("products").select("material").not("material", "is", null),
+  ]);
+
+  const colors = Array.from(
+    new Set((colorsData ?? []).map((r) => (r as { color: string }).color))
+  ).sort();
+  const materials = Array.from(
+    new Set((materialsData ?? []).map((r) => (r as { material: string }).material))
+  ).sort();
+
+  return { colors, materials };
 }

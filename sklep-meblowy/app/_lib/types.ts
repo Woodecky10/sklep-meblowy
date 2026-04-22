@@ -8,6 +8,8 @@ export type Product = {
   category: Category;
   images: string[];
   stock: number;
+  color: string | null;
+  material: string | null;
   variants: ProductVariant[] | null;
   created_at: string;
 };
