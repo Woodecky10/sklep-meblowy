@@ -8,28 +8,47 @@ export type CartItem = {
   price: number;
   image: string;
   quantity: number;
-  variant?: string;
+  variantValues?: Record<string, string>;
 };
 
 type CartState = { items: CartItem[] };
 
 type CartAction =
   | { type: "ADD"; item: CartItem }
-  | { type: "REMOVE"; id: string; variant?: string }
-  | { type: "UPDATE_QTY"; id: string; variant?: string; quantity: number }
+  | { type: "REMOVE"; id: string; variantValues?: Record<string, string> }
+  | {
+      type: "UPDATE_QTY";
+      id: string;
+      variantValues: Record<string, string> | undefined;
+      quantity: number;
+    }
   | { type: "CLEAR" };
+
+// Stabilny klucz wariantu — sortuje po nazwie opcji żeby kolejność wyboru
+// (np. najpierw Kolor, potem Strona) nie tworzyła osobnych pozycji w koszyku.
+function variantKey(values?: Record<string, string>): string {
+  if (!values) return "";
+  return Object.keys(values)
+    .sort()
+    .map((k) => `${k}=${values[k]}`)
+    .join("|");
+}
+
+function itemKey(id: string, values?: Record<string, string>): string {
+  return id + "::" + variantKey(values);
+}
 
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case "ADD": {
-      const key = action.item.id + (action.item.variant ?? "");
+      const key = itemKey(action.item.id, action.item.variantValues);
       const existing = state.items.find(
-        (i) => i.id + (i.variant ?? "") === key
+        (i) => itemKey(i.id, i.variantValues) === key
       );
       if (existing) {
         return {
           items: state.items.map((i) =>
-            i.id + (i.variant ?? "") === key
+            itemKey(i.id, i.variantValues) === key
               ? { ...i, quantity: i.quantity + action.item.quantity }
               : i
           ),
@@ -37,20 +56,22 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       }
       return { items: [...state.items, action.item] };
     }
-    case "REMOVE":
+    case "REMOVE": {
+      const key = itemKey(action.id, action.variantValues);
       return {
-        items: state.items.filter(
-          (i) => i.id + (i.variant ?? "") !== action.id + (action.variant ?? "")
-        ),
+        items: state.items.filter((i) => itemKey(i.id, i.variantValues) !== key),
       };
-    case "UPDATE_QTY":
+    }
+    case "UPDATE_QTY": {
+      const key = itemKey(action.id, action.variantValues);
       return {
         items: state.items.map((i) =>
-          i.id + (i.variant ?? "") === action.id + (action.variant ?? "")
+          itemKey(i.id, i.variantValues) === key
             ? { ...i, quantity: action.quantity }
             : i
         ),
       };
+    }
     case "CLEAR":
       return state.items.length === 0 ? state : { items: [] };
     default:
@@ -63,8 +84,12 @@ type CartContextValue = {
   total: number;
   count: number;
   add: (item: CartItem) => void;
-  remove: (id: string, variant?: string) => void;
-  updateQty: (id: string, quantity: number, variant?: string) => void;
+  remove: (id: string, variantValues?: Record<string, string>) => void;
+  updateQty: (
+    id: string,
+    quantity: number,
+    variantValues?: Record<string, string>
+  ) => void;
   clear: () => void;
 };
 
@@ -75,12 +100,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const add = useCallback((item: CartItem) => dispatch({ type: "ADD", item }), []);
   const remove = useCallback(
-    (id: string, variant?: string) => dispatch({ type: "REMOVE", id, variant }),
+    (id: string, variantValues?: Record<string, string>) =>
+      dispatch({ type: "REMOVE", id, variantValues }),
     []
   );
   const updateQty = useCallback(
-    (id: string, quantity: number, variant?: string) =>
-      dispatch({ type: "UPDATE_QTY", id, variant, quantity }),
+    (id: string, quantity: number, variantValues?: Record<string, string>) =>
+      dispatch({ type: "UPDATE_QTY", id, variantValues, quantity }),
     []
   );
   const clear = useCallback(() => dispatch({ type: "CLEAR" }), []);
@@ -107,3 +133,5 @@ export function useCart() {
   if (!ctx) throw new Error("useCart must be used inside CartProvider");
   return ctx;
 }
+
+export { itemKey as cartItemKey };

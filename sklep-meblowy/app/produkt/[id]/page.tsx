@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getProduct, getRelatedProducts } from "@/app/_lib/products";
 import { getCategoryLabel } from "@/app/_lib/categories";
+import { totalProductStock } from "@/app/_lib/variants";
 import ImageGallery from "@/app/_components/ui/ImageGallery";
 import ProductActions from "@/app/_components/ui/ProductActions";
 import ProductCard from "@/app/_components/ui/ProductCard";
@@ -27,6 +28,34 @@ export default async function ProduktPage({ params }: Props) {
   if (!product) notFound();
 
   const related = await getRelatedProducts(product.id, product.category);
+  const totalStock = totalProductStock(product);
+
+  const details: { label: string; value: string }[] = [];
+  if (product.dimensions) {
+    const { width, depth, height } = product.dimensions;
+    details.push({
+      label: "Wymiary",
+      value: `${width} × ${depth} × ${height} cm (szer. × gł. × wys.)`,
+    });
+  }
+  if (product.weight !== null && product.weight !== undefined) {
+    details.push({ label: "Waga", value: `${product.weight} kg` });
+  }
+  if (product.material) {
+    details.push({ label: "Materiał", value: product.material });
+  }
+  if (product.color) {
+    details.push({ label: "Kolor bazowy", value: product.color });
+  }
+  if (product.construction) {
+    details.push({ label: "Konstrukcja", value: product.construction });
+  }
+  if (product.delivery_time) {
+    details.push({ label: "Czas dostawy", value: product.delivery_time });
+  }
+  if (product.warranty) {
+    details.push({ label: "Gwarancja", value: product.warranty });
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
@@ -67,12 +96,12 @@ export default async function ProduktPage({ params }: Props) {
 
           <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
             <span
-              className={`w-2 h-2 rounded-full ${product.stock > 0 ? "bg-green-500" : "bg-red-400"}`}
+              className={`w-2 h-2 rounded-full ${totalStock > 0 ? "bg-green-500" : "bg-red-400"}`}
             />
-            {product.stock > 5
+            {totalStock > 5
               ? "Dostępny"
-              : product.stock > 0
-              ? `Ostatnie ${product.stock} szt.`
+              : totalStock > 0
+              ? `Ostatnie ${totalStock} szt.`
               : "Wyprzedany"}
           </div>
 
@@ -85,6 +114,33 @@ export default async function ProduktPage({ params }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Sekcja Szczegóły */}
+      {details.length > 0 && (
+        <section className="mb-24">
+          <div className="mb-8">
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+              Specyfikacja
+            </p>
+            <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
+              Szczegóły produktu
+            </h2>
+          </div>
+          <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 max-w-4xl">
+            {details.map((d) => (
+              <div
+                key={d.label}
+                className="flex justify-between gap-6 py-3 border-b border-[var(--border)]"
+              >
+                <dt className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] shrink-0 pt-1">
+                  {d.label}
+                </dt>
+                <dd className="text-sm text-[var(--fg)] text-right">{d.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )}
 
       {/* Podobne produkty */}
       {related.length > 0 && (

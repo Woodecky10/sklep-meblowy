@@ -1,0 +1,92 @@
+import type { Product, ProductVariant } from "./types";
+
+// Czy produkt ma warianty (i przynajmniej jedną opcję)?
+export function hasVariants(product: Product): boolean {
+  return !!product.variants && product.variants.options.length > 0;
+}
+
+// Znajdź dokładną kombinację dopasowaną do wybranych wartości.
+// Zwraca null jeśli nie wszystkie opcje są wybrane lub kombinacja nie istnieje.
+export function findVariant(
+  product: Product,
+  selectedValues: Record<string, string>
+): ProductVariant | null {
+  if (!product.variants) return null;
+  const optionNames = product.variants.options.map((o) => o.name);
+
+  for (const name of optionNames) {
+    if (!selectedValues[name]) return null;
+  }
+
+  return (
+    product.variants.combinations.find((c) =>
+      optionNames.every((n) => c.values[n] === selectedValues[n])
+    ) ?? null
+  );
+}
+
+// Czy wybór wariantu jest kompletny (wszystkie opcje mają wartość)?
+export function isVariantSelectionComplete(
+  product: Product,
+  selectedValues: Record<string, string>
+): boolean {
+  if (!hasVariants(product)) return true;
+  return product.variants!.options.every((o) => !!selectedValues[o.name]);
+}
+
+// Stock dostępny dla wybranej kombinacji.
+// Brak wariantów -> product.stock. Niekompletny wybór lub brak kombinacji -> 0.
+export function getVariantStock(
+  product: Product,
+  selectedValues: Record<string, string>
+): number {
+  if (!hasVariants(product)) return product.stock;
+  const variant = findVariant(product, selectedValues);
+  return variant?.stock ?? 0;
+}
+
+// Cena dla wybranej kombinacji = product.price + price_modifier.
+// Niekompletny wybór -> bazowa cena.
+export function getVariantPrice(
+  product: Product,
+  selectedValues: Record<string, string>
+): number {
+  if (!hasVariants(product)) return product.price;
+  const variant = findVariant(product, selectedValues);
+  if (!variant) return product.price;
+  return product.price + (variant.price_modifier ?? 0);
+}
+
+// Suma stocków wszystkich kombinacji (lub product.stock dla produktu bez wariantów).
+// Używane np. w „Wyprzedany" gdy wszystkie kombinacje mają 0.
+export function totalProductStock(product: Product): number {
+  if (!hasVariants(product)) return product.stock;
+  return product.variants!.combinations.reduce((sum, c) => sum + c.stock, 0);
+}
+
+// Czy konkretna wartość opcji jest w ogóle dostępna (jakakolwiek kombinacja > 0)
+// przy uwzględnieniu już wybranych innych opcji. Używane do wyszarzania chipów.
+export function isOptionValueAvailable(
+  product: Product,
+  optionName: string,
+  value: string,
+  selectedValues: Record<string, string>
+): boolean {
+  if (!product.variants) return true;
+  const otherSelections = Object.entries(selectedValues).filter(
+    ([k, v]) => k !== optionName && !!v
+  );
+
+  return product.variants.combinations.some((c) => {
+    if (c.values[optionName] !== value) return false;
+    if (c.stock <= 0) return false;
+    return otherSelections.every(([k, v]) => c.values[k] === v);
+  });
+}
+
+// Krótka, czytelna etykieta wybranych wartości — np. "Strona: Lewa, Kolor: Beżowy".
+export function formatVariantLabel(values: Record<string, string>): string {
+  return Object.entries(values)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(", ");
+}

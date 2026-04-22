@@ -2,7 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { stripe } from "@/app/_lib/stripe";
 import { createClient } from "@/app/_lib/supabase/server";
 import { createOrder } from "@/app/_lib/orders";
-import type { Address } from "@/app/_lib/types";
+import {
+  findVariant,
+  formatVariantLabel,
+  hasVariants,
+  isVariantSelectionComplete,
+} from "@/app/_lib/variants";
+import type { Address, Product } from "@/app/_lib/types";
 
 type LineItem = NonNullable<
   NonNullable<Parameters<typeof stripe.checkout.sessions.create>[0]>["line_items"]
@@ -15,7 +21,7 @@ type CheckoutBody = {
     price: number;
     quantity: number;
     image?: string;
-    variant?: string;
+    variantValues?: Record<string, string>;
   }[];
   email: string;
   fullName: string;
@@ -36,12 +42,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Pobierz aktualne ceny z DB (nie ufaj klientowi)
+    // Pobierz aktualne ceny + warianty z DB (nie ufaj klientowi)
     const supabase = await createClient();
     const productIds = body.items.map((i) => i.id);
     const { data: products, error: prodErr } = await supabase
       .from("products")
-      .select("id, name, price, stock, images")
+      .select("id, name, price, stock, images, variants")
       .in("id", productIds);
 
     if (prodErr || !products) {
@@ -51,22 +57,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    type ProductRow = {
-      id: string;
-      name: string;
-      price: number;
-      stock: number;
-      images: string[];
-    };
-    const productMap = new Map<string, ProductRow>(
-      (products as ProductRow[]).map((p) => [p.id, p])
+    const productMap = new Map<string, Product>(
+      (products as unknown as Product[]).map((p) => [p.id, p])
     );
 
-    // Walidacja magazynu + ceny serwerowe
+    // Walidacja magazynu + ceny serwerowe (cena = bazowa + price_modifier wariantu)
     const orderItems: {
       product_id: string;
       quantity: number;
       price: number;
+      variant_values?: Record<string, string> | null;
     }[] = [];
     const stripeLineItems: LineItem[] = [];
     let total = 0;
@@ -79,28 +79,63 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      if (product.stock < item.quantity) {
-        return NextResponse.json(
-          { error: `Brak wystarczającej ilości: ${product.name}` },
-          { status: 400 }
-        );
+
+      let unitPrice = Number(product.price);
+      let variantValues: Record<string, string> | null = null;
+
+      if (hasVariants(product)) {
+        if (
+          !item.variantValues ||
+          !isVariantSelectionComplete(product, item.variantValues)
+        ) {
+          return NextResponse.json(
+            { error: `Brak wyboru wariantu dla: ${product.name}` },
+            { status: 400 }
+          );
+        }
+        const variant = findVariant(product, item.variantValues);
+        if (!variant) {
+          return NextResponse.json(
+            { error: `Niedostępna kombinacja wariantu dla: ${product.name}` },
+            { status: 400 }
+          );
+        }
+        if (variant.stock < item.quantity) {
+          return NextResponse.json(
+            {
+              error: `Brak wystarczającej ilości dla: ${product.name} (${formatVariantLabel(item.variantValues)})`,
+            },
+            { status: 400 }
+          );
+        }
+        unitPrice += variant.price_modifier ?? 0;
+        variantValues = item.variantValues;
+      } else {
+        if (product.stock < item.quantity) {
+          return NextResponse.json(
+            { error: `Brak wystarczającej ilości: ${product.name}` },
+            { status: 400 }
+          );
+        }
       }
 
-      const price = Number(product.price);
-      total += price * item.quantity;
+      total += unitPrice * item.quantity;
       orderItems.push({
         product_id: product.id,
         quantity: item.quantity,
-        price,
+        price: unitPrice,
+        variant_values: variantValues,
       });
 
       stripeLineItems.push({
         quantity: item.quantity,
         price_data: {
           currency: "pln",
-          unit_amount: Math.round(price * 100),
+          unit_amount: Math.round(unitPrice * 100),
           product_data: {
-            name: product.name + (item.variant ? ` — ${item.variant}` : ""),
+            name:
+              product.name +
+              (variantValues ? ` — ${formatVariantLabel(variantValues)}` : ""),
             images: product.images?.length ? [product.images[0]] : undefined,
           },
         },
