@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import ThemeToggle from "./ThemeToggle";
 import CartIcon from "./CartIcon";
 import MobileMenu from "./MobileMenu";
 import UserMenu from "./UserMenu";
+import SearchBox from "./SearchBox";
 import { createClient } from "@/app/_lib/supabase/server";
 
 const categories = [
@@ -41,6 +43,9 @@ export default async function Navbar() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <Suspense fallback={<div className="w-10 h-10" />}>
+            <SearchBox />
+          </Suspense>
           <ThemeToggle />
           <UserMenu />
           <CartIcon />
