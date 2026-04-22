@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { useCart } from "@/app/_context/CartContext";
+import { useCart, cartItemKey } from "@/app/_context/CartContext";
+import { formatVariantLabel } from "@/app/_lib/variants";
 import type { Address } from "@/app/_lib/types";
 
 export default function CheckoutForm({
@@ -55,7 +56,7 @@ export default function CheckoutForm({
             price: i.price,
             quantity: i.quantity,
             image: i.image,
-            variant: i.variant,
+            variantValues: i.variantValues,
           })),
           email,
           fullName,
@@ -194,7 +195,7 @@ export default function CheckoutForm({
 
           <div className="flex flex-col gap-4 max-h-64 overflow-y-auto">
             {items.map((item) => {
-              const key = item.id + (item.variant ?? "");
+              const key = cartItemKey(item.id, item.variantValues);
               return (
                 <div key={key} className="flex gap-3">
                   <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-stone-100 dark:bg-stone-800 shrink-0">
@@ -212,6 +213,11 @@ export default function CheckoutForm({
                     <p className="font-semibold text-[var(--fg)] truncate">
                       {item.name}
                     </p>
+                    {item.variantValues && (
+                      <p className="text-[11px] text-[var(--muted)] truncate">
+                        {formatVariantLabel(item.variantValues)}
+                      </p>
+                    )}
                     <p className="text-xs text-[var(--muted)]">
                       {item.quantity} ×{" "}
                       {item.price.toLocaleString("pl-PL")} zł

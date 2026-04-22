@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useCart } from "@/app/_context/CartContext";
+import { useCart, cartItemKey } from "@/app/_context/CartContext";
+import { formatVariantLabel } from "@/app/_lib/variants";
 
 export default function KoszykPage() {
   const { items, total, count, remove, updateQty, clear } = useCart();
@@ -53,7 +54,7 @@ export default function KoszykPage() {
         {/* Lista produktów */}
         <div className="lg:col-span-2 flex flex-col gap-6">
           {items.map((item) => {
-            const key = item.id + (item.variant ?? "");
+            const key = cartItemKey(item.id, item.variantValues);
             return (
               <div
                 key={key}
@@ -85,9 +86,9 @@ export default function KoszykPage() {
                       {item.name}
                     </p>
                   </Link>
-                  {item.variant && (
+                  {item.variantValues && (
                     <p className="text-xs text-[var(--muted)] mb-3">
-                      Wariant: {item.variant}
+                      {formatVariantLabel(item.variantValues)}
                     </p>
                   )}
 
@@ -97,8 +98,8 @@ export default function KoszykPage() {
                       <button
                         onClick={() =>
                           item.quantity > 1
-                            ? updateQty(item.id, item.quantity - 1, item.variant)
-                            : remove(item.id, item.variant)
+                            ? updateQty(item.id, item.quantity - 1, item.variantValues)
+                            : remove(item.id, item.variantValues)
                         }
                         className="w-5 h-5 flex items-center justify-center text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors font-bold"
                       >
@@ -109,7 +110,7 @@ export default function KoszykPage() {
                       </span>
                       <button
                         onClick={() =>
-                          updateQty(item.id, item.quantity + 1, item.variant)
+                          updateQty(item.id, item.quantity + 1, item.variantValues)
                         }
                         className="w-5 h-5 flex items-center justify-center text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors font-bold"
                       >
@@ -122,7 +123,7 @@ export default function KoszykPage() {
                         {(item.price * item.quantity).toLocaleString("pl-PL")} zł
                       </p>
                       <button
-                        onClick={() => remove(item.id, item.variant)}
+                        onClick={() => remove(item.id, item.variantValues)}
                         className="text-[var(--muted)] hover:text-red-500 transition-colors"
                         aria-label="Usuń"
                       >

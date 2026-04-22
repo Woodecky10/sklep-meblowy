@@ -4,7 +4,12 @@ import type { Address, Order, OrderItem } from "./types";
 type CreateOrderInput = {
   userId: string | null;
   guestEmail: string | null;
-  items: { product_id: string; quantity: number; price: number }[];
+  items: {
+    product_id: string;
+    quantity: number;
+    price: number;
+    variant_values?: Record<string, string> | null;
+  }[];
   total: number;
   shippingAddress: Address;
 };
