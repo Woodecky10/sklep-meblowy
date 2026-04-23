@@ -1,6 +1,6 @@
 "use client";
 
-import { useCart } from "@/app/_context/CartContext";
+import { useCart, cartItemKey } from "@/app/_context/CartContext";
 import type { Product } from "@/app/_lib/types";
 
 type Props = {
@@ -21,12 +21,18 @@ export default function AddToCartButton({
   currentStock,
   needsVariant,
 }: Props) {
-  const { add } = useCart();
+  const { add, items } = useCart();
 
   const hasSelection = selectedValues && Object.keys(selectedValues).length > 0;
   const price = currentPrice ?? product.price;
   const stock = currentStock ?? product.stock;
-  const disabled = stock === 0 || !!needsVariant;
+
+  // Ile sztuk tej kombinacji (lub produktu bez wariantów) jest już w koszyku.
+  const key = cartItemKey(product.id, hasSelection ? selectedValues : undefined);
+  const inCart =
+    items.find((i) => cartItemKey(i.id, i.variantValues) === key)?.quantity ?? 0;
+  const limitReached = inCart >= stock;
+  const disabled = stock === 0 || !!needsVariant || limitReached;
 
   function handleAdd() {
     if (disabled) return;
@@ -44,7 +50,7 @@ export default function AddToCartButton({
     return (
       <button
         onClick={handleAdd}
-        disabled={product.stock === 0}
+        disabled={product.stock === 0 || limitReached}
         className="w-9 h-9 flex items-center justify-center rounded-full bg-[var(--color-navy)] text-white hover:bg-[var(--color-gold)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         aria-label="Dodaj do koszyka"
       >
@@ -59,6 +65,8 @@ export default function AddToCartButton({
     ? "Wybierz wariant"
     : stock === 0
     ? "Wyprzedane"
+    : limitReached
+    ? `Masz w koszyku ${inCart} z ${stock}`
     : "Dodaj do koszyka";
 
   return (
