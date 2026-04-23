@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { COMPANY, formatFullAddress } from "@/app/_lib/company";
+import { COMPANY, formatFullAddress, isFilled } from "@/app/_lib/company";
 
 export const metadata: Metadata = {
   title: "Regulamin sklepu",
@@ -26,7 +26,7 @@ export default function RegulaminPage() {
         <li>
           Właścicielem Sklepu jest <strong>{COMPANY.legalName}</strong> z siedzibą pod adresem{" "}
           {formatFullAddress()}, NIP: {COMPANY.nip}
-          {COMPANY.regon !== "DO UZUPEŁNIENIA" && <>, REGON: {COMPANY.regon}</>}
+          {isFilled(COMPANY.regon) && <>, REGON: {COMPANY.regon}</>}
           {COMPANY.krs && <>, KRS: {COMPANY.krs}</>}
           {" "}(dalej: „Sprzedawca").
         </li>

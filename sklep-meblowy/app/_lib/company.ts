@@ -43,6 +43,15 @@ export const COMPANY = {
   foundedYear: 2026,
 } as const;
 
+// Helper — czy pole zostało uzupełnione (nie jest placeholder-em).
+// Przyjmuje argument jako `string`, żeby TypeScript nie zawęził typu do
+// literału (przy `as const` na obiekcie COMPANY).
+export function isFilled(v: string | null | undefined): boolean {
+  if (!v) return false;
+  const s: string = v;
+  return !s.startsWith("DO UZUPEŁNIENIA");
+}
+
 // Sformatowany pełny adres – używany w regulaminie i polityce prywatności
 export function formatFullAddress(): string {
   const a = COMPANY.address;
@@ -56,7 +65,7 @@ export function formatCompanyHeader(): string {
     formatFullAddress(),
     `NIP: ${COMPANY.nip}`,
   ];
-  if (COMPANY.regon !== "DO UZUPEŁNIENIA") parts.push(`REGON: ${COMPANY.regon}`);
+  if (isFilled(COMPANY.regon)) parts.push(`REGON: ${COMPANY.regon}`);
   if (COMPANY.krs) parts.push(`KRS: ${COMPANY.krs}`);
   return parts.join(" | ");
 }

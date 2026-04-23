@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { COMPANY, formatFullAddress } from "@/app/_lib/company";
+import { COMPANY, formatFullAddress, isFilled } from "@/app/_lib/company";
 
 export const metadata: Metadata = {
   title: "Kontakt",
@@ -136,7 +136,7 @@ export default function KontaktPage() {
           <strong>{COMPANY.legalName}</strong>
         </li>
         <li>NIP: {COMPANY.nip}</li>
-        {COMPANY.regon !== "DO UZUPEŁNIENIA" && <li>REGON: {COMPANY.regon}</li>}
+        {isFilled(COMPANY.regon) && <li>REGON: {COMPANY.regon}</li>}
         {COMPANY.krs && <li>KRS: {COMPANY.krs}</li>}
         <li>{formatFullAddress()}</li>
       </ul>

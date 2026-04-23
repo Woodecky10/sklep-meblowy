@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { SECTIONS, getCategoriesBySection } from "@/app/_lib/categories";
-import { COMPANY } from "@/app/_lib/company";
+import { COMPANY, isFilled } from "@/app/_lib/company";
 
 const INFO_LINKS: [string, string][] = [
   ["Moje konto", "/konto"],
@@ -73,7 +73,7 @@ export default function Footer() {
 
       <div className="border-t border-white/10 py-6 text-center text-xs text-white/40 px-6">
         © {new Date().getFullYear()} {COMPANY.brandName}. Wszelkie prawa zastrzeżone.
-        {COMPANY.nip !== "DO UZUPEŁNIENIA" && (
+        {isFilled(COMPANY.nip) && (
           <>
             {" "}
             | NIP: {COMPANY.nip}
