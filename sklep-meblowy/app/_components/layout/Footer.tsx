@@ -1,5 +1,16 @@
 import Link from "next/link";
 import { SECTIONS, getCategoriesBySection } from "@/app/_lib/categories";
+import { COMPANY, isFilled } from "@/app/_lib/company";
+
+const INFO_LINKS: [string, string][] = [
+  ["Moje konto", "/konto"],
+  ["Historia zamówień", "/konto/zamowienia"],
+  ["Dostawa i płatności", "/dostawa"],
+  ["Zwroty i reklamacje", "/zwroty"],
+  ["Kontakt", "/kontakt"],
+  ["Regulamin", "/regulamin"],
+  ["Polityka prywatności", "/prywatnosc"],
+];
 
 export default function Footer() {
   return (
@@ -7,11 +18,20 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-6 py-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
         <div>
           <p className="font-display text-2xl font-bold mb-4">
-            Meble<span className="text-[var(--color-gold)]">Premium</span>
+            {COMPANY.brandName}
           </p>
-          <p className="text-sm text-white/60 leading-relaxed max-w-xs">
+          <p className="text-sm text-white/60 leading-relaxed max-w-xs mb-4">
             Tworzymy przestrzenie, w których chce się żyć. Meble najwyższej
             jakości, z pasją do detalu.
+          </p>
+          <p className="text-xs text-white/40 leading-relaxed">
+            {COMPANY.email}
+            {COMPANY.phone && (
+              <>
+                <br />
+                {COMPANY.phone}
+              </>
+            )}
           </p>
         </div>
 
@@ -40,12 +60,7 @@ export default function Footer() {
             Informacje
           </p>
           <ul className="space-y-3 text-sm text-white/70">
-            {[
-              ["Moje konto", "/konto"],
-              ["Historia zamówień", "/konto/zamowienia"],
-              ["Polityka prywatności", "/prywatnosc"],
-              ["Regulamin", "/regulamin"],
-            ].map(([label, href]) => (
+            {INFO_LINKS.map(([label, href]) => (
               <li key={href}>
                 <Link href={href} className="hover:text-[var(--color-gold)] transition-colors">
                   {label}
@@ -56,8 +71,14 @@ export default function Footer() {
         </div>
       </div>
 
-      <div className="border-t border-white/10 py-6 text-center text-xs text-white/40">
-        © {new Date().getFullYear()} MeblePremium. Wszelkie prawa zastrzeżone.
+      <div className="border-t border-white/10 py-6 text-center text-xs text-white/40 px-6">
+        © {new Date().getFullYear()} {COMPANY.brandName}. Wszelkie prawa zastrzeżone.
+        {isFilled(COMPANY.nip) && (
+          <>
+            {" "}
+            | NIP: {COMPANY.nip}
+          </>
+        )}
       </div>
     </footer>
   );

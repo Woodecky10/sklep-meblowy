@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "./_components/layout/ThemeProvider";
 import Navbar from "./_components/layout/Navbar";
 import Footer from "./_components/layout/Footer";
+import CookieBanner from "./_components/layout/CookieBanner";
 import { CartProvider } from "./_context/CartContext";
 
 const inter = Inter({
@@ -48,6 +49,7 @@ export default function RootLayout({
             <Navbar />
             <main className="flex-1">{children}</main>
             <Footer />
+            <CookieBanner />
           </CartProvider>
         </ThemeProvider>
       </body>
