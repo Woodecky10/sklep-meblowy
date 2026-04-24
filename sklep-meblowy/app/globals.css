@@ -1,22 +1,29 @@
 @import "tailwindcss";
 
+/* Tailwind v4 domyślnie bazuje na `prefers-color-scheme`. Zmieniamy na class
+   strategy, zgodną z naszym ThemeProvider (toggle klasą .dark na <html>). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --color-navy: #1a1a2e;
   --color-navy-light: #16213e;
   --color-gold: #c9a84c;
   --color-gold-light: #e0c070;
-  --color-cream: #faf8f5;
+  --color-cream: #ece4d7;
 
   --font-sans: var(--font-inter);
   --font-display: var(--font-playfair);
 }
 
 :root {
-  --bg: #faf8f5;
+  /* --bg: identyczny z kolorem tła loga (#ECE4D7) — logo „wtapia się" w stronę */
+  --bg: #ece4d7;
   --fg: #1a1a2e;
-  --card-bg: #ffffff;
-  --border: #e8e3dc;
-  --muted: #6b6560;
+  /* --card-bg: delikatnie jaśniejszy od --bg, żeby karty, navbar i modale
+     nadal wyraźnie się wyróżniały od tła strony, ale nie były jaskrawo białe */
+  --card-bg: #f7f1e6;
+  --border: #d2c5ab;
+  --muted: #5a544e;
 }
 
 .dark {

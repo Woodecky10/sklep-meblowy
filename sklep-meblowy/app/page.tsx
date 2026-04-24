@@ -11,24 +11,32 @@ const categories = [
     slug: "sofy",
     description: "Komfort i elegancja w każdym salonie",
     bg: "bg-stone-100 dark:bg-stone-900",
+    title: "text-stone-900 dark:text-stone-100",
+    desc: "text-stone-700 dark:text-stone-300",
   },
   {
     name: "Łóżka tapicerowane",
     slug: "lozko-tapicerowane",
     description: "Sypialnia marzeń, sen doskonały",
     bg: "bg-slate-100 dark:bg-slate-900",
+    title: "text-slate-900 dark:text-slate-100",
+    desc: "text-slate-700 dark:text-slate-300",
   },
   {
     name: "Fotele",
     slug: "fotele",
     description: "Twój kąt relaksu i inspiracji",
     bg: "bg-amber-50 dark:bg-amber-950",
+    title: "text-amber-950 dark:text-amber-50",
+    desc: "text-amber-800 dark:text-amber-200",
   },
   {
     name: "Pufy",
     slug: "pufy",
     description: "Styl i wszechstronność w jednym",
     bg: "bg-rose-50 dark:bg-rose-950",
+    title: "text-rose-950 dark:text-rose-50",
+    desc: "text-rose-800 dark:text-rose-200",
   },
 ];
 
@@ -123,10 +131,12 @@ export default function HomePage() {
               href={`/sklep?kategoria=${cat.slug}`}
               className={`group ${cat.bg} rounded-2xl p-8 flex flex-col gap-3 hover:ring-2 hover:ring-[var(--color-gold)] transition-all`}
             >
-              <span className="font-display text-2xl font-bold text-[var(--fg)] group-hover:text-[var(--color-gold)] transition-colors">
+              <span
+                className={`font-display text-2xl font-bold ${cat.title} group-hover:text-[var(--color-gold)] transition-colors`}
+              >
                 {cat.name}
               </span>
-              <span className="text-sm text-[var(--muted)] leading-snug">
+              <span className={`text-sm ${cat.desc} leading-snug`}>
                 {cat.description}
               </span>
               <span className="mt-auto text-xs font-sans uppercase tracking-widest text-[var(--color-gold)] flex items-center gap-1">

@@ -1,38 +1,30 @@
 "use client";
 
-import { useCart, cartItemKey } from "@/app/_context/CartContext";
+import { useCart } from "@/app/_context/CartContext";
 import type { Product } from "@/app/_lib/types";
 
 type Props = {
   product: Product;
   compact?: boolean;
   selectedValues?: Record<string, string>;
-  // Cena/stock zależne od wariantu — przekazane z ProductActions; w trybie compact (karta listy) brak.
   currentPrice?: number;
-  currentStock?: number;
   needsVariant?: boolean;
 };
 
+// Meble robione na zamówienie — brak limitów sztuk. Walidujemy tylko
+// kompletność wyboru wariantu (jeśli produkt ma opcje).
 export default function AddToCartButton({
   product,
   compact,
   selectedValues,
   currentPrice,
-  currentStock,
   needsVariant,
 }: Props) {
-  const { add, items } = useCart();
+  const { add } = useCart();
 
   const hasSelection = selectedValues && Object.keys(selectedValues).length > 0;
   const price = currentPrice ?? product.price;
-  const stock = currentStock ?? product.stock;
-
-  // Ile sztuk tej kombinacji (lub produktu bez wariantów) jest już w koszyku.
-  const key = cartItemKey(product.id, hasSelection ? selectedValues : undefined);
-  const inCart =
-    items.find((i) => cartItemKey(i.id, i.variantValues) === key)?.quantity ?? 0;
-  const limitReached = inCart >= stock;
-  const disabled = stock === 0 || !!needsVariant || limitReached;
+  const disabled = !!needsVariant;
 
   function handleAdd() {
     if (disabled) return;
@@ -50,8 +42,7 @@ export default function AddToCartButton({
     return (
       <button
         onClick={handleAdd}
-        disabled={product.stock === 0 || limitReached}
-        className="w-9 h-9 flex items-center justify-center rounded-full bg-[var(--color-navy)] text-white hover:bg-[var(--color-gold)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="w-9 h-9 flex items-center justify-center rounded-full bg-[var(--color-navy)] text-white hover:bg-[var(--color-gold)] transition-colors"
         aria-label="Dodaj do koszyka"
       >
         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -61,13 +52,7 @@ export default function AddToCartButton({
     );
   }
 
-  const label = needsVariant
-    ? "Wybierz wariant"
-    : stock === 0
-    ? "Wyprzedane"
-    : limitReached
-    ? `Masz w koszyku ${inCart} z ${stock}`
-    : "Dodaj do koszyka";
+  const label = needsVariant ? "Wybierz wariant" : "Dodaj do koszyka";
 
   return (
     <button

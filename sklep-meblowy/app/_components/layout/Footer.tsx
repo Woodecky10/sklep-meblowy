@@ -1,13 +1,15 @@
 import Link from "next/link";
+import Image from "next/image";
 import { SECTIONS, getCategoriesBySection } from "@/app/_lib/categories";
 import { COMPANY, isFilled } from "@/app/_lib/company";
 
 const INFO_LINKS: [string, string][] = [
+  ["O nas", "/o-nas"],
+  ["Kontakt", "/kontakt"],
   ["Moje konto", "/konto"],
   ["Historia zamówień", "/konto/zamowienia"],
   ["Dostawa i płatności", "/dostawa"],
   ["Zwroty i reklamacje", "/zwroty"],
-  ["Kontakt", "/kontakt"],
   ["Regulamin", "/regulamin"],
   ["Polityka prywatności", "/prywatnosc"],
 ];
@@ -17,9 +19,18 @@ export default function Footer() {
     <footer className="bg-[var(--color-navy)] text-white mt-24">
       <div className="max-w-7xl mx-auto px-6 py-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
         <div>
-          <p className="font-display text-2xl font-bold mb-4">
-            {COMPANY.brandName}
-          </p>
+          <div className="flex items-center gap-3 mb-4">
+            <Image
+              src="/logo-mark.svg"
+              alt=""
+              width={48}
+              height={48}
+              className="w-12 h-12"
+            />
+            <p className="font-display text-2xl font-bold">
+              {COMPANY.brandName}
+            </p>
+          </div>
           <p className="text-sm text-white/60 leading-relaxed max-w-xs mb-4">
             Tworzymy przestrzenie, w których chce się żyć. Meble najwyższej
             jakości, z pasją do detalu.

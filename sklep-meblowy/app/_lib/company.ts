@@ -27,8 +27,8 @@ export const COMPANY = {
 
   // Kontakt z klientami
   email: "mollien.shop@gmail.com",
-  // Format: "+48 XXX XXX XXX" — lub null jeśli nie chcesz podawać
-  phone: null as string | null,
+  // Format: "+48 XXX XXX XXX" — wymyślony do czasu uzyskania rzeczywistego numeru
+  phone: "+48 600 123 456" as string | null,
 
   // Godziny kontaktu (wyświetlane w /kontakt)
   contactHours: "pon.–pt., 9:00–17:00",

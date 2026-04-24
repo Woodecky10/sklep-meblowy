@@ -1,10 +1,17 @@
 import Link from "next/link";
 import Image from "next/image";
-import type { Product } from "@/app/_lib/types";
+import type { Product, ProductRating } from "@/app/_lib/types";
 import { getCategoryLabel } from "@/app/_lib/categories";
 import AddToCartButton from "./AddToCartButton";
+import StarRating from "./StarRating";
 
-export default function ProductCard({ product }: { product: Product }) {
+export default function ProductCard({
+  product,
+  rating,
+}: {
+  product: Product;
+  rating?: ProductRating;
+}) {
   const image = product.images?.[0];
 
   return (
@@ -24,11 +31,9 @@ export default function ProductCard({ product }: { product: Product }) {
               Brak zdjęcia
             </div>
           )}
-          {product.stock === 0 && (
-            <span className="absolute top-4 left-4 px-3 py-1 bg-black/70 text-white text-xs font-sans rounded-full">
-              Wyprzedane
-            </span>
-          )}
+          <span className="absolute top-4 left-4 px-3 py-1 bg-[var(--color-gold)] text-[var(--color-navy)] text-[10px] font-sans font-semibold uppercase tracking-widest rounded-full">
+            Na zamówienie
+          </span>
         </div>
       </Link>
 
@@ -40,6 +45,12 @@ export default function ProductCard({ product }: { product: Product }) {
           {product.name}
         </p>
       </Link>
+      {rating && rating.count > 0 && (
+        <div className="flex items-center gap-2 mb-2">
+          <StarRating value={rating.average} size={12} />
+          <span className="text-xs text-[var(--muted)]">({rating.count})</span>
+        </div>
+      )}
       <div className="flex items-center justify-between mt-auto">
         <p className="font-sans font-bold text-[var(--fg)]">
           {product.price.toLocaleString("pl-PL")} zł
