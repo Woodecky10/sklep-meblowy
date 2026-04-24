@@ -1,11 +1,12 @@
 import Link from "next/link";
 
 const LEGAL_LINKS: { href: string; label: string }[] = [
-  { href: "/regulamin", label: "Regulamin" },
-  { href: "/prywatnosc", label: "Polityka prywatności" },
+  { href: "/o-nas", label: "O nas" },
+  { href: "/kontakt", label: "Kontakt" },
   { href: "/dostawa", label: "Dostawa i płatności" },
   { href: "/zwroty", label: "Zwroty i reklamacje" },
-  { href: "/kontakt", label: "Kontakt" },
+  { href: "/regulamin", label: "Regulamin" },
+  { href: "/prywatnosc", label: "Polityka prywatności" },
 ];
 
 export default function LegalLayout({ children }: { children: React.ReactNode }) {

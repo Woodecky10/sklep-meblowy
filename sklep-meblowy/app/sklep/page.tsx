@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { getProducts, getFilterFacets } from "@/app/_lib/products";
+import { getRatingsForProducts } from "@/app/_lib/reviews";
 import type { Category } from "@/app/_lib/types";
 import { getCategoryLabel, isCategorySlug } from "@/app/_lib/categories";
 import ProductCard from "@/app/_components/ui/ProductCard";
@@ -58,6 +59,9 @@ export default async function SklepPage({
     getFilterFacets(),
   ]);
 
+  // Batch pobrania ocen — jedno zapytanie dla całej strony list.
+  const ratings = await getRatingsForProducts(products.map((p) => p.id));
+
   // Zachowaj wszystkie aktywne filtry w linkach paginacji
   const rawParams: Record<string, string> = {};
   if (sp.kategoria) rawParams.kategoria = sp.kategoria;
@@ -99,7 +103,11 @@ export default async function SklepPage({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {products.map((product) => (
-            <ProductCard key={product.id} product={product} />
+            <ProductCard
+              key={product.id}
+              product={product}
+              rating={ratings.get(product.id)}
+            />
           ))}
         </div>
       )}

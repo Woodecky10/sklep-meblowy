@@ -91,6 +91,23 @@ export type OrderItem = {
   product?: Product;
 };
 
+export type ProductReview = {
+  id: string;
+  product_id: string;
+  user_id: string;
+  rating: 1 | 2 | 3 | 4 | 5;
+  comment: string | null;
+  created_at: string;
+  updated_at: string;
+  // Dołączane przez getReviewsForProduct — imię autora z profiles.full_name.
+  author_name?: string | null;
+};
+
+export type ProductRating = {
+  average: number; // 0..5
+  count: number;
+};
+
 type OrderInsert = {
   user_id?: string | null;
   guest_email?: string | null;

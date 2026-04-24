@@ -13,7 +13,7 @@ export default function MobileMenu({ isLoggedIn = false }: { isLoggedIn?: boolea
     <>
       <button
         onClick={() => setOpen(!open)}
-        className="md:hidden w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--fg)]"
+        className="lg:hidden w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--fg)]"
         aria-label="Menu"
       >
         {open ? (
@@ -27,7 +27,7 @@ export default function MobileMenu({ isLoggedIn = false }: { isLoggedIn?: boolea
         )}
       </button>
       {open && (
-        <div className="absolute top-full left-0 right-0 bg-[var(--card-bg)] border-b border-[var(--border)] shadow-lg md:hidden">
+        <div className="absolute top-full left-0 right-0 bg-[var(--card-bg)] border-b border-[var(--border)] shadow-lg lg:hidden">
           <nav className="flex flex-col px-6 py-4 gap-3">
             {SECTIONS.map((section) => {
               const cats = getCategoriesBySection(section.slug);
@@ -70,6 +70,20 @@ export default function MobileMenu({ isLoggedIn = false }: { isLoggedIn?: boolea
                 </div>
               );
             })}
+            <Link
+              href="/o-nas"
+              onClick={() => setOpen(false)}
+              className="font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors py-1"
+            >
+              O nas
+            </Link>
+            <Link
+              href="/kontakt"
+              onClick={() => setOpen(false)}
+              className="font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors py-1"
+            >
+              Kontakt
+            </Link>
             <div className="border-t border-[var(--border)] pt-4 mt-2 flex flex-col gap-4">
               {isLoggedIn ? (
                 <>

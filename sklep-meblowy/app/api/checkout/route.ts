@@ -83,6 +83,8 @@ export async function POST(request: NextRequest) {
       let unitPrice = Number(product.price);
       let variantValues: Record<string, string> | null = null;
 
+      // Meble robione na zamówienie — walidujemy tylko kompletność wyboru
+      // wariantu (nie stany magazynowe).
       if (hasVariants(product)) {
         if (
           !item.variantValues ||
@@ -96,27 +98,12 @@ export async function POST(request: NextRequest) {
         const variant = findVariant(product, item.variantValues);
         if (!variant) {
           return NextResponse.json(
-            { error: `Niedostępna kombinacja wariantu dla: ${product.name}` },
-            { status: 400 }
-          );
-        }
-        if (variant.stock < item.quantity) {
-          return NextResponse.json(
-            {
-              error: `Brak wystarczającej ilości dla: ${product.name} (${formatVariantLabel(item.variantValues)})`,
-            },
+            { error: `Nieprawidłowy wariant dla: ${product.name}` },
             { status: 400 }
           );
         }
         unitPrice += variant.price_modifier ?? 0;
         variantValues = item.variantValues;
-      } else {
-        if (product.stock < item.quantity) {
-          return NextResponse.json(
-            { error: `Brak wystarczającej ilości: ${product.name}` },
-            { status: 400 }
-          );
-        }
       }
 
       total += unitPrice * item.quantity;
