@@ -6,6 +6,7 @@ import TopBar from "./_components/layout/TopBar";
 import Navbar from "./_components/layout/Navbar";
 import Footer from "./_components/layout/Footer";
 import CookieBanner from "./_components/layout/CookieBanner";
+import CartToast from "./_components/layout/CartToast";
 import { CartProvider } from "./_context/CartContext";
 import { COMPANY } from "./_lib/company";
 
@@ -60,6 +61,7 @@ export default function RootLayout({
             <main className="flex-1">{children}</main>
             <Footer />
             <CookieBanner />
+            <CartToast />
           </CartProvider>
         </ThemeProvider>
       </body>

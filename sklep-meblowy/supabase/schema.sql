@@ -46,7 +46,8 @@ create table if not exists public.products (
   description text not null default '',
   price       numeric(10, 2) not null check (price >= 0),
   category    text not null check (category in (
-    'sofy', 'naroznik-l', 'naroznik-u', 'fotele', 'pufy',
+    'sofa-2-osobowa', 'sofa-3-osobowa',
+    'naroznik-l', 'naroznik-u', 'fotele', 'pufy', 'zestawy',
     'lozko-kontynentalne', 'lozko-tapicerowane', 'materace'
   )),
   images      text[] not null default '{}',
@@ -174,7 +175,7 @@ insert into public.products (name, description, price, category, images, stock, 
   (
     'Sofa Velvet Midnight',
     'Luksusowa sofa tapicerowana aksamitem w kolorze głębokiego granatu. Rama z litego dębu, poduszki wypełnione puchem. Idealna do eleganckich salonów.',
-    4299.00, 'sofy',
+    4299.00, 'sofa-3-osobowa',
     array['https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800'],
     8,
     '[{"name":"Kolor","value":"Granat"},{"name":"Kolor","value":"Szary"},{"name":"Kolor","value":"Beż"}]'::jsonb
@@ -182,7 +183,7 @@ insert into public.products (name, description, price, category, images, stock, 
   (
     'Sofa Porto Modular',
     'Modułowa sofa narożna z możliwością konfiguracji. Tkanina odporna na zabrudzenia, idealna dla rodzin z dziećmi.',
-    6799.00, 'sofy',
+    6799.00, 'naroznik-l',
     array['https://images.unsplash.com/photo-1567016432779-094069958ea5?w=800'],
     4, null
   ),

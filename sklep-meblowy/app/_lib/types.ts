@@ -43,6 +43,7 @@ export type Product = {
   delivery_time: string | null;
   warranty: string | null;
   variants: ProductVariants | null;
+  baselinker_id: string | null;
   created_at: string;
 };
 
@@ -59,6 +60,11 @@ export type Address = {
   city: string;
   postal_code: string;
   country: string;
+  // Imię i nazwisko adresata (potrzebne dla BaseLinker / kuriera).
+  // Optional, bo stare zamówienia w DB go nie mają.
+  fullname?: string;
+  // Telefon kontaktowy (opcjonalny).
+  phone?: string;
 };
 
 export type OrderStatus =

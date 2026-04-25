@@ -65,6 +65,7 @@ export default function CheckoutForm({
             city,
             postal_code: postalCode,
             country,
+            fullname: fullName,
           },
         }),
       });
