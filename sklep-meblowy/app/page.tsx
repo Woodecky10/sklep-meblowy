@@ -7,8 +7,8 @@ export const metadata: Metadata = {
 
 const categories = [
   {
-    name: "Sofy",
-    slug: "sofy",
+    name: "Sofy 3-osobowe",
+    slug: "sofa-3-osobowa",
     description: "Komfort i elegancja w każdym salonie",
     bg: "bg-stone-100 dark:bg-stone-900",
     title: "text-stone-900 dark:text-stone-100",
@@ -45,7 +45,7 @@ const featured = [
     id: "1",
     name: "Sofa Velvet Midnight",
     price: 4299,
-    category: "Sofy",
+    category: "Sofa 3-osobowa",
     badge: "Bestseller",
   },
   {

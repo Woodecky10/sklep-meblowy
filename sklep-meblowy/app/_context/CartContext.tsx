@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, useReducer, useCallback } from "react";
+import { createContext, useContext, useMemo, useReducer, useCallback, useState } from "react";
 
 export type CartItem = {
   id: string;
@@ -9,6 +9,13 @@ export type CartItem = {
   image: string;
   quantity: number;
   variantValues?: Record<string, string>;
+};
+
+// Sygnał dla CartToast — `ts` (Date.now) zmienia się przy każdym dodaniu,
+// nawet jeśli to ten sam produkt, żeby toast mógł się ponownie pokazać.
+export type CartNotification = {
+  item: CartItem;
+  ts: number;
 };
 
 type CartState = { items: CartItem[] };
@@ -83,6 +90,7 @@ type CartContextValue = {
   items: CartItem[];
   total: number;
   count: number;
+  notification: CartNotification | null;
   add: (item: CartItem) => void;
   remove: (id: string, variantValues?: Record<string, string>) => void;
   updateQty: (
@@ -91,14 +99,19 @@ type CartContextValue = {
     variantValues?: Record<string, string>
   ) => void;
   clear: () => void;
+  dismissNotification: () => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { items: [] });
+  const [notification, setNotification] = useState<CartNotification | null>(null);
 
-  const add = useCallback((item: CartItem) => dispatch({ type: "ADD", item }), []);
+  const add = useCallback((item: CartItem) => {
+    dispatch({ type: "ADD", item });
+    setNotification({ item, ts: Date.now() });
+  }, []);
   const remove = useCallback(
     (id: string, variantValues?: Record<string, string>) =>
       dispatch({ type: "REMOVE", id, variantValues }),
@@ -110,6 +123,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     []
   );
   const clear = useCallback(() => dispatch({ type: "CLEAR" }), []);
+  const dismissNotification = useCallback(() => setNotification(null), []);
 
   const value = useMemo<CartContextValue>(() => {
     const total = state.items.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -118,12 +132,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       items: state.items,
       total,
       count,
+      notification,
       add,
       remove,
       updateQty,
       clear,
+      dismissNotification,
     };
-  }, [state.items, add, remove, updateQty, clear]);
+  }, [state.items, notification, add, remove, updateQty, clear, dismissNotification]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
