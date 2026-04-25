@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { stripe } from "@/app/_lib/stripe";
 import { markOrderPaid } from "@/app/_lib/orders";
+import { pushOrderToBaseLinker } from "@/app/_lib/baselinker-orders";
 
 // Meble robione na zamówienie — nie dekrementujemy stock przy opłacie.
 // Pole `stock` w produktach zostaje w bazie na wypadek przyszłych towarów
@@ -47,6 +48,21 @@ export async function POST(request: NextRequest) {
         { error: "Błąd aktualizacji zamówienia" },
         { status: 500 }
       );
+    }
+
+    // Push do BaseLinker — best-effort, nie blokuje webhooka jeśli zawiedzie.
+    // Nieudany push można zsynchronizować później (cron w kroku sync statusów).
+    try {
+      const result = await pushOrderToBaseLinker(orderId);
+      if (result.baselinker_order_id) {
+        console.log(
+          `[BL] order ${orderId} → BaseLinker order_id=${result.baselinker_order_id}`
+        );
+      } else {
+        console.warn(`[BL] push pominięty: ${result.reason}`);
+      }
+    } catch (err) {
+      console.error("[BL] push do BaseLinker nieudany:", err);
     }
   }
 
