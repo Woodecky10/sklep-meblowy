@@ -39,10 +39,32 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Zalogowany → /logowanie i /rejestracja przekieruj na konto
-  if (user && (path === "/logowanie" || path === "/rejestracja")) {
+  // Niezalogowany → /admin/* przekieruj na logowanie z next=/admin
+  if (!user && path.startsWith("/admin")) {
     const url = request.nextUrl.clone();
-    url.pathname = "/konto";
+    url.pathname = "/logowanie";
+    url.search = "?next=/admin";
+    return NextResponse.redirect(url);
+  }
+
+  // Zalogowany ale nie admin → /admin/* przekieruj na home (defense in depth;
+  // layout admina i tak sprawdza rolę server-side w requireAdmin())
+  if (user && path.startsWith("/admin")) {
+    const role = (user.app_metadata as { role?: string } | undefined)?.role;
+    if (role !== "admin") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // Zalogowany → /logowanie i /rejestracja przekieruj
+  // Admin → /admin, zwykły user → /konto
+  if (user && (path === "/logowanie" || path === "/rejestracja")) {
+    const role = (user.app_metadata as { role?: string } | undefined)?.role;
+    const url = request.nextUrl.clone();
+    url.pathname = role === "admin" ? "/admin" : "/konto";
     url.search = "";
     return NextResponse.redirect(url);
   }

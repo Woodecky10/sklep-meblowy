@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/app/_lib/supabase/server";
+import { isAdmin } from "@/app/_lib/admin";
 import LoginForm from "./LoginForm";
 
 export const metadata = { title: "Logowanie — MeblePremium" };
@@ -11,7 +12,7 @@ export default async function LoginPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user) redirect("/konto");
+  if (user) redirect(isAdmin(user) ? "/admin" : "/konto");
 
   return (
     <div className="max-w-md mx-auto px-6 py-20">

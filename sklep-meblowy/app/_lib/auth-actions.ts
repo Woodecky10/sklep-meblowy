@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { createClient } from "./supabase/server";
 import { linkGuestOrders } from "./link-guest-orders";
+import { isAdmin } from "./admin";
 
 export type AuthState = { error?: string; info?: string } | null;
 
@@ -47,7 +48,7 @@ export async function signIn(_state: AuthState, formData: FormData): Promise<Aut
   }
 
   revalidatePath("/", "layout");
-  redirect("/konto");
+  redirect(isAdmin(user) ? "/admin" : "/konto");
 }
 
 export async function signUp(_state: AuthState, formData: FormData): Promise<AuthState> {
