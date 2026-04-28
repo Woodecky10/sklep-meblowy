@@ -1,9 +1,54 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import HomeHeroSlider, { type HeroSlide } from "./_components/layout/HomeHeroSlider";
 
 export const metadata: Metadata = {
   title: "Meble Premium | Eleganckie Meble do Twojego Domu",
 };
+
+// Slajdy hero — docelowo zastąpimy odczytem z DB (admin panel CRUD).
+// Na razie hardkod w kodzie — zmiana wymaga PR + deploy.
+const HERO_SLIDES: HeroSlide[] = [
+  {
+    id: "kolekcja-2026",
+    imageUrl:
+      "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=2000&q=80",
+    imageAlt: "Elegancka sofa w jasnym salonie premium",
+    eyebrow: "Kolekcja 2026",
+    title:
+      'Meble, które <em class="not-italic text-[var(--color-gold)]">opowiadają</em> historię',
+    subtitle:
+      "Odkryj kolekcję mebli premium, stworzonych z myślą o ludziach, którzy cenią piękno, trwałość i niepowtarzalny styl.",
+    ctaPrimary: { label: "Przeglądaj kolekcję", href: "/sklep" },
+    ctaSecondary: { label: "Nowości", href: "/sklep?sortuj=newest" },
+  },
+  {
+    id: "sypialnia-premium",
+    imageUrl:
+      "https://images.unsplash.com/photo-1505693314120-0d443867891c?w=2000&q=80",
+    imageAlt: "Luksusowa sypialnia z tapicerowanym łóżkiem",
+    eyebrow: "Sypialnia premium",
+    title:
+      'Sen, na który <em class="not-italic text-[var(--color-gold)]">zasługujesz</em>',
+    subtitle:
+      "Tapicerowane łóżka, kontynentale, materace i toppery — komfort dopracowany w każdym detalu.",
+    ctaPrimary: { label: "Zobacz łóżka", href: "/sklep?kategoria=lozko-tapicerowane" },
+    ctaSecondary: { label: "Materace", href: "/sklep?kategoria=materace" },
+  },
+  {
+    id: "narozniki-i-sofy",
+    imageUrl:
+      "https://images.unsplash.com/photo-1567016432779-094069958ea5?w=2000&q=80",
+    imageAlt: "Modułowy narożnik w nowoczesnym salonie",
+    eyebrow: "Centrum salonu",
+    title:
+      'Narożniki, w których <em class="not-italic text-[var(--color-gold)]">rodzą się</em> wspomnienia',
+    subtitle:
+      "Modułowe narożniki w kształcie L i U oraz sofy 2- i 3-osobowe — szyte na zamówienie pod Twój salon.",
+    ctaPrimary: { label: "Narożniki L", href: "/sklep?kategoria=naroznik-l" },
+    ctaSecondary: { label: "Sofy", href: "/sklep?kategoria=sofa-3-osobowa" },
+  },
+];
 
 const categories = [
   {
@@ -74,45 +119,8 @@ const featured = [
 export default function HomePage() {
   return (
     <>
-      {/* Hero */}
-      <section className="relative min-h-[80vh] flex items-center bg-[var(--color-navy)] overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-10"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(45deg, #c9a84c 0, #c9a84c 1px, transparent 0, transparent 50%)",
-            backgroundSize: "20px 20px",
-          }}
-        />
-        <div className="relative max-w-7xl mx-auto px-6 py-24">
-          <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-6">
-            Kolekcja 2025
-          </p>
-          <h1 className="font-display text-5xl md:text-7xl font-bold text-white leading-tight max-w-2xl mb-8">
-            Meble, które{" "}
-            <em className="not-italic text-[var(--color-gold)]">opowiadają</em>{" "}
-            historię
-          </h1>
-          <p className="text-white/60 text-lg max-w-lg mb-10 leading-relaxed">
-            Odkryj kolekcję mebli premium, stworzonych z myślą o ludziach,
-            którzy cenią piękno, trwałość i niepowtarzalny styl.
-          </p>
-          <div className="flex flex-wrap gap-4">
-            <Link
-              href="/sklep"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-[var(--color-gold)] text-[var(--color-navy)] font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold-light)] transition-colors"
-            >
-              Przeglądaj kolekcję
-            </Link>
-            <Link
-              href="/sklep?kategoria=nowosci"
-              className="inline-flex items-center gap-2 px-8 py-4 border border-white/30 text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
-            >
-              Nowości
-            </Link>
-          </div>
-        </div>
-      </section>
+      {/* Hero — slider z auto-rotacją (6s) i nawigacją (strzałki + kropki) */}
+      <HomeHeroSlider slides={HERO_SLIDES} />
 
       {/* Kategorie */}
       <section className="max-w-7xl mx-auto px-6 py-24">
@@ -177,7 +185,7 @@ export default function HomePage() {
                 href={`/produkt/${p.id}`}
                 className="group flex flex-col"
               >
-                <div className="relative aspect-[4/5] bg-stone-100 dark:bg-stone-800 rounded-2xl overflow-hidden mb-4">
+                <div className="relative aspect-[4/3] bg-stone-100 dark:bg-stone-800 rounded-2xl overflow-hidden mb-4">
                   {p.badge && (
                     <span className="absolute top-4 left-4 z-10 px-3 py-1 bg-[var(--color-gold)] text-[var(--color-navy)] text-xs font-sans font-bold uppercase tracking-wider rounded-full">
                       {p.badge}
