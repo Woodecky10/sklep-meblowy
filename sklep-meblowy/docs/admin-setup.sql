@@ -12,16 +12,16 @@ update auth.users
 set raw_app_meta_data =
   coalesce(raw_app_meta_data, '{}'::jsonb)
   || jsonb_build_object('role', 'admin')
-where email = 'wood19991@gmail.com';
+where email = 'miki19991@gmail.com';
 
 -- Weryfikacja:
 select email, raw_app_meta_data ->> 'role' as role
 from auth.users
-where email = 'wood19991@gmail.com';
+where email = 'miki19991@gmail.com';
 
 -- ============================================================
 -- Cofnięcie uprawnień (gdyby trzeba):
 -- ============================================================
 -- update auth.users
 -- set raw_app_meta_data = raw_app_meta_data - 'role'
--- where email = 'wood19991@gmail.com';
+-- where email = 'miki19991@gmail.com';
