@@ -9,7 +9,7 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="relative aspect-[4/5] bg-stone-100 dark:bg-stone-800 rounded-3xl overflow-hidden">
+      <div className="relative aspect-[4/3] bg-stone-100 dark:bg-stone-800 rounded-3xl overflow-hidden">
         <Image
           src={list[active]}
           alt={name}
