@@ -108,3 +108,63 @@ export async function signOut() {
   revalidatePath("/", "layout");
   redirect("/");
 }
+
+// ============================================================
+// Reset hasła
+// ============================================================
+// Flow: user wpisuje email na /zapomnialem-hasla → wysyłamy link recovery →
+// user klika link → /auth/confirm weryfikuje token i przekierowuje na
+// /reset-hasla → user ustawia nowe hasło → updateUser({ password }).
+
+export async function requestPasswordReset(
+  _state: AuthState,
+  formData: FormData
+): Promise<AuthState> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!validateEmail(email)) return { error: "Nieprawidłowy email" };
+
+  const headerList = await headers();
+  const origin = getOrigin(headerList);
+
+  const supabase = await createClient();
+  // Z kontekstu bezpieczeństwa NIE ujawniamy czy email istnieje w bazie —
+  // zawsze zwracamy ten sam komunikat (info), niezależnie od wyniku.
+  await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/confirm?next=/reset-hasla`,
+  });
+
+  return {
+    info: "Jeśli ten email jest zarejestrowany, wysłaliśmy na niego link do resetu hasła. Sprawdź skrzynkę.",
+  };
+}
+
+export async function updatePassword(
+  _state: AuthState,
+  formData: FormData
+): Promise<AuthState> {
+  const password = String(formData.get("password") ?? "");
+  const confirm = String(formData.get("confirm") ?? "");
+
+  if (password.length < 6) return { error: "Hasło musi mieć min. 6 znaków" };
+  if (password !== confirm) return { error: "Hasła nie są identyczne" };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Sesja recovery jest aktywna tylko po kliknięciu w link z maila
+  // (auth/confirm ją tworzy). Bez sesji updateUser zawiedzie.
+  if (!user) {
+    return {
+      error:
+        "Sesja resetu wygasła lub jest nieprawidłowa. Wyślij sobie nowy link z /zapomnialem-hasla.",
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) return { error: error.message };
+
+  revalidatePath("/", "layout");
+  redirect(isAdmin(user) ? "/admin" : "/konto");
+}

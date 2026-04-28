@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { signIn, signInWithGoogle, type AuthState } from "@/app/_lib/auth-actions";
 
@@ -44,9 +45,17 @@ export default function LoginForm() {
         </label>
 
         <label className="flex flex-col gap-2">
-          <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
-            Hasło
-          </span>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
+              Hasło
+            </span>
+            <Link
+              href="/zapomnialem-hasla"
+              className="text-xs font-sans text-[var(--color-gold)] hover:underline"
+            >
+              Zapomniałem hasła
+            </Link>
+          </div>
           <input
             name="password"
             type="password"
