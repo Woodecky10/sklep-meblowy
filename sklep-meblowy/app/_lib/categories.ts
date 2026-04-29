@@ -7,7 +7,7 @@
 
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
-import { createClient } from "./supabase/server";
+import { createAdminClient } from "./supabase/server";
 
 // Tag używany przez `unstable_cache` i `revalidateTag` po mutacjach z admina.
 export const CATEGORIES_CACHE_TAG = "categories";
@@ -50,9 +50,14 @@ type CategoriesData = {
 
 // `unstable_cache` cache'uje cross-request — admin po mutacji wywoła
 // `revalidateTag(CATEGORIES_CACHE_TAG)` żeby wymusić refresh.
+//
+// UWAGA: używamy `createAdminClient()` (service role, bez cookies), bo Next 16
+// zabrania użycia dynamic data sources (cookies/headers) wewnątrz `unstable_cache`.
+// Kategorie są danymi publicznymi (RLS: public read), więc bypass RLS przez
+// admin client jest tu bezpieczny.
 const fetchCategoriesData = unstable_cache(
   async (): Promise<CategoriesData> => {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
 
     const [{ data: groups }, { data: categories }] = await Promise.all([
       supabase
