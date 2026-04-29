@@ -34,11 +34,12 @@ export default async function ProduktPage({ params }: Props) {
   const product = await getProduct(id);
   if (!product) notFound();
 
-  const [related, rating, reviews, reviewStatus] = await Promise.all([
+  const [related, rating, reviews, reviewStatus, categoryLabel] = await Promise.all([
     getRelatedProducts(product.id, product.category),
     getProductRating(product.id),
     getReviewsForProduct(product.id),
     getReviewStatus(product.id),
+    getCategoryLabel(product.category),
   ]);
 
   const details: { label: string; value: string }[] = [];
@@ -80,7 +81,7 @@ export default async function ProduktPage({ params }: Props) {
           href={`/sklep?kategoria=${product.category}`}
           className="hover:text-[var(--color-gold)] transition-colors"
         >
-          {getCategoryLabel(product.category) ?? product.category}
+          {categoryLabel ?? product.category}
         </a>
         <span>/</span>
         <span className="text-[var(--fg)] normal-case tracking-normal">{product.name}</span>
@@ -93,7 +94,7 @@ export default async function ProduktPage({ params }: Props) {
         <div className="flex flex-col gap-8">
           <div>
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-3">
-              {getCategoryLabel(product.category) ?? product.category}
+              {categoryLabel ?? product.category}
             </p>
             <h1 className="font-display text-4xl font-bold text-[var(--fg)] leading-tight mb-4">
               {product.name}

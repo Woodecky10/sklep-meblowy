@@ -1,0 +1,577 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import type { Section, CategoryDef } from "@/app/_lib/categories";
+import {
+  createGroup,
+  updateGroup,
+  deleteGroup,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  type ActionResult,
+} from "./actions";
+
+type Props = {
+  sections: Section[];
+  categories: CategoryDef[];
+  productCounts: Record<string, number>;
+};
+
+type Toast = { type: "success" | "error"; message: string } | null;
+
+export default function KategorieEditor({
+  sections,
+  categories,
+  productCounts,
+}: Props) {
+  const [toast, setToast] = useState<Toast>(null);
+  const [openGroupForm, setOpenGroupForm] = useState<string | null>(null);
+  const [openCategoryForm, setOpenCategoryForm] = useState<string | null>(null);
+  const [openNewCategoryForGroup, setOpenNewCategoryForGroup] = useState<string | null>(null);
+  const [openNewGroup, setOpenNewGroup] = useState(false);
+
+  function showToast(t: Toast) {
+    setToast(t);
+    if (t) setTimeout(() => setToast(null), 4000);
+  }
+
+  function handleResult(result: ActionResult, onSuccess?: () => void) {
+    if (result.ok) {
+      showToast({ type: "success", message: result.message ?? "Zapisano" });
+      onSuccess?.();
+    } else {
+      showToast({ type: "error", message: result.error });
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+            Mollien
+          </p>
+          <h1 className="font-display text-4xl font-bold text-[var(--fg)]">
+            Kategorie
+          </h1>
+          <p className="text-sm text-[var(--muted)] mt-2 max-w-2xl">
+            Zarządzaj grupami i kategoriami widocznymi w nawigacji sklepu.
+            Zmiany zapisują się od razu — sklep odświeży się przy następnej wizycie klienta.
+          </p>
+        </div>
+        <button
+          onClick={() => setOpenNewGroup(true)}
+          className="shrink-0 px-5 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
+        >
+          + Nowa grupa
+        </button>
+      </div>
+
+      {toast && <ToastView toast={toast} onClose={() => setToast(null)} />}
+
+      {/* Formularz nowej grupy */}
+      {openNewGroup && (
+        <Card>
+          <GroupForm
+            mode="create"
+            onCancel={() => setOpenNewGroup(false)}
+            onSubmit={async (fd) => {
+              const res = await createGroup(fd);
+              handleResult(res, () => setOpenNewGroup(false));
+            }}
+          />
+        </Card>
+      )}
+
+      {/* Lista grup z kategoriami */}
+      {sections.length === 0 ? (
+        <EmptyState message="Brak grup. Dodaj pierwszą żeby zacząć." />
+      ) : (
+        <div className="flex flex-col gap-6">
+          {sections.map((section) => {
+            const sectionCategories = categories.filter(
+              (c) => c.group_id === section.id
+            );
+            return (
+              <Card key={section.id}>
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div>
+                    <h2 className="font-display text-xl font-semibold text-[var(--fg)] flex items-center gap-3">
+                      {section.label}
+                      {!section.active && (
+                        <span className="px-2 py-0.5 bg-stone-200 dark:bg-stone-800 text-[var(--muted)] text-[10px] font-sans uppercase tracking-widest rounded-full">
+                          ukryta
+                        </span>
+                      )}
+                    </h2>
+                    <p className="text-xs font-sans text-[var(--muted)] mt-1">
+                      slug: <code>{section.slug}</code> · kolejność: {section.sort_order} ·{" "}
+                      {sectionCategories.length} kategorii
+                    </p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() =>
+                        setOpenGroupForm(openGroupForm === section.id ? null : section.id)
+                      }
+                      className="px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--border)] text-[var(--fg)] rounded-full hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
+                    >
+                      Edytuj
+                    </button>
+                    <DeleteButton
+                      label="Usuń"
+                      confirmMessage={`Usunąć grupę "${section.label}"? Tej operacji nie da się cofnąć.`}
+                      onConfirm={async () => {
+                        const fd = new FormData();
+                        fd.set("id", section.id);
+                        const res = await deleteGroup(fd);
+                        handleResult(res);
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Edycja istniejącej grupy */}
+                {openGroupForm === section.id && (
+                  <div className="mb-4 p-4 bg-[var(--bg)] border border-[var(--border)] rounded-xl">
+                    <GroupForm
+                      mode="update"
+                      initial={section}
+                      onCancel={() => setOpenGroupForm(null)}
+                      onSubmit={async (fd) => {
+                        const res = await updateGroup(fd);
+                        handleResult(res, () => setOpenGroupForm(null));
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Lista kategorii w grupie */}
+                <div className="flex flex-col gap-2">
+                  {sectionCategories.length === 0 ? (
+                    <p className="text-sm text-[var(--muted)] italic py-2">
+                      Brak kategorii w tej grupie
+                    </p>
+                  ) : (
+                    sectionCategories.map((cat) => {
+                      const productCount = productCounts[cat.slug] ?? 0;
+                      const editing = openCategoryForm === cat.id;
+                      return (
+                        <div key={cat.id}>
+                          <div
+                            className={`flex items-center justify-between gap-3 px-4 py-3 border border-[var(--border)] rounded-xl ${
+                              cat.active ? "bg-[var(--bg)]" : "bg-stone-100 dark:bg-stone-900 opacity-60"
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-sans font-semibold text-[var(--fg)] truncate">
+                                {cat.label}
+                                {!cat.active && (
+                                  <span className="ml-2 text-[10px] uppercase tracking-widest text-[var(--muted)]">
+                                    (ukryta)
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-xs text-[var(--muted)] truncate">
+                                <code>{cat.slug}</code> · {productCount}{" "}
+                                {productCount === 1 ? "produkt" : "produktów"}
+                                {cat.baselinkerCategoryId !== null && (
+                                  <> · BL: {cat.baselinkerCategoryId}</>
+                                )}
+                              </p>
+                            </div>
+                            <div className="flex gap-2 shrink-0">
+                              <button
+                                onClick={() =>
+                                  setOpenCategoryForm(editing ? null : cat.id)
+                                }
+                                className="px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--border)] text-[var(--fg)] rounded-full hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
+                              >
+                                Edytuj
+                              </button>
+                              <DeleteButton
+                                label="Usuń"
+                                disabled={productCount > 0}
+                                disabledTitle={
+                                  productCount > 0
+                                    ? `Nie można usunąć — kategoria ma ${productCount} ${
+                                        productCount === 1 ? "produkt" : "produktów"
+                                      }`
+                                    : undefined
+                                }
+                                confirmMessage={`Usunąć kategorię "${cat.label}"?`}
+                                onConfirm={async () => {
+                                  const fd = new FormData();
+                                  fd.set("id", cat.id);
+                                  const res = await deleteCategory(fd);
+                                  handleResult(res);
+                                }}
+                              />
+                            </div>
+                          </div>
+                          {editing && (
+                            <div className="mt-2 p-4 bg-[var(--bg)] border border-[var(--border)] rounded-xl">
+                              <CategoryForm
+                                mode="update"
+                                initial={cat}
+                                groups={sections}
+                                onCancel={() => setOpenCategoryForm(null)}
+                                onSubmit={async (fd) => {
+                                  const res = await updateCategory(fd);
+                                  handleResult(res, () => setOpenCategoryForm(null));
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Dodawanie nowej kategorii do grupy */}
+                {openNewCategoryForGroup === section.id ? (
+                  <div className="mt-3 p-4 bg-[var(--bg)] border border-[var(--border)] rounded-xl">
+                    <CategoryForm
+                      mode="create"
+                      defaultGroupId={section.id}
+                      groups={sections}
+                      onCancel={() => setOpenNewCategoryForGroup(null)}
+                      onSubmit={async (fd) => {
+                        const res = await createCategory(fd);
+                        handleResult(res, () => setOpenNewCategoryForGroup(null));
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setOpenNewCategoryForGroup(section.id)}
+                    className="self-start mt-3 text-xs font-sans uppercase tracking-widest text-[var(--color-gold)] hover:underline"
+                  >
+                    + Dodaj kategorię do tej grupy
+                  </button>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Formularz grupy
+// ============================================================
+
+function GroupForm({
+  mode,
+  initial,
+  onSubmit,
+  onCancel,
+}: {
+  mode: "create" | "update";
+  initial?: Section;
+  onSubmit: (fd: FormData) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <form
+      action={(fd) => startTransition(() => onSubmit(fd))}
+      className="flex flex-col gap-3"
+    >
+      {initial && <input type="hidden" name="id" value={initial.id} />}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Field label="Nazwa wyświetlana" required>
+          <input
+            name="label"
+            defaultValue={initial?.label ?? ""}
+            required
+            minLength={2}
+            placeholder="np. Salon"
+            className="w-full px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
+          />
+        </Field>
+
+        {mode === "create" && (
+          <Field label="Slug (link)" hint="Zostaw puste żeby wygenerować z nazwy">
+            <input
+              name="slug"
+              placeholder="np. salon"
+              className="w-full px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
+            />
+          </Field>
+        )}
+
+        <Field label="Kolejność" hint="Mniejsze na początku">
+          <input
+            type="number"
+            name="sort_order"
+            defaultValue={initial?.sort_order ?? 0}
+            className="w-full px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
+          />
+        </Field>
+      </div>
+
+      {mode === "update" && initial && (
+        <label className="flex items-center gap-2 text-sm text-[var(--fg)] cursor-pointer">
+          <input
+            type="checkbox"
+            name="active"
+            value="1"
+            defaultChecked={initial.active}
+            className="h-4 w-4 accent-[var(--color-gold)]"
+          />
+          <span>Pokazuj w nawigacji</span>
+        </label>
+      )}
+
+      <div className="flex gap-2 pt-2">
+        <button
+          type="submit"
+          disabled={pending}
+          className="px-5 py-2 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
+        >
+          {pending ? "Zapisuję..." : mode === "create" ? "Dodaj grupę" : "Zapisz"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={pending}
+          className="px-5 py-2 border border-[var(--border)] text-[var(--fg)] font-sans text-sm uppercase tracking-widest rounded-full hover:border-[var(--color-gold)] transition-colors"
+        >
+          Anuluj
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ============================================================
+// Formularz kategorii
+// ============================================================
+
+function CategoryForm({
+  mode,
+  initial,
+  defaultGroupId,
+  groups,
+  onSubmit,
+  onCancel,
+}: {
+  mode: "create" | "update";
+  initial?: CategoryDef;
+  defaultGroupId?: string;
+  groups: Section[];
+  onSubmit: (fd: FormData) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <form
+      action={(fd) => startTransition(() => onSubmit(fd))}
+      className="flex flex-col gap-3"
+    >
+      {initial && <input type="hidden" name="id" value={initial.id} />}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <Field label="Nazwa wyświetlana" required>
+          <input
+            name="label"
+            defaultValue={initial?.label ?? ""}
+            required
+            minLength={2}
+            placeholder="np. Sofa 3-osobowa"
+            className="w-full px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
+          />
+        </Field>
+
+        <Field label="Grupa" required>
+          <select
+            name="group_id"
+            defaultValue={initial?.group_id ?? defaultGroupId ?? ""}
+            required
+            className="w-full px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
+          >
+            <option value="">— wybierz grupę —</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        {mode === "create" && (
+          <Field label="Slug (link)" hint="Zostaw puste żeby wygenerować z nazwy">
+            <input
+              name="slug"
+              placeholder="np. sofa-3-osobowa"
+              className="w-full px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
+            />
+          </Field>
+        )}
+
+        <Field
+          label="ID kategorii w BaseLinker"
+          hint="Opcjonalne. Sprawdź ID w panelu BL → Magazyn → Kategorie. Bez tego sync produktów BL pominie tę kategorię."
+        >
+          <input
+            type="number"
+            name="baselinker_category_id"
+            defaultValue={initial?.baselinkerCategoryId ?? ""}
+            min={1}
+            placeholder="np. 7489757"
+            className="w-full px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
+          />
+        </Field>
+
+        <Field label="Kolejność" hint="Mniejsze na początku">
+          <input
+            type="number"
+            name="sort_order"
+            defaultValue={initial?.sort_order ?? 0}
+            className="w-full px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
+          />
+        </Field>
+      </div>
+
+      {mode === "update" && initial && (
+        <label className="flex items-center gap-2 text-sm text-[var(--fg)] cursor-pointer">
+          <input
+            type="checkbox"
+            name="active"
+            value="1"
+            defaultChecked={initial.active}
+            className="h-4 w-4 accent-[var(--color-gold)]"
+          />
+          <span>Pokazuj w sklepie</span>
+        </label>
+      )}
+
+      <div className="flex gap-2 pt-2">
+        <button
+          type="submit"
+          disabled={pending}
+          className="px-5 py-2 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
+        >
+          {pending ? "Zapisuję..." : mode === "create" ? "Dodaj kategorię" : "Zapisz"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={pending}
+          className="px-5 py-2 border border-[var(--border)] text-[var(--fg)] font-sans text-sm uppercase tracking-widest rounded-full hover:border-[var(--color-gold)] transition-colors"
+        >
+          Anuluj
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ============================================================
+// Pomocnicze komponenty
+// ============================================================
+
+function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="p-6 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl">
+      {children}
+    </div>
+  );
+}
+
+function Field({
+  label,
+  hint,
+  required,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
+        {label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </span>
+      {children}
+      {hint && <span className="text-xs text-[var(--muted)] leading-snug">{hint}</span>}
+    </label>
+  );
+}
+
+function DeleteButton({
+  label,
+  confirmMessage,
+  onConfirm,
+  disabled,
+  disabledTitle,
+}: {
+  label: string;
+  confirmMessage: string;
+  onConfirm: () => Promise<void>;
+  disabled?: boolean;
+  disabledTitle?: string;
+}) {
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <button
+      type="button"
+      disabled={disabled || pending}
+      title={disabledTitle}
+      onClick={() => {
+        if (disabled) return;
+        if (!window.confirm(confirmMessage)) return;
+        startTransition(() => onConfirm());
+      }}
+      className={`px-3 py-1.5 text-xs font-sans uppercase tracking-widest rounded-full transition-colors ${
+        disabled
+          ? "border border-[var(--border)] text-[var(--muted)] opacity-50 cursor-not-allowed"
+          : "border border-red-300 dark:border-red-900 text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+      }`}
+    >
+      {pending ? "..." : label}
+    </button>
+  );
+}
+
+function ToastView({ toast, onClose }: { toast: NonNullable<Toast>; onClose: () => void }) {
+  return (
+    <div
+      role="status"
+      className={`fixed top-24 right-6 z-50 max-w-sm px-5 py-4 rounded-2xl shadow-2xl border ${
+        toast.type === "success"
+          ? "bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-200"
+          : "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-900 text-red-800 dark:text-red-200"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <p className="text-sm flex-1">{toast.message}</p>
+        <button onClick={onClose} aria-label="Zamknij" className="shrink-0 opacity-70 hover:opacity-100">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="text-center py-16 text-[var(--muted)] border border-dashed border-[var(--border)] rounded-2xl">
+      <p className="font-display text-lg">{message}</p>
+    </div>
+  );
+}

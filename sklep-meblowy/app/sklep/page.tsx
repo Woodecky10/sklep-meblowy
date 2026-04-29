@@ -2,8 +2,11 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { getProducts, getFilterFacets } from "@/app/_lib/products";
 import { getRatingsForProducts } from "@/app/_lib/reviews";
-import type { Category } from "@/app/_lib/types";
-import { getCategoryLabel, isCategorySlug } from "@/app/_lib/categories";
+import {
+  getCategoryLabel,
+  getSections,
+  getCategories,
+} from "@/app/_lib/categories";
 import ProductCard from "@/app/_components/ui/ProductCard";
 import FilterBar from "@/app/_components/ui/FilterBar";
 import Pagination from "@/app/_components/ui/Pagination";
@@ -34,7 +37,7 @@ export default async function SklepPage({
   searchParams: SearchParams;
 }) {
   const sp = await searchParams;
-  const category = isCategorySlug(sp.kategoria) ? (sp.kategoria as Category) : undefined;
+  const category = sp.kategoria || undefined;
   const sort = (sp.sortuj as "price_asc" | "price_desc" | "newest") ?? "newest";
   const page = Number(sp.strona ?? 1);
   const search = sp.q?.trim() || undefined;
@@ -44,20 +47,24 @@ export default async function SklepPage({
   const colors = sp.kolor?.split(",").filter(Boolean);
   const materials = sp.material?.split(",").filter(Boolean);
 
-  const [{ products, total, pages }, facets] = await Promise.all([
-    getProducts({
-      category,
-      sort,
-      page,
-      search,
-      priceMin,
-      priceMax,
-      inStockOnly,
-      colors,
-      materials,
-    }),
-    getFilterFacets(),
-  ]);
+  const [{ products, total, pages }, facets, sections, allCategories, categoryLabel] =
+    await Promise.all([
+      getProducts({
+        category,
+        sort,
+        page,
+        search,
+        priceMin,
+        priceMax,
+        inStockOnly,
+        colors,
+        materials,
+      }),
+      getFilterFacets(),
+      getSections(),
+      getCategories(),
+      getCategoryLabel(category),
+    ]);
 
   // Batch pobrania ocen — jedno zapytanie dla całej strony list.
   const ratings = await getRatingsForProducts(products.map((p) => p.id));
@@ -76,8 +83,17 @@ export default async function SklepPage({
   const heading = search
     ? `Wyniki: „${search}”`
     : category
-      ? getCategoryLabel(category) ?? "Sklep"
+      ? categoryLabel ?? "Sklep"
       : "Wszystkie produkty";
+
+  // Projekcja dla FilterBar (client) — slug + label per sekcja.
+  const filterSections = sections.map((s) => ({
+    slug: s.slug,
+    label: s.label,
+    categories: allCategories
+      .filter((c) => c.group_slug === s.slug)
+      .map((c) => ({ slug: c.slug, label: c.label })),
+  }));
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
@@ -92,7 +108,11 @@ export default async function SklepPage({
       </div>
 
       <Suspense>
-        <FilterBar colors={facets.colors} materials={facets.materials} />
+        <FilterBar
+          colors={facets.colors}
+          materials={facets.materials}
+          sections={filterSections}
+        />
       </Suspense>
 
       {products.length === 0 ? (

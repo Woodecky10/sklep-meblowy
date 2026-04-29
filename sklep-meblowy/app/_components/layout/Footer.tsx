@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { SECTIONS, getCategoriesBySection } from "@/app/_lib/categories";
+import { getSections, getCategories } from "@/app/_lib/categories";
 import { COMPANY, isFilled } from "@/app/_lib/company";
 
 const INFO_LINKS: [string, string][] = [
@@ -14,7 +14,12 @@ const INFO_LINKS: [string, string][] = [
   ["Polityka prywatności", "/prywatnosc"],
 ];
 
-export default function Footer() {
+export default async function Footer() {
+  const [sections, categories] = await Promise.all([
+    getSections(),
+    getCategories(),
+  ]);
+
   return (
     <footer className="bg-[var(--color-navy)] text-white mt-24">
       <div className="max-w-7xl mx-auto px-6 py-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
@@ -46,22 +51,24 @@ export default function Footer() {
           </p>
         </div>
 
-        {SECTIONS.map((section) => (
+        {sections.map((section) => (
           <div key={section.slug}>
             <p className="font-sans text-xs uppercase tracking-widest text-[var(--color-gold)] mb-4">
               {section.label}
             </p>
             <ul className="space-y-3 text-sm text-white/70">
-              {getCategoriesBySection(section.slug).map((c) => (
-                <li key={c.slug}>
-                  <Link
-                    href={`/sklep?kategoria=${c.slug}`}
-                    className="hover:text-[var(--color-gold)] transition-colors"
-                  >
-                    {c.label}
-                  </Link>
-                </li>
-              ))}
+              {categories
+                .filter((c) => c.group_slug === section.slug)
+                .map((c) => (
+                  <li key={c.slug}>
+                    <Link
+                      href={`/sklep?kategoria=${c.slug}`}
+                      className="hover:text-[var(--color-gold)] transition-colors"
+                    >
+                      {c.label}
+                    </Link>
+                  </li>
+                ))}
             </ul>
           </div>
         ))}

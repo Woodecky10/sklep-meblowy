@@ -78,24 +78,25 @@ type ProductInsert = Omit<Product, "id" | "created_at"> & {
   created_at?: string;
 };
 
-function mapBlToProduct(
+async function mapBlToProduct(
   blId: string,
   bl: BLInventoryProduct,
   defaultPriceGroup: number
-):
+): Promise<
   | { ok: true; product: ProductInsert }
-  | { ok: false; reason: string } {
+  | { ok: false; reason: string }
+> {
   const name = bl.text_fields?.name ?? "";
   if (!name.trim()) return { ok: false, reason: "brak nazwy" };
 
   const blCategoryId = Number(bl.category_id ?? 0);
   if (!blCategoryId) return { ok: false, reason: "brak kategorii w BL" };
 
-  const cat = getCategoryByBaselinkerId(blCategoryId);
+  const cat = await getCategoryByBaselinkerId(blCategoryId);
   if (!cat) {
     return {
       ok: false,
-      reason: `kategoria BL ${blCategoryId} nie zmapowana w categories.ts`,
+      reason: `kategoria BL ${blCategoryId} nie zmapowana — dodaj mapowanie w admin panelu /admin/kategorie`,
     };
   }
 
@@ -191,7 +192,7 @@ export async function POST(request: NextRequest) {
 
       // Mapowanie + upsert per produkt
       for (const [blId, bl] of Object.entries(products)) {
-        const mapped = mapBlToProduct(blId, bl, defaultPriceGroup);
+        const mapped = await mapBlToProduct(blId, bl, defaultPriceGroup);
         if (!mapped.ok) {
           result.skipped.push({
             id: blId,

@@ -18,7 +18,7 @@ const CARDS = [
     description:
       "Dodawaj, edytuj i porządkuj kategorie produktów. Mapowanie na BaseLinker.",
     cta: "Zarządzaj",
-    status: "wkrótce" as const,
+    status: "dostępne" as const,
   },
   {
     href: "/admin/baselinker",
