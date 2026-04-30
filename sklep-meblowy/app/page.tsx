@@ -1,54 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import HomeHeroSlider, { type HeroSlide } from "./_components/layout/HomeHeroSlider";
+import HomeHeroSlider from "./_components/layout/HomeHeroSlider";
+import { getActiveSlides, DEFAULT_FALLBACK_SLIDE } from "./_lib/slides";
 
 export const metadata: Metadata = {
   title: "Meble Premium | Eleganckie Meble do Twojego Domu",
 };
-
-// Slajdy hero — docelowo zastąpimy odczytem z DB (admin panel CRUD).
-// Na razie hardkod w kodzie — zmiana wymaga PR + deploy.
-const HERO_SLIDES: HeroSlide[] = [
-  {
-    id: "kolekcja-2026",
-    imageUrl:
-      "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=2000&q=80",
-    imageAlt: "Elegancka sofa w jasnym salonie premium",
-    eyebrow: "Kolekcja 2026",
-    title:
-      'Meble, które <em class="not-italic text-[var(--color-gold)]">opowiadają</em> historię',
-    subtitle:
-      "Odkryj kolekcję mebli premium, stworzonych z myślą o ludziach, którzy cenią piękno, trwałość i niepowtarzalny styl.",
-    ctaPrimary: { label: "Przeglądaj kolekcję", href: "/sklep" },
-    ctaSecondary: { label: "Nowości", href: "/sklep?sortuj=newest" },
-  },
-  {
-    id: "sypialnia-premium",
-    imageUrl:
-      "https://images.unsplash.com/photo-1505693314120-0d443867891c?w=2000&q=80",
-    imageAlt: "Luksusowa sypialnia z tapicerowanym łóżkiem",
-    eyebrow: "Sypialnia premium",
-    title:
-      'Sen, na który <em class="not-italic text-[var(--color-gold)]">zasługujesz</em>',
-    subtitle:
-      "Tapicerowane łóżka, kontynentale, materace i toppery — komfort dopracowany w każdym detalu.",
-    ctaPrimary: { label: "Zobacz łóżka", href: "/sklep?kategoria=lozko-tapicerowane" },
-    ctaSecondary: { label: "Materace", href: "/sklep?kategoria=materace" },
-  },
-  {
-    id: "narozniki-i-sofy",
-    imageUrl:
-      "https://images.unsplash.com/photo-1567016432779-094069958ea5?w=2000&q=80",
-    imageAlt: "Modułowy narożnik w nowoczesnym salonie",
-    eyebrow: "Centrum salonu",
-    title:
-      'Narożniki, w których <em class="not-italic text-[var(--color-gold)]">rodzą się</em> wspomnienia',
-    subtitle:
-      "Modułowe narożniki w kształcie L i U oraz sofy 2- i 3-osobowe — szyte na zamówienie pod Twój salon.",
-    ctaPrimary: { label: "Narożniki L", href: "/sklep?kategoria=naroznik-l" },
-    ctaSecondary: { label: "Sofy", href: "/sklep?kategoria=sofa-3-osobowa" },
-  },
-];
 
 const categories = [
   {
@@ -116,11 +73,15 @@ const featured = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const dbSlides = await getActiveSlides();
+  // Fallback gdy admin jeszcze nic nie dodał — żeby home nie była pusta.
+  const slides = dbSlides.length > 0 ? dbSlides : [DEFAULT_FALLBACK_SLIDE];
+
   return (
     <>
       {/* Hero — slider z auto-rotacją (6s) i nawigacją (strzałki + kropki) */}
-      <HomeHeroSlider slides={HERO_SLIDES} />
+      <HomeHeroSlider slides={slides} />
 
       {/* Kategorie */}
       <section className="max-w-7xl mx-auto px-6 py-24">
