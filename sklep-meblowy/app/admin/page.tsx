@@ -10,7 +10,7 @@ const CARDS = [
     description:
       "Edytuj slajdy hero, podmieniaj zdjęcia, ustalaj daty obowiązywania promocji.",
     cta: "Edytuj slider",
-    status: "wkrótce" as const,
+    status: "dostępne" as const,
   },
   {
     href: "/admin/kategorie",

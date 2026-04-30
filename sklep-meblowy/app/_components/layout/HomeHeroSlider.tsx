@@ -7,22 +7,24 @@ import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
 
 export type HeroSlide = {
-  /** stabilny key (np. slug slajdu) */
+  /** stabilny key (np. id z DB albo slug) */
   id: string;
-  /** zdjęcie tła — pełnoekranowe */
-  imageUrl: string;
+  /** zdjęcie tła — pełnoekranowe (URL z Supabase Storage albo zewnętrzny) */
+  imageUrl: string | null;
   /** alt do zdjęcia (dostępność + SEO) */
   imageAlt: string;
   /** mała etykietka nad tytułem (np. "Kolekcja 2026") */
-  eyebrow?: string;
-  /** główny tytuł — wspiera <em> dla podkreślenia złotem (zob. niżej format) */
+  eyebrow?: string | null;
+  /** główny tytuł — plain text. Bez HTML, bez markdown. */
   title: string;
+  /** Jeśli ustawione, słowo z `title` zostanie wizualnie podświetlone złotem (przez <em>). */
+  highlightedWord?: string | null;
   /** podpis pod tytułem */
-  subtitle?: string;
+  subtitle?: string | null;
   /** główne CTA */
-  ctaPrimary: { label: string; href: string };
+  ctaPrimary?: { label: string; href: string } | null;
   /** opcjonalne drugie CTA */
-  ctaSecondary?: { label: string; href: string };
+  ctaSecondary?: { label: string; href: string } | null;
 };
 
 const AUTOPLAY_MS = 6000;
@@ -76,15 +78,19 @@ export default function HomeHeroSlider({ slides }: { slides: HeroSlide[] }) {
               aria-roledescription="slide"
               aria-label={`${idx + 1} z ${slides.length}`}
             >
-              {/* Tło — zdjęcie */}
-              <Image
-                src={slide.imageUrl}
-                alt={slide.imageAlt}
-                fill
-                priority={idx === 0}
-                sizes="100vw"
-                className="object-cover"
-              />
+              {/* Tło — zdjęcie (jeśli brak, fallback navy) */}
+              {slide.imageUrl ? (
+                <Image
+                  src={slide.imageUrl}
+                  alt={slide.imageAlt}
+                  fill
+                  priority={idx === 0}
+                  sizes="100vw"
+                  className="object-cover"
+                />
+              ) : (
+                <div className="absolute inset-0 bg-[var(--color-navy)]" />
+              )}
               {/* Overlay dla czytelności tekstu */}
               <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/20" />
 
@@ -96,23 +102,26 @@ export default function HomeHeroSlider({ slides }: { slides: HeroSlide[] }) {
                       {slide.eyebrow}
                     </p>
                   )}
-                  <h1
-                    className="font-display text-5xl md:text-7xl font-bold text-white leading-tight mb-8"
-                    dangerouslySetInnerHTML={{ __html: slide.title }}
-                  />
+                  {slide.title && (
+                    <h1 className="font-display text-5xl md:text-7xl font-bold text-white leading-tight mb-8">
+                      {renderTitleWithHighlight(slide.title, slide.highlightedWord)}
+                    </h1>
+                  )}
                   {slide.subtitle && (
                     <p className="text-white/70 text-lg max-w-lg mb-10 leading-relaxed">
                       {slide.subtitle}
                     </p>
                   )}
                   <div className="flex flex-wrap gap-4">
-                    <Link
-                      href={slide.ctaPrimary.href}
-                      className="inline-flex items-center gap-2 px-8 py-4 bg-[var(--color-gold)] text-[var(--color-navy)] font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold-light)] transition-colors"
-                    >
-                      {slide.ctaPrimary.label}
-                    </Link>
-                    {slide.ctaSecondary && (
+                    {slide.ctaPrimary?.href && slide.ctaPrimary.label && (
+                      <Link
+                        href={slide.ctaPrimary.href}
+                        className="inline-flex items-center gap-2 px-8 py-4 bg-[var(--color-gold)] text-[var(--color-navy)] font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold-light)] transition-colors"
+                      >
+                        {slide.ctaPrimary.label}
+                      </Link>
+                    )}
+                    {slide.ctaSecondary?.href && slide.ctaSecondary.label && (
                       <Link
                         href={slide.ctaSecondary.href}
                         className="inline-flex items-center gap-2 px-8 py-4 border border-white/30 text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
@@ -171,5 +180,30 @@ export default function HomeHeroSlider({ slides }: { slides: HeroSlide[] }) {
         </div>
       )}
     </section>
+  );
+}
+
+// Renderuje tytuł podświetlając pierwsze wystąpienie `highlight` (case-insensitive)
+// jako <em> ze złotym kolorem. Bez HTML inputu — czysty React, zero ryzyka XSS.
+function renderTitleWithHighlight(title: string, highlight: string | null | undefined) {
+  if (!highlight || highlight.trim() === "") return title;
+
+  const trimmed = highlight.trim();
+  const lowerTitle = title.toLowerCase();
+  const lowerHighlight = trimmed.toLowerCase();
+  const idx = lowerTitle.indexOf(lowerHighlight);
+
+  if (idx === -1) return title;
+
+  const before = title.slice(0, idx);
+  const matched = title.slice(idx, idx + trimmed.length);
+  const after = title.slice(idx + trimmed.length);
+
+  return (
+    <>
+      {before}
+      <em className="not-italic text-[var(--color-gold)]">{matched}</em>
+      {after}
+    </>
   );
 }
