@@ -26,7 +26,7 @@ const CARDS = [
     description:
       "Synchronizuj produkty z BL → strona, sprawdź historię synchronizacji.",
     cta: "Otwórz",
-    status: "wkrótce" as const,
+    status: "dostępne" as const,
   },
 ];
 

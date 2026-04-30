@@ -1,0 +1,446 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import {
+  syncProductsAction,
+  type SyncActionResult,
+  type SyncLogRow,
+} from "./actions";
+import type {
+  SyncInventoryResult,
+  SyncSkippedProduct,
+} from "@/app/_lib/baselinker-sync";
+
+type Toast = { type: "success" | "error" | "warning"; message: string } | null;
+
+export default function BaseLinkerSyncPanel({
+  initialLogs,
+}: {
+  initialLogs: SyncLogRow[];
+}) {
+  const [logs, setLogs] = useState<SyncLogRow[]>(initialLogs);
+  const [pending, startTransition] = useTransition();
+  const [lastResult, setLastResult] = useState<SyncActionResult | null>(null);
+  const [toast, setToast] = useState<Toast>(null);
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+
+  function showToast(t: Toast) {
+    setToast(t);
+    if (t) setTimeout(() => setToast(null), 5000);
+  }
+
+  function handleSync() {
+    startTransition(async () => {
+      const result = await syncProductsAction();
+      setLastResult(result);
+
+      if (!result.ok) {
+        showToast({
+          type: "error",
+          message: `Sync nieudany: ${result.error}`,
+        });
+        return;
+      }
+
+      const t = result.outcome.totals;
+      const msg = `Zsynchronizowano: ${t.inserted} nowych, ${t.updated} zaktualizowanych${
+        t.skipped_count > 0 ? `, ${t.skipped_count} pominiętych` : ""
+      }`;
+
+      showToast({
+        type: t.skipped_count > 0 ? "warning" : "success",
+        message: msg,
+      });
+
+      // Refresh page po krótkiej chwili żeby pobrać nowy log
+      setTimeout(() => window.location.reload(), 1500);
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+            Mollien
+          </p>
+          <h1 className="font-display text-4xl font-bold text-[var(--fg)]">BaseLinker</h1>
+          <p className="text-sm text-[var(--muted)] mt-2 max-w-2xl leading-relaxed">
+            Synchronizacja produktów z BaseLinkera na stronę. Odpalenie tu pobierze
+            wszystkie produkty z BL i utworzy lub zaktualizuje je w bazie sklepu.
+            Bezpieczne — żadne istniejące produkty nie zostaną usunięte.
+          </p>
+        </div>
+        <button
+          onClick={handleSync}
+          disabled={pending}
+          className="shrink-0 px-6 py-3.5 bg-[var(--color-gold)] text-[var(--color-navy)] font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold-light)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {pending ? (
+            <span className="flex items-center gap-2">
+              <Spinner />
+              Synchronizuję...
+            </span>
+          ) : (
+            "Synchronizuj teraz"
+          )}
+        </button>
+      </div>
+
+      {toast && <ToastView toast={toast} onClose={() => setToast(null)} />}
+
+      {/* Wynik ostatniej synchronizacji (świeżo zrobionej w tym okienku) */}
+      {lastResult && lastResult.ok && (
+        <Card>
+          <h2 className="font-display text-lg font-semibold text-[var(--fg)] mb-3">
+            Wynik ostatniej synchronizacji
+          </h2>
+          <ResultSummary result={lastResult} />
+        </Card>
+      )}
+
+      {/* Historia synchronizacji */}
+      <div>
+        <h2 className="font-display text-2xl font-semibold text-[var(--fg)] mb-4">
+          Historia synchronizacji
+        </h2>
+
+        {logs.length === 0 ? (
+          <EmptyState message='Brak synchronizacji w historii. Kliknij „Synchronizuj teraz” żeby zacząć.' />
+        ) : (
+          <div className="flex flex-col gap-2">
+            {logs.map((log) => (
+              <LogRow
+                key={log.id}
+                log={log}
+                expanded={expandedLogId === log.id}
+                onToggle={() =>
+                  setExpandedLogId(expandedLogId === log.id ? null : log.id)
+                }
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Instrukcja dla nietechnicznego usera */}
+      <Card>
+        <h2 className="font-display text-lg font-semibold text-[var(--fg)] mb-3">
+          Co robić gdy produkt jest „pominięty”?
+        </h2>
+        <div className="text-sm text-[var(--muted)] leading-relaxed space-y-2">
+          <p>
+            <strong className="text-[var(--fg)]">„kategoria BL X nie zmapowana”</strong> —
+            wejdź w <a href="/admin/kategorie" className="text-[var(--color-gold)] hover:underline">Kategorie</a>,
+            znajdź odpowiednią kategorię i wpisz w polu „ID kategorii w BaseLinker”
+            liczbę z BL (Magazyn → Kategorie → kliknij kategorię → ID widoczne w URL).
+            Potem wróć tu i kliknij „Synchronizuj teraz” ponownie.
+          </p>
+          <p>
+            <strong className="text-[var(--fg)]">„brak ceny lub cena = 0”</strong> —
+            ustaw cenę produktu w BL.
+          </p>
+          <p>
+            <strong className="text-[var(--fg)]">„brak nazwy”</strong> — wypełnij nazwę produktu w BL.
+          </p>
+          <p>
+            <strong className="text-[var(--fg)]">„brak kategorii w BL”</strong> —
+            przypisz produkt do kategorii w BL (Magazyn → produkt → Kategoria).
+          </p>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================================
+// Wynik synchronizacji — szczegółowy widok per inventory
+// ============================================================
+
+function ResultSummary({
+  result,
+}: {
+  result: Extract<SyncActionResult, { ok: true }>;
+}) {
+  const totals = result.outcome.totals;
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Stat label="W BL" value={totals.total_in_bl} />
+        <Stat label="Dodanych" value={totals.inserted} variant="success" />
+        <Stat label="Zaktualizowanych" value={totals.updated} variant="info" />
+        <Stat
+          label="Pominiętych"
+          value={totals.skipped_count}
+          variant={totals.skipped_count > 0 ? "warning" : "neutral"}
+        />
+      </div>
+      <p className="text-xs text-[var(--muted)]">
+        Czas: {(result.duration_ms / 1000).toFixed(1)}s
+        {result.outcome.warning && ` · ${result.outcome.warning}`}
+      </p>
+      {result.outcome.results.map((inv) => (
+        <InventoryResult key={inv.inventory_id} inv={inv} />
+      ))}
+    </div>
+  );
+}
+
+function InventoryResult({ inv }: { inv: SyncInventoryResult }) {
+  const [showAllSkipped, setShowAllSkipped] = useState(false);
+  const visibleSkipped = showAllSkipped ? inv.skipped : inv.skipped.slice(0, 5);
+
+  return (
+    <div className="border border-[var(--border)] rounded-xl p-4">
+      <p className="font-sans text-sm font-semibold text-[var(--fg)] mb-2">
+        Magazyn: {inv.inventory_name}
+      </p>
+      <p className="text-xs text-[var(--muted)] mb-3">
+        {inv.total_in_bl} produktów · {inv.inserted} nowych · {inv.updated} zaktualizowanych
+        {inv.skipped.length > 0 && ` · ${inv.skipped.length} pominiętych`}
+      </p>
+      {inv.skipped.length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
+            Pominięte produkty:
+          </p>
+          <div className="flex flex-col gap-2">
+            {visibleSkipped.map((s) => (
+              <SkippedRow key={s.id} skipped={s} />
+            ))}
+          </div>
+          {inv.skipped.length > 5 && (
+            <button
+              onClick={() => setShowAllSkipped(!showAllSkipped)}
+              className="mt-2 text-xs text-[var(--color-gold)] hover:underline"
+            >
+              {showAllSkipped
+                ? "Pokaż mniej"
+                : `Pokaż wszystkie (${inv.skipped.length - 5} więcej)`}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SkippedRow({ skipped }: { skipped: SyncSkippedProduct }) {
+  return (
+    <div className="flex items-start gap-3 p-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg">
+      <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 text-[10px] font-sans rounded shrink-0 mt-0.5">
+        BL: {skipped.id}
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-[var(--fg)] truncate">{skipped.name}</p>
+        <p className="text-xs text-[var(--muted)] leading-snug">{skipped.reason}</p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Historia: wiersz logu z rozwijanym detalami
+// ============================================================
+
+function LogRow({
+  log,
+  expanded,
+  onToggle,
+}: {
+  log: SyncLogRow;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const date = new Date(log.triggered_at);
+  const formatted = date.toLocaleString("pl-PL", {
+    dateStyle: "short",
+    timeStyle: "medium",
+  });
+
+  // Z DB results to JSON; przy expand parsujemy.
+  const results =
+    log.results && typeof log.results === "object"
+      ? (log.results as SyncInventoryResult[])
+      : [];
+
+  return (
+    <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center gap-3 p-4 text-left hover:bg-[var(--bg)] transition-colors"
+      >
+        <StatusBadge status={log.status} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-sans font-medium text-[var(--fg)]">
+            {formatted}
+            {log.duration_ms !== null && (
+              <span className="text-[var(--muted)] font-normal ml-2">
+                ({(log.duration_ms / 1000).toFixed(1)}s)
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-[var(--muted)]">
+            {log.total_in_bl} produktów ·{" "}
+            <span className="text-emerald-700 dark:text-emerald-300">
+              {log.inserted} nowych
+            </span>{" "}
+            ·{" "}
+            <span className="text-blue-700 dark:text-blue-300">
+              {log.updated} zaktualizowanych
+            </span>
+            {log.skipped_count > 0 && (
+              <>
+                {" "}
+                ·{" "}
+                <span className="text-amber-700 dark:text-amber-300">
+                  {log.skipped_count} pominiętych
+                </span>
+              </>
+            )}
+            {log.triggered_by_email && (
+              <span className="ml-2">· {log.triggered_by_email}</span>
+            )}
+          </p>
+        </div>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className={`text-[var(--muted)] shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-[var(--border)] p-4 bg-[var(--bg)] space-y-3">
+          {log.error_message && (
+            <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 rounded-lg px-4 py-3 text-sm">
+              <strong>Błąd:</strong> {log.error_message}
+            </div>
+          )}
+          {results.length === 0 && !log.error_message && (
+            <p className="text-sm text-[var(--muted)] italic">Brak szczegółowych danych.</p>
+          )}
+          {results.map((inv) => (
+            <InventoryResult key={inv.inventory_id} inv={inv} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Pomocnicze
+// ============================================================
+
+function Stat({
+  label,
+  value,
+  variant = "neutral",
+}: {
+  label: string;
+  value: number;
+  variant?: "success" | "info" | "warning" | "neutral";
+}) {
+  const colors = {
+    success: "bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200",
+    info: "bg-blue-50 dark:bg-blue-950 text-blue-800 dark:text-blue-200",
+    warning: "bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-200",
+    neutral: "bg-[var(--bg)] text-[var(--fg)]",
+  };
+  return (
+    <div className={`px-4 py-3 rounded-xl ${colors[variant]}`}>
+      <p className="text-xs font-sans uppercase tracking-widest opacity-70">{label}</p>
+      <p className="font-display text-2xl font-bold mt-0.5">{value}</p>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: SyncLogRow["status"] }) {
+  const config = {
+    success: {
+      label: "OK",
+      cls: "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300",
+    },
+    partial: {
+      label: "Częściowo",
+      cls: "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300",
+    },
+    error: {
+      label: "Błąd",
+      cls: "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300",
+    },
+  }[status];
+  return (
+    <span
+      className={`px-2.5 py-1 text-[10px] font-sans uppercase tracking-widest rounded-full shrink-0 ${config.cls}`}
+    >
+      {config.label}
+    </span>
+  );
+}
+
+function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="p-6 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl">
+      {children}
+    </div>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="text-center py-12 text-[var(--muted)] border border-dashed border-[var(--border)] rounded-2xl">
+      <p className="font-display text-base">{message}</p>
+    </div>
+  );
+}
+
+function Spinner() {
+  return (
+    <svg
+      className="animate-spin"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+    >
+      <circle cx="12" cy="12" r="10" opacity="0.25" />
+      <path d="M22 12a10 10 0 0 0-10-10" />
+    </svg>
+  );
+}
+
+function ToastView({ toast, onClose }: { toast: NonNullable<Toast>; onClose: () => void }) {
+  const colors = {
+    success:
+      "bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-200",
+    warning:
+      "bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-200",
+    error:
+      "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-900 text-red-800 dark:text-red-200",
+  };
+  return (
+    <div
+      role="status"
+      className={`fixed top-24 right-6 z-50 max-w-md px-5 py-4 rounded-2xl shadow-2xl border ${colors[toast.type]}`}
+    >
+      <div className="flex items-start gap-3">
+        <p className="text-sm flex-1 leading-relaxed">{toast.message}</p>
+        <button onClick={onClose} aria-label="Zamknij" className="shrink-0 opacity-70 hover:opacity-100">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
