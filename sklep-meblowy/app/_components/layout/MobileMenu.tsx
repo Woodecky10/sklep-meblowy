@@ -3,9 +3,20 @@
 import { useState } from "react";
 import Link from "next/link";
 import { signOut } from "@/app/_lib/auth-actions";
-import { SECTIONS, getCategoriesBySection } from "@/app/_lib/categories";
 
-export default function MobileMenu({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
+export type MobileMenuSection = {
+  slug: string;
+  label: string;
+  categories: { slug: string; label: string }[];
+};
+
+export default function MobileMenu({
+  isLoggedIn = false,
+  sections = [],
+}: {
+  isLoggedIn?: boolean;
+  sections?: MobileMenuSection[];
+}) {
   const [open, setOpen] = useState(false);
   const [openSection, setOpenSection] = useState<string | null>(null);
 
@@ -29,8 +40,8 @@ export default function MobileMenu({ isLoggedIn = false }: { isLoggedIn?: boolea
       {open && (
         <div className="absolute top-full left-0 right-0 bg-[var(--card-bg)] border-b border-[var(--border)] shadow-lg lg:hidden">
           <nav className="flex flex-col px-6 py-4 gap-3">
-            {SECTIONS.map((section) => {
-              const cats = getCategoriesBySection(section.slug);
+            {sections.map((section) => {
+              const cats = section.categories;
               const isOpen = openSection === section.slug;
               return (
                 <div key={section.slug}>

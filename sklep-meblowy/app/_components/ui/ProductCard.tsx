@@ -5,7 +5,7 @@ import { getCategoryLabel } from "@/app/_lib/categories";
 import AddToCartButton from "./AddToCartButton";
 import StarRating from "./StarRating";
 
-export default function ProductCard({
+export default async function ProductCard({
   product,
   rating,
 }: {
@@ -13,6 +13,7 @@ export default function ProductCard({
   rating?: ProductRating;
 }) {
   const image = product.images?.[0];
+  const categoryLabel = await getCategoryLabel(product.category);
 
   return (
     <div className="group flex flex-col">
@@ -38,7 +39,7 @@ export default function ProductCard({
       </Link>
 
       <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-1">
-        {getCategoryLabel(product.category) ?? product.category}
+        {categoryLabel ?? product.category}
       </p>
       <Link href={`/produkt/${product.id}`}>
         <p className="font-display text-lg font-semibold text-[var(--fg)] group-hover:text-[var(--color-gold)] transition-colors mb-2 leading-snug">

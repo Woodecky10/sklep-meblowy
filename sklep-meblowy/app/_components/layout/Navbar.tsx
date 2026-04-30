@@ -7,14 +7,40 @@ import MobileMenu from "./MobileMenu";
 import UserMenu from "./UserMenu";
 import SearchBox from "./SearchBox";
 import { createClient } from "@/app/_lib/supabase/server";
-import { SECTIONS, getCategoriesBySection } from "@/app/_lib/categories";
+import { getSections, getCategories } from "@/app/_lib/categories";
 import { COMPANY } from "@/app/_lib/company";
 
 export default async function Navbar() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [
+    {
+      data: { user },
+    },
+    sections,
+    categories,
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    getSections(),
+    getCategories(),
+  ]);
+
+  // Grupowanie kategorii pod sekcjami — jedna iteracja zamiast N+1 zapytań.
+  const categoriesBySection = new Map<string, typeof categories>();
+  for (const c of categories) {
+    const arr = categoriesBySection.get(c.group_slug) ?? [];
+    arr.push(c);
+    categoriesBySection.set(c.group_slug, arr);
+  }
+
+  // Lekka projekcja dla MobileMenu (klient) — bez rzeczy nie potrzebnych.
+  const mobileSections = sections.map((s) => ({
+    slug: s.slug,
+    label: s.label,
+    categories: (categoriesBySection.get(s.slug) ?? []).map((c) => ({
+      slug: c.slug,
+      label: c.label,
+    })),
+  }));
 
   return (
     <header className="sticky top-0 z-50 bg-[var(--bg)] border-b border-[var(--border)] backdrop-blur-sm">
@@ -41,8 +67,8 @@ export default async function Navbar() {
         {/* Nawigacja + searchbar (desktop) */}
         <div className="hidden lg:flex items-center gap-8 flex-1 justify-center">
           <nav className="flex items-center gap-6">
-            {SECTIONS.map((section) => {
-              const cats = getCategoriesBySection(section.slug);
+            {sections.map((section) => {
+              const cats = categoriesBySection.get(section.slug) ?? [];
               return (
                 <div key={section.slug} className="relative group">
                   <button className="font-sans text-xs uppercase tracking-widest text-[var(--muted)] group-hover:text-[var(--color-gold)] transition-colors flex items-center gap-1 h-24">
@@ -104,7 +130,7 @@ export default async function Navbar() {
           <ThemeToggle />
           <UserMenu />
           <CartIcon />
-          <MobileMenu isLoggedIn={!!user} />
+          <MobileMenu isLoggedIn={!!user} sections={mobileSections} />
         </div>
       </div>
     </header>

@@ -1,6 +1,7 @@
-// Eksportowane z _lib/categories.ts — single source of truth.
-import type { CategorySlug } from "./categories";
-export type Category = CategorySlug;
+// Kategorie są teraz dynamiczne (z DB, edytowane przez admin panel) —
+// reprezentujemy slug jako zwykły string. Walidacja istnienia odbywa się
+// po stronie DB przez FK products.category → categories.slug.
+export type Category = string;
 
 export type ProductDimensions = {
   width: number;

@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { SECTIONS, getCategoriesBySection } from "@/app/_lib/categories";
 
 const SORTS = [
   { value: "newest", label: "Najnowsze" },
@@ -10,12 +9,19 @@ const SORTS = [
   { value: "price_desc", label: "Cena: malejąco" },
 ];
 
+export type FilterBarSection = {
+  slug: string;
+  label: string;
+  categories: { slug: string; label: string }[];
+};
+
 type Props = {
   colors: string[];
   materials: string[];
+  sections?: FilterBarSection[];
 };
 
-export default function FilterBar({ colors, materials }: Props) {
+export default function FilterBar({ colors, materials, sections = [] }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -98,8 +104,8 @@ export default function FilterBar({ colors, materials }: Props) {
           >
             Wszystkie
           </button>
-          {SECTIONS.map((section) => {
-            const cats = getCategoriesBySection(section.slug);
+          {sections.map((section) => {
+            const cats = section.categories;
             return (
               <div key={section.slug} className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mr-1">
