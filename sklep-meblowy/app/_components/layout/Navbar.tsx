@@ -7,6 +7,7 @@ import MobileMenu from "./MobileMenu";
 import UserMenu from "./UserMenu";
 import SearchBox from "./SearchBox";
 import { createClient } from "@/app/_lib/supabase/server";
+import { isAdmin } from "@/app/_lib/admin";
 import { getSections, getCategories } from "@/app/_lib/categories";
 import { COMPANY } from "@/app/_lib/company";
 
@@ -130,7 +131,11 @@ export default async function Navbar() {
           <ThemeToggle />
           <UserMenu />
           <CartIcon />
-          <MobileMenu isLoggedIn={!!user} sections={mobileSections} />
+          <MobileMenu
+            isLoggedIn={!!user}
+            isAdmin={isAdmin(user)}
+            sections={mobileSections}
+          />
         </div>
       </div>
     </header>

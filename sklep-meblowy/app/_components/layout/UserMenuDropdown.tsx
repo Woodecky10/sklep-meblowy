@@ -7,9 +7,11 @@ import { signOut } from "@/app/_lib/auth-actions";
 export default function UserMenuDropdown({
   label,
   initial,
+  isAdminUser = false,
 }: {
   label: string;
   initial: string;
+  isAdminUser?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -45,6 +47,21 @@ export default function UserMenuDropdown({
             </p>
           </div>
           <nav className="flex flex-col py-1">
+            {isAdminUser && (
+              <Link
+                href="/admin"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-[var(--color-gold)] hover:bg-[var(--border)] transition-colors border-b border-[var(--border)]"
+              >
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
+                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+                Panel admina
+              </Link>
+            )}
             <Link
               href="/konto"
               onClick={() => setOpen(false)}
