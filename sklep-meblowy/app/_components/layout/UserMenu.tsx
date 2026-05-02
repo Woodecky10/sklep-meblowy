@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/app/_lib/supabase/server";
+import { isAdmin } from "@/app/_lib/admin";
 import UserMenuDropdown from "./UserMenuDropdown";
 
 export default async function UserMenu() {
@@ -27,6 +28,27 @@ export default async function UserMenu() {
     user.email ??
     "Konto";
   const initial = label.charAt(0).toUpperCase();
+  const userIsAdmin = isAdmin(user);
 
-  return <UserMenuDropdown label={label} initial={initial} />;
+  return (
+    <>
+      {/* Widoczny przycisk powrotu do panelu admina — tylko dla admina */}
+      {userIsAdmin && (
+        <Link
+          href="/admin"
+          className="hidden sm:inline-flex items-center gap-2 px-3 h-9 rounded-full bg-[var(--color-gold)] text-[var(--color-navy)] text-xs font-sans font-semibold uppercase tracking-widest hover:bg-[var(--color-gold-light)] transition-colors"
+          aria-label="Panel admina"
+        >
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="7" height="7" rx="1" />
+          </svg>
+          <span className="hidden md:inline">Panel</span>
+        </Link>
+      )}
+      <UserMenuDropdown label={label} initial={initial} isAdminUser={userIsAdmin} />
+    </>
+  );
 }

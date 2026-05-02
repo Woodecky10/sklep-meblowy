@@ -12,9 +12,11 @@ export type MobileMenuSection = {
 
 export default function MobileMenu({
   isLoggedIn = false,
+  isAdmin = false,
   sections = [],
 }: {
   isLoggedIn?: boolean;
+  isAdmin?: boolean;
   sections?: MobileMenuSection[];
 }) {
   const [open, setOpen] = useState(false);
@@ -98,6 +100,21 @@ export default function MobileMenu({
             <div className="border-t border-[var(--border)] pt-4 mt-2 flex flex-col gap-4">
               {isLoggedIn ? (
                 <>
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setOpen(false)}
+                      className="font-sans text-sm uppercase tracking-widest text-[var(--color-gold)] font-semibold flex items-center gap-2"
+                    >
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <rect x="3" y="3" width="7" height="7" rx="1" />
+                        <rect x="14" y="3" width="7" height="7" rx="1" />
+                        <rect x="3" y="14" width="7" height="7" rx="1" />
+                        <rect x="14" y="14" width="7" height="7" rx="1" />
+                      </svg>
+                      Panel admina
+                    </Link>
+                  )}
                   <Link
                     href="/konto"
                     onClick={() => setOpen(false)}
