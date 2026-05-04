@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import DOMPurify from "isomorphic-dompurify";
 import { getProduct, getRelatedProducts } from "@/app/_lib/products";
 import { getCategoryLabel } from "@/app/_lib/categories";
 import {
@@ -16,13 +17,19 @@ import ReviewForm from "@/app/_components/ui/ReviewForm";
 
 type Props = { params: Promise<{ id: string }> };
 
+// Strip HTML tagów dla meta description (Google nie chce tagów w meta).
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const product = await getProduct(id);
   if (!product) return { title: "Produkt nie znaleziony" };
   return {
     title: product.name,
-    description: product.description,
+    // Meta description = plain text (bez HTML, max 160 znaków)
+    description: stripHtml(product.description).slice(0, 160),
     openGraph: {
       images: product.images?.[0] ? [{ url: product.images[0] }] : [],
     },
@@ -118,7 +125,15 @@ export default async function ProduktPage({ params }: Props) {
             </p>
           </div>
 
-          <p className="text-[var(--muted)] leading-relaxed">{product.description}</p>
+          <div
+            className="text-[var(--muted)] leading-relaxed prose prose-sm dark:prose-invert max-w-none [&_p]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:text-[var(--fg)] [&_a]:text-[var(--color-gold)]"
+            dangerouslySetInnerHTML={{
+              __html: DOMPurify.sanitize(product.description, {
+                ALLOWED_TAGS: ["p", "br", "strong", "em", "b", "i", "u", "ul", "ol", "li", "a", "h2", "h3", "h4", "span"],
+                ALLOWED_ATTR: ["href", "target", "rel"],
+              }),
+            }}
+          />
 
           <div className="inline-flex items-center gap-2 text-sm text-[var(--muted)]">
             <span className="w-2 h-2 rounded-full bg-[var(--color-gold)]" />
