@@ -71,8 +71,8 @@ export default async function Navbar() {
             {sections.map((section) => {
               const cats = categoriesBySection.get(section.slug) ?? [];
               return (
-                <div key={section.slug} className="relative group">
-                  <button className="font-sans text-xs uppercase tracking-widest text-[var(--muted)] group-hover:text-[var(--color-gold)] transition-colors flex items-center gap-1 h-24">
+                <div key={section.slug} className="relative group shrink-0">
+                  <button className="font-sans text-xs uppercase tracking-widest text-[var(--muted)] group-hover:text-[var(--color-gold)] transition-colors flex items-center gap-1 h-24 whitespace-nowrap">
                     {section.label}
                     <svg
                       width="10"
@@ -103,13 +103,13 @@ export default async function Navbar() {
             })}
             <Link
               href="/o-nas"
-              className="font-sans text-xs uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors"
+              className="font-sans text-xs uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors whitespace-nowrap shrink-0"
             >
               O nas
             </Link>
             <Link
               href="/kontakt"
-              className="font-sans text-xs uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors"
+              className="font-sans text-xs uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors whitespace-nowrap shrink-0"
             >
               Kontakt
             </Link>
