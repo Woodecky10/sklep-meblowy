@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import DOMPurify from "isomorphic-dompurify";
 import { getProduct, getRelatedProducts } from "@/app/_lib/products";
 import { getCategoryLabel } from "@/app/_lib/categories";
 import {
@@ -125,15 +124,9 @@ export default async function ProduktPage({ params }: Props) {
             </p>
           </div>
 
-          <div
-            className="text-[var(--muted)] leading-relaxed prose prose-sm dark:prose-invert max-w-none [&_p]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:text-[var(--fg)] [&_a]:text-[var(--color-gold)]"
-            dangerouslySetInnerHTML={{
-              __html: DOMPurify.sanitize(product.description, {
-                ALLOWED_TAGS: ["p", "br", "strong", "em", "b", "i", "u", "ul", "ol", "li", "a", "h2", "h3", "h4", "span"],
-                ALLOWED_ATTR: ["href", "target", "rel"],
-              }),
-            }}
-          />
+          <div className="text-[var(--muted)] leading-relaxed whitespace-pre-line">
+            {stripHtml(product.description)}
+          </div>
 
           <div className="inline-flex items-center gap-2 text-sm text-[var(--muted)]">
             <span className="w-2 h-2 rounded-full bg-[var(--color-gold)]" />
