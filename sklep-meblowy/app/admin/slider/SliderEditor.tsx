@@ -348,9 +348,62 @@ function SlideForm({
     cta_primary_label: initial?.cta_primary_label ?? "",
   });
 
+  // Skompresowany plik do podmiany w FormData przed wysłaniem.
+  // Bez tego upload zdjęć z telefonu (5–12 MB) wywala server actions
+  // (limit body 1MB / 4MB / 10MB w zależności od konfiguracji).
+  const [compressedFile, setCompressedFile] = useState<File | null>(null);
+  const [compressing, setCompressing] = useState(false);
+  const [compressInfo, setCompressInfo] = useState<string | null>(null);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Pokaż preview (oryginał — tylko do oka, kompresja dla uploadu)
+    setPreview((p) => ({ ...p, image_url: URL.createObjectURL(file) }));
+
+    // Mały plik — pomiń kompresję żeby zaoszczędzić czas
+    if (file.size < 800 * 1024) {
+      setCompressedFile(file);
+      setCompressInfo(`${(file.size / 1024).toFixed(0)} KB — bez kompresji`);
+      return;
+    }
+
+    // Kompresja w tle (web worker — nie blokuje UI)
+    setCompressing(true);
+    setCompressInfo(null);
+    try {
+      const imageCompression = (await import("browser-image-compression")).default;
+      const compressed = await imageCompression(file, {
+        maxSizeMB: 1, // <1MB po kompresji
+        maxWidthOrHeight: 2400, // hero szerokie ale nie 4K
+        useWebWorker: true,
+        fileType: file.type === "image/png" ? "image/jpeg" : file.type, // PNG → JPEG (mniejsze)
+        initialQuality: 0.82,
+      });
+      setCompressedFile(compressed);
+      const before = (file.size / 1024 / 1024).toFixed(1);
+      const after = (compressed.size / 1024).toFixed(0);
+      setCompressInfo(`${before} MB → ${after} KB (skompresowane)`);
+    } catch (err) {
+      // Kompresja nieudana — wyślemy oryginał jako fallback
+      console.error("Kompresja nieudana:", err);
+      setCompressedFile(file);
+      setCompressInfo(`${(file.size / 1024 / 1024).toFixed(1)} MB — kompresja zawiodła, wysyłam oryginał`);
+    } finally {
+      setCompressing(false);
+    }
+  }
+
   return (
     <form
-      action={(fd) => startTransition(() => onSubmit(fd))}
+      action={(fd) => {
+        // Podmień oryginalny plik z formularza na skompresowany
+        if (compressedFile) {
+          fd.set("image", compressedFile, compressedFile.name);
+        }
+        startTransition(() => onSubmit(fd));
+      }}
       className="grid grid-cols-1 lg:grid-cols-3 gap-6"
     >
       {initial && <input type="hidden" name="id" value={initial.id} />}
@@ -362,22 +415,31 @@ function SlideForm({
           label="Zdjęcie tła"
           hint={
             initial?.image_url
-              ? "Zostaw puste żeby zachować obecne zdjęcie. Wybierz nowe żeby zastąpić."
-              : "Format: JPG/PNG/WebP. Polecane: szerokie (16:9 albo 21:9), min. 1920px szerokości."
+              ? "Zostaw puste żeby zachować obecne zdjęcie. Wybierz nowe żeby zastąpić. Duże zdjęcia są automatycznie kompresowane."
+              : "Format: JPG/PNG/WebP. Duże zdjęcia (z telefonu, 5–12 MB) są automatycznie kompresowane do <1 MB przed wgraniem."
           }
         >
           <input
             type="file"
             name="image"
             accept="image/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                setPreview((p) => ({ ...p, image_url: URL.createObjectURL(file) }));
-              }
-            }}
+            onChange={handleFileChange}
             className="w-full text-sm text-[var(--fg)] file:mr-3 file:px-4 file:py-2 file:rounded-full file:border file:border-[var(--border)] file:bg-[var(--card-bg)] file:text-[var(--fg)] file:text-xs file:font-sans file:uppercase file:tracking-widest file:cursor-pointer hover:file:border-[var(--color-gold)]"
           />
+          {compressing && (
+            <p className="text-xs text-[var(--color-gold)] mt-1 flex items-center gap-2">
+              <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                <circle cx="12" cy="12" r="10" opacity="0.25" />
+                <path d="M22 12a10 10 0 0 0-10-10" />
+              </svg>
+              Kompresuję zdjęcie...
+            </p>
+          )}
+          {compressInfo && !compressing && (
+            <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">
+              ✓ {compressInfo}
+            </p>
+          )}
         </Field>
 
         <Field label="Opis zdjęcia (alt)" hint="Co widać na zdjęciu — dla wyszukiwarek i niewidzących">
@@ -540,10 +602,16 @@ function SlideForm({
         <div className="flex gap-2 pt-2">
           <button
             type="submit"
-            disabled={pending}
+            disabled={pending || compressing}
             className="px-5 py-2.5 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
           >
-            {pending ? "Zapisuję..." : mode === "create" ? "Dodaj slajd" : "Zapisz zmiany"}
+            {compressing
+              ? "Kompresuję..."
+              : pending
+              ? "Zapisuję..."
+              : mode === "create"
+              ? "Dodaj slajd"
+              : "Zapisz zmiany"}
           </button>
           <button
             type="button"
