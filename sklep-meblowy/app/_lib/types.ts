@@ -17,15 +17,29 @@ export type ProductOption = {
 
 // Konkretna kombinacja wybranych wartości + stock + ewentualny modyfikator ceny.
 // values mapuje nazwę opcji → wybraną wartość, np. {"Strona":"Lewa","Kolor":"Beżowy"}.
+// images — opcjonalnie URL-e zdjęć dla tego wariantu (admin przypina ręcznie).
+//   Jeśli puste/null → na froncie pokazujemy wszystkie zdjęcia produktu.
 export type ProductVariant = {
   values: Record<string, string>;
   stock: number;
   price_modifier?: number;
+  images?: string[];
+};
+
+// Override-y wyświetlanych nazw — admin może zmienić "Wariant" → "Kolor"
+// i "01 beż drewniany stelaż" → "Beż drewniany". Zapisane oddzielnie żeby
+// sync z BL nie nadpisał ich (BL przy każdym sync zwraca surowe nazwy).
+export type ProductVariantOverrides = {
+  // np. {"Wariant": "Kolor"}
+  option_names?: Record<string, string>;
+  // np. {"Wariant": {"01 beż drewniany stelaż": "Beż drewniany"}}
+  value_labels?: Record<string, Record<string, string>>;
 };
 
 export type ProductVariants = {
   options: ProductOption[];
   combinations: ProductVariant[];
+  overrides?: ProductVariantOverrides;
 };
 
 export type Product = {
