@@ -10,9 +10,15 @@ import {
   getInventoryProductsList,
   getInventoryProductsData,
   type BLInventoryProduct,
+  type BLVariant,
 } from "./baselinker";
 import { getCategoryByBaselinkerId } from "./categories";
-import type { Product, ProductDimensions } from "./types";
+import type {
+  Product,
+  ProductDimensions,
+  ProductVariants,
+  ProductVariant,
+} from "./types";
 
 export type SyncSkippedProduct = {
   id: string;
@@ -88,6 +94,83 @@ type ProductInsert = Omit<Product, "id" | "created_at"> & {
   created_at?: string;
 };
 
+// Longest common prefix (case-sensitive) — pomocnicze do parsera wariantów.
+function commonPrefix(strings: string[]): string {
+  if (strings.length === 0) return "";
+  let p = strings[0];
+  for (let i = 1; i < strings.length; i++) {
+    while (!strings[i].startsWith(p)) {
+      p = p.slice(0, -1);
+      if (!p) return "";
+    }
+  }
+  return p;
+}
+
+// Najmniejszy próg długości prefixu żeby uznać że "warto stripować".
+// Krótsze prefixy → fallback: pełne nazwy jako wartości.
+const PREFIX_THRESHOLD = 5;
+
+// Mapper: BL variants (Record<string, BLVariant>) → ProductVariants (nasz format).
+// Zwraca null gdy BL nie ma wariantów albo dane są niepoprawne.
+//
+// BL daje płaską listę wariantów po nazwach (bez strukturalnych atrybutów),
+// więc generujemy zawsze JEDNĄ opcję (domyślnie "Wariant"). Wartości to
+// fragment nazwy który się różni między wariantami.
+function parseVariantsFromBl(
+  blVariants: Record<string, BLVariant> | undefined,
+  defaultPriceGroup: number,
+  mainPrice: number
+): ProductVariants | null {
+  if (!blVariants) return null;
+  const entries = Object.entries(blVariants);
+  if (entries.length === 0) return null;
+
+  const names = entries.map(([, v]) => (v.name ?? "").trim());
+  if (names.some((n) => !n)) return null; // bezpieczny fallback
+
+  // Znajdź wspólny prefix i strip-uj go z nazw, jeśli dostatecznie długi.
+  const prefix = commonPrefix(names);
+  const useStripped = prefix.length >= PREFIX_THRESHOLD;
+  const rawValues = useStripped
+    ? names.map((n) => n.slice(prefix.length).trim())
+    : names.map((n) => n.trim());
+
+  // Dedup wartości — czasem BL ma duplikaty
+  const seen = new Set<string>();
+  const valuesUnique: string[] = [];
+  for (const v of rawValues) {
+    if (!v || seen.has(v)) continue;
+    seen.add(v);
+    valuesUnique.push(v);
+  }
+  if (valuesUnique.length === 0) return null;
+
+  const optionName = "Wariant";
+
+  const combinations: ProductVariant[] = entries.map(([, v], idx) => {
+    const variantPrice =
+      v.prices?.[String(defaultPriceGroup)] ??
+      Object.values(v.prices ?? {}).find((p) => typeof p === "number" && p > 0) ??
+      mainPrice;
+    const stock = Object.values(v.stock ?? {}).reduce(
+      (s, q) => s + (typeof q === "number" ? q : 0),
+      0
+    );
+    const value = rawValues[idx];
+    return {
+      values: { [optionName]: value },
+      stock,
+      price_modifier: variantPrice - mainPrice,
+    };
+  });
+
+  return {
+    options: [{ name: optionName, values: valuesUnique }],
+    combinations,
+  };
+}
+
 async function mapBlToProduct(
   blId: string,
   bl: BLInventoryProduct,
@@ -129,7 +212,7 @@ async function mapBlToProduct(
     construction: getFeature(bl.features, "Konstrukcja"),
     delivery_time: getFeature(bl.features, "Czas realizacji"),
     warranty: getFeature(bl.features, "Gwarancja"),
-    variants: null,
+    variants: parseVariantsFromBl(bl.variants, defaultPriceGroup, price),
     baselinker_id: blId,
   };
 
