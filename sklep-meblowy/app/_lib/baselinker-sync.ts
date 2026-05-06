@@ -276,7 +276,21 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
       };
 
       for (const [blId, bl] of Object.entries(products)) {
+        // DEBUG — info o wariantach z BL i o tym co parser zwrócił.
+        // Do usunięcia gdy potwierdzimy że sync wariantów działa.
+        const blVariantsInfo = bl.variants
+          ? `${Object.keys(bl.variants).length} BL variants`
+          : "no variants";
         const mapped = await mapBlToProduct(blId, bl, defaultPriceGroup);
+        if (mapped.ok) {
+          const parsedInfo = mapped.product.variants
+            ? `parsed ${mapped.product.variants.combinations.length} variants`
+            : "parsed null";
+          console.log(
+            `[BL sync] ${blId} "${bl.text_fields?.name ?? "?"}" — ${blVariantsInfo} — ${parsedInfo}`
+          );
+        }
+
         if (!mapped.ok) {
           result.skipped.push({
             id: blId,
@@ -289,8 +303,16 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
         const { data, error } = await supabase
           .from("products")
           .upsert(mapped.product as never, { onConflict: "baselinker_id" })
-          .select("id, created_at")
+          .select("id, created_at, variants")
           .single();
+
+        // DEBUG — co Supabase rzeczywiście zapisał w kolumnie variants
+        if (!error && data) {
+          const dbVariants = (data as { variants: unknown }).variants;
+          console.log(
+            `[BL sync upsert] ${blId} db_variants=${JSON.stringify(dbVariants)?.slice(0, 200)}`
+          );
+        }
 
         if (error) {
           result.skipped.push({
