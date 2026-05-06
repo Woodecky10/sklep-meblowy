@@ -90,3 +90,37 @@ export function formatVariantLabel(values: Record<string, string>): string {
     .map(([k, v]) => `${k}: ${v}`)
     .join(", ");
 }
+
+// Zdjęcia do wyświetlenia dla wybranego wariantu.
+// Jeśli wariant ma własne `images` (admin je przypisał) — pokaż tylko te.
+// Inaczej fallback do wszystkich zdjęć produktu.
+export function getVariantImages(
+  product: Product,
+  selectedValues: Record<string, string>
+): string[] {
+  if (!hasVariants(product)) return product.images ?? [];
+  const variant = findVariant(product, selectedValues);
+  if (variant?.images && variant.images.length > 0) return variant.images;
+  return product.images ?? [];
+}
+
+// Display name opcji — jeśli admin nadpisał ("Wariant" → "Kolor"), użyj override.
+export function getOptionDisplayName(
+  product: Product,
+  optionName: string
+): string {
+  return (
+    product.variants?.overrides?.option_names?.[optionName] ?? optionName
+  );
+}
+
+// Display label wartości — jeśli admin nadpisał ("01 beż" → "Beż"), użyj override.
+export function getValueDisplayLabel(
+  product: Product,
+  optionName: string,
+  value: string
+): string {
+  return (
+    product.variants?.overrides?.value_labels?.[optionName]?.[value] ?? value
+  );
+}

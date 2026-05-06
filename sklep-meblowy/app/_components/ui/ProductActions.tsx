@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import type { Product } from "@/app/_lib/types";
 import {
   hasVariants,
@@ -10,28 +9,30 @@ import {
 import VariantSelector from "./VariantSelector";
 import AddToCartButton from "./AddToCartButton";
 
-// Produkty robione na zamówienie — bez limitów magazynowych.
-// Walidujemy tylko kompletność wyboru wariantu i liczymy dynamiczną cenę
-// z ewentualnym modyfikatorem (np. droższy kolor).
-export default function ProductActions({ product }: { product: Product }) {
-  const [selected, setSelected] = useState<Record<string, string>>({});
-
+// Akcje produktu — wybór wariantu, dynamiczna cena, dodaj do koszyka.
+// State wybranego wariantu może być przekazany z zewnątrz (przez ProductMain),
+// żeby galeria zdjęć też mogła reagować na wybór.
+export default function ProductActions({
+  product,
+  selected,
+  onSelectedChange,
+}: {
+  product: Product;
+  selected: Record<string, string>;
+  onSelectedChange: (next: Record<string, string>) => void;
+}) {
   const showVariants = hasVariants(product);
   const complete = isVariantSelectionComplete(product, selected);
   const price = getVariantPrice(product, selected);
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Dynamiczna cena (gdy modyfikator zmienia bazową) */}
+      {/* Cena wariantu — bez przekreślonej bazowej (warianty to różne ceny,
+          nie promocje). */}
       {showVariants && complete && price !== product.price && (
-        <div className="flex items-baseline gap-3">
-          <p className="font-sans text-2xl font-bold text-[var(--color-gold)]">
-            {price.toLocaleString("pl-PL")} zł
-          </p>
-          <p className="text-sm text-[var(--muted)] line-through">
-            {product.price.toLocaleString("pl-PL")} zł
-          </p>
-        </div>
+        <p className="font-sans text-2xl font-bold text-[var(--color-gold)]">
+          {price.toLocaleString("pl-PL")} zł
+        </p>
       )}
 
       {showVariants && (
@@ -39,7 +40,7 @@ export default function ProductActions({ product }: { product: Product }) {
           product={product}
           variants={product.variants!}
           selected={selected}
-          onChange={setSelected}
+          onChange={onSelectedChange}
         />
       )}
 

@@ -18,7 +18,49 @@ import type {
   ProductDimensions,
   ProductVariants,
   ProductVariant,
+  ProductVariantOverrides,
 } from "./types";
+
+// Klucz do dopasowania wariantów — wartości opcji posortowane po nazwie,
+// żeby kolejność nie miała znaczenia: {Kolor:"róż", Rozmiar:"M"} == {Rozmiar:"M", Kolor:"róż"}
+function variantKey(values: Record<string, string>): string {
+  return Object.keys(values)
+    .sort()
+    .map((k) => `${k}=${values[k]}`)
+    .join("|");
+}
+
+// Merge nowych wariantów (z BL) ze starymi (z DB) — zachowuje ręczne edycje
+// admina (per-variant images, overrides nazw). BL jest źródłem prawdy dla
+// nazw/cen/stocku, admin dla images i overrides.
+export function mergeVariantsPreserveAdminEdits(
+  fresh: ProductVariants,
+  existing: ProductVariants
+): ProductVariants {
+  const existingByKey = new Map<string, ProductVariant>();
+  for (const c of existing.combinations) {
+    existingByKey.set(variantKey(c.values), c);
+  }
+
+  const merged: ProductVariant[] = fresh.combinations.map((c) => {
+    const old = existingByKey.get(variantKey(c.values));
+    if (old?.images && old.images.length > 0) {
+      return { ...c, images: old.images };
+    }
+    return c;
+  });
+
+  // Overrides zachowujemy w całości — to świadoma zmiana admina.
+  const overrides: ProductVariantOverrides | undefined = existing.overrides
+    ? { ...existing.overrides }
+    : undefined;
+
+  return {
+    options: fresh.options,
+    combinations: merged,
+    ...(overrides ? { overrides } : {}),
+  };
+}
 
 export type SyncSkippedProduct = {
   id: string;
@@ -276,20 +318,7 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
       };
 
       for (const [blId, bl] of Object.entries(products)) {
-        // DEBUG — info o wariantach z BL i o tym co parser zwrócił.
-        // Do usunięcia gdy potwierdzimy że sync wariantów działa.
-        const blVariantsInfo = bl.variants
-          ? `${Object.keys(bl.variants).length} BL variants`
-          : "no variants";
         const mapped = await mapBlToProduct(blId, bl, defaultPriceGroup);
-        if (mapped.ok) {
-          const parsedInfo = mapped.product.variants
-            ? `parsed ${mapped.product.variants.combinations.length} variants`
-            : "parsed null";
-          console.log(
-            `[BL sync] ${blId} "${bl.text_fields?.name ?? "?"}" — ${blVariantsInfo} — ${parsedInfo}`
-          );
-        }
 
         if (!mapped.ok) {
           result.skipped.push({
@@ -300,19 +329,29 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
           continue;
         }
 
+        // Zachowaj manualne mapowania admina (zdjęcia per wariant + overrides).
+        // BL nie ma tych danych — admin ustawia je w panelu /admin/produkty.
+        if (mapped.product.variants) {
+          const { data: existing } = await supabase
+            .from("products")
+            .select("variants")
+            .eq("baselinker_id", blId)
+            .maybeSingle();
+          const existingVariants = (existing as { variants: ProductVariants | null } | null)
+            ?.variants;
+          if (existingVariants) {
+            mapped.product.variants = mergeVariantsPreserveAdminEdits(
+              mapped.product.variants,
+              existingVariants
+            );
+          }
+        }
+
         const { data, error } = await supabase
           .from("products")
           .upsert(mapped.product as never, { onConflict: "baselinker_id" })
-          .select("id, created_at, variants")
+          .select("id, created_at")
           .single();
-
-        // DEBUG — co Supabase rzeczywiście zapisał w kolumnie variants
-        if (!error && data) {
-          const dbVariants = (data as { variants: unknown }).variants;
-          console.log(
-            `[BL sync upsert] ${blId} db_variants=${JSON.stringify(dbVariants)?.slice(0, 200)}`
-          );
-        }
 
         if (error) {
           result.skipped.push({
