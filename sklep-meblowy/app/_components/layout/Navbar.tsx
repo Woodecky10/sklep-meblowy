@@ -101,18 +101,6 @@ export default async function Navbar() {
                 </div>
               );
             })}
-            <Link
-              href="/o-nas"
-              className="font-sans text-xs uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors whitespace-nowrap shrink-0"
-            >
-              O nas
-            </Link>
-            <Link
-              href="/kontakt"
-              className="font-sans text-xs uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors whitespace-nowrap shrink-0"
-            >
-              Kontakt
-            </Link>
           </nav>
         </div>
 
