@@ -28,7 +28,7 @@ export default function KoszykPage() {
     );
   }
 
-  const shipping = total >= 2000 ? 0 : 299;
+  const shipping = 299;
   const grandTotal = total + shipping;
 
   return (
@@ -153,21 +153,8 @@ export default function KoszykPage() {
               </div>
               <div className="flex justify-between text-[var(--muted)]">
                 <span>Dostawa</span>
-                <span>
-                  {shipping === 0 ? (
-                    <span className="text-green-600 font-semibold">Gratis</span>
-                  ) : (
-                    `${shipping} zł`
-                  )}
-                </span>
+                <span>{shipping} zł</span>
               </div>
-              {shipping > 0 && (
-                <p className="text-xs text-[var(--muted)] bg-amber-50 dark:bg-amber-950 rounded-lg px-3 py-2">
-                  Dodaj jeszcze{" "}
-                  <strong>{(2000 - total).toLocaleString("pl-PL")} zł</strong>{" "}
-                  do darmowej dostawy
-                </p>
-              )}
               <div className="border-t border-[var(--border)] pt-3 flex justify-between font-bold text-base text-[var(--fg)]">
                 <span>Razem</span>
                 <span>{grandTotal.toLocaleString("pl-PL")} zł</span>

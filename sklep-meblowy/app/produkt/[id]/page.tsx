@@ -143,7 +143,6 @@ export default async function ProduktPage({ params }: Props) {
           <ProductActions product={product} />
 
           <div className="border-t border-[var(--border)] pt-6 text-sm text-[var(--muted)] space-y-2">
-            <p>✓ Darmowa dostawa od 2000 zł</p>
             <p>✓ Zwrot do 30 dni</p>
             <p>✓ Gwarancja 2 lata</p>
           </div>
