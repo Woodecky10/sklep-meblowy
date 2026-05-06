@@ -32,10 +32,7 @@ export default function DostawaPage() {
       <h2>Koszty i czas dostawy</h2>
       <ul>
         <li>
-          <strong>Koszt dostawy:</strong> 299 zł dla zamówień o wartości do 2000 zł.
-        </li>
-        <li>
-          <strong>Darmowa dostawa:</strong> dla zamówień powyżej 2000 zł.
+          <strong>Koszt dostawy:</strong> 299 zł (stała stawka, niezależnie od wartości zamówienia).
         </li>
         <li>
           <strong>Czas realizacji:</strong> od 7 do 35 dni roboczych, w zależności od produktu –

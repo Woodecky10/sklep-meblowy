@@ -111,8 +111,18 @@ export type BLInventoryProduct = {
   manufacturer_id?: number;
   images?: string[];
   features?: { name: string; value: string }[];
-  variants?: unknown[];
+  // BL zwraca warianty jako obiekt {variant_id: BLVariant}, nie array.
+  variants?: Record<string, BLVariant>;
   stock?: Record<string, number>;
+};
+
+export type BLVariant = {
+  name: string;
+  ean?: string;
+  asin?: string;
+  sku?: string;
+  stock?: Record<string, number>; // {warehouse_id: qty}
+  prices?: Record<string, number>; // {price_group_id: price}
 };
 
 export type BLInventoryProductsListResponse = {

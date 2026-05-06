@@ -83,20 +83,6 @@ export default function MobileMenu({
                 </div>
               );
             })}
-            <Link
-              href="/o-nas"
-              onClick={() => setOpen(false)}
-              className="font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors py-1"
-            >
-              O nas
-            </Link>
-            <Link
-              href="/kontakt"
-              onClick={() => setOpen(false)}
-              className="font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors py-1"
-            >
-              Kontakt
-            </Link>
             <div className="border-t border-[var(--border)] pt-4 mt-2 flex flex-col gap-4">
               {isLoggedIn ? (
                 <>

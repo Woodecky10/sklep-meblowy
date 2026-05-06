@@ -129,20 +129,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Dostawa: darmowa od 2000 zł, inaczej 299 zł
-    const shipping = total >= 2000 ? 0 : 299;
+    // Stała stawka dostawy 299 zł
+    const shipping = 299;
     total += shipping;
 
-    if (shipping > 0) {
-      stripeLineItems.push({
-        quantity: 1,
-        price_data: {
-          currency: "pln",
-          unit_amount: shipping * 100,
-          product_data: { name: "Dostawa" },
-        },
-      });
-    }
+    stripeLineItems.push({
+      quantity: 1,
+      price_data: {
+        currency: "pln",
+        unit_amount: shipping * 100,
+        product_data: { name: "Dostawa" },
+      },
+    });
 
     // Użytkownik zalogowany?
     const {
