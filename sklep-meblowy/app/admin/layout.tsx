@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: "/admin", label: "Pulpit", icon: DashboardIcon },
   { href: "/admin/produkty", label: "Produkty", icon: ProductsIcon },
   { href: "/admin/slider", label: "Slider", icon: SliderIcon },
+  { href: "/admin/kafelki", label: "Kafelki", icon: TilesIcon },
   { href: "/admin/kategorie", label: "Kategorie", icon: CategoriesIcon },
   { href: "/admin/baselinker", label: "BaseLinker", icon: BLIcon },
 ];
@@ -103,6 +104,17 @@ function SliderIcon() {
       <circle cx="8" cy="19" r="1" fill="currentColor" />
       <circle cx="12" cy="19" r="1" fill="currentColor" />
       <circle cx="16" cy="19" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function TilesIcon() {
+  return (
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="3" width="8" height="8" rx="1" />
+      <rect x="13" y="3" width="8" height="8" rx="1" />
+      <rect x="3" y="13" width="8" height="8" rx="1" />
+      <rect x="13" y="13" width="8" height="8" rx="1" />
     </svg>
   );
 }
