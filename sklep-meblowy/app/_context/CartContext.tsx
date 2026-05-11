@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, useReducer, useCallback, useState } from "react";
+import { createContext, useContext, useMemo, useReducer, useCallback, useState, useEffect } from "react";
 
 export type CartItem = {
   id: string;
@@ -40,7 +40,8 @@ type CartAction =
       variantValues: Record<string, string> | undefined;
       quantity: number;
     }
-  | { type: "CLEAR" };
+  | { type: "CLEAR" }
+  | { type: "HYDRATE"; items: CartItem[] };
 
 // Stabilny klucz wariantu — sortuje po nazwie opcji żeby kolejność wyboru
 // (np. najpierw Kolor, potem Strona) nie tworzyła osobnych pozycji w koszyku.
@@ -92,10 +93,16 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     }
     case "CLEAR":
       return state.items.length === 0 ? state : { items: [] };
+    case "HYDRATE":
+      return { items: action.items };
     default:
       return state;
   }
 }
+
+// localStorage keys
+const LS_ITEMS = "mollien-cart-items";
+const LS_PROMO = "mollien-cart-promo";
 
 type CartContextValue = {
   items: CartItem[];
@@ -122,6 +129,47 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { items: [] });
   const [notification, setNotification] = useState<CartNotification | null>(null);
   const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
+  // hydrated=true dopiero po odczycie z localStorage, żeby nie nadpisać
+  // zapisanego stanu pustym przy pierwszym renderze.
+  const [hydrated, setHydrated] = useState(false);
+
+  // Hydrate z localStorage na mount (client-only).
+  useEffect(() => {
+    try {
+      const rawItems = localStorage.getItem(LS_ITEMS);
+      if (rawItems) {
+        const items = JSON.parse(rawItems) as CartItem[];
+        if (Array.isArray(items)) dispatch({ type: "HYDRATE", items });
+      }
+      const rawPromo = localStorage.getItem(LS_PROMO);
+      if (rawPromo) {
+        const promo = JSON.parse(rawPromo) as AppliedPromo;
+        if (promo && typeof promo === "object" && promo.code) {
+          setAppliedPromo(promo);
+        }
+      }
+    } catch {
+      // Uszkodzony JSON — ignorujemy.
+    }
+    setHydrated(true);
+  }, []);
+
+  // Persist items
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem(LS_ITEMS, JSON.stringify(state.items));
+    } catch {}
+  }, [state.items, hydrated]);
+
+  // Persist promo
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      if (appliedPromo) localStorage.setItem(LS_PROMO, JSON.stringify(appliedPromo));
+      else localStorage.removeItem(LS_PROMO);
+    } catch {}
+  }, [appliedPromo, hydrated]);
 
   const add = useCallback((item: CartItem) => {
     dispatch({ type: "ADD", item });
