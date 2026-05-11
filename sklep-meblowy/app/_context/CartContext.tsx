@@ -11,6 +11,17 @@ export type CartItem = {
   variantValues?: Record<string, string>;
 };
 
+// Zwalidowany kod rabatowy zastosowany do koszyka. Walidacja na serwerze
+// (validatePromoCode), tu tylko trzymamy wynik. Discount = ZŁ kwota
+// zniżki obliczona na podstawie total z momentu walidacji.
+export type AppliedPromo = {
+  promoId: string;
+  code: string;
+  discount: number;
+  discountType: "percent" | "fixed";
+  discountValue: number;
+};
+
 // Sygnał dla CartToast — `ts` (Date.now) zmienia się przy każdym dodaniu,
 // nawet jeśli to ten sam produkt, żeby toast mógł się ponownie pokazać.
 export type CartNotification = {
@@ -91,6 +102,7 @@ type CartContextValue = {
   total: number;
   count: number;
   notification: CartNotification | null;
+  appliedPromo: AppliedPromo | null;
   add: (item: CartItem) => void;
   remove: (id: string, variantValues?: Record<string, string>) => void;
   updateQty: (
@@ -100,6 +112,8 @@ type CartContextValue = {
   ) => void;
   clear: () => void;
   dismissNotification: () => void;
+  applyPromo: (promo: AppliedPromo) => void;
+  clearPromo: () => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -107,6 +121,7 @@ const CartContext = createContext<CartContextValue | null>(null);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { items: [] });
   const [notification, setNotification] = useState<CartNotification | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
 
   const add = useCallback((item: CartItem) => {
     dispatch({ type: "ADD", item });
@@ -122,8 +137,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: "UPDATE_QTY", id, variantValues, quantity }),
     []
   );
-  const clear = useCallback(() => dispatch({ type: "CLEAR" }), []);
+  const clear = useCallback(() => {
+    dispatch({ type: "CLEAR" });
+    setAppliedPromo(null);
+  }, []);
   const dismissNotification = useCallback(() => setNotification(null), []);
+  const applyPromo = useCallback((promo: AppliedPromo) => setAppliedPromo(promo), []);
+  const clearPromo = useCallback(() => setAppliedPromo(null), []);
 
   const value = useMemo<CartContextValue>(() => {
     const total = state.items.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -133,13 +153,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       total,
       count,
       notification,
+      appliedPromo,
       add,
       remove,
       updateQty,
       clear,
       dismissNotification,
+      applyPromo,
+      clearPromo,
     };
-  }, [state.items, notification, add, remove, updateQty, clear, dismissNotification]);
+  }, [state.items, notification, appliedPromo, add, remove, updateQty, clear, dismissNotification, applyPromo, clearPromo]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { stripe } from "@/app/_lib/stripe";
-import { markOrderPaid } from "@/app/_lib/orders";
+import { markOrderPaid, getOrderById } from "@/app/_lib/orders";
+import { incrementPromoUsage } from "@/app/_lib/promo";
 import { pushOrderToBaseLinker } from "@/app/_lib/baselinker-orders";
 
 // Meble robione na zamówienie — nie dekrementujemy stock przy opłacie.
@@ -48,6 +49,18 @@ export async function POST(request: NextRequest) {
         { error: "Błąd aktualizacji zamówienia" },
         { status: 500 }
       );
+    }
+
+    // Increment used_count dla kodu rabatowego, jeśli zamówienie go używało.
+    // Best-effort — nieudany increment nie blokuje webhooka.
+    try {
+      const order = await getOrderById(orderId);
+      const promoId = (order as unknown as { promo_code_id: string | null }).promo_code_id;
+      if (promoId) {
+        await incrementPromoUsage(promoId);
+      }
+    } catch (err) {
+      console.error("[promo] increment used_count nieudany:", err);
     }
 
     // Push do BaseLinker — best-effort, nie blokuje webhooka jeśli zawiedzie.
