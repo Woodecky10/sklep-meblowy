@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import type { Product } from "@/app/_lib/types";
 import {
   hasVariants,
@@ -13,9 +12,18 @@ import AddToCartButton from "./AddToCartButton";
 // Produkty robione na zamówienie — bez limitów magazynowych.
 // Walidujemy tylko kompletność wyboru wariantu i liczymy dynamiczną cenę
 // z ewentualnym modyfikatorem (np. droższy kolor).
-export default function ProductActions({ product }: { product: Product }) {
-  const [selected, setSelected] = useState<Record<string, string>>({});
-
+//
+// Komponent jest kontrolowany — selected/onChange trzyma parent
+// (ProductMainSection), żeby galeria zdjęć mogła reagować na wybór wariantu.
+export default function ProductActions({
+  product,
+  selected,
+  onChange,
+}: {
+  product: Product;
+  selected: Record<string, string>;
+  onChange: (next: Record<string, string>) => void;
+}) {
   const showVariants = hasVariants(product);
   const complete = isVariantSelectionComplete(product, selected);
   const price = getVariantPrice(product, selected);
@@ -39,7 +47,7 @@ export default function ProductActions({ product }: { product: Product }) {
           product={product}
           variants={product.variants!}
           selected={selected}
-          onChange={setSelected}
+          onChange={onChange}
         />
       )}
 

@@ -90,3 +90,16 @@ export function formatVariantLabel(values: Record<string, string>): string {
     .map(([k, v]) => `${k}: ${v}`)
     .join(", ");
 }
+
+// Zdjęcia do pokazania klientowi: jeśli wybrany wariant ma własne, użyj ich.
+// W przeciwnym razie (brak wariantów, niekompletny wybór, brak zdjęć w
+// kombinacji) wracamy do globalnej galerii produktu.
+export function getVariantImages(
+  product: Product,
+  selectedValues: Record<string, string>
+): string[] {
+  if (!hasVariants(product)) return product.images;
+  const variant = findVariant(product, selectedValues);
+  if (variant?.images && variant.images.length > 0) return variant.images;
+  return product.images;
+}
