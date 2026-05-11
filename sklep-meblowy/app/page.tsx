@@ -124,9 +124,6 @@ export default async function HomePage() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-end justify-between mb-16">
             <div>
-              <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-3">
-                Wybór redakcji
-              </p>
               <h2 className="font-display text-4xl font-bold text-[var(--fg)]">
                 Polecane produkty
               </h2>
