@@ -61,7 +61,7 @@ export default async function Navbar() {
             priority
           />
           <span className="font-display text-2xl lg:text-3xl font-bold tracking-tight text-[var(--color-navy)] dark:text-[var(--color-gold)]">
-            {COMPANY.brandName}
+            {COMPANY.displayName}
           </span>
         </Link>
 
