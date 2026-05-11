@@ -11,6 +11,7 @@ export const metadata: Metadata = {
 const NAV_ITEMS = [
   { href: "/admin", label: "Pulpit", icon: DashboardIcon },
   { href: "/admin/produkty", label: "Produkty", icon: ProductsIcon },
+  { href: "/admin/polecane", label: "Polecane", icon: StarIcon },
   { href: "/admin/slider", label: "Slider", icon: SliderIcon },
   { href: "/admin/kafelki", label: "Kafelki", icon: TilesIcon },
   { href: "/admin/kategorie", label: "Kategorie", icon: CategoriesIcon },
@@ -104,6 +105,14 @@ function SliderIcon() {
       <circle cx="8" cy="19" r="1" fill="currentColor" />
       <circle cx="12" cy="19" r="1" fill="currentColor" />
       <circle cx="16" cy="19" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function StarIcon() {
+  return (
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
     </svg>
   );
 }
