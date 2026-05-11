@@ -204,16 +204,6 @@ export default function ProductEditor({
             <input name="material" defaultValue={product.material ?? ""} maxLength={100} className={inputClass} />
           </Field>
 
-          <Field label="Opis" className="md:col-span-2" hint="HTML dozwolony — renderowany po sanitize na karcie produktu.">
-            <textarea
-              name="description"
-              defaultValue={product.description}
-              rows={8}
-              maxLength={20000}
-              className={`${inputClass} resize-y font-mono text-xs`}
-            />
-          </Field>
-
           <Field label="Wymiary (cm)" className="md:col-span-2" hint="Szerokość × głębokość × wysokość. Zostaw puste żeby wyczyścić.">
             <div className="grid grid-cols-3 gap-2">
               <input

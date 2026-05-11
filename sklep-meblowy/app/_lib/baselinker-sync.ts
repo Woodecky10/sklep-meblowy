@@ -196,11 +196,24 @@ async function mapBlToProduct(
   const price = defaultPrice(bl, defaultPriceGroup);
   if (!price) return { ok: false, reason: "brak ceny lub cena = 0" };
 
-  const description = bl.text_fields?.description ?? "";
+  // Sklej Opis 1-5 z BL (description + description_extra1..4) z separatorem
+  // \n\n. Każde pole to osobny "Opis N" w panelu BL — koleżanka dopisuje
+  // kolejne i pojawiają się jeden pod drugim na karcie produktu.
+  // NIE strip-ujemy HTML — sanitize robi front (DOMPurify w product-html.ts).
+  const description = [
+    bl.text_fields?.description,
+    bl.text_fields?.description_extra1,
+    bl.text_fields?.description_extra2,
+    bl.text_fields?.description_extra3,
+    bl.text_fields?.description_extra4,
+  ]
+    .map((s) => (typeof s === "string" ? s.trim() : ""))
+    .filter((s) => s.length > 0)
+    .join("\n\n");
 
   const product: ProductInsert = {
     name: name.trim(),
-    description: description.trim(),
+    description,
     price,
     category: cat.slug,
     images: pickFirstImage(bl.images),

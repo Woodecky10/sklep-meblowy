@@ -143,9 +143,11 @@ export async function updateProductBasics(
     dimensions = { width, depth, height };
   }
 
+  // UWAGA: pole `description` celowo pomijane w updates — opis jest single
+  // source of truth z BaseLinkera (sklejone Opis 1-5 w mapBlToProduct).
+  // Admin nie edytuje opisu — robi to inna osoba w panelu BL.
   const updates: Record<string, unknown> = {
     name,
-    description: sanitize(formData.get("description"), 20000),
     price,
     category,
     stock: parseInteger(formData.get("stock"), 0),
