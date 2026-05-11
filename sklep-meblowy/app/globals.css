@@ -99,3 +99,49 @@ body {
   margin-bottom: 2rem;
   display: block;
 }
+
+/* Typografia opisu produktu (sanitized HTML z BL / admina) */
+.product-description h2 {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  color: var(--fg);
+}
+.product-description h3 {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--fg);
+}
+.product-description h4 {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-top: 1.25rem;
+  margin-bottom: 0.4rem;
+  color: var(--fg);
+}
+.product-description p {
+  line-height: 1.7;
+  margin-bottom: 1rem;
+}
+.product-description ul,
+.product-description ol {
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+  line-height: 1.7;
+}
+.product-description ul { list-style: disc; }
+.product-description ol { list-style: decimal; }
+.product-description li { margin-bottom: 0.35rem; }
+.product-description strong, .product-description b { font-weight: 600; }
+.product-description em, .product-description i { font-style: italic; }
+.product-description a {
+  color: var(--color-gold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

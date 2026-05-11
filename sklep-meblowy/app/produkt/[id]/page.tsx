@@ -12,6 +12,10 @@ import ProductCard from "@/app/_components/ui/ProductCard";
 import StarRating from "@/app/_components/ui/StarRating";
 import ReviewList from "@/app/_components/ui/ReviewList";
 import ReviewForm from "@/app/_components/ui/ReviewForm";
+import {
+  sanitizeProductHtml,
+  extractShortDescription,
+} from "@/app/_lib/product-html";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -97,7 +101,7 @@ export default async function ProduktPage({ params }: Props) {
         product={product}
         categoryLabel={categoryLabel ?? null}
         rating={rating}
-        descriptionText={stripHtml(product.description)}
+        descriptionText={extractShortDescription(product.description)}
       />
 
       {/* Sekcja Szczegóły */}
@@ -124,6 +128,24 @@ export default async function ProduktPage({ params }: Props) {
               </div>
             ))}
           </dl>
+        </section>
+      )}
+
+      {/* Sekcja: pełen opis HTML (z BL / admina, sanitized) */}
+      {product.description && product.description.trim().length > 0 && (
+        <section className="mb-24">
+          <div className="mb-8">
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+              Pełny opis
+            </p>
+            <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
+              Opis produktu
+            </h2>
+          </div>
+          <div
+            className="product-description max-w-4xl text-[var(--fg)] leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: sanitizeProductHtml(product.description) }}
+          />
         </section>
       )}
 
