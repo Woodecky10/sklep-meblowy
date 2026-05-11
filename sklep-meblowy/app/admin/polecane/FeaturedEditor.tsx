@@ -113,7 +113,7 @@ export default function FeaturedEditor({
       {items.length === 0 ? (
         <EmptyState message="Brak polecanych — dodaj pierwszy z listy powyżej." />
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <DndContext id="featured-dnd" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={items.map((x) => x.id)} strategy={verticalListSortingStrategy}>
             <div className="flex flex-col gap-3">
               {items.map((it) => (

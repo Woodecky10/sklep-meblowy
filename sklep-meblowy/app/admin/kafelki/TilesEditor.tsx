@@ -132,7 +132,7 @@ export default function TilesEditor({
       {tiles.length === 0 && !creating ? (
         <EmptyState message="Brak kafelków. Dodaj pierwszy żeby zacząć." />
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <DndContext id="tiles-dnd" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={tiles.map((t) => t.id)} strategy={verticalListSortingStrategy}>
             <div className="flex flex-col gap-3">
               {tiles.map((tile) => (
