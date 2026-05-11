@@ -8,9 +8,13 @@ import StarRating from "./StarRating";
 export default async function ProductCard({
   product,
   rating,
+  badge,
 }: {
   product: Product;
   rating?: ProductRating;
+  // Opcjonalny badge zastępujący domyślne "Na zamówienie"
+  // (używane w sekcji "Polecane" na home: "Bestseller", "Nowość" etc.).
+  badge?: string | null;
 }) {
   const image = product.images?.[0];
   const categoryLabel = await getCategoryLabel(product.category);
@@ -33,7 +37,7 @@ export default async function ProductCard({
             </div>
           )}
           <span className="absolute top-4 left-4 px-3 py-1 bg-[var(--color-gold)] text-[var(--color-navy)] text-[10px] font-sans font-semibold uppercase tracking-widest rounded-full">
-            Na zamówienie
+            {badge || "Na zamówienie"}
           </span>
         </div>
       </Link>

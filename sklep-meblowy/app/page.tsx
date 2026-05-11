@@ -4,44 +4,19 @@ import type { Metadata } from "next";
 import HomeHeroSlider from "./_components/layout/HomeHeroSlider";
 import { getActiveSlides, DEFAULT_FALLBACK_SLIDE } from "./_lib/slides";
 import { getActiveTiles, DEFAULT_FALLBACK_TILES } from "./_lib/home-tiles";
+import { getFeaturedOrFallback } from "./_lib/featured";
+import ProductCard from "./_components/ui/ProductCard";
 
 export const metadata: Metadata = {
   title: "Meble Premium | Eleganckie Meble do Twojego Domu",
 };
 
-const featured = [
-  {
-    id: "1",
-    name: "Sofa Velvet Midnight",
-    price: 4299,
-    category: "Sofa 3-osobowa",
-    badge: "Bestseller",
-  },
-  {
-    id: "2",
-    name: "Łóżko Aurelia 180",
-    price: 5899,
-    category: "Łóżka tapicerowane",
-    badge: "Nowość",
-  },
-  {
-    id: "3",
-    name: "Fotel Cashmere",
-    price: 2199,
-    category: "Fotele",
-    badge: null,
-  },
-  {
-    id: "4",
-    name: "Pufa Porto Grande",
-    price: 899,
-    category: "Pufy",
-    badge: "Nowość",
-  },
-];
-
 export default async function HomePage() {
-  const [dbSlides, dbTiles] = await Promise.all([getActiveSlides(), getActiveTiles()]);
+  const [dbSlides, dbTiles, featured] = await Promise.all([
+    getActiveSlides(),
+    getActiveTiles(),
+    getFeaturedOrFallback(),
+  ]);
   // Fallback gdy admin jeszcze nic nie dodał — żeby home nie była pusta.
   const slides = dbSlides.length > 0 ? dbSlides : [DEFAULT_FALLBACK_SLIDE];
   const tiles = dbTiles.length > 0 ? dbTiles : DEFAULT_FALLBACK_TILES;
@@ -116,35 +91,17 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featured.map((p) => (
-              <Link
-                key={p.id}
-                href={`/produkt/${p.id}`}
-                className="group flex flex-col"
-              >
-                <div className="relative aspect-[4/3] bg-stone-100 dark:bg-stone-800 rounded-2xl overflow-hidden mb-4">
-                  {p.badge && (
-                    <span className="absolute top-4 left-4 z-10 px-3 py-1 bg-[var(--color-gold)] text-[var(--color-navy)] text-xs font-sans font-bold uppercase tracking-wider rounded-full">
-                      {p.badge}
-                    </span>
-                  )}
-                  <div className="absolute inset-0 flex items-center justify-center text-[var(--muted)] text-sm">
-                    Zdjęcie produktu
-                  </div>
-                </div>
-                <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-1">
-                  {p.category}
-                </p>
-                <p className="font-display text-lg font-semibold text-[var(--fg)] group-hover:text-[var(--color-gold)] transition-colors mb-2">
-                  {p.name}
-                </p>
-                <p className="font-sans font-bold text-[var(--fg)]">
-                  {p.price.toLocaleString("pl-PL")} zł
-                </p>
-              </Link>
-            ))}
-          </div>
+          {featured.length === 0 ? (
+            <p className="text-sm text-[var(--muted)]">
+              Brak polecanych produktów. Wybierz je w Admin → Polecane.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {featured.map(({ product, badge }) => (
+                <ProductCard key={product.id} product={product} badge={badge} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

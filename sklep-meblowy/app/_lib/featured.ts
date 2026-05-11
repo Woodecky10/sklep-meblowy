@@ -120,6 +120,29 @@ export async function getAvailableProductsForFeatured(): Promise<Product[]> {
 }
 
 // ============================================================
+// Dla home: featured z DB, fallback do 4 najnowszych gdy puste
+// ============================================================
+// Zwraca jednolity kształt { product, badge } dla home page.
+export async function getFeaturedOrFallback(): Promise<
+  Array<{ product: Product; badge: string | null }>
+> {
+  const items = await getFeaturedItems();
+  if (items.length > 0) {
+    return items.map((it) => ({ product: it.product, badge: it.badge }));
+  }
+
+  // Fallback: 4 najnowsze produkty bez badge
+  const supabase = await createAdminClient();
+  const { data } = await supabase
+    .from("products")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(4);
+
+  return ((data ?? []) as Product[]).map((product) => ({ product, badge: null }));
+}
+
+// ============================================================
 // Inwalidacja cache
 // ============================================================
 export function invalidateFeaturedCache() {
