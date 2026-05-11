@@ -17,10 +17,13 @@ export type ProductOption = {
 
 // Konkretna kombinacja wybranych wartości + stock + ewentualny modyfikator ceny.
 // values mapuje nazwę opcji → wybraną wartość, np. {"Strona":"Lewa","Kolor":"Beżowy"}.
+// images: opcjonalny zestaw zdjęć dla tej kombinacji — jeśli pusty/null,
+// frontend pokazuje globalną galerię produktu (products.images).
 export type ProductVariant = {
   values: Record<string, string>;
   stock: number;
   price_modifier?: number;
+  images?: string[];
 };
 
 export type ProductVariants = {
