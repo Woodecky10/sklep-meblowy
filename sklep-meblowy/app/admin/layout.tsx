@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Pulpit", icon: DashboardIcon },
+  { href: "/admin/produkty", label: "Produkty", icon: ProductsIcon },
   { href: "/admin/slider", label: "Slider", icon: SliderIcon },
   { href: "/admin/kategorie", label: "Kategorie", icon: CategoriesIcon },
   { href: "/admin/baselinker", label: "BaseLinker", icon: BLIcon },
@@ -81,6 +82,16 @@ function DashboardIcon() {
       <rect x="14" y="3" width="7" height="7" rx="1" />
       <rect x="3" y="14" width="7" height="7" rx="1" />
       <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+
+function ProductsIcon() {
+  return (
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <path d="M3 7l9-4 9 4-9 4-9-4z" />
+      <path d="M3 7v10l9 4 9-4V7" />
+      <path d="M12 11v10" />
     </svg>
   );
 }
