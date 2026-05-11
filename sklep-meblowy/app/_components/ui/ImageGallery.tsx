@@ -27,7 +27,7 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
           type="button"
           onClick={() => setLightbox(true)}
           aria-label="Powiększ zdjęcie"
-          className="relative aspect-[4/3] bg-stone-100 dark:bg-stone-800 rounded-3xl overflow-hidden cursor-zoom-in group"
+          className="relative aspect-[4/3] bg-stone-100 dark:bg-stone-800 rounded-3xl overflow-hidden group"
         >
           <Image
             src={list[active]}
@@ -37,12 +37,6 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
             sizes="(max-width: 768px) 100vw, 50vw"
             className="object-cover transition-transform group-hover:scale-105"
           />
-          <span className="absolute top-3 right-3 w-9 h-9 flex items-center justify-center rounded-full bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity">
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8" />
-              <path d="M21 21l-4.35-4.35M11 8v6M8 11h6" />
-            </svg>
-          </span>
         </button>
         {list.length > 1 && (
           <div className="flex gap-3">
@@ -71,29 +65,35 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
         >
           <div className="relative w-full max-w-6xl aspect-[4/3]" onClick={(e) => e.stopPropagation()}>
             <Image src={list[active]} alt={name} fill sizes="100vw" className="object-contain" />
-            {list.length > 1 && (
-              <>
-                <button
-                  onClick={() => setActive((i) => (i - 1 + list.length) % list.length)}
-                  aria-label="Poprzednie zdjęcie"
-                  className="absolute left-2 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white"
-                >
-                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <polyline points="15 18 9 12 15 6" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => setActive((i) => (i + 1) % list.length)}
-                  aria-label="Następne zdjęcie"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white"
-                >
-                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </button>
-              </>
-            )}
           </div>
+          {list.length > 1 && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActive((i) => (i - 1 + list.length) % list.length);
+                }}
+                aria-label="Poprzednie zdjęcie"
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white z-10"
+              >
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActive((i) => (i + 1) % list.length);
+                }}
+                aria-label="Następne zdjęcie"
+                className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white z-10"
+              >
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+            </>
+          )}
           <button
             onClick={() => setLightbox(false)}
             aria-label="Zamknij"
