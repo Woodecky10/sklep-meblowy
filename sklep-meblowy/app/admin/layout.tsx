@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: "/admin/slider", label: "Slider", icon: SliderIcon },
   { href: "/admin/kafelki", label: "Kafelki", icon: TilesIcon },
   { href: "/admin/kategorie", label: "Kategorie", icon: CategoriesIcon },
+  { href: "/admin/kody-rabatowe", label: "Kody rabatowe", icon: TicketIcon },
   { href: "/admin/baselinker", label: "BaseLinker", icon: BLIcon },
 ];
 
@@ -132,6 +133,15 @@ function CategoriesIcon() {
   return (
     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
       <path d="M3 7h18M3 12h18M3 17h12" />
+    </svg>
+  );
+}
+
+function TicketIcon() {
+  return (
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <path d="M2 9V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4z" />
+      <path d="M9 4v2M9 10v2M9 16v2" />
     </svg>
   );
 }

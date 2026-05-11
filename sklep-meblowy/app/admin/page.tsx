@@ -6,6 +6,7 @@ const CARDS = [
   { href: "/admin/slider", title: "Slider na stronie głównej", cta: "Edytuj slider" },
   { href: "/admin/kafelki", title: "Kafelki „Znajdź swój styl”", cta: "Edytuj kafelki" },
   { href: "/admin/kategorie", title: "Kategorie", cta: "Zarządzaj" },
+  { href: "/admin/kody-rabatowe", title: "Kody rabatowe", cta: "Zarządzaj kodami" },
   { href: "/admin/baselinker", title: "BaseLinker", cta: "Otwórz" },
 ];
 
