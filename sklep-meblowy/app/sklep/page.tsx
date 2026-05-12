@@ -60,7 +60,7 @@ export default async function SklepPage({
         colors,
         materials,
       }),
-      getFilterFacets(),
+      getFilterFacets({ search, category }),
       getSections(),
       getCategories(),
       getCategoryLabel(category),

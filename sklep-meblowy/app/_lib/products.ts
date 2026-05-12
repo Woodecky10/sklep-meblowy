@@ -99,13 +99,36 @@ export async function getRelatedProducts(productId: string, category: Category, 
 }
 
 // Pobiera unikalne wartości color/material — użyte do dynamicznego budowania filtrów.
-// Dwa zapytania, bo distinct po jednej kolumnie naraz.
-export async function getFilterFacets() {
+// Facets respektują obecne search (q) i kategorię, żeby pokazywać tylko
+// opcje obecne w faktycznym widoku (np. "sofa" w q pokaże tylko kolory sof).
+// Color/material filters z URL NIE są stosowane — żeby user mógł je toggle'ować
+// niezależnie i widzieć pełen zakres opcji w bieżącym zawężeniu.
+export async function getFilterFacets(
+  filters: { search?: string; category?: Category } = {}
+) {
   const supabase = await createClient();
+  const term = filters.search?.trim()
+    ? filters.search.trim().replace(/[%_]/g, "\\$&")
+    : null;
+
+  let colorsQuery = supabase.from("products").select("color").not("color", "is", null);
+  let materialsQuery = supabase
+    .from("products")
+    .select("material")
+    .not("material", "is", null);
+
+  if (filters.category) {
+    colorsQuery = colorsQuery.eq("category", filters.category);
+    materialsQuery = materialsQuery.eq("category", filters.category);
+  }
+  if (term) {
+    colorsQuery = colorsQuery.or(`name.ilike.%${term}%,description.ilike.%${term}%`);
+    materialsQuery = materialsQuery.or(`name.ilike.%${term}%,description.ilike.%${term}%`);
+  }
 
   const [{ data: colorsData }, { data: materialsData }] = await Promise.all([
-    supabase.from("products").select("color").not("color", "is", null),
-    supabase.from("products").select("material").not("material", "is", null),
+    colorsQuery,
+    materialsQuery,
   ]);
 
   const colors = Array.from(
