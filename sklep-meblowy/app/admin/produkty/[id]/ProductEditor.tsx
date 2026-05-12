@@ -377,6 +377,96 @@ export default function ProductEditor({
           Sekcja: Warianty (pełny editor)
           ============================================================ */}
       <VariantsEditor productId={product.id} initial={product.variants} onToast={showToast} />
+
+      {/* ============================================================
+          Sekcja: Surowe dane z BaseLinker (debug / diagnostyka)
+          ============================================================ */}
+      {product.baselinker_id && (
+        <BaseLinkerRawSection baselinkerId={product.baselinker_id} />
+      )}
     </div>
+  );
+}
+
+// ============================================================
+// BaseLinkerRawSection — akordeon z surowym payloadem BL produktu
+// ============================================================
+// Pomocne przy debugowaniu wariantów (czy nazwa pasuje do "Kolor:
+// Beżowy, Strona: Lewa"?) i innych pól które sync może nie podchwycić.
+function BaseLinkerRawSection({ baselinkerId }: { baselinkerId: string }) {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState<unknown>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
+    if (data || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/baselinker/raw?productId=${encodeURIComponent(baselinkerId)}`);
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Błąd pobierania danych");
+      } else {
+        setData(json);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nieznany błąd");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function toggle() {
+    const willOpen = !open;
+    setOpen(willOpen);
+    if (willOpen) load();
+  }
+
+  return (
+    <section className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl">
+      <button
+        type="button"
+        onClick={toggle}
+        className="w-full flex items-center justify-between gap-4 p-6 text-left hover:bg-[var(--bg)] transition-colors rounded-2xl"
+      >
+        <div>
+          <h2 className="font-display text-xl font-semibold text-[var(--fg)]">
+            Surowe dane z BaseLinker
+          </h2>
+          <p className="text-sm text-[var(--muted)] mt-1">
+            BL product ID: <code className="font-mono">{baselinkerId}</code> — kliknij żeby zobaczyć
+            payload zwrócony przez API (pomocne przy diagnozie wariantów).
+          </p>
+        </div>
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className={`shrink-0 text-[var(--muted)] transition-transform ${open ? "rotate-180" : ""}`}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      {open && (
+        <div className="border-t border-[var(--border)] p-6">
+          {loading && (
+            <p className="text-sm text-[var(--muted)]">Pobieram z BaseLinker…</p>
+          )}
+          {error && (
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          )}
+          {data !== null && !loading && !error && (
+            <pre className="text-[11px] font-mono bg-[var(--bg)] border border-[var(--border)] rounded-xl p-4 overflow-x-auto max-h-[600px] overflow-y-auto whitespace-pre-wrap break-words">
+              {JSON.stringify(data, null, 2)}
+            </pre>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
