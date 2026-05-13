@@ -48,7 +48,17 @@ export type Product = {
   warranty: string | null;
   variants: ProductVariants | null;
   baselinker_id: string | null;
+  collection_id: string | null;
   created_at: string;
+};
+
+export type Collection = {
+  id: string;
+  slug: string;
+  label: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type Profile = {

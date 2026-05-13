@@ -75,6 +75,55 @@ export async function getProduct(id: string) {
   return data as Product;
 }
 
+// ============================================================
+// Cross-sell: produkty z kategorii powiązanych z koszykiem
+// ============================================================
+// Bierze unikalne slugi kategorii produktów w koszyku, dla każdej szuka
+// jej `cross_sell_categories` (np. lozko-tapicerowane → ['materace']),
+// łączy je w jeden set i pobiera produkty z tych kategorii (max limit).
+// Excluduje produkty już w koszyku.
+export async function getCrossSellProducts(
+  cartCategorySlugs: string[],
+  excludeProductIds: string[] = [],
+  limit = 4
+): Promise<Product[]> {
+  if (cartCategorySlugs.length === 0) return [];
+
+  const supabase = await createClient();
+
+  // Wczytaj cross_sell_categories dla wszystkich kategorii w koszyku
+  const { data: cats } = await supabase
+    .from("categories")
+    .select("slug, cross_sell_categories")
+    .in("slug", cartCategorySlugs);
+
+  const targetSlugs = new Set<string>();
+  for (const c of (cats ?? []) as {
+    slug: string;
+    cross_sell_categories: string[] | null;
+  }[]) {
+    for (const s of c.cross_sell_categories ?? []) {
+      // Nie polecamy kategorii już w koszyku (to nie cross-sell, to same-sell)
+      if (!cartCategorySlugs.includes(s)) targetSlugs.add(s);
+    }
+  }
+  if (targetSlugs.size === 0) return [];
+
+  let query = supabase
+    .from("products")
+    .select("*")
+    .in("category", Array.from(targetSlugs))
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (excludeProductIds.length > 0) {
+    query = query.not("id", "in", `(${excludeProductIds.join(",")})`);
+  }
+
+  const { data } = await query;
+  return (data ?? []) as Product[];
+}
+
 export async function getFeaturedProducts(limit = 4) {
   const supabase = await createClient();
   const { data } = await supabase

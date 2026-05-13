@@ -297,6 +297,8 @@ async function mapBlToProduct(
     warranty: getFeature(bl.features, "Gwarancja"),
     variants: parseVariantsFromBl(bl.variants, defaultPriceGroup, price),
     baselinker_id: blId,
+    // Kolekcję przypisuje admin ręcznie w /admin/kolekcje — sync nie ustawia.
+    collection_id: null,
   };
 
   return { ok: true, product };
