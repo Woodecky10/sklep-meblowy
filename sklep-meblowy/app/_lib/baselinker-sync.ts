@@ -63,8 +63,21 @@ function getFeature(
   name: string
 ): string | null {
   if (!features) return null;
+  const target = name.toLowerCase().trim();
+
+  // Format 1 (aktualny BL): Record<string, string> — {"Kolor": "Brązowy"}
+  if (!Array.isArray(features)) {
+    for (const [k, v] of Object.entries(features)) {
+      if (typeof v === "string" && k.toLowerCase().trim() === target) {
+        return v;
+      }
+    }
+    return null;
+  }
+
+  // Format 2 (legacy): array {name, value}[]
   const f = features.find(
-    (x) => x.name?.toLowerCase().trim() === name.toLowerCase().trim()
+    (x) => x.name?.toLowerCase().trim() === target
   );
   return f?.value ?? null;
 }
