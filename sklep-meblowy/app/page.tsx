@@ -56,16 +56,16 @@ export default async function HomePage() {
                 />
               ) : null}
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
-              <div className="relative h-full p-6 flex flex-col justify-end gap-2">
-                <span className="font-display text-2xl font-bold text-white leading-tight group-hover:text-[var(--color-gold)] transition-colors">
+              <div className="relative h-full p-4 sm:p-5 md:p-6 flex flex-col justify-end gap-1.5 sm:gap-2">
+                <span className="font-display text-lg sm:text-xl md:text-2xl font-bold text-white leading-tight break-words hyphens-auto group-hover:text-[var(--color-gold)] transition-colors">
                   {tile.label}
                 </span>
                 {tile.description && (
-                  <span className="text-sm text-white/80 leading-snug">
+                  <span className="hidden sm:block text-sm text-white/80 leading-snug">
                     {tile.description}
                   </span>
                 )}
-                <span className="mt-1 text-xs font-sans uppercase tracking-widest text-[var(--color-gold)] flex items-center gap-1">
+                <span className="mt-1 text-[10px] sm:text-xs font-sans uppercase tracking-widest text-[var(--color-gold)] flex items-center gap-1">
                   Odkryj
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M5 12h14M12 5l7 7-7 7" />
