@@ -139,7 +139,7 @@ export default function SliderEditor({
       {slides.length === 0 && !creating ? (
         <EmptyState message="Brak slajdów. Dodaj pierwszy żeby zacząć." />
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <DndContext id="slides-dnd" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={slides.map((s) => s.id)} strategy={verticalListSortingStrategy}>
             <div className="flex flex-col gap-3">
               {slides.map((slide) => (

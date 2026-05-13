@@ -154,6 +154,10 @@ export async function createCategory(formData: FormData): Promise<ActionResult> 
 
   const baselinkerCategoryId = parseOptionalBigInt(formData.get("baselinker_category_id"));
   const sortOrder = parseInteger(formData.get("sort_order"));
+  const crossSellCategories = formData
+    .getAll("cross_sell_categories")
+    .map((v) => String(v).trim())
+    .filter((v) => v.length > 0);
 
   const supabase = await createAdminClient();
   const { error } = await supabase
@@ -163,6 +167,7 @@ export async function createCategory(formData: FormData): Promise<ActionResult> 
       label,
       group_id: groupId,
       baselinker_category_id: baselinkerCategoryId,
+      cross_sell_categories: crossSellCategories,
       sort_order: sortOrder,
     } as never);
 
@@ -190,6 +195,10 @@ export async function updateCategory(formData: FormData): Promise<ActionResult> 
   const baselinkerCategoryId = parseOptionalBigInt(formData.get("baselinker_category_id"));
   const sortOrder = parseInteger(formData.get("sort_order"));
   const active = formData.get("active") === "1";
+  const crossSellCategories = formData
+    .getAll("cross_sell_categories")
+    .map((v) => String(v).trim())
+    .filter((v) => v.length > 0);
 
   const supabase = await createAdminClient();
   const { error } = await supabase
@@ -198,6 +207,7 @@ export async function updateCategory(formData: FormData): Promise<ActionResult> 
       label,
       group_id: groupId,
       baselinker_category_id: baselinkerCategoryId,
+      cross_sell_categories: crossSellCategories,
       sort_order: sortOrder,
       active,
     } as never)

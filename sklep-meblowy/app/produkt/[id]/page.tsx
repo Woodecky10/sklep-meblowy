@@ -1,17 +1,26 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getProduct, getRelatedProducts } from "@/app/_lib/products";
-import { getCategoryLabel } from "@/app/_lib/categories";
+import {
+  getProduct,
+  getRelatedProducts,
+  getCrossSellProducts,
+} from "@/app/_lib/products";
+import { getCategoryLabel, getAllCategories } from "@/app/_lib/categories";
+import { getCollection, getCollectionSiblings } from "@/app/_lib/collections";
 import {
   getProductRating,
   getReviewsForProduct,
   getReviewStatus,
 } from "@/app/_lib/reviews";
-import ProductMain from "@/app/_components/ui/ProductMain";
+import ProductMainSection from "@/app/_components/ui/ProductMainSection";
 import ProductCard from "@/app/_components/ui/ProductCard";
 import StarRating from "@/app/_components/ui/StarRating";
 import ReviewList from "@/app/_components/ui/ReviewList";
 import ReviewForm from "@/app/_components/ui/ReviewForm";
+import {
+  sanitizeProductHtml,
+  extractShortDescription,
+} from "@/app/_lib/product-html";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -39,13 +48,34 @@ export default async function ProduktPage({ params }: Props) {
   const product = await getProduct(id);
   if (!product) notFound();
 
-  const [related, rating, reviews, reviewStatus, categoryLabel] = await Promise.all([
-    getRelatedProducts(product.id, product.category),
-    getProductRating(product.id),
-    getReviewsForProduct(product.id),
-    getReviewStatus(product.id),
-    getCategoryLabel(product.category),
-  ]);
+  const [related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell] =
+    await Promise.all([
+      getRelatedProducts(product.id, product.category),
+      getProductRating(product.id),
+      getReviewsForProduct(product.id),
+      getReviewStatus(product.id),
+      getCategoryLabel(product.category),
+      getAllCategories(),
+      getCrossSellProducts([product.category], [product.id], 4),
+    ]);
+
+  // Etykieta cross-sell pochodzi z LABELA pierwszej cross_sell_categories tej
+  // kategorii — np. dla łóżek pokaże "Polecane materace".
+  const currentCat = allCategories.find((c) => c.slug === product.category);
+  const crossSellTargetSlug = currentCat?.crossSellCategories?.[0];
+  const crossSellLabel = crossSellTargetSlug
+    ? allCategories.find((c) => c.slug === crossSellTargetSlug)?.label ?? null
+    : null;
+
+  const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
+
+  // Kolekcja: jeśli produkt jest w kolekcji, pobierz inne produkty z niej.
+  const [collection, collectionSiblings] = product.collection_id
+    ? await Promise.all([
+        getCollection(product.collection_id),
+        getCollectionSiblings(product.collection_id, product.id, 8),
+      ])
+    : [null, []];
 
   const details: { label: string; value: string }[] = [];
   if (product.dimensions) {
@@ -92,13 +122,12 @@ export default async function ProduktPage({ params }: Props) {
         <span className="text-[var(--fg)] normal-case tracking-normal">{product.name}</span>
       </nav>
 
-      {/* Główna sekcja — galeria + info + akcje (client, z synchronizacją
-          wybranego wariantu między galerią i selektorem). */}
-      <ProductMain
+      {/* Główna sekcja (client wrapper — galeria reaguje na wybór wariantu) */}
+      <ProductMainSection
         product={product}
-        categoryLabel={categoryLabel ?? product.category}
+        categoryLabel={categoryLabel ?? null}
         rating={rating}
-        description={stripHtml(product.description)}
+        descriptionText={extractShortDescription(product.description)}
       />
 
       {/* Sekcja Szczegóły */}
@@ -125,6 +154,67 @@ export default async function ProduktPage({ params }: Props) {
               </div>
             ))}
           </dl>
+        </section>
+      )}
+
+      {/* Sekcja: pełen opis HTML (z BL / admina, sanitized) */}
+      {product.description && product.description.trim().length > 0 && (
+        <section className="mb-24">
+          <div className="mb-8">
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+              Pełny opis
+            </p>
+            <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
+              Opis produktu
+            </h2>
+          </div>
+          <div
+            className="product-description max-w-4xl text-[var(--fg)] leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: sanitizeProductHtml(product.description) }}
+          />
+        </section>
+      )}
+
+      {/* Cross-sell — np. dla łóżka pokaż "Polecane materace" */}
+      {crossSell.length > 0 && (
+        <section className="mb-24">
+          <div className="mb-8">
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+              Dopełnienie
+            </p>
+            <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
+              {crossSellLabel ? `Polecane ${crossSellLabel.toLowerCase()}` : "Może Cię zainteresować"}
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {crossSell.map((p) => (
+              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Pełna kolekcja — pozostałe produkty z tej samej serii */}
+      {collection && collectionSiblings.length > 0 && (
+        <section className="mb-24">
+          <div className="mb-8">
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+              Pełna kolekcja
+            </p>
+            <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
+              {collection.label}
+            </h2>
+            {collection.description && (
+              <p className="text-sm text-[var(--muted)] mt-2 max-w-2xl">
+                {collection.description}
+              </p>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {collectionSiblings.map((p) => (
+              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} />
+            ))}
+          </div>
         </section>
       )}
 
@@ -198,7 +288,7 @@ export default async function ProduktPage({ params }: Props) {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {related.map((p) => (
-              <ProductCard key={p.id} product={p} />
+              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} />
             ))}
           </div>
         </section>

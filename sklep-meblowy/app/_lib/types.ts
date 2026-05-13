@@ -17,8 +17,8 @@ export type ProductOption = {
 
 // Konkretna kombinacja wybranych wartości + stock + ewentualny modyfikator ceny.
 // values mapuje nazwę opcji → wybraną wartość, np. {"Strona":"Lewa","Kolor":"Beżowy"}.
-// images — opcjonalnie URL-e zdjęć dla tego wariantu (admin przypina ręcznie).
-//   Jeśli puste/null → na froncie pokazujemy wszystkie zdjęcia produktu.
+// images: opcjonalny zestaw zdjęć dla tej kombinacji — jeśli pusty/null,
+// frontend pokazuje globalną galerię produktu (products.images).
 export type ProductVariant = {
   values: Record<string, string>;
   stock: number;
@@ -59,7 +59,17 @@ export type Product = {
   warranty: string | null;
   variants: ProductVariants | null;
   baselinker_id: string | null;
+  collection_id: string | null;
   created_at: string;
+};
+
+export type Collection = {
+  id: string;
+  slug: string;
+  label: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type Profile = {

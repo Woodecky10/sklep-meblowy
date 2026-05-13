@@ -75,6 +75,55 @@ export async function getProduct(id: string) {
   return data as Product;
 }
 
+// ============================================================
+// Cross-sell: produkty z kategorii powiązanych z koszykiem
+// ============================================================
+// Bierze unikalne slugi kategorii produktów w koszyku, dla każdej szuka
+// jej `cross_sell_categories` (np. lozko-tapicerowane → ['materace']),
+// łączy je w jeden set i pobiera produkty z tych kategorii (max limit).
+// Excluduje produkty już w koszyku.
+export async function getCrossSellProducts(
+  cartCategorySlugs: string[],
+  excludeProductIds: string[] = [],
+  limit = 4
+): Promise<Product[]> {
+  if (cartCategorySlugs.length === 0) return [];
+
+  const supabase = await createClient();
+
+  // Wczytaj cross_sell_categories dla wszystkich kategorii w koszyku
+  const { data: cats } = await supabase
+    .from("categories")
+    .select("slug, cross_sell_categories")
+    .in("slug", cartCategorySlugs);
+
+  const targetSlugs = new Set<string>();
+  for (const c of (cats ?? []) as {
+    slug: string;
+    cross_sell_categories: string[] | null;
+  }[]) {
+    for (const s of c.cross_sell_categories ?? []) {
+      // Nie polecamy kategorii już w koszyku (to nie cross-sell, to same-sell)
+      if (!cartCategorySlugs.includes(s)) targetSlugs.add(s);
+    }
+  }
+  if (targetSlugs.size === 0) return [];
+
+  let query = supabase
+    .from("products")
+    .select("*")
+    .in("category", Array.from(targetSlugs))
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (excludeProductIds.length > 0) {
+    query = query.not("id", "in", `(${excludeProductIds.join(",")})`);
+  }
+
+  const { data } = await query;
+  return (data ?? []) as Product[];
+}
+
 export async function getFeaturedProducts(limit = 4) {
   const supabase = await createClient();
   const { data } = await supabase
@@ -99,13 +148,36 @@ export async function getRelatedProducts(productId: string, category: Category, 
 }
 
 // Pobiera unikalne wartości color/material — użyte do dynamicznego budowania filtrów.
-// Dwa zapytania, bo distinct po jednej kolumnie naraz.
-export async function getFilterFacets() {
+// Facets respektują obecne search (q) i kategorię, żeby pokazywać tylko
+// opcje obecne w faktycznym widoku (np. "sofa" w q pokaże tylko kolory sof).
+// Color/material filters z URL NIE są stosowane — żeby user mógł je toggle'ować
+// niezależnie i widzieć pełen zakres opcji w bieżącym zawężeniu.
+export async function getFilterFacets(
+  filters: { search?: string; category?: Category } = {}
+) {
   const supabase = await createClient();
+  const term = filters.search?.trim()
+    ? filters.search.trim().replace(/[%_]/g, "\\$&")
+    : null;
+
+  let colorsQuery = supabase.from("products").select("color").not("color", "is", null);
+  let materialsQuery = supabase
+    .from("products")
+    .select("material")
+    .not("material", "is", null);
+
+  if (filters.category) {
+    colorsQuery = colorsQuery.eq("category", filters.category);
+    materialsQuery = materialsQuery.eq("category", filters.category);
+  }
+  if (term) {
+    colorsQuery = colorsQuery.or(`name.ilike.%${term}%,description.ilike.%${term}%`);
+    materialsQuery = materialsQuery.or(`name.ilike.%${term}%,description.ilike.%${term}%`);
+  }
 
   const [{ data: colorsData }, { data: materialsData }] = await Promise.all([
-    supabase.from("products").select("color").not("color", "is", null),
-    supabase.from("products").select("material").not("material", "is", null),
+    colorsQuery,
+    materialsQuery,
   ]);
 
   const colors = Array.from(

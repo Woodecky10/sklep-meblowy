@@ -20,7 +20,7 @@ export default function CheckoutForm({
   isLoggedIn: boolean;
 }) {
   const router = useRouter();
-  const { items, total, count } = useCart();
+  const { items, total, count, appliedPromo } = useCart();
 
   const [fullName, setFullName] = useState(defaultFullName);
   const [email, setEmail] = useState(defaultEmail);
@@ -38,7 +38,8 @@ export default function CheckoutForm({
   }, [items.length, router]);
 
   const shipping = total >= 2000 ? 0 : 299;
-  const grandTotal = total + shipping;
+  const discount = appliedPromo?.discount ?? 0;
+  const grandTotal = Math.max(0, total - discount) + shipping;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -67,6 +68,7 @@ export default function CheckoutForm({
             country,
             fullname: fullName,
           },
+          promoCode: appliedPromo?.code ?? null,
         }),
       });
 
@@ -237,6 +239,12 @@ export default function CheckoutForm({
               <span>Produkty</span>
               <span>{total.toLocaleString("pl-PL")} zł</span>
             </div>
+            {appliedPromo && discount > 0 && (
+              <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
+                <span className="font-mono">{appliedPromo.code}</span>
+                <span>−{discount.toLocaleString("pl-PL")} zł</span>
+              </div>
+            )}
             <div className="flex justify-between text-[var(--muted)]">
               <span>Dostawa</span>
               <span>

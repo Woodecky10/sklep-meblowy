@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, useReducer, useCallback, useState } from "react";
+import { createContext, useContext, useMemo, useReducer, useCallback, useState, useEffect } from "react";
 
 export type CartItem = {
   id: string;
@@ -9,6 +9,20 @@ export type CartItem = {
   image: string;
   quantity: number;
   variantValues?: Record<string, string>;
+  // Slug kategorii — wymagane do cross-sell. Optional w typie żeby
+  // starsze localStorage states (bez tego pola) dalej działały.
+  category?: string;
+};
+
+// Zwalidowany kod rabatowy zastosowany do koszyka. Walidacja na serwerze
+// (validatePromoCode), tu tylko trzymamy wynik. Discount = ZŁ kwota
+// zniżki obliczona na podstawie total z momentu walidacji.
+export type AppliedPromo = {
+  promoId: string;
+  code: string;
+  discount: number;
+  discountType: "percent" | "fixed";
+  discountValue: number;
 };
 
 // Sygnał dla CartToast — `ts` (Date.now) zmienia się przy każdym dodaniu,
@@ -29,7 +43,8 @@ type CartAction =
       variantValues: Record<string, string> | undefined;
       quantity: number;
     }
-  | { type: "CLEAR" };
+  | { type: "CLEAR" }
+  | { type: "HYDRATE"; items: CartItem[] };
 
 // Stabilny klucz wariantu — sortuje po nazwie opcji żeby kolejność wyboru
 // (np. najpierw Kolor, potem Strona) nie tworzyła osobnych pozycji w koszyku.
@@ -81,16 +96,23 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     }
     case "CLEAR":
       return state.items.length === 0 ? state : { items: [] };
+    case "HYDRATE":
+      return { items: action.items };
     default:
       return state;
   }
 }
+
+// localStorage keys
+const LS_ITEMS = "mollien-cart-items";
+const LS_PROMO = "mollien-cart-promo";
 
 type CartContextValue = {
   items: CartItem[];
   total: number;
   count: number;
   notification: CartNotification | null;
+  appliedPromo: AppliedPromo | null;
   add: (item: CartItem) => void;
   remove: (id: string, variantValues?: Record<string, string>) => void;
   updateQty: (
@@ -100,6 +122,8 @@ type CartContextValue = {
   ) => void;
   clear: () => void;
   dismissNotification: () => void;
+  applyPromo: (promo: AppliedPromo) => void;
+  clearPromo: () => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -107,6 +131,48 @@ const CartContext = createContext<CartContextValue | null>(null);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { items: [] });
   const [notification, setNotification] = useState<CartNotification | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
+  // hydrated=true dopiero po odczycie z localStorage, żeby nie nadpisać
+  // zapisanego stanu pustym przy pierwszym renderze.
+  const [hydrated, setHydrated] = useState(false);
+
+  // Hydrate z localStorage na mount (client-only).
+  useEffect(() => {
+    try {
+      const rawItems = localStorage.getItem(LS_ITEMS);
+      if (rawItems) {
+        const items = JSON.parse(rawItems) as CartItem[];
+        if (Array.isArray(items)) dispatch({ type: "HYDRATE", items });
+      }
+      const rawPromo = localStorage.getItem(LS_PROMO);
+      if (rawPromo) {
+        const promo = JSON.parse(rawPromo) as AppliedPromo;
+        if (promo && typeof promo === "object" && promo.code) {
+          setAppliedPromo(promo);
+        }
+      }
+    } catch {
+      // Uszkodzony JSON — ignorujemy.
+    }
+    setHydrated(true);
+  }, []);
+
+  // Persist items
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem(LS_ITEMS, JSON.stringify(state.items));
+    } catch {}
+  }, [state.items, hydrated]);
+
+  // Persist promo
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      if (appliedPromo) localStorage.setItem(LS_PROMO, JSON.stringify(appliedPromo));
+      else localStorage.removeItem(LS_PROMO);
+    } catch {}
+  }, [appliedPromo, hydrated]);
 
   const add = useCallback((item: CartItem) => {
     dispatch({ type: "ADD", item });
@@ -122,8 +188,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: "UPDATE_QTY", id, variantValues, quantity }),
     []
   );
-  const clear = useCallback(() => dispatch({ type: "CLEAR" }), []);
+  const clear = useCallback(() => {
+    dispatch({ type: "CLEAR" });
+    setAppliedPromo(null);
+  }, []);
   const dismissNotification = useCallback(() => setNotification(null), []);
+  const applyPromo = useCallback((promo: AppliedPromo) => setAppliedPromo(promo), []);
+  const clearPromo = useCallback(() => setAppliedPromo(null), []);
 
   const value = useMemo<CartContextValue>(() => {
     const total = state.items.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -133,13 +204,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       total,
       count,
       notification,
+      appliedPromo,
       add,
       remove,
       updateQty,
       clear,
       dismissNotification,
+      applyPromo,
+      clearPromo,
     };
-  }, [state.items, notification, add, remove, updateQty, clear, dismissNotification]);
+  }, [state.items, notification, appliedPromo, add, remove, updateQty, clear, dismissNotification, applyPromo, clearPromo]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

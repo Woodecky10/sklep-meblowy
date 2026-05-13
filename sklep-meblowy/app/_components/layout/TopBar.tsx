@@ -51,6 +51,10 @@ export default function TopBar() {
           )}
         </div>
 
+        {/* Slogan po prawej */}
+        <span className="hidden md:inline text-white/70 tracking-wide">
+          Polski producent mebli tapicerowanych
+        </span>
       </div>
     </div>
   );

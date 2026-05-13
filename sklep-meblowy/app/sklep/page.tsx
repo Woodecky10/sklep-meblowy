@@ -60,7 +60,7 @@ export default async function SklepPage({
         colors,
         materials,
       }),
-      getFilterFacets(),
+      getFilterFacets({ search, category }),
       getSections(),
       getCategories(),
       getCategoryLabel(category),
@@ -68,6 +68,7 @@ export default async function SklepPage({
 
   // Batch pobrania ocen — jedno zapytanie dla całej strony list.
   const ratings = await getRatingsForProducts(products.map((p) => p.id));
+  const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
 
   // Zachowaj wszystkie aktywne filtry w linkach paginacji
   const rawParams: Record<string, string> = {};
@@ -127,6 +128,7 @@ export default async function SklepPage({
               key={product.id}
               product={product}
               rating={ratings.get(product.id)}
+              categoryLabel={categoryLabels.get(product.category)}
             />
           ))}
         </div>

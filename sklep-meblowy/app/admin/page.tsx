@@ -1,9 +1,13 @@
 import Link from "next/link";
 
 const CARDS = [
+  { href: "/admin/produkty", title: "Produkty", cta: "Edytuj produkty" },
+  { href: "/admin/polecane", title: "Polecane produkty", cta: "Edytuj polecane" },
   { href: "/admin/slider", title: "Slider na stronie głównej", cta: "Edytuj slider" },
+  { href: "/admin/kafelki", title: "Kafelki „Znajdź swój styl”", cta: "Edytuj kafelki" },
   { href: "/admin/kategorie", title: "Kategorie", cta: "Zarządzaj" },
-  { href: "/admin/produkty", title: "Produkty (warianty)", cta: "Edytuj" },
+  { href: "/admin/kolekcje", title: "Kolekcje produktów", cta: "Zarządzaj kolekcjami" },
+  { href: "/admin/kody-rabatowe", title: "Kody rabatowe", cta: "Zarządzaj kodami" },
   { href: "/admin/baselinker", title: "BaseLinker", cta: "Otwórz" },
 ];
 

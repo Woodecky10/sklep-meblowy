@@ -91,9 +91,9 @@ export function formatVariantLabel(values: Record<string, string>): string {
     .join(", ");
 }
 
-// Zdjęcia do wyświetlenia dla wybranego wariantu.
-// Jeśli wariant ma własne `images` (admin je przypisał) — pokaż tylko te.
-// Inaczej fallback do wszystkich zdjęć produktu.
+// Zdjęcia do pokazania klientowi: jeśli wybrany wariant ma własne, użyj ich.
+// W przeciwnym razie (brak wariantów, niekompletny wybór, brak zdjęć w
+// kombinacji) wracamy do globalnej galerii produktu.
 export function getVariantImages(
   product: Product,
   selectedValues: Record<string, string>

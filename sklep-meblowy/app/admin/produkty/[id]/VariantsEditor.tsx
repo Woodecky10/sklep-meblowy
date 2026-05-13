@@ -1,344 +1,610 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Image from "next/image";
-import type { Product, ProductVariant } from "@/app/_lib/types";
+import { updateProductVariants, uploadProductImage } from "../actions";
+import type {
+  ProductOption,
+  ProductVariant,
+  ProductVariants,
+} from "@/app/_lib/types";
 import {
-  updateOptionName,
-  updateValueLabel,
-  updateVariantImages,
-  type ActionResult,
-} from "./actions";
+  Field,
+  IconBtn,
+  compressIfNeeded,
+  inputClass,
+  type Toast,
+} from "./_shared";
+import { formatVariantLabel } from "@/app/_lib/variants";
 
-type Toast = { type: "success" | "error"; message: string } | null;
+// ============================================================
+// Pomocnicze: klucz kombinacji + cartesian product + rebuild
+// ============================================================
 
-export default function VariantsEditor({ product }: { product: Product }) {
-  const [toast, setToast] = useState<Toast>(null);
-  const variants = product.variants!;
-  const allImages = product.images ?? [];
+// Deterministyczny klucz dla mapy: nazwy opcji posortowane,
+// żeby kolejność wstawiania nie zmieniała klucza.
+function variantKey(values: Record<string, string>): string {
+  return Object.entries(values)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${v}`)
+    .join("|");
+}
 
-  function showToast(t: Toast) {
-    setToast(t);
-    if (t) setTimeout(() => setToast(null), 3500);
+// Wszystkie kombinacje opcji (cartesian product).
+function cartesianProduct(
+  options: ProductOption[]
+): Array<Record<string, string>> {
+  const valid = options.filter((o) => o.name.trim() && o.values.length > 0);
+  if (valid.length === 0) return [];
+  return valid.reduce<Array<Record<string, string>>>(
+    (acc, opt) =>
+      acc.flatMap((prev) =>
+        opt.values.map((v) => ({ ...prev, [opt.name]: v }))
+      ),
+    [{}]
+  );
+}
+
+// Po zmianie opcji rebuild listę kombinacji, zachowując stock / price /
+// images dla kombinacji których klucz dalej istnieje. Nowe kombinacje
+// dostają stock 0, price_modifier 0.
+function rebuildCombinations(
+  options: ProductOption[],
+  oldCombinations: ProductVariant[]
+): ProductVariant[] {
+  const oldMap = new Map<string, ProductVariant>(
+    oldCombinations.map((c) => [variantKey(c.values), c])
+  );
+  return cartesianProduct(options).map((values) => {
+    const prev = oldMap.get(variantKey(values));
+    if (prev) return { ...prev, values };
+    return { values, stock: 0, price_modifier: 0 };
+  });
+}
+
+// ============================================================
+// Komponent
+// ============================================================
+
+export default function VariantsEditor({
+  productId,
+  initial,
+  onToast,
+}: {
+  productId: string;
+  initial: ProductVariants | null;
+  onToast: (t: Toast) => void;
+}) {
+  const [variants, setVariants] = useState<ProductVariants | null>(initial);
+  const [saving, startSaveTransition] = useTransition();
+  // Klucze kombinacji w trakcie uploadu zdjęcia (żeby zablokować ich button)
+  const [uploadingKeys, setUploadingKeys] = useState<Set<string>>(new Set());
+
+  const dirty = useMemo(
+    () => JSON.stringify(variants) !== JSON.stringify(initial),
+    [variants, initial]
+  );
+
+  // ============================================================
+  // Mutacje stanu — opcje
+  // ============================================================
+
+  function enableVariants() {
+    setVariants({ options: [], combinations: [] });
   }
 
-  function handleResult(r: ActionResult) {
-    if (r.ok) showToast({ type: "success", message: r.message ?? "Zapisano" });
-    else showToast({ type: "error", message: r.error });
+  function disableVariants() {
+    if (!window.confirm("Usunąć wszystkie warianty produktu? Zdjęcia per wariant zostaną wyczyszczone.")) return;
+    setVariants(null);
+  }
+
+  function addOption() {
+    if (!variants) return;
+    const nextOptions = [...variants.options, { name: "", values: [] }];
+    setVariants({ ...variants, options: nextOptions });
+  }
+
+  function removeOption(idx: number) {
+    if (!variants) return;
+    const nextOptions = variants.options.filter((_, i) => i !== idx);
+    setVariants({
+      options: nextOptions,
+      combinations: rebuildCombinations(nextOptions, variants.combinations),
+    });
+  }
+
+  function setOptionName(idx: number, name: string) {
+    if (!variants) return;
+    const old = variants.options[idx];
+    const nextOptions = variants.options.map((o, i) => (i === idx ? { ...o, name } : o));
+    // Jeśli nazwa się zmieniła, klucz starych kombinacji jest nieaktualny
+    // — najprościej zrebuild, tracąc poprzednie stock/images (ostrzegamy w UI).
+    // Ale jeśli mamy poprzednią nazwę i pasujące values, możemy zmapować.
+    const remappedCombos = variants.combinations.map((c) => {
+      if (old.name in c.values) {
+        const { [old.name]: v, ...rest } = c.values;
+        return { ...c, values: { ...rest, [name]: v } };
+      }
+      return c;
+    });
+    setVariants({
+      options: nextOptions,
+      combinations: rebuildCombinations(nextOptions, remappedCombos),
+    });
+  }
+
+  function addValue(optIdx: number, value: string) {
+    if (!variants) return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    if (variants.options[optIdx].values.includes(trimmed)) return;
+    const nextOptions = variants.options.map((o, i) =>
+      i === optIdx ? { ...o, values: [...o.values, trimmed] } : o
+    );
+    setVariants({
+      options: nextOptions,
+      combinations: rebuildCombinations(nextOptions, variants.combinations),
+    });
+  }
+
+  function removeValue(optIdx: number, value: string) {
+    if (!variants) return;
+    const nextOptions = variants.options.map((o, i) =>
+      i === optIdx ? { ...o, values: o.values.filter((v) => v !== value) } : o
+    );
+    setVariants({
+      options: nextOptions,
+      combinations: rebuildCombinations(nextOptions, variants.combinations),
+    });
+  }
+
+  // ============================================================
+  // Mutacje stanu — kombinacje
+  // ============================================================
+
+  function patchCombination(idx: number, patch: Partial<ProductVariant>) {
+    if (!variants) return;
+    const nextCombos = variants.combinations.map((c, i) =>
+      i === idx ? { ...c, ...patch } : c
+    );
+    setVariants({ ...variants, combinations: nextCombos });
+  }
+
+  function setComboImages(idx: number, images: string[]) {
+    patchCombination(idx, { images });
+  }
+
+  async function uploadComboImage(comboIdx: number, file: File) {
+    if (!variants) return;
+    const combo = variants.combinations[comboIdx];
+    const key = variantKey(combo.values);
+    setUploadingKeys((prev) => new Set(prev).add(key));
+    try {
+      const toSend = await compressIfNeeded(file);
+      const fd = new FormData();
+      fd.set("image", toSend, toSend.name);
+      const res = await uploadProductImage(fd);
+      if (!res.ok) {
+        onToast({ type: "error", message: res.error });
+        return;
+      }
+      const url = (res.data as { url: string } | undefined)?.url;
+      if (!url) {
+        onToast({ type: "error", message: "Brak URL po uploadzie" });
+        return;
+      }
+      const currentImages = combo.images ?? [];
+      setComboImages(comboIdx, [...currentImages, url]);
+      onToast({
+        type: "success",
+        message: "Zdjęcie wgrane. Kliknij „Zapisz warianty” żeby utrwalić.",
+      });
+    } finally {
+      setUploadingKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  }
+
+  function moveComboImage(comboIdx: number, imgIdx: number, dir: -1 | 1) {
+    if (!variants) return;
+    const combo = variants.combinations[comboIdx];
+    const imgs = combo.images ?? [];
+    const target = imgIdx + dir;
+    if (target < 0 || target >= imgs.length) return;
+    const next = imgs.slice();
+    [next[imgIdx], next[target]] = [next[target], next[imgIdx]];
+    setComboImages(comboIdx, next);
+  }
+
+  function removeComboImage(comboIdx: number, imgIdx: number) {
+    if (!variants) return;
+    const combo = variants.combinations[comboIdx];
+    const imgs = combo.images ?? [];
+    setComboImages(
+      comboIdx,
+      imgs.filter((_, i) => i !== imgIdx)
+    );
+  }
+
+  // ============================================================
+  // Zapis
+  // ============================================================
+
+  function save() {
+    startSaveTransition(async () => {
+      // Sprzątanie: filtruj puste opcje/wartości, rebuild kombinacji
+      let toSave: ProductVariants | null = variants;
+      if (variants) {
+        const cleanOptions = variants.options
+          .map((o) => ({ name: o.name.trim(), values: o.values.filter((v) => v.trim()) }))
+          .filter((o) => o.name && o.values.length > 0);
+        if (cleanOptions.length === 0) {
+          toSave = null;
+        } else {
+          toSave = {
+            options: cleanOptions,
+            combinations: rebuildCombinations(cleanOptions, variants.combinations),
+          };
+        }
+      }
+      const res = await updateProductVariants(productId, toSave);
+      if (res.ok) {
+        onToast({ type: "success", message: res.message ?? "Zapisano warianty" });
+        setVariants(toSave);
+      } else {
+        onToast({ type: "error", message: res.error });
+      }
+    });
+  }
+
+  // ============================================================
+  // Render
+  // ============================================================
+
+  if (!variants) {
+    return (
+      <section className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col gap-4">
+        <div>
+          <h2 className="font-display text-xl font-semibold text-[var(--fg)]">
+            Warianty produktu
+          </h2>
+          <p className="text-sm text-[var(--muted)] mt-1">
+            Produkt nie ma wariantów. Stock jest zarządzany w polu &bdquo;Stan magazynowy&rdquo; wyżej.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={enableVariants}
+          className="self-start px-5 py-2.5 border border-[var(--color-gold)] text-[var(--color-gold)] font-sans font-semibold text-xs uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
+        >
+          + Dodaj warianty
+        </button>
+      </section>
+    );
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      {toast && <ToastView toast={toast} onClose={() => setToast(null)} />}
-
-      {/* Sekcja: Edycja nazw opcji */}
-      <Card>
-        <h2 className="font-display text-lg font-semibold text-[var(--fg)] mb-1">
-          Nazwy opcji
-        </h2>
-        <p className="text-xs text-[var(--muted)] mb-4">
-          Zmień napis który widzi klient (np. „Wariant" → „Kolor"). Zostaw
-          puste żeby użyć surowej nazwy z BaseLinkera.
-        </p>
-        <div className="flex flex-col gap-3">
-          {variants.options.map((opt) => (
-            <OptionNameRow
-              key={opt.name}
-              productId={product.id}
-              optionName={opt.name}
-              currentDisplay={
-                variants.overrides?.option_names?.[opt.name] ?? ""
-              }
-              onResult={handleResult}
-            />
-          ))}
-        </div>
-      </Card>
-
-      {/* Sekcja: Edycja value labels — per opcja */}
-      {variants.options.map((opt) => (
-        <Card key={`labels-${opt.name}`}>
-          <h2 className="font-display text-lg font-semibold text-[var(--fg)] mb-1">
-            Wartości — „{opt.name}"
+    <section className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col gap-6">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="font-display text-xl font-semibold text-[var(--fg)]">
+            Warianty produktu
           </h2>
-          <p className="text-xs text-[var(--muted)] mb-4">
-            Zmień napis który widzi klient (np. „01 beż drewniany stelaż" →
-            „Beż drewniany"). Zostaw puste żeby zachować surową nazwę.
+          <p className="text-sm text-[var(--muted)] mt-1 max-w-2xl">
+            Najpierw dodaj opcje (np. „Kolor”, „Strona”). Kombinacje generują się
+            automatycznie z opcji × wartości. Dla każdej kombinacji ustaw stan i opcjonalnie
+            zdjęcia — pokażą się klientowi po wybraniu wariantu.
           </p>
-          <div className="flex flex-col gap-2">
-            {opt.values.map((val) => (
-              <ValueLabelRow
-                key={val}
-                productId={product.id}
-                optionName={opt.name}
-                rawValue={val}
-                currentDisplay={
-                  variants.overrides?.value_labels?.[opt.name]?.[val] ?? ""
-                }
-                onResult={handleResult}
-              />
-            ))}
-          </div>
-        </Card>
-      ))}
+        </div>
+        <button
+          type="button"
+          onClick={disableVariants}
+          className="shrink-0 px-4 py-2 text-xs font-sans uppercase tracking-widest border border-red-300 dark:border-red-900 text-red-600 rounded-full hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+        >
+          Usuń warianty
+        </button>
+      </div>
 
-      {/* Sekcja: Zdjęcia per wariant */}
-      <Card>
-        <h2 className="font-display text-lg font-semibold text-[var(--fg)] mb-1">
-          Zdjęcia per wariant
-        </h2>
-        <p className="text-xs text-[var(--muted)] mb-4 leading-relaxed">
-          Dla każdego wariantu zaznacz zdjęcia które klient zobaczy po jego
-          wyborze. Bez zaznaczenia żadnego — pokażemy wszystkie zdjęcia
-          produktu (fallback).
-        </p>
-        {allImages.length === 0 ? (
+      {/* ============================================================
+          Opcje wariantów
+          ============================================================ */}
+      <div className="flex flex-col gap-3">
+        <h3 className="font-display text-base font-semibold text-[var(--fg)]">
+          Opcje
+        </h3>
+        {variants.options.length === 0 && (
           <p className="text-sm text-[var(--muted)] italic">
-            Produkt nie ma żadnych zdjęć — wgraj je w BaseLinkerze.
+            Brak opcji. Dodaj pierwszą żeby zacząć (np. „Kolor”).
+          </p>
+        )}
+        {variants.options.map((opt, i) => (
+          <OptionRow
+            key={i}
+            option={opt}
+            onNameChange={(name) => setOptionName(i, name)}
+            onAddValue={(v) => addValue(i, v)}
+            onRemoveValue={(v) => removeValue(i, v)}
+            onRemoveOption={() => removeOption(i)}
+          />
+        ))}
+        <button
+          type="button"
+          onClick={addOption}
+          className="self-start px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
+        >
+          + Dodaj opcję
+        </button>
+      </div>
+
+      {/* ============================================================
+          Kombinacje
+          ============================================================ */}
+      <div className="flex flex-col gap-3 border-t border-[var(--border)] pt-6">
+        <h3 className="font-display text-base font-semibold text-[var(--fg)]">
+          Kombinacje ({variants.combinations.length})
+        </h3>
+        {variants.combinations.length === 0 ? (
+          <p className="text-sm text-[var(--muted)] italic">
+            Brak kombinacji. Dodaj co najmniej jedną opcję z wartościami żeby kombinacje wygenerowały się automatycznie.
           </p>
         ) : (
-          <div className="flex flex-col gap-6">
-            {variants.combinations.map((combo, idx) => (
-              <VariantImagesRow
-                key={idx}
-                productId={product.id}
-                combo={combo}
-                allImages={allImages}
-                onResult={handleResult}
-              />
-            ))}
-          </div>
+          <ul className="flex flex-col gap-3">
+            {variants.combinations.map((combo, i) => {
+              const key = variantKey(combo.values);
+              return (
+                <CombinationRow
+                  key={key}
+                  combo={combo}
+                  uploading={uploadingKeys.has(key)}
+                  onStockChange={(stock) => patchCombination(i, { stock })}
+                  onPriceModifierChange={(price_modifier) =>
+                    patchCombination(i, { price_modifier })
+                  }
+                  onUpload={(file) => uploadComboImage(i, file)}
+                  onMoveImage={(imgIdx, dir) => moveComboImage(i, imgIdx, dir)}
+                  onRemoveImage={(imgIdx) => removeComboImage(i, imgIdx)}
+                />
+              );
+            })}
+          </ul>
         )}
-      </Card>
-    </div>
-  );
-}
+      </div>
 
-// ============================================================
-// Pojedynczy wiersz: edycja nazwy opcji
-// ============================================================
-
-function OptionNameRow({
-  productId,
-  optionName,
-  currentDisplay,
-  onResult,
-}: {
-  productId: string;
-  optionName: string;
-  currentDisplay: string;
-  onResult: (r: ActionResult) => void;
-}) {
-  const [value, setValue] = useState(currentDisplay);
-  const [pending, startTransition] = useTransition();
-
-  function save() {
-    startTransition(async () => {
-      const r = await updateOptionName(productId, optionName, value);
-      onResult(r);
-    });
-  }
-
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] w-24 shrink-0">
-        {optionName}
-      </span>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder={`np. Kolor (zostaw puste = ${optionName})`}
-        className="flex-1 px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
-      />
-      <button
-        onClick={save}
-        disabled={pending || value === currentDisplay}
-        className="px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--border)] text-[var(--fg)] rounded-full hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors disabled:opacity-30"
-      >
-        {pending ? "..." : "Zapisz"}
-      </button>
-    </div>
-  );
-}
-
-// ============================================================
-// Pojedynczy wiersz: edycja value label
-// ============================================================
-
-function ValueLabelRow({
-  productId,
-  optionName,
-  rawValue,
-  currentDisplay,
-  onResult,
-}: {
-  productId: string;
-  optionName: string;
-  rawValue: string;
-  currentDisplay: string;
-  onResult: (r: ActionResult) => void;
-}) {
-  const [value, setValue] = useState(currentDisplay);
-  const [pending, startTransition] = useTransition();
-
-  function save() {
-    startTransition(async () => {
-      const r = await updateValueLabel(productId, optionName, rawValue, value);
-      onResult(r);
-    });
-  }
-
-  return (
-    <div className="flex items-center gap-3">
-      <code className="text-xs text-[var(--muted)] w-48 shrink-0 truncate" title={rawValue}>
-        {rawValue}
-      </code>
-      <span className="text-[var(--muted)]">→</span>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder={`zostaw puste = "${rawValue}"`}
-        className="flex-1 px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
-      />
-      <button
-        onClick={save}
-        disabled={pending || value === currentDisplay}
-        className="px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--border)] text-[var(--fg)] rounded-full hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors disabled:opacity-30"
-      >
-        {pending ? "..." : "Zapisz"}
-      </button>
-    </div>
-  );
-}
-
-// ============================================================
-// Pojedynczy wiersz: zdjęcia per wariant
-// ============================================================
-
-function VariantImagesRow({
-  productId,
-  combo,
-  allImages,
-  onResult,
-}: {
-  productId: string;
-  combo: ProductVariant;
-  allImages: string[];
-  onResult: (r: ActionResult) => void;
-}) {
-  const [selectedImages, setSelectedImages] = useState<Set<string>>(
-    new Set(combo.images ?? [])
-  );
-  const [pending, startTransition] = useTransition();
-  const initial = new Set(combo.images ?? []);
-  const dirty =
-    selectedImages.size !== initial.size ||
-    [...selectedImages].some((url) => !initial.has(url));
-
-  function toggle(url: string) {
-    const next = new Set(selectedImages);
-    if (next.has(url)) next.delete(url);
-    else next.add(url);
-    setSelectedImages(next);
-  }
-
-  function save() {
-    startTransition(async () => {
-      const r = await updateVariantImages(
-        productId,
-        combo.values,
-        Array.from(selectedImages)
-      );
-      onResult(r);
-    });
-  }
-
-  const variantLabel = Object.entries(combo.values)
-    .map(([k, v]) => `${k}: ${v}`)
-    .join(" · ");
-
-  return (
-    <div className="flex flex-col gap-3 p-4 bg-[var(--bg)] border border-[var(--border)] rounded-xl">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-sm font-sans font-semibold text-[var(--fg)]">
-          {variantLabel}
+      {/* ============================================================
+          Zapis
+          ============================================================ */}
+      <div className="flex items-center justify-between gap-4 pt-4 border-t border-[var(--border)]">
+        <p className="text-xs text-[var(--muted)]">
+          {dirty ? "Masz niezapisane zmiany w wariantach." : "Warianty zapisane."}
         </p>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-[var(--muted)]">
-            {selectedImages.size} z {allImages.length} zaznaczone
-          </span>
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving || !dirty}
+          className="px-6 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
+        >
+          {saving ? "Zapisuję..." : "Zapisz warianty"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+// ============================================================
+// Sub-komponenty
+// ============================================================
+
+function OptionRow({
+  option,
+  onNameChange,
+  onAddValue,
+  onRemoveValue,
+  onRemoveOption,
+}: {
+  option: ProductOption;
+  onNameChange: (name: string) => void;
+  onAddValue: (v: string) => void;
+  onRemoveValue: (v: string) => void;
+  onRemoveOption: () => void;
+}) {
+  const [newValue, setNewValue] = useState("");
+  return (
+    <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl p-4 flex flex-col gap-3">
+      <div className="flex items-center gap-3">
+        <Field label="Nazwa opcji" required className="flex-1">
+          <input
+            value={option.name}
+            onChange={(e) => onNameChange(e.target.value)}
+            placeholder="np. Kolor, Strona, Rozmiar"
+            maxLength={50}
+            className={inputClass}
+          />
+        </Field>
+        <button
+          type="button"
+          onClick={onRemoveOption}
+          className="self-end shrink-0 px-3 py-2 text-xs font-sans uppercase tracking-widest border border-red-300 dark:border-red-900 text-red-600 rounded-full hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+        >
+          Usuń opcję
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
+          Wartości
+        </span>
+        <div className="flex flex-wrap gap-2">
+          {option.values.length === 0 && (
+            <span className="text-xs text-[var(--muted)] italic">Brak wartości — dodaj poniżej.</span>
+          )}
+          {option.values.map((v) => (
+            <span
+              key={v}
+              className="inline-flex items-center gap-1.5 pl-3 pr-1 py-1 bg-[var(--card-bg)] border border-[var(--border)] rounded-full text-sm"
+            >
+              {v}
+              <button
+                type="button"
+                onClick={() => onRemoveValue(v)}
+                aria-label={`Usuń ${v}`}
+                className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-red-100 dark:hover:bg-red-950 text-red-600"
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </span>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={newValue}
+            onChange={(e) => setNewValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onAddValue(newValue);
+                setNewValue("");
+              }
+            }}
+            placeholder="np. Beżowy"
+            maxLength={50}
+            className={`${inputClass} flex-1`}
+          />
           <button
-            onClick={save}
-            disabled={pending || !dirty}
-            className="px-4 py-1.5 text-xs font-sans uppercase tracking-widest bg-[var(--color-navy)] text-white rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-30"
+            type="button"
+            onClick={() => {
+              onAddValue(newValue);
+              setNewValue("");
+            }}
+            className="px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
           >
-            {pending ? "Zapisuję..." : "Zapisz"}
+            + Dodaj wartość
           </button>
         </div>
       </div>
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
-        {allImages.map((url) => {
-          const active = selectedImages.has(url);
-          return (
-            <button
-              key={url}
-              type="button"
-              onClick={() => toggle(url)}
-              className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-colors ${
-                active
-                  ? "border-[var(--color-gold)]"
-                  : "border-transparent hover:border-[var(--border)]"
-              }`}
-              aria-pressed={active}
-            >
-              <Image src={url} alt="" fill sizes="100px" className="object-cover" />
-              {active && (
-                <span className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded-full bg-[var(--color-gold)] text-[var(--color-navy)]">
-                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
+    </div>
+  );
+}
+
+function CombinationRow({
+  combo,
+  uploading,
+  onStockChange,
+  onPriceModifierChange,
+  onUpload,
+  onMoveImage,
+  onRemoveImage,
+}: {
+  combo: ProductVariant;
+  uploading: boolean;
+  onStockChange: (stock: number) => void;
+  onPriceModifierChange: (mod: number) => void;
+  onUpload: (file: File) => void;
+  onMoveImage: (imgIdx: number, dir: -1 | 1) => void;
+  onRemoveImage: (imgIdx: number) => void;
+}) {
+  const label = formatVariantLabel(combo.values);
+  const images = combo.images ?? [];
+
+  return (
+    <li className="bg-[var(--bg)] border border-[var(--border)] rounded-xl p-4 flex flex-col gap-3">
+      <p className="font-display text-sm font-semibold text-[var(--fg)]">
+        {label}
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="Stan magazynowy">
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={combo.stock}
+            onChange={(e) => onStockChange(Number(e.target.value) || 0)}
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Modyfikator ceny (zł)" hint="+/- różnica vs cena bazowa produktu.">
+          <input
+            type="number"
+            step="0.01"
+            value={combo.price_modifier ?? 0}
+            onChange={(e) => onPriceModifierChange(Number(e.target.value) || 0)}
+            className={inputClass}
+          />
+        </Field>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
+            Zdjęcia tej kombinacji ({images.length})
+          </span>
+          <label className="shrink-0 px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors cursor-pointer disabled:opacity-50">
+            {uploading ? "Wgrywam..." : "+ Dodaj zdjęcie"}
+            <input
+              type="file"
+              accept="image/*"
+              disabled={uploading}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (f) onUpload(f);
+              }}
+              className="hidden"
+            />
+          </label>
+        </div>
+        {images.length === 0 ? (
+          <p className="text-xs text-[var(--muted)] italic">
+            Brak zdjęć — klient zobaczy globalną galerię produktu.
+          </p>
+        ) : (
+          <ul className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+            {images.map((url, i) => (
+              <li
+                key={`${url}-${i}`}
+                className="relative aspect-square bg-stone-100 dark:bg-stone-800 rounded-lg overflow-hidden border border-[var(--border)]"
+              >
+                <Image src={url} alt={`Zdjęcie wariantu ${i + 1}`} fill sizes="150px" className="object-cover" />
+                <span className="absolute top-1 left-1 px-1.5 py-0.5 bg-black/60 text-white text-[10px] font-sans rounded-full">
+                  {i + 1}
                 </span>
-              )}
-            </button>
-          );
-        })}
+                <div className="absolute inset-x-0 bottom-0 p-1 flex items-center justify-between gap-1 bg-gradient-to-t from-black/70 to-transparent">
+                  <div className="flex gap-0.5">
+                    <IconBtn
+                      label="W lewo"
+                      onClick={() => onMoveImage(i, -1)}
+                      disabled={i === 0}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="15 18 9 12 15 6" />
+                      </svg>
+                    </IconBtn>
+                    <IconBtn
+                      label="W prawo"
+                      onClick={() => onMoveImage(i, 1)}
+                      disabled={i === images.length - 1}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </IconBtn>
+                  </div>
+                  <IconBtn label="Usuń" onClick={() => onRemoveImage(i)} danger>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z" />
+                    </svg>
+                  </IconBtn>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-    </div>
-  );
-}
-
-// ============================================================
-// Pomocnicze
-// ============================================================
-
-function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="p-6 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl">
-      {children}
-    </div>
-  );
-}
-
-function ToastView({ toast, onClose }: { toast: NonNullable<Toast>; onClose: () => void }) {
-  return (
-    <div
-      role="status"
-      className={`fixed top-24 right-6 z-50 max-w-sm px-5 py-4 rounded-2xl shadow-2xl border ${
-        toast.type === "success"
-          ? "bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-200"
-          : "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-900 text-red-800 dark:text-red-200"
-      }`}
-    >
-      <div className="flex items-start gap-3">
-        <p className="text-sm flex-1">{toast.message}</p>
-        <button onClick={onClose} aria-label="Zamknij" className="shrink-0 opacity-70 hover:opacity-100">
-          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-    </div>
+    </li>
   );
 }

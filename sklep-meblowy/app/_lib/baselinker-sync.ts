@@ -105,8 +105,21 @@ function getFeature(
   name: string
 ): string | null {
   if (!features) return null;
+  const target = name.toLowerCase().trim();
+
+  // Format 1 (aktualny BL): Record<string, string> — {"Kolor": "Brązowy"}
+  if (!Array.isArray(features)) {
+    for (const [k, v] of Object.entries(features)) {
+      if (typeof v === "string" && k.toLowerCase().trim() === target) {
+        return v;
+      }
+    }
+    return null;
+  }
+
+  // Format 2 (legacy): array {name, value}[]
   const f = features.find(
-    (x) => x.name?.toLowerCase().trim() === name.toLowerCase().trim()
+    (x) => x.name?.toLowerCase().trim() === target
   );
   return f?.value ?? null;
 }
@@ -153,12 +166,33 @@ function commonPrefix(strings: string[]): string {
 // Krótsze prefixy → fallback: pełne nazwy jako wartości.
 const PREFIX_THRESHOLD = 5;
 
-// Mapper: BL variants (Record<string, BLVariant>) → ProductVariants (nasz format).
+// Próbuje sparsować nazwę wariantu jako "Nazwa1: Wartość1, Nazwa2: Wartość2".
+// Zwraca obiekt {Nazwa1: Wartość1, ...} albo null jeśli format nie pasuje.
+// Wspiera separatory: ',' i ';'.
+function parseNamedAttrs(name: string): Record<string, string> | null {
+  const pairs = name.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+  if (pairs.length === 0) return null;
+  const result: Record<string, string> = {};
+  for (const pair of pairs) {
+    const match = pair.match(/^([^:]+?)\s*:\s*(.+)$/);
+    if (!match) return null;
+    const key = match[1].trim();
+    const value = match[2].trim();
+    if (!key || !value) return null;
+    result[key] = value;
+  }
+  return Object.keys(result).length > 0 ? result : null;
+}
+
+// Mapper: BL variants (Record<string, BLVariant>) → ProductVariants.
 // Zwraca null gdy BL nie ma wariantów albo dane są niepoprawne.
 //
-// BL daje płaską listę wariantów po nazwach (bez strukturalnych atrybutów),
-// więc generujemy zawsze JEDNĄ opcję (domyślnie "Wariant"). Wartości to
-// fragment nazwy który się różni między wariantami.
+// Strategia 2-etapowa:
+// 1) Jeśli WSZYSTKIE nazwy wariantów mają format "Nazwa: Wartość[, Nazwa2:
+//    Wartość2]" z tymi samymi kluczami — używamy strukturalnych opcji
+//    (np. Kolor + Strona).
+// 2) Inaczej fallback: jedna opcja "Wariant" z wartościami uzyskanymi
+//    przez strip wspólnego prefixu (np. "Sofa - Lewa" → "Lewa").
 function parseVariantsFromBl(
   blVariants: Record<string, BLVariant> | undefined,
   defaultPriceGroup: number,
@@ -169,16 +203,65 @@ function parseVariantsFromBl(
   if (entries.length === 0) return null;
 
   const names = entries.map(([, v]) => (v.name ?? "").trim());
-  if (names.some((n) => !n)) return null; // bezpieczny fallback
+  if (names.some((n) => !n)) return null;
 
-  // Znajdź wspólny prefix i strip-uj go z nazw, jeśli dostatecznie długi.
+  function priceModifier(v: BLVariant): number {
+    const variantPrice =
+      v.prices?.[String(defaultPriceGroup)] ??
+      Object.values(v.prices ?? {}).find((p) => typeof p === "number" && p > 0) ??
+      mainPrice;
+    return variantPrice - mainPrice;
+  }
+  function variantStock(v: BLVariant): number {
+    return Object.values(v.stock ?? {}).reduce(
+      (s, q) => s + (typeof q === "number" ? q : 0),
+      0
+    );
+  }
+
+  // ===== Etap 1: strukturalne "Nazwa: Wartość[, ...]" =====
+  const parsed = names.map(parseNamedAttrs);
+  if (parsed.every((p) => p !== null)) {
+    const firstKeys = Object.keys(parsed[0] as Record<string, string>);
+    const allSameKeys = parsed.every((p) => {
+      const keys = Object.keys(p as Record<string, string>);
+      return (
+        keys.length === firstKeys.length &&
+        firstKeys.every((k) => k in (p as Record<string, string>))
+      );
+    });
+    if (allSameKeys && firstKeys.length > 0) {
+      // Wartości per opcja (zachowując kolejność pierwszego wystąpienia)
+      const optionValues = new Map<string, string[]>(
+        firstKeys.map((k) => [k, []])
+      );
+      for (const p of parsed) {
+        for (const k of firstKeys) {
+          const v = (p as Record<string, string>)[k];
+          const arr = optionValues.get(k)!;
+          if (!arr.includes(v)) arr.push(v);
+        }
+      }
+      const options = firstKeys.map((name) => ({
+        name,
+        values: optionValues.get(name)!,
+      }));
+      const combinations: ProductVariant[] = entries.map(([, v], idx) => ({
+        values: parsed[idx] as Record<string, string>,
+        stock: variantStock(v),
+        price_modifier: priceModifier(v),
+      }));
+      return { options, combinations };
+    }
+  }
+
+  // ===== Etap 2: fallback — strip wspólnego prefixu, opcja "Wariant" =====
   const prefix = commonPrefix(names);
   const useStripped = prefix.length >= PREFIX_THRESHOLD;
   const rawValues = useStripped
     ? names.map((n) => n.slice(prefix.length).trim())
     : names.map((n) => n.trim());
 
-  // Dedup wartości — czasem BL ma duplikaty
   const seen = new Set<string>();
   const valuesUnique: string[] = [];
   for (const v of rawValues) {
@@ -189,24 +272,11 @@ function parseVariantsFromBl(
   if (valuesUnique.length === 0) return null;
 
   const optionName = "Wariant";
-
-  const combinations: ProductVariant[] = entries.map(([, v], idx) => {
-    const variantPrice =
-      v.prices?.[String(defaultPriceGroup)] ??
-      Object.values(v.prices ?? {}).find((p) => typeof p === "number" && p > 0) ??
-      mainPrice;
-    const stock = Object.values(v.stock ?? {}).reduce(
-      (s, q) => s + (typeof q === "number" ? q : 0),
-      0
-    );
-    const value = rawValues[idx];
-    return {
-      values: { [optionName]: value },
-      stock,
-      price_modifier: variantPrice - mainPrice,
-    };
-  });
-
+  const combinations: ProductVariant[] = entries.map(([, v], idx) => ({
+    values: { [optionName]: rawValues[idx] },
+    stock: variantStock(v),
+    price_modifier: priceModifier(v),
+  }));
   return {
     options: [{ name: optionName, values: valuesUnique }],
     combinations,
@@ -238,11 +308,24 @@ async function mapBlToProduct(
   const price = defaultPrice(bl, defaultPriceGroup);
   if (!price) return { ok: false, reason: "brak ceny lub cena = 0" };
 
-  const description = bl.text_fields?.description ?? "";
+  // Sklej Opis 1-5 z BL (description + description_extra1..4) z separatorem
+  // \n\n. Każde pole to osobny "Opis N" w panelu BL — koleżanka dopisuje
+  // kolejne i pojawiają się jeden pod drugim na karcie produktu.
+  // NIE strip-ujemy HTML — sanitize robi front (DOMPurify w product-html.ts).
+  const description = [
+    bl.text_fields?.description,
+    bl.text_fields?.description_extra1,
+    bl.text_fields?.description_extra2,
+    bl.text_fields?.description_extra3,
+    bl.text_fields?.description_extra4,
+  ]
+    .map((s) => (typeof s === "string" ? s.trim() : ""))
+    .filter((s) => s.length > 0)
+    .join("\n\n");
 
   const product: ProductInsert = {
     name: name.trim(),
-    description: description.trim(),
+    description,
     price,
     category: cat.slug,
     images: pickFirstImage(bl.images),
@@ -256,6 +339,8 @@ async function mapBlToProduct(
     warranty: getFeature(bl.features, "Gwarancja"),
     variants: parseVariantsFromBl(bl.variants, defaultPriceGroup, price),
     baselinker_id: blId,
+    // Kolekcję przypisuje admin ręcznie w /admin/kolekcje — sync nie ustawia.
+    collection_id: null,
   };
 
   return { ok: true, product };

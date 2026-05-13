@@ -31,6 +31,9 @@ export type CategoryDef = {
   group_id: string;
   group_slug: string;
   baselinkerCategoryId: number | null;
+  // Slugi kategorii do cross-sell (np. dla "lozko-tapicerowane" może być
+  // ["materace"] — wtedy w koszyku z łóżkiem polecamy materace).
+  crossSellCategories: string[];
   sort_order: number;
   active: boolean;
 };
@@ -84,6 +87,7 @@ const fetchCategoriesData = unstable_cache(
         label: string;
         group_id: string;
         baselinker_category_id: number | null;
+        cross_sell_categories: string[] | null;
         sort_order: number;
         active: boolean;
         group: { slug: string } | null;
@@ -94,6 +98,7 @@ const fetchCategoriesData = unstable_cache(
         group_id: c.group_id,
         group_slug: c.group?.slug ?? "",
         baselinkerCategoryId: c.baselinker_category_id,
+        crossSellCategories: c.cross_sell_categories ?? [],
         sort_order: c.sort_order,
         active: c.active,
       })),

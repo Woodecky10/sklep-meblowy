@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { stripe } from "@/app/_lib/stripe";
 import { createClient } from "@/app/_lib/supabase/server";
 import { createOrder } from "@/app/_lib/orders";
+import { validatePromoCode } from "@/app/_lib/promo";
 import {
   findVariant,
   formatVariantLabel,
@@ -26,6 +27,7 @@ type CheckoutBody = {
   email: string;
   fullName: string;
   address: Address;
+  promoCode?: string | null;
 };
 
 export async function POST(request: NextRequest) {
@@ -129,9 +131,42 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Walidacja kodu rabatowego (autorytatywna — klient mógł zmienić cokolwiek).
+    // Discount stosujemy do total produktów (przed dostawą). Stripe dostaje
+    // dynamicznie utworzony Coupon zamiast modyfikacji line_items.
+    let promoCodeId: string | null = null;
+    let promoDiscount = 0;
+    let stripeCouponId: string | null = null;
+
+    if (body.promoCode) {
+      const promoResult = await validatePromoCode(body.promoCode, total);
+      if (!promoResult.ok) {
+        return NextResponse.json({ error: promoResult.error }, { status: 400 });
+      }
+      promoCodeId = promoResult.promo.id;
+      promoDiscount = promoResult.discount;
+
+      // Stripe Coupon (one-shot, dla tej sesji). Dla percent używamy
+      // percent_off, dla fixed — amount_off w groszach + currency.
+      const coupon =
+        promoResult.promo.discount_type === "percent"
+          ? await stripe.coupons.create({
+              percent_off: promoResult.promo.discount_value,
+              duration: "once",
+              name: promoResult.promo.code,
+            })
+          : await stripe.coupons.create({
+              amount_off: Math.round(promoDiscount * 100),
+              currency: "pln",
+              duration: "once",
+              name: promoResult.promo.code,
+            });
+      stripeCouponId = coupon.id;
+    }
+
     // Stała stawka dostawy 299 zł
     const shipping = 299;
-    total += shipping;
+    const finalTotal = Math.max(0, total - promoDiscount) + shipping;
 
     stripeLineItems.push({
       quantity: 1,
@@ -152,8 +187,10 @@ export async function POST(request: NextRequest) {
       userId: user?.id ?? null,
       guestEmail: user ? null : body.email.trim().toLowerCase(),
       items: orderItems,
-      total,
+      total: finalTotal,
       shippingAddress: body.address,
+      promoCodeId,
+      promoDiscount,
     });
 
     // Stripe Checkout Session
@@ -171,6 +208,9 @@ export async function POST(request: NextRequest) {
       cancel_url: `${origin}/checkout/cancel`,
       metadata: { order_id: order.id },
       locale: "pl",
+      ...(stripeCouponId
+        ? { discounts: [{ coupon: stripeCouponId }] }
+        : {}),
     });
 
     return NextResponse.json({ url: session.url });

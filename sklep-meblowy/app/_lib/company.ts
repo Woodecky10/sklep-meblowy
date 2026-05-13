@@ -8,8 +8,11 @@ export const COMPANY = {
   // Pełna nazwa firmy / JDG (jak w CEIDG/KRS)
   legalName: "LOGAN KAMIL DERKACZ",
 
-  // Nazwa handlowa sklepu (widoczna w UI, w tytułach, emailach)
+  // Nazwa handlowa sklepu (używana w metadanych, tytułach, emailach, regulaminie)
   brandName: "Mollien",
+
+  // Wizualne logo wyświetlane w Navbar (może różnić się od brandName)
+  displayName: "MOLLIEN.PL",
 
   // Adres rejestrowy
   address: {

@@ -9,17 +9,20 @@ import {
 import VariantSelector from "./VariantSelector";
 import AddToCartButton from "./AddToCartButton";
 
-// Akcje produktu — wybór wariantu, dynamiczna cena, dodaj do koszyka.
-// State wybranego wariantu może być przekazany z zewnątrz (przez ProductMain),
-// żeby galeria zdjęć też mogła reagować na wybór.
+// Produkty robione na zamówienie — bez limitów magazynowych.
+// Walidujemy tylko kompletność wyboru wariantu i liczymy dynamiczną cenę
+// z ewentualnym modyfikatorem (np. droższy kolor).
+//
+// Komponent jest kontrolowany — selected/onChange trzyma parent
+// (ProductMainSection), żeby galeria zdjęć mogła reagować na wybór wariantu.
 export default function ProductActions({
   product,
   selected,
-  onSelectedChange,
+  onChange,
 }: {
   product: Product;
   selected: Record<string, string>;
-  onSelectedChange: (next: Record<string, string>) => void;
+  onChange: (next: Record<string, string>) => void;
 }) {
   const showVariants = hasVariants(product);
   const complete = isVariantSelectionComplete(product, selected);
@@ -27,12 +30,16 @@ export default function ProductActions({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Cena wariantu — bez przekreślonej bazowej (warianty to różne ceny,
-          nie promocje). */}
+      {/* Dynamiczna cena (gdy modyfikator zmienia bazową) */}
       {showVariants && complete && price !== product.price && (
-        <p className="font-sans text-2xl font-bold text-[var(--color-gold)]">
-          {price.toLocaleString("pl-PL")} zł
-        </p>
+        <div className="flex items-baseline gap-3">
+          <p className="font-sans text-2xl font-bold text-[var(--color-gold)]">
+            {price.toLocaleString("pl-PL")} zł
+          </p>
+          <p className="text-sm text-[var(--muted)] line-through">
+            {product.price.toLocaleString("pl-PL")} zł
+          </p>
+        </div>
       )}
 
       {showVariants && (
@@ -40,7 +47,7 @@ export default function ProductActions({
           product={product}
           variants={product.variants!}
           selected={selected}
-          onChange={onSelectedChange}
+          onChange={onChange}
         />
       )}
 

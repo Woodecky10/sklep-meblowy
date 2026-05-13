@@ -10,9 +10,13 @@ export const metadata: Metadata = {
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Pulpit", icon: DashboardIcon },
-  { href: "/admin/slider", label: "Slider", icon: SliderIcon },
-  { href: "/admin/kategorie", label: "Kategorie", icon: CategoriesIcon },
   { href: "/admin/produkty", label: "Produkty", icon: ProductsIcon },
+  { href: "/admin/polecane", label: "Polecane", icon: StarIcon },
+  { href: "/admin/slider", label: "Slider", icon: SliderIcon },
+  { href: "/admin/kafelki", label: "Kafelki", icon: TilesIcon },
+  { href: "/admin/kategorie", label: "Kategorie", icon: CategoriesIcon },
+  { href: "/admin/kolekcje", label: "Kolekcje", icon: CollectionsIcon },
+  { href: "/admin/kody-rabatowe", label: "Kody rabatowe", icon: TicketIcon },
   { href: "/admin/baselinker", label: "BaseLinker", icon: BLIcon },
 ];
 
@@ -86,6 +90,16 @@ function DashboardIcon() {
   );
 }
 
+function ProductsIcon() {
+  return (
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <path d="M3 7l9-4 9 4-9 4-9-4z" />
+      <path d="M3 7v10l9 4 9-4V7" />
+      <path d="M12 11v10" />
+    </svg>
+  );
+}
+
 function SliderIcon() {
   return (
     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -93,6 +107,25 @@ function SliderIcon() {
       <circle cx="8" cy="19" r="1" fill="currentColor" />
       <circle cx="12" cy="19" r="1" fill="currentColor" />
       <circle cx="16" cy="19" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function StarIcon() {
+  return (
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  );
+}
+
+function TilesIcon() {
+  return (
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="3" width="8" height="8" rx="1" />
+      <rect x="13" y="3" width="8" height="8" rx="1" />
+      <rect x="3" y="13" width="8" height="8" rx="1" />
+      <rect x="13" y="13" width="8" height="8" rx="1" />
     </svg>
   );
 }
@@ -105,12 +138,21 @@ function CategoriesIcon() {
   );
 }
 
-function ProductsIcon() {
+function CollectionsIcon() {
   return (
     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
       <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
       <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
       <line x1="12" y1="22.08" x2="12" y2="12" />
+    </svg>
+  );
+}
+
+function TicketIcon() {
+  return (
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <path d="M2 9V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4z" />
+      <path d="M9 4v2M9 10v2M9 16v2" />
     </svg>
   );
 }

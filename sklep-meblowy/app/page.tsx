@@ -1,82 +1,28 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { Metadata } from "next";
 import HomeHeroSlider from "./_components/layout/HomeHeroSlider";
 import { getActiveSlides, DEFAULT_FALLBACK_SLIDE } from "./_lib/slides";
+import { getActiveTiles, DEFAULT_FALLBACK_TILES } from "./_lib/home-tiles";
+import { getFeaturedOrFallback } from "./_lib/featured";
+import { getCategories } from "./_lib/categories";
+import ProductCard from "./_components/ui/ProductCard";
 
 export const metadata: Metadata = {
   title: "Meble Premium | Eleganckie Meble do Twojego Domu",
 };
 
-const categories = [
-  {
-    name: "Sofy 3-osobowe",
-    slug: "sofa-3-osobowa",
-    description: "Komfort i elegancja w każdym salonie",
-    bg: "bg-stone-100 dark:bg-stone-900",
-    title: "text-stone-900 dark:text-stone-100",
-    desc: "text-stone-700 dark:text-stone-300",
-  },
-  {
-    name: "Łóżka tapicerowane",
-    slug: "lozko-tapicerowane",
-    description: "Sypialnia marzeń, sen doskonały",
-    bg: "bg-slate-100 dark:bg-slate-900",
-    title: "text-slate-900 dark:text-slate-100",
-    desc: "text-slate-700 dark:text-slate-300",
-  },
-  {
-    name: "Fotele",
-    slug: "fotele",
-    description: "Twój kąt relaksu i inspiracji",
-    bg: "bg-amber-50 dark:bg-amber-950",
-    title: "text-amber-950 dark:text-amber-50",
-    desc: "text-amber-800 dark:text-amber-200",
-  },
-  {
-    name: "Pufy",
-    slug: "pufy",
-    description: "Styl i wszechstronność w jednym",
-    bg: "bg-rose-50 dark:bg-rose-950",
-    title: "text-rose-950 dark:text-rose-50",
-    desc: "text-rose-800 dark:text-rose-200",
-  },
-];
-
-const featured = [
-  {
-    id: "1",
-    name: "Sofa Velvet Midnight",
-    price: 4299,
-    category: "Sofa 3-osobowa",
-    badge: "Bestseller",
-  },
-  {
-    id: "2",
-    name: "Łóżko Aurelia 180",
-    price: 5899,
-    category: "Łóżka tapicerowane",
-    badge: "Nowość",
-  },
-  {
-    id: "3",
-    name: "Fotel Cashmere",
-    price: 2199,
-    category: "Fotele",
-    badge: null,
-  },
-  {
-    id: "4",
-    name: "Pufa Porto Grande",
-    price: 899,
-    category: "Pufy",
-    badge: "Nowość",
-  },
-];
-
 export default async function HomePage() {
-  const dbSlides = await getActiveSlides();
+  const [dbSlides, dbTiles, featured, allCategories] = await Promise.all([
+    getActiveSlides(),
+    getActiveTiles(),
+    getFeaturedOrFallback(),
+    getCategories(),
+  ]);
+  const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
   // Fallback gdy admin jeszcze nic nie dodał — żeby home nie była pusta.
   const slides = dbSlides.length > 0 ? dbSlides : [DEFAULT_FALLBACK_SLIDE];
+  const tiles = dbTiles.length > 0 ? dbTiles : DEFAULT_FALLBACK_TILES;
 
   return (
     <>
@@ -94,26 +40,38 @@ export default async function HomePage() {
           </h2>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {categories.map((cat) => (
+          {tiles.map((tile) => (
             <Link
-              key={cat.slug}
-              href={`/sklep?kategoria=${cat.slug}`}
-              className={`group ${cat.bg} rounded-2xl p-8 flex flex-col gap-3 hover:ring-2 hover:ring-[var(--color-gold)] transition-all`}
+              key={tile.id}
+              href={tile.href}
+              className="group relative aspect-square rounded-2xl overflow-hidden bg-[var(--color-navy)] hover:ring-2 hover:ring-[var(--color-gold)] transition-all"
             >
-              <span
-                className={`font-display text-2xl font-bold ${cat.title} group-hover:text-[var(--color-gold)] transition-colors`}
-              >
-                {cat.name}
-              </span>
-              <span className={`text-sm ${cat.desc} leading-snug`}>
-                {cat.description}
-              </span>
-              <span className="mt-auto text-xs font-sans uppercase tracking-widest text-[var(--color-gold)] flex items-center gap-1">
-                Odkryj
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
-              </span>
+              {tile.image_url ? (
+                <Image
+                  src={tile.image_url}
+                  alt={tile.image_alt}
+                  fill
+                  sizes="(max-width: 768px) 50vw, 25vw"
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+              ) : null}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+              <div className="relative h-full p-4 sm:p-5 md:p-6 flex flex-col justify-end gap-1.5 sm:gap-2">
+                <span className="font-display text-lg sm:text-xl md:text-2xl font-bold text-white leading-tight break-words hyphens-auto group-hover:text-[var(--color-gold)] transition-colors">
+                  {tile.label}
+                </span>
+                {tile.description && (
+                  <span className="hidden sm:block text-sm text-white/80 leading-snug">
+                    {tile.description}
+                  </span>
+                )}
+                <span className="mt-1 text-[10px] sm:text-xs font-sans uppercase tracking-widest text-[var(--color-gold)] flex items-center gap-1">
+                  Odkryj
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
+                </span>
+              </div>
             </Link>
           ))}
         </div>
@@ -124,9 +82,6 @@ export default async function HomePage() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-end justify-between mb-16">
             <div>
-              <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-3">
-                Wybór redakcji
-              </p>
               <h2 className="font-display text-4xl font-bold text-[var(--fg)]">
                 Polecane produkty
               </h2>
@@ -139,35 +94,22 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featured.map((p) => (
-              <Link
-                key={p.id}
-                href={`/produkt/${p.id}`}
-                className="group flex flex-col"
-              >
-                <div className="relative aspect-[4/3] bg-stone-100 dark:bg-stone-800 rounded-2xl overflow-hidden mb-4">
-                  {p.badge && (
-                    <span className="absolute top-4 left-4 z-10 px-3 py-1 bg-[var(--color-gold)] text-[var(--color-navy)] text-xs font-sans font-bold uppercase tracking-wider rounded-full">
-                      {p.badge}
-                    </span>
-                  )}
-                  <div className="absolute inset-0 flex items-center justify-center text-[var(--muted)] text-sm">
-                    Zdjęcie produktu
-                  </div>
-                </div>
-                <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-1">
-                  {p.category}
-                </p>
-                <p className="font-display text-lg font-semibold text-[var(--fg)] group-hover:text-[var(--color-gold)] transition-colors mb-2">
-                  {p.name}
-                </p>
-                <p className="font-sans font-bold text-[var(--fg)]">
-                  {p.price.toLocaleString("pl-PL")} zł
-                </p>
-              </Link>
-            ))}
-          </div>
+          {featured.length === 0 ? (
+            <p className="text-sm text-[var(--muted)]">
+              Brak polecanych produktów. Wybierz je w Admin → Polecane.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {featured.map(({ product, badge }) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  badge={badge}
+                  categoryLabel={categoryLabels.get(product.category)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

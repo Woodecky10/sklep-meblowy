@@ -1,12 +1,26 @@
 "use client";
 
+import { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useCart, cartItemKey } from "@/app/_context/CartContext";
 import { formatVariantLabel } from "@/app/_lib/variants";
+import { applyPromoCodeAction, getCartCrossSellAction } from "./actions";
+import ProductCard from "@/app/_components/ui/ProductCard";
+import type { Product } from "@/app/_lib/types";
 
 export default function KoszykPage() {
-  const { items, total, count, remove, updateQty, clear } = useCart();
+  const {
+    items,
+    total,
+    count,
+    remove,
+    updateQty,
+    clear,
+    appliedPromo,
+    applyPromo,
+    clearPromo,
+  } = useCart();
 
   if (items.length === 0) {
     return (
@@ -29,7 +43,56 @@ export default function KoszykPage() {
   }
 
   const shipping = 299;
-  const grandTotal = total + shipping;
+  const discount = appliedPromo?.discount ?? 0;
+  const grandTotal = Math.max(0, total - discount) + shipping;
+
+  // Cross-sell — "Może Cię zainteresować"
+  const [crossSell, setCrossSell] = useState<Product[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    if (items.length === 0) {
+      setCrossSell([]);
+      return;
+    }
+    getCartCrossSellAction(
+      items.map((i) => ({ id: i.id, category: i.category }))
+    ).then((products) => {
+      if (!cancelled) setCrossSell(products);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Re-fetch gdy zmienia się skład koszyka (po id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.map((i) => i.id).join(",")]);
+
+  // Re-waliduj kod gdy zmieni się total (np. po dodaniu/usunięciu pozycji
+  // albo zmianie ilości). Server policzy nową kwotę zniżki (przy percent)
+  // albo wyrzuci kod (np. spadliśmy poniżej min_order_value).
+  useEffect(() => {
+    if (!appliedPromo) return;
+    let cancelled = false;
+    applyPromoCodeAction(appliedPromo.code, total).then((res) => {
+      if (cancelled) return;
+      if (res.ok) {
+        if (res.discount !== appliedPromo.discount) {
+          applyPromo({
+            promoId: res.promoId,
+            code: res.code,
+            discount: res.discount,
+            discountType: res.discountType,
+            discountValue: res.discountValue,
+          });
+        }
+      } else {
+        clearPromo();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [total]);
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
@@ -139,18 +202,31 @@ export default function KoszykPage() {
           })}
         </div>
 
-        {/* Podsumowanie */}
+        {/* Podsumowanie (z cross-sell pod nim w mobile) */}
         <div className="lg:col-span-1">
           <div className="sticky top-24 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8 flex flex-col gap-6">
             <h2 className="font-display text-2xl font-bold text-[var(--fg)]">
               Podsumowanie
             </h2>
 
+            <PromoInput
+              cartTotal={total}
+              appliedPromo={appliedPromo}
+              onApply={applyPromo}
+              onClear={clearPromo}
+            />
+
             <div className="flex flex-col gap-3 text-sm font-sans">
               <div className="flex justify-between text-[var(--muted)]">
                 <span>Produkty ({count} szt.)</span>
                 <span>{total.toLocaleString("pl-PL")} zł</span>
               </div>
+              {appliedPromo && discount > 0 && (
+                <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
+                  <span>Zniżka ({appliedPromo.code})</span>
+                  <span>−{discount.toLocaleString("pl-PL")} zł</span>
+                </div>
+              )}
               <div className="flex justify-between text-[var(--muted)]">
                 <span>Dostawa</span>
                 <span>{shipping} zł</span>
@@ -183,6 +259,120 @@ export default function KoszykPage() {
           </div>
         </div>
       </div>
+
+      {/* Cross-sell: "Może Cię zainteresować" */}
+      {crossSell.length > 0 && (
+        <section className="mt-20 pt-16 border-t border-[var(--border)]">
+          <div className="mb-10">
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+              Polecane do koszyka
+            </p>
+            <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
+              Może Cię zainteresować
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {crossSell.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
+  );
+}
+
+// ============================================================
+// Sub-component: wpisz kod rabatowy
+// ============================================================
+
+function PromoInput({
+  cartTotal,
+  appliedPromo,
+  onApply,
+  onClear,
+}: {
+  cartTotal: number;
+  appliedPromo: ReturnType<typeof useCart>["appliedPromo"];
+  onApply: ReturnType<typeof useCart>["applyPromo"];
+  onClear: ReturnType<typeof useCart>["clearPromo"];
+}) {
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function submit(e?: React.FormEvent) {
+    e?.preventDefault();
+    setError(null);
+    if (!code.trim()) return;
+    startTransition(async () => {
+      const res = await applyPromoCodeAction(code, cartTotal);
+      if (res.ok) {
+        onApply({
+          promoId: res.promoId,
+          code: res.code,
+          discount: res.discount,
+          discountType: res.discountType,
+          discountValue: res.discountValue,
+        });
+        setCode("");
+      } else {
+        setError(res.error);
+      }
+    });
+  }
+
+  if (appliedPromo) {
+    return (
+      <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-xl p-3 flex items-center gap-3">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-700 dark:text-emerald-400 shrink-0">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200 font-mono">
+            {appliedPromo.code}
+          </p>
+          <p className="text-xs text-emerald-700 dark:text-emerald-400">
+            {appliedPromo.discountType === "percent"
+              ? `Zniżka ${appliedPromo.discountValue}%`
+              : `Zniżka ${appliedPromo.discountValue.toFixed(2)} zł`}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-xs font-sans uppercase tracking-widest text-emerald-700 dark:text-emerald-400 hover:underline"
+        >
+          Usuń
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-2">
+      <label className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
+        Kod rabatowy
+      </label>
+      <div className="flex gap-2">
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          placeholder="np. MOLLIEN10"
+          maxLength={50}
+          className="flex-1 px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-sm text-[var(--fg)] font-mono uppercase focus:outline-none focus:border-[var(--color-gold)]"
+        />
+        <button
+          type="submit"
+          disabled={pending || !code.trim()}
+          className="px-4 py-2 border border-[var(--color-gold)] text-[var(--color-gold)] font-sans text-xs uppercase tracking-widest rounded-lg hover:bg-[var(--color-gold)] hover:text-[var(--color-navy)] transition-colors disabled:opacity-50"
+        >
+          {pending ? "..." : "Zastosuj"}
+        </button>
+      </div>
+      {error && (
+        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+      )}
+    </form>
   );
 }

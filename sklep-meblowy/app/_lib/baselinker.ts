@@ -109,8 +109,10 @@ export type BLInventoryProduct = {
   width?: number;
   length?: number;
   manufacturer_id?: number;
-  images?: string[];
-  features?: { name: string; value: string }[];
+  images?: string[] | Record<string, string>;
+  // BL zwraca features jako obiekt {nazwa: wartość} — historycznie był array
+  // {name, value}[], wspieramy oba formaty w helperze getFeature.
+  features?: Record<string, string> | { name: string; value: string }[];
   // BL zwraca warianty jako obiekt {variant_id: BLVariant}, nie array.
   variants?: Record<string, BLVariant>;
   stock?: Record<string, number>;
