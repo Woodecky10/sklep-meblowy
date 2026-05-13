@@ -6,6 +6,7 @@ import {
   getCrossSellProducts,
 } from "@/app/_lib/products";
 import { getCategoryLabel, getAllCategories } from "@/app/_lib/categories";
+import { getCollection, getCollectionSiblings } from "@/app/_lib/collections";
 import {
   getProductRating,
   getReviewsForProduct,
@@ -67,6 +68,14 @@ export default async function ProduktPage({ params }: Props) {
     : null;
 
   const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
+
+  // Kolekcja: jeśli produkt jest w kolekcji, pobierz inne produkty z niej.
+  const [collection, collectionSiblings] = product.collection_id
+    ? await Promise.all([
+        getCollection(product.collection_id),
+        getCollectionSiblings(product.collection_id, product.id, 8),
+      ])
+    : [null, []];
 
   const details: { label: string; value: string }[] = [];
   if (product.dimensions) {
@@ -179,6 +188,30 @@ export default async function ProduktPage({ params }: Props) {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {crossSell.map((p) => (
+              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Pełna kolekcja — pozostałe produkty z tej samej serii */}
+      {collection && collectionSiblings.length > 0 && (
+        <section className="mb-24">
+          <div className="mb-8">
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+              Pełna kolekcja
+            </p>
+            <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
+              {collection.label}
+            </h2>
+            {collection.description && (
+              <p className="text-sm text-[var(--muted)] mt-2 max-w-2xl">
+                {collection.description}
+              </p>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {collectionSiblings.map((p) => (
               <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} />
             ))}
           </div>
