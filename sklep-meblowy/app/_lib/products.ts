@@ -12,6 +12,9 @@ export type ProductFilters = {
   inStockOnly?: boolean;
   colors?: string[];
   materials?: string[];
+  // Slug kolekcji — filtruje produkty należące do konkretnej kolekcji
+  // (np. ?kolekcja=lisbon w URL).
+  collectionSlug?: string;
 };
 
 export async function getProducts(filters: ProductFilters = {}) {
@@ -27,11 +30,27 @@ export async function getProducts(filters: ProductFilters = {}) {
     inStockOnly,
     colors,
     materials,
+    collectionSlug,
   } = filters;
 
   let query = supabase.from("products").select("*", { count: "exact" });
 
   if (category) query = query.eq("category", category);
+
+  // Filter po kolekcji — najpierw lookup collection.id po slug, potem in()
+  if (collectionSlug) {
+    const { data: coll } = await supabase
+      .from("collections")
+      .select("id")
+      .eq("slug", collectionSlug)
+      .maybeSingle();
+    if (coll) {
+      query = query.eq("collection_id", (coll as { id: string }).id);
+    } else {
+      // Brak takiej kolekcji — zwracamy puste wyniki
+      query = query.eq("id", "00000000-0000-0000-0000-000000000000");
+    }
+  }
 
   if (search && search.trim()) {
     const term = search.trim().replace(/[%_]/g, "\\$&");

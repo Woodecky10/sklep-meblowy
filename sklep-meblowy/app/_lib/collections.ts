@@ -59,6 +59,42 @@ export async function getCollectionSiblings(
 }
 
 // ============================================================
+// Kolekcje + sample produkty dla home page (auto-display)
+// ============================================================
+// Zwraca tylko kolekcje które mają co najmniej jeden produkt — puste kolekcje
+// nie pokazują się klientom. Dla każdej dodaje do 4 sample produktów żeby
+// front mógł zrobić mozaikę miniaturek.
+export async function getCollectionsForHome(): Promise<
+  Array<{ collection: Collection; sampleProducts: Product[] }>
+> {
+  const supabase = await createAdminClient();
+  const collections = await getAllCollections();
+  if (collections.length === 0) return [];
+
+  // Pobierz wszystkie produkty należące do dowolnej kolekcji jednym query
+  const { data } = await supabase
+    .from("products")
+    .select("*")
+    .not("collection_id", "is", null)
+    .order("name", { ascending: true });
+
+  const byCollection = new Map<string, Product[]>();
+  for (const p of (data ?? []) as Product[]) {
+    if (!p.collection_id) continue;
+    const arr = byCollection.get(p.collection_id) ?? [];
+    if (arr.length < 4) arr.push(p);
+    byCollection.set(p.collection_id, arr);
+  }
+
+  return collections
+    .map((collection) => ({
+      collection,
+      sampleProducts: byCollection.get(collection.id) ?? [],
+    }))
+    .filter((row) => row.sampleProducts.length > 0);
+}
+
+// ============================================================
 // Inwalidacja cache
 // ============================================================
 export function invalidateCollectionsCache() {
