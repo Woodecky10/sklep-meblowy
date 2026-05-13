@@ -35,6 +35,7 @@ export default function AddToCartButton({
       image: product.images?.[0] ?? "",
       quantity: 1,
       variantValues: hasSelection ? selectedValues : undefined,
+      category: product.category,
     });
   }
 

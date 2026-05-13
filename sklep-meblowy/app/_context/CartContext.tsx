@@ -9,6 +9,9 @@ export type CartItem = {
   image: string;
   quantity: number;
   variantValues?: Record<string, string>;
+  // Slug kategorii — wymagane do cross-sell. Optional w typie żeby
+  // starsze localStorage states (bez tego pola) dalej działały.
+  category?: string;
 };
 
 // Zwalidowany kod rabatowy zastosowany do koszyka. Walidacja na serwerze

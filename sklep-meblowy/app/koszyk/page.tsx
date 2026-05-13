@@ -5,7 +5,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { useCart, cartItemKey } from "@/app/_context/CartContext";
 import { formatVariantLabel } from "@/app/_lib/variants";
-import { applyPromoCodeAction } from "./actions";
+import { applyPromoCodeAction, getCartCrossSellAction } from "./actions";
+import ProductCard from "@/app/_components/ui/ProductCard";
+import type { Product } from "@/app/_lib/types";
 
 export default function KoszykPage() {
   const {
@@ -43,6 +45,26 @@ export default function KoszykPage() {
   const shipping = 299;
   const discount = appliedPromo?.discount ?? 0;
   const grandTotal = Math.max(0, total - discount) + shipping;
+
+  // Cross-sell — "Może Cię zainteresować"
+  const [crossSell, setCrossSell] = useState<Product[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    if (items.length === 0) {
+      setCrossSell([]);
+      return;
+    }
+    getCartCrossSellAction(
+      items.map((i) => ({ id: i.id, category: i.category }))
+    ).then((products) => {
+      if (!cancelled) setCrossSell(products);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Re-fetch gdy zmienia się skład koszyka (po id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.map((i) => i.id).join(",")]);
 
   // Re-waliduj kod gdy zmieni się total (np. po dodaniu/usunięciu pozycji
   // albo zmianie ilości). Server policzy nową kwotę zniżki (przy percent)
@@ -180,7 +202,7 @@ export default function KoszykPage() {
           })}
         </div>
 
-        {/* Podsumowanie */}
+        {/* Podsumowanie (z cross-sell pod nim w mobile) */}
         <div className="lg:col-span-1">
           <div className="sticky top-24 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8 flex flex-col gap-6">
             <h2 className="font-display text-2xl font-bold text-[var(--fg)]">
@@ -237,6 +259,25 @@ export default function KoszykPage() {
           </div>
         </div>
       </div>
+
+      {/* Cross-sell: "Może Cię zainteresować" */}
+      {crossSell.length > 0 && (
+        <section className="mt-20 pt-16 border-t border-[var(--border)]">
+          <div className="mb-10">
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+              Polecane do koszyka
+            </p>
+            <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
+              Może Cię zainteresować
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {crossSell.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

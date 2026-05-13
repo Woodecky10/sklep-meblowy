@@ -1,7 +1,11 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getProduct, getRelatedProducts } from "@/app/_lib/products";
-import { getCategoryLabel } from "@/app/_lib/categories";
+import {
+  getProduct,
+  getRelatedProducts,
+  getCrossSellProducts,
+} from "@/app/_lib/products";
+import { getCategoryLabel, getAllCategories } from "@/app/_lib/categories";
 import {
   getProductRating,
   getReviewsForProduct,
@@ -43,13 +47,26 @@ export default async function ProduktPage({ params }: Props) {
   const product = await getProduct(id);
   if (!product) notFound();
 
-  const [related, rating, reviews, reviewStatus, categoryLabel] = await Promise.all([
-    getRelatedProducts(product.id, product.category),
-    getProductRating(product.id),
-    getReviewsForProduct(product.id),
-    getReviewStatus(product.id),
-    getCategoryLabel(product.category),
-  ]);
+  const [related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell] =
+    await Promise.all([
+      getRelatedProducts(product.id, product.category),
+      getProductRating(product.id),
+      getReviewsForProduct(product.id),
+      getReviewStatus(product.id),
+      getCategoryLabel(product.category),
+      getAllCategories(),
+      getCrossSellProducts([product.category], [product.id], 4),
+    ]);
+
+  // Etykieta cross-sell pochodzi z LABELA pierwszej cross_sell_categories tej
+  // kategorii — np. dla łóżek pokaże "Polecane materace".
+  const currentCat = allCategories.find((c) => c.slug === product.category);
+  const crossSellTargetSlug = currentCat?.crossSellCategories?.[0];
+  const crossSellLabel = crossSellTargetSlug
+    ? allCategories.find((c) => c.slug === crossSellTargetSlug)?.label ?? null
+    : null;
+
+  const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
 
   const details: { label: string; value: string }[] = [];
   if (product.dimensions) {
@@ -149,6 +166,25 @@ export default async function ProduktPage({ params }: Props) {
         </section>
       )}
 
+      {/* Cross-sell — np. dla łóżka pokaż "Polecane materace" */}
+      {crossSell.length > 0 && (
+        <section className="mb-24">
+          <div className="mb-8">
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+              Dopełnienie
+            </p>
+            <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
+              {crossSellLabel ? `Polecane ${crossSellLabel.toLowerCase()}` : "Może Cię zainteresować"}
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {crossSell.map((p) => (
+              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Sekcja opinii */}
       <section id="opinie" className="mb-24 scroll-mt-24">
         <div className="mb-8 flex items-end justify-between flex-wrap gap-4">
@@ -219,7 +255,7 @@ export default async function ProduktPage({ params }: Props) {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {related.map((p) => (
-              <ProductCard key={p.id} product={p} />
+              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} />
             ))}
           </div>
         </section>

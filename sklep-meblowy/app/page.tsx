@@ -5,6 +5,7 @@ import HomeHeroSlider from "./_components/layout/HomeHeroSlider";
 import { getActiveSlides, DEFAULT_FALLBACK_SLIDE } from "./_lib/slides";
 import { getActiveTiles, DEFAULT_FALLBACK_TILES } from "./_lib/home-tiles";
 import { getFeaturedOrFallback } from "./_lib/featured";
+import { getCategories } from "./_lib/categories";
 import ProductCard from "./_components/ui/ProductCard";
 
 export const metadata: Metadata = {
@@ -12,11 +13,13 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  const [dbSlides, dbTiles, featured] = await Promise.all([
+  const [dbSlides, dbTiles, featured, allCategories] = await Promise.all([
     getActiveSlides(),
     getActiveTiles(),
     getFeaturedOrFallback(),
+    getCategories(),
   ]);
+  const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
   // Fallback gdy admin jeszcze nic nie dodał — żeby home nie była pusta.
   const slides = dbSlides.length > 0 ? dbSlides : [DEFAULT_FALLBACK_SLIDE];
   const tiles = dbTiles.length > 0 ? dbTiles : DEFAULT_FALLBACK_TILES;
@@ -98,7 +101,12 @@ export default async function HomePage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {featured.map(({ product, badge }) => (
-                <ProductCard key={product.id} product={product} badge={badge} />
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  badge={badge}
+                  categoryLabel={categoryLabels.get(product.category)}
+                />
               ))}
             </div>
           )}
