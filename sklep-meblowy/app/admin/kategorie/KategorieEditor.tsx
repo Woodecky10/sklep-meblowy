@@ -216,6 +216,7 @@ export default function KategorieEditor({
                                 mode="update"
                                 initial={cat}
                                 groups={sections}
+                                allCategories={categories}
                                 onCancel={() => setOpenCategoryForm(null)}
                                 onSubmit={async (fd) => {
                                   const res = await updateCategory(fd);
@@ -237,6 +238,7 @@ export default function KategorieEditor({
                       mode="create"
                       defaultGroupId={section.id}
                       groups={sections}
+                      allCategories={categories}
                       onCancel={() => setOpenNewCategoryForGroup(null)}
                       onSubmit={async (fd) => {
                         const res = await createCategory(fd);
@@ -360,6 +362,7 @@ function CategoryForm({
   initial,
   defaultGroupId,
   groups,
+  allCategories,
   onSubmit,
   onCancel,
 }: {
@@ -367,10 +370,24 @@ function CategoryForm({
   initial?: CategoryDef;
   defaultGroupId?: string;
   groups: Section[];
+  allCategories: CategoryDef[];
   onSubmit: (fd: FormData) => Promise<void>;
   onCancel: () => void;
 }) {
   const [pending, startTransition] = useTransition();
+  const [crossSell, setCrossSell] = useState<string[]>(initial?.crossSellCategories ?? []);
+
+  // Inne kategorie (oprócz aktualnie edytowanej) jako kandydatów do cross-sell.
+  const candidates = allCategories
+    .filter((c) => c.id !== initial?.id)
+    .slice()
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  function toggle(slug: string) {
+    setCrossSell((prev) =>
+      prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]
+    );
+  }
 
   return (
     <form
@@ -452,6 +469,49 @@ function CategoryForm({
           />
           <span>Pokazuj w sklepie</span>
         </label>
+      )}
+
+      {/* Cross-sell — multi-select kategorii polecanych */}
+      {candidates.length > 0 && (
+        <div className="flex flex-col gap-2 pt-2 border-t border-[var(--border)]">
+          <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
+            Polecaj klientom z tych kategorii (cross-sell)
+          </span>
+          <p className="text-xs text-[var(--muted)] leading-snug">
+            Klient kupuje produkt z tej kategorii → w koszyku i na karcie
+            produktu pokażemy mu produkty z zaznaczonych kategorii poniżej.
+          </p>
+          {/* Hidden input gwarantujący że FormData zna ten klucz nawet
+              gdy lista jest pusta (server zinterpretuje getAll() = []) */}
+          {crossSell.length === 0 && (
+            <input type="hidden" name="cross_sell_categories" value="" />
+          )}
+          <div className="flex flex-wrap gap-2">
+            {candidates.map((c) => {
+              const active = crossSell.includes(c.slug);
+              return (
+                <label
+                  key={c.slug}
+                  className={`px-3 py-1.5 text-xs font-sans rounded-full border cursor-pointer transition-colors ${
+                    active
+                      ? "bg-[var(--color-gold)] text-[var(--color-navy)] border-[var(--color-gold)]"
+                      : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    name="cross_sell_categories"
+                    value={c.slug}
+                    checked={active}
+                    onChange={() => toggle(c.slug)}
+                    className="hidden"
+                  />
+                  {c.label}
+                </label>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       <div className="flex gap-2 pt-2">
