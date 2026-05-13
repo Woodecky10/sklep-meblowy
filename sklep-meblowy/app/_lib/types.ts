@@ -26,9 +26,20 @@ export type ProductVariant = {
   images?: string[];
 };
 
+// Override-y wyświetlanych nazw — admin może zmienić "Wariant" → "Kolor"
+// i "01 beż drewniany stelaż" → "Beż drewniany". Zapisane oddzielnie żeby
+// sync z BL nie nadpisał ich (BL przy każdym sync zwraca surowe nazwy).
+export type ProductVariantOverrides = {
+  // np. {"Wariant": "Kolor"}
+  option_names?: Record<string, string>;
+  // np. {"Wariant": {"01 beż drewniany stelaż": "Beż drewniany"}}
+  value_labels?: Record<string, Record<string, string>>;
+};
+
 export type ProductVariants = {
   options: ProductOption[];
   combinations: ProductVariant[];
+  overrides?: ProductVariantOverrides;
 };
 
 export type Product = {
