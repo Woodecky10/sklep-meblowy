@@ -23,6 +23,7 @@ type CheckoutBody = {
     quantity: number;
     image?: string;
     variantValues?: Record<string, string>;
+    notes?: string;
   }[];
   email: string;
   fullName: string;
@@ -69,6 +70,7 @@ export async function POST(request: NextRequest) {
       quantity: number;
       price: number;
       variant_values?: Record<string, string> | null;
+      notes?: string | null;
     }[] = [];
     const stripeLineItems: LineItem[] = [];
     let total = 0;
@@ -114,6 +116,7 @@ export async function POST(request: NextRequest) {
         quantity: item.quantity,
         price: unitPrice,
         variant_values: variantValues,
+        notes: item.notes?.trim() ? item.notes.trim().slice(0, 500) : null,
       });
 
       stripeLineItems.push({

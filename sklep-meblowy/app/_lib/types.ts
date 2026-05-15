@@ -119,6 +119,7 @@ export type OrderItem = {
   quantity: number;
   price: number;
   variant_values: Record<string, string> | null;
+  notes: string | null;
   product?: Product;
 };
 
@@ -154,6 +155,7 @@ type OrderItemInsert = {
   quantity: number;
   price: number;
   variant_values?: Record<string, string> | null;
+  notes?: string | null;
 };
 
 export type Database = {

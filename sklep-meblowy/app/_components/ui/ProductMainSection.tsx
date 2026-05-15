@@ -6,6 +6,7 @@ import { getVariantImages } from "@/app/_lib/variants";
 import ImageGallery from "./ImageGallery";
 import ProductActions from "./ProductActions";
 import StarRating from "./StarRating";
+import InquiryModal from "./InquiryModal";
 
 // Client wrapper łączący galerię i akcje, żeby wybór wariantu mógł
 // jednocześnie zmieniać zdjęcia (galeria) i cenę / przycisk dodaj-do-koszyka
@@ -74,6 +75,8 @@ export default function ProductMainSection({
         </div>
 
         <ProductActions product={product} selected={selected} onChange={setSelected} />
+
+        <InquiryModal productId={product.id} productName={product.name} />
 
         <div className="border-t border-[var(--border)] pt-6 text-sm text-[var(--muted)] space-y-2">
           <p>✓ Zwrot do 30 dni</p>

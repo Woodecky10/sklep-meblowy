@@ -12,6 +12,9 @@ export type CartItem = {
   // Slug kategorii — wymagane do cross-sell. Optional w typie żeby
   // starsze localStorage states (bez tego pola) dalej działały.
   category?: string;
+  // Uwagi klienta do tej pozycji — np. "róż jak na zdjęciu 2".
+  // Optional dla backward compat.
+  notes?: string;
 };
 
 // Zwalidowany kod rabatowy zastosowany do koszyka. Walidacja na serwerze
@@ -42,6 +45,12 @@ type CartAction =
       id: string;
       variantValues: Record<string, string> | undefined;
       quantity: number;
+    }
+  | {
+      type: "UPDATE_NOTES";
+      id: string;
+      variantValues: Record<string, string> | undefined;
+      notes: string;
     }
   | { type: "CLEAR" }
   | { type: "HYDRATE"; items: CartItem[] };
@@ -94,6 +103,16 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         ),
       };
     }
+    case "UPDATE_NOTES": {
+      const key = itemKey(action.id, action.variantValues);
+      return {
+        items: state.items.map((i) =>
+          itemKey(i.id, i.variantValues) === key
+            ? { ...i, notes: action.notes }
+            : i
+        ),
+      };
+    }
     case "CLEAR":
       return state.items.length === 0 ? state : { items: [] };
     case "HYDRATE":
@@ -118,6 +137,11 @@ type CartContextValue = {
   updateQty: (
     id: string,
     quantity: number,
+    variantValues?: Record<string, string>
+  ) => void;
+  updateNotes: (
+    id: string,
+    notes: string,
     variantValues?: Record<string, string>
   ) => void;
   clear: () => void;
@@ -188,6 +212,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: "UPDATE_QTY", id, variantValues, quantity }),
     []
   );
+  const updateNotes = useCallback(
+    (id: string, notes: string, variantValues?: Record<string, string>) =>
+      dispatch({ type: "UPDATE_NOTES", id, variantValues, notes }),
+    []
+  );
   const clear = useCallback(() => {
     dispatch({ type: "CLEAR" });
     setAppliedPromo(null);
@@ -208,12 +237,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       add,
       remove,
       updateQty,
+      updateNotes,
       clear,
       dismissNotification,
       applyPromo,
       clearPromo,
     };
-  }, [state.items, notification, appliedPromo, add, remove, updateQty, clear, dismissNotification, applyPromo, clearPromo]);
+  }, [state.items, notification, appliedPromo, add, remove, updateQty, updateNotes, clear, dismissNotification, applyPromo, clearPromo]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

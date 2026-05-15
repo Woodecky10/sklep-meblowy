@@ -90,19 +90,23 @@ export async function pushOrderToBaseLinker(orderId: string): Promise<{
     (address.fullname ?? "").trim() ||
     "Klient (dane do uzupełnienia)";
 
-  // Mapuj pozycje zamówienia
+  // Mapuj pozycje zamówienia. Klient mógł dopisać uwagi (item.notes) —
+  // dołączamy do `attributes` BL żeby były widoczne pracownikom obok wariantu.
   const products: BLOrderProduct[] = o.items.map((item) => {
     const p = item.product;
     const baseName = p?.name ?? "Produkt";
-    const variantSuffix = item.variant_values
-      ? ` — ${formatVariantLabel(item.variant_values)}`
+    const variantLabel = item.variant_values
+      ? formatVariantLabel(item.variant_values)
       : "";
+    const itemNotes = (item as { notes?: string | null }).notes?.trim() ?? "";
+    const variantSuffix = variantLabel ? ` — ${variantLabel}` : "";
+    const attributes = [variantLabel, itemNotes ? `Uwagi: ${itemNotes}` : ""]
+      .filter(Boolean)
+      .join(" | ");
     return {
       product_id: p?.baselinker_id ?? undefined,
       name: baseName + variantSuffix,
-      attributes: item.variant_values
-        ? formatVariantLabel(item.variant_values)
-        : undefined,
+      attributes: attributes || undefined,
       price_brutto: Number(item.price),
       tax_rate: DEFAULT_TAX_RATE,
       quantity: item.quantity,
