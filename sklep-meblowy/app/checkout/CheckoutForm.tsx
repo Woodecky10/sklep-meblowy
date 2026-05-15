@@ -58,6 +58,7 @@ export default function CheckoutForm({
             quantity: i.quantity,
             image: i.image,
             variantValues: i.variantValues,
+            notes: i.notes,
           })),
           email,
           fullName,

@@ -16,6 +16,7 @@ export default function KoszykPage() {
     count,
     remove,
     updateQty,
+    updateNotes,
     clear,
     appliedPromo,
     applyPromo,
@@ -196,6 +197,12 @@ export default function KoszykPage() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Uwagi klienta — collapse */}
+                  <ItemNotes
+                    initial={item.notes ?? ""}
+                    onSave={(notes) => updateNotes(item.id, notes, item.variantValues)}
+                  />
                 </div>
               </div>
             );
@@ -278,6 +285,71 @@ export default function KoszykPage() {
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// Sub-component: uwagi do pozycji (collapse)
+// ============================================================
+
+function ItemNotes({
+  initial,
+  onSave,
+}: {
+  initial: string;
+  onSave: (notes: string) => void;
+}) {
+  const [open, setOpen] = useState(initial.length > 0);
+  const [value, setValue] = useState(initial);
+  const dirty = value !== initial;
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="self-start mt-3 text-xs font-sans uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors"
+      >
+        + Dodaj uwagi do tego produktu
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-3 flex flex-col gap-2">
+      <label className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
+        Uwagi do tego produktu
+      </label>
+      <textarea
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => {
+          if (dirty) onSave(value);
+        }}
+        rows={2}
+        maxLength={500}
+        placeholder="np. róż jak na zdjęciu 2, proszę o telefon przed dostawą"
+        className="w-full px-3 py-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)] resize-y"
+      />
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] text-[var(--muted)]">
+          {value.length}/500 znaków{dirty ? " · niezapisane" : ""}
+        </span>
+        {value.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setValue("");
+              onSave("");
+              setOpen(false);
+            }}
+            className="text-[10px] font-sans uppercase tracking-widest text-[var(--muted)] hover:text-red-500"
+          >
+            Usuń uwagi
+          </button>
+        )}
+      </div>
     </div>
   );
 }

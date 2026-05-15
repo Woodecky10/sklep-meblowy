@@ -9,6 +9,7 @@ type CreateOrderInput = {
     quantity: number;
     price: number;
     variant_values?: Record<string, string> | null;
+    notes?: string | null;
   }[];
   total: number;
   shippingAddress: Address;
