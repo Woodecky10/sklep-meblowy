@@ -6,6 +6,7 @@ import { getActiveSlides, DEFAULT_FALLBACK_SLIDE } from "./_lib/slides";
 import { getActiveTiles, DEFAULT_FALLBACK_TILES } from "./_lib/home-tiles";
 import { getFeaturedOrFallback } from "./_lib/featured";
 import { getCategories } from "./_lib/categories";
+import { getCollectionsForHome } from "./_lib/collections";
 import ProductCard from "./_components/ui/ProductCard";
 
 export const metadata: Metadata = {
@@ -13,11 +14,12 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  const [dbSlides, dbTiles, featured, allCategories] = await Promise.all([
+  const [dbSlides, dbTiles, featured, allCategories, collectionsForHome] = await Promise.all([
     getActiveSlides(),
     getActiveTiles(),
     getFeaturedOrFallback(),
     getCategories(),
+    getCollectionsForHome(),
   ]);
   const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
   // Fallback gdy admin jeszcze nic nie dodał — żeby home nie była pusta.
@@ -112,6 +114,74 @@ export default async function HomePage() {
           )}
         </div>
       </section>
+
+      {/* Nasze kolekcje — auto-render kolekcji z DB które mają produkty */}
+      {collectionsForHome.length > 0 && (
+        <section className="max-w-7xl mx-auto px-6 py-24">
+          <div className="text-center mb-16">
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-3">
+              Serie mebli
+            </p>
+            <h2 className="font-display text-4xl font-bold text-[var(--fg)]">
+              Nasze kolekcje
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {collectionsForHome.map(({ collection, sampleProducts }) => (
+              <Link
+                key={collection.id}
+                href={`/sklep?kolekcja=${collection.slug}`}
+                className="group flex flex-col bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl overflow-hidden hover:border-[var(--color-gold)] transition-colors"
+              >
+                {/* Mozaika do 4 zdjęć produktów z kolekcji */}
+                <div className="relative aspect-[4/3] grid grid-cols-2 gap-1 p-1 bg-stone-100 dark:bg-stone-900">
+                  {sampleProducts.slice(0, 4).map((p, i) => (
+                    <div
+                      key={p.id}
+                      className={`relative bg-stone-200 dark:bg-stone-800 rounded-lg overflow-hidden ${
+                        sampleProducts.length === 1
+                          ? "col-span-2 row-span-2"
+                          : sampleProducts.length === 2
+                            ? "col-span-1 row-span-2"
+                            : sampleProducts.length === 3 && i === 0
+                              ? "col-span-2"
+                              : ""
+                      }`}
+                    >
+                      {p.images?.[0] && (
+                        <Image
+                          src={p.images[0]}
+                          alt=""
+                          fill
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                          className="object-cover transition-transform group-hover:scale-105"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="p-6 flex flex-col gap-2">
+                  <h3 className="font-display text-2xl font-bold text-[var(--fg)] group-hover:text-[var(--color-gold)] transition-colors">
+                    {collection.label}
+                  </h3>
+                  {collection.description && (
+                    <p className="text-sm text-[var(--muted)] leading-snug line-clamp-2">
+                      {collection.description}
+                    </p>
+                  )}
+                  <span className="mt-2 text-xs font-sans uppercase tracking-widest text-[var(--color-gold)] flex items-center gap-1">
+                    Zobacz kolekcję ({sampleProducts.length}
+                    {sampleProducts.length === 1 ? " produkt" : sampleProducts.length < 5 ? " produkty" : " produktów"})
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Banner promocyjny */}
       <section className="max-w-7xl mx-auto px-6 py-24">

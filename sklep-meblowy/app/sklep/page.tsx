@@ -7,6 +7,7 @@ import {
   getSections,
   getCategories,
 } from "@/app/_lib/categories";
+import { getCollection } from "@/app/_lib/collections";
 import ProductCard from "@/app/_components/ui/ProductCard";
 import FilterBar from "@/app/_components/ui/FilterBar";
 import Pagination from "@/app/_components/ui/Pagination";
@@ -23,6 +24,7 @@ type SearchParams = Promise<{
   dostepne?: string;
   kolor?: string;
   material?: string;
+  kolekcja?: string;
 }>;
 
 function parsePositiveNumber(value: string | undefined) {
@@ -46,8 +48,9 @@ export default async function SklepPage({
   const inStockOnly = sp.dostepne === "1";
   const colors = sp.kolor?.split(",").filter(Boolean);
   const materials = sp.material?.split(",").filter(Boolean);
+  const collectionSlug = sp.kolekcja?.trim() || undefined;
 
-  const [{ products, total, pages }, facets, sections, allCategories, categoryLabel] =
+  const [{ products, total, pages }, facets, sections, allCategories, categoryLabel, collection] =
     await Promise.all([
       getProducts({
         category,
@@ -59,11 +62,13 @@ export default async function SklepPage({
         inStockOnly,
         colors,
         materials,
+        collectionSlug,
       }),
       getFilterFacets({ search, category }),
       getSections(),
       getCategories(),
       getCategoryLabel(category),
+      collectionSlug ? getCollection(collectionSlug) : Promise.resolve(null),
     ]);
 
   // Batch pobrania ocen — jedno zapytanie dla całej strony list.
@@ -80,12 +85,15 @@ export default async function SklepPage({
   if (sp.dostepne) rawParams.dostepne = sp.dostepne;
   if (sp.kolor) rawParams.kolor = sp.kolor;
   if (sp.material) rawParams.material = sp.material;
+  if (sp.kolekcja) rawParams.kolekcja = sp.kolekcja;
 
-  const heading = search
+  const heading = collection
+    ? collection.label
+    : search
     ? `Wyniki: „${search}”`
     : category
-      ? categoryLabel ?? "Sklep"
-      : "Wszystkie produkty";
+    ? categoryLabel ?? "Sklep"
+    : "Wszystkie produkty";
 
   // Projekcja dla FilterBar (client) — slug + label per sekcja.
   const filterSections = sections.map((s) => ({
