@@ -185,7 +185,7 @@ export default async function HomePage() {
 
       {/* Banner promocyjny */}
       <section className="max-w-7xl mx-auto px-6 py-24">
-        <div className="rounded-3xl bg-[var(--color-navy)] px-12 py-16 flex flex-col md:flex-row items-center justify-between gap-8">
+        <div className="rounded-3xl bg-[var(--color-navy)] px-6 sm:px-12 py-16 flex flex-col md:flex-row items-center justify-between gap-8">
           <div>
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-3">
               Oferta limitowana

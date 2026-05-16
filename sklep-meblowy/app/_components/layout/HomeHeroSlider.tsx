@@ -103,7 +103,7 @@ export default function HomeHeroSlider({ slides }: { slides: HeroSlide[] }) {
                     </p>
                   )}
                   {slide.title && (
-                    <h1 className="font-display text-5xl md:text-7xl font-bold text-white leading-tight mb-8">
+                    <h1 className="font-display text-4xl sm:text-5xl md:text-7xl font-bold text-white leading-tight mb-8 break-words hyphens-auto">
                       {renderTitleWithHighlight(slide.title, slide.highlightedWord)}
                     </h1>
                   )}

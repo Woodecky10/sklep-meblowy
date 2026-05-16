@@ -45,11 +45,11 @@ export default async function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 bg-[var(--bg)] border-b border-[var(--border)] backdrop-blur-sm">
-      <div className="max-w-7xl mx-auto px-6 h-24 flex items-center justify-between gap-6 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-24 flex items-center justify-between gap-2 sm:gap-6 relative">
         {/* Logo */}
         <Link
           href="/"
-          className="flex items-center gap-3 shrink-0"
+          className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0"
           aria-label={`${COMPANY.brandName} — strona główna`}
         >
           <Image
@@ -57,10 +57,10 @@ export default async function Navbar() {
             alt=""
             width={80}
             height={80}
-            className="w-16 h-16 lg:w-20 lg:h-20 mt-[3px]"
+            className="w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 mt-[3px] shrink-0"
             priority
           />
-          <span className="font-display text-2xl lg:text-3xl font-bold tracking-tight text-[var(--color-navy)] dark:text-[var(--color-gold)]">
+          <span className="hidden sm:inline font-display text-2xl lg:text-3xl font-bold tracking-tight text-[var(--color-navy)] dark:text-[var(--color-gold)] truncate">
             {COMPANY.displayName}
           </span>
         </Link>
