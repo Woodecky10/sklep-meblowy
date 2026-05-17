@@ -3,12 +3,14 @@ import Image from "next/image";
 import type { Product, ProductRating } from "@/app/_lib/types";
 import AddToCartButton from "./AddToCartButton";
 import StarRating from "./StarRating";
+import WishlistButton from "./WishlistButton";
 
 export default function ProductCard({
   product,
   rating,
   badge,
   categoryLabel,
+  isInWishlist = false,
 }: {
   product: Product;
   rating?: ProductRating;
@@ -19,13 +21,16 @@ export default function ProductCard({
   // w client components (np. cross-sell w /koszyk) które nie mogą
   // robić async fetch w trakcie renderu.
   categoryLabel?: string;
+  // Czy produkt jest na liście ulubionych zalogowanego usera.
+  // Default false — niezalogowani widzą puste serce.
+  isInWishlist?: boolean;
 }) {
   const image = product.images?.[0];
 
   return (
     <div className="group flex flex-col">
-      <Link href={`/produkt/${product.id}`} className="block">
-        <div className="relative aspect-[4/3] bg-stone-100 dark:bg-stone-800 rounded-2xl overflow-hidden mb-4">
+      <div className="relative aspect-[4/3] bg-stone-100 dark:bg-stone-800 rounded-2xl overflow-hidden mb-4">
+        <Link href={`/produkt/${product.id}`} className="block absolute inset-0">
           {image ? (
             <Image
               src={image}
@@ -42,8 +47,13 @@ export default function ProductCard({
           <span className="absolute top-4 left-4 px-3 py-1 bg-[var(--color-gold)] text-[var(--color-navy)] text-[10px] font-sans font-semibold uppercase tracking-widest rounded-full">
             {badge || "Na zamówienie"}
           </span>
-        </div>
-      </Link>
+        </Link>
+        <WishlistButton
+          productId={product.id}
+          initialIsInWishlist={isInWishlist}
+          variant="card"
+        />
+      </div>
 
       <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-1">
         {categoryLabel ?? product.category}

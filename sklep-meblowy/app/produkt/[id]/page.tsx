@@ -7,6 +7,7 @@ import {
 } from "@/app/_lib/products";
 import { getCategoryLabel, getAllCategories } from "@/app/_lib/categories";
 import { getCollection, getCollectionSiblings } from "@/app/_lib/collections";
+import { getUserWishlistIds } from "@/app/_lib/wishlist";
 import {
   getProductRating,
   getReviewsForProduct,
@@ -21,6 +22,7 @@ import {
   sanitizeProductHtml,
   extractShortDescription,
 } from "@/app/_lib/product-html";
+import { COMPANY } from "@/app/_lib/company";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -48,7 +50,7 @@ export default async function ProduktPage({ params }: Props) {
   const product = await getProduct(id);
   if (!product) notFound();
 
-  const [related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell] =
+  const [related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell, wishlistIds] =
     await Promise.all([
       getRelatedProducts(product.id, product.category),
       getProductRating(product.id),
@@ -57,6 +59,7 @@ export default async function ProduktPage({ params }: Props) {
       getCategoryLabel(product.category),
       getAllCategories(),
       getCrossSellProducts([product.category], [product.id], 4),
+      getUserWishlistIds(),
     ]);
 
   // Etykieta cross-sell pochodzi z LABELA pierwszej cross_sell_categories tej
@@ -104,8 +107,49 @@ export default async function ProduktPage({ params }: Props) {
     details.push({ label: "Gwarancja", value: product.warranty });
   }
 
+  // Structured data dla Google (schema.org/Product) — rich snippets w SERP-ach:
+  // cena, dostępność, gwiazdki/ocena prosto w wynikach wyszukiwania.
+  // Plain text description (bez HTML tagów) wymagany przez Google.
+  const plainDescription = stripHtml(product.description).slice(0, 5000);
+  const productUrl = `https://${COMPANY.domain}/produkt/${product.id}`;
+  const jsonLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: plainDescription,
+    image: product.images ?? [],
+    sku: product.baselinker_id ?? product.id,
+    brand: {
+      "@type": "Brand",
+      name: COMPANY.brandName,
+    },
+    offers: {
+      "@type": "Offer",
+      url: productUrl,
+      priceCurrency: "PLN",
+      price: product.price.toFixed(2),
+      // Meble robione na zamówienie — zawsze "dostępne", BL realizuje.
+      availability: "https://schema.org/InStock",
+      itemCondition: "https://schema.org/NewCondition",
+    },
+  };
+  if (rating && rating.count > 0) {
+    jsonLd.aggregateRating = {
+      "@type": "AggregateRating",
+      ratingValue: rating.average.toFixed(1),
+      reviewCount: rating.count,
+      bestRating: "5",
+      worstRating: "1",
+    };
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-xs font-sans text-[var(--muted)] mb-12 uppercase tracking-widest">
         <a href="/" className="hover:text-[var(--color-gold)] transition-colors">Dom</a>
@@ -188,7 +232,7 @@ export default async function ProduktPage({ params }: Props) {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {crossSell.map((p) => (
-              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} />
+              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} />
             ))}
           </div>
         </section>
@@ -212,7 +256,7 @@ export default async function ProduktPage({ params }: Props) {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {collectionSiblings.map((p) => (
-              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} />
+              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} />
             ))}
           </div>
         </section>
@@ -288,7 +332,7 @@ export default async function ProduktPage({ params }: Props) {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {related.map((p) => (
-              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} />
+              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} />
             ))}
           </div>
         </section>

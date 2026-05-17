@@ -8,6 +8,7 @@ import {
   getCategories,
 } from "@/app/_lib/categories";
 import { getCollection } from "@/app/_lib/collections";
+import { getUserWishlistIds } from "@/app/_lib/wishlist";
 import ProductCard from "@/app/_components/ui/ProductCard";
 import FilterBar from "@/app/_components/ui/FilterBar";
 import Pagination from "@/app/_components/ui/Pagination";
@@ -72,7 +73,10 @@ export default async function SklepPage({
     ]);
 
   // Batch pobrania ocen — jedno zapytanie dla całej strony list.
-  const ratings = await getRatingsForProducts(products.map((p) => p.id));
+  const [ratings, wishlistIds] = await Promise.all([
+    getRatingsForProducts(products.map((p) => p.id)),
+    getUserWishlistIds(),
+  ]);
   const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
 
   // Zachowaj wszystkie aktywne filtry w linkach paginacji
@@ -137,6 +141,7 @@ export default async function SklepPage({
               product={product}
               rating={ratings.get(product.id)}
               categoryLabel={categoryLabels.get(product.category)}
+              isInWishlist={wishlistIds.has(product.id)}
             />
           ))}
         </div>

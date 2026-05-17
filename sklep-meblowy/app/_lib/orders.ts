@@ -59,7 +59,7 @@ export async function getUserOrders(userId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("orders")
-    .select(`*, items:order_items(*, product:products(*))`)
+    .select(`*, items:order_items(*, product:products(*)), promo_code:promo_codes(code)`)
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -84,7 +84,7 @@ export async function getOrderById(orderId: string) {
   const supabase = await createAdminClient();
   const { data, error } = await supabase
     .from("orders")
-    .select(`*, items:order_items(*, product:products(*))`)
+    .select(`*, items:order_items(*, product:products(*)), promo_code:promo_codes(code)`)
     .eq("id", orderId)
     .single();
 
