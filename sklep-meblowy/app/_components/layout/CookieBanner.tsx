@@ -86,7 +86,7 @@ export default function CookieBanner() {
               włączamy wyłącznie za Twoją zgodą. Szczegóły w{" "}
               <Link
                 href="/prywatnosc"
-                className="underline text-[var(--color-gold)] hover:opacity-80"
+                className="underline text-[var(--color-gold-text)] hover:opacity-80"
               >
                 Polityce prywatności
               </Link>

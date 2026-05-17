@@ -78,13 +78,17 @@ export default function HomeHeroSlider({ slides }: { slides: HeroSlide[] }) {
               aria-roledescription="slide"
               aria-label={`${idx + 1} z ${slides.length}`}
             >
-              {/* Tło — zdjęcie (jeśli brak, fallback navy) */}
+              {/* Tło — zdjęcie (jeśli brak, fallback navy). Pierwszy slide
+                  to LCP element — fetchPriority="high" daje Chrome'owi sygnał
+                  żeby pobrać go przed innymi zasobami (Next.js powinien dodać
+                  to przy priority={true}, ale w v16 musimy explicit). */}
               {slide.imageUrl ? (
                 <Image
                   src={slide.imageUrl}
                   alt={slide.imageAlt}
                   fill
                   priority={idx === 0}
+                  fetchPriority={idx === 0 ? "high" : "auto"}
                   sizes="100vw"
                   className="object-cover"
                 />
@@ -103,7 +107,15 @@ export default function HomeHeroSlider({ slides }: { slides: HeroSlide[] }) {
                     </p>
                   )}
                   {slide.title && (
-                    <h1 className="font-display text-4xl sm:text-5xl md:text-7xl font-bold text-white leading-tight mb-8 break-words hyphens-auto">
+                    // min-h rezerwuje miejsce na typowy tytuł (3 linie desktop,
+                    // 4 mobile) ŻEBY swap fontu Playfair → fallback nie powodował
+                    // reflowa subtitle+CTA poniżej (główne źródło CLS=0.202 w
+                    // raporcie PageSpeed). Liczone: line-height tight (1.25) ×
+                    // font-size × max linii.
+                    // mobile: 36px × 1.25 × 4 = 180px
+                    // sm:    48px × 1.25 × 3 = 180px
+                    // md:    72px × 1.25 × 3 = 270px
+                    <h1 className="font-display text-4xl sm:text-5xl md:text-7xl font-bold text-white leading-tight mb-8 break-words hyphens-auto min-h-[180px] md:min-h-[270px]">
                       {renderTitleWithHighlight(slide.title, slide.highlightedWord)}
                     </h1>
                   )}

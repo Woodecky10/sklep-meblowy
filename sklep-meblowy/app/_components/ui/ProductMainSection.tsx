@@ -33,7 +33,7 @@ export default function ProductMainSection({
 
       <div className="flex flex-col gap-8">
         <div>
-          <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-3">
+          <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-3">
             {categoryLabel ?? product.category}
           </p>
           <h1 className="font-display text-4xl font-bold text-[var(--fg)] leading-tight mb-4">

@@ -50,7 +50,7 @@ export default function InquiryModal({
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-1">
+                <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-1">
                   Pytanie
                 </p>
                 <h2 className="font-display text-2xl font-bold text-[var(--fg)] leading-tight">

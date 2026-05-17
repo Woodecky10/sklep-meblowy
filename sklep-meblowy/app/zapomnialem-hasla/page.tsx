@@ -17,7 +17,7 @@ export default async function ZapomnialemHaslaPage() {
   return (
     <div className="max-w-md mx-auto px-6 py-20">
       <div className="mb-10 text-center">
-        <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+        <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
           Konto
         </p>
         <h1 className="font-display text-4xl font-bold text-[var(--fg)]">

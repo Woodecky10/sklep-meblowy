@@ -99,7 +99,7 @@ export default function KoszykPage() {
     <div className="max-w-7xl mx-auto px-6 py-16">
       <div className="mb-10 flex items-end justify-between">
         <div>
-          <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+          <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
             Koszyk
           </p>
           <h1 className="font-display text-4xl font-bold text-[var(--fg)]">
@@ -271,7 +271,7 @@ export default function KoszykPage() {
       {crossSell.length > 0 && (
         <section className="mt-20 pt-16 border-t border-[var(--border)]">
           <div className="mb-10">
-            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
               Polecane do koszyka
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">

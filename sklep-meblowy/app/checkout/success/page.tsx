@@ -45,7 +45,7 @@ export default async function SuccessPage({
         </svg>
       </div>
 
-      <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-3">
+      <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-3">
         Dziękujemy
       </p>
       <h1 className="font-display text-4xl md:text-5xl font-bold text-[var(--fg)] mb-6">
