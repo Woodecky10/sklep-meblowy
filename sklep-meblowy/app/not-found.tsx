@@ -27,7 +27,7 @@ export default async function NotFound() {
         404
       </p>
 
-      <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-3 mt-4">
+      <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-3 mt-4">
         Strona nie znaleziona
       </p>
       <h1 className="font-display text-3xl md:text-4xl font-bold text-[var(--fg)] mb-6">

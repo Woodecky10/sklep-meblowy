@@ -178,7 +178,7 @@ export default async function ProduktPage({ params }: Props) {
       {details.length > 0 && (
         <section className="mb-24">
           <div className="mb-8">
-            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
               Specyfikacja
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
@@ -205,7 +205,7 @@ export default async function ProduktPage({ params }: Props) {
       {product.description && product.description.trim().length > 0 && (
         <section className="mb-24">
           <div className="mb-8">
-            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
               Pełny opis
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
@@ -223,7 +223,7 @@ export default async function ProduktPage({ params }: Props) {
       {crossSell.length > 0 && (
         <section className="mb-24">
           <div className="mb-8">
-            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
               Dopełnienie
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
@@ -242,7 +242,7 @@ export default async function ProduktPage({ params }: Props) {
       {collection && collectionSiblings.length > 0 && (
         <section className="mb-24">
           <div className="mb-8">
-            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
               Pełna kolekcja
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
@@ -266,7 +266,7 @@ export default async function ProduktPage({ params }: Props) {
       <section id="opinie" className="mb-24 scroll-mt-24">
         <div className="mb-8 flex items-end justify-between flex-wrap gap-4">
           <div>
-            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
               Opinie
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
@@ -323,7 +323,7 @@ export default async function ProduktPage({ params }: Props) {
       {related.length > 0 && (
         <section>
           <div className="mb-10">
-            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
               Zobacz też
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">

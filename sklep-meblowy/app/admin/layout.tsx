@@ -39,7 +39,7 @@ export default async function AdminLayout({
           >
             Mollien
           </Link>
-          <p className="font-sans text-[10px] uppercase tracking-[0.3em] text-[var(--color-gold)] mt-1">
+          <p className="font-sans text-[10px] uppercase tracking-[0.3em] text-[var(--color-gold-text)] mt-1">
             Panel admina
           </p>
         </div>

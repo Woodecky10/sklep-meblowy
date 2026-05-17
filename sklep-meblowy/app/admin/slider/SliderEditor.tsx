@@ -93,7 +93,7 @@ export default function SliderEditor({
     <div className="flex flex-col gap-8">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+          <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
             Mollien
           </p>
           <h1 className="font-display text-4xl font-bold text-[var(--fg)]">Slider</h1>
@@ -668,7 +668,7 @@ function SlidePreview({
         <div className="relative h-full flex items-center p-5">
           <div className="max-w-full">
             {state.eyebrow && (
-              <p className="font-sans text-[10px] uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+              <p className="font-sans text-[10px] uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
                 {state.eyebrow}
               </p>
             )}

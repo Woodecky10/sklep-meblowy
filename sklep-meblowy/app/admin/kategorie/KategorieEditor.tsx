@@ -49,7 +49,7 @@ export default function KategorieEditor({
     <div className="flex flex-col gap-8">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold)] mb-2">
+          <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
             Mollien
           </p>
           <h1 className="font-display text-4xl font-bold text-[var(--fg)]">

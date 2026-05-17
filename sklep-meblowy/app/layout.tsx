@@ -13,11 +13,20 @@ import { COMPANY } from "./_lib/company";
 const inter = Inter({
   subsets: ["latin", "latin-ext"],
   variable: "--font-inter",
+  // 'swap' = pokaż fallback od razu, podmień gdy font dotrze. Inter ma
+  // bardzo zbliżone metryki do system-ui, więc swap nie powoduje CLS.
+  display: "swap",
 });
 
 const playfair = Playfair_Display({
   subsets: ["latin", "latin-ext"],
   variable: "--font-playfair",
+  // 'swap' z explicit fallback dla mniejszego CLS — Playfair to display
+  // serif z unikalnymi metrykami, ich różnica vs system serif powoduje
+  // duży reflow tytułów (źródło CLS=0.202 na hero). adjustFontFallback
+  // domyślnie true od 13.2 — Next.js auto-generuje fallback z size-adjust.
+  display: "swap",
+  fallback: ["Georgia", "Times New Roman", "serif"],
 });
 
 export const metadata: Metadata = {

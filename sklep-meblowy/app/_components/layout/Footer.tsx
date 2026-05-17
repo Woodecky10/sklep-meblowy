@@ -40,7 +40,7 @@ export default async function Footer() {
             Tworzymy przestrzenie, w których chce się żyć. Meble najwyższej
             jakości, z pasją do detalu.
           </p>
-          <p className="text-xs text-white/40 leading-relaxed">
+          <p className="text-xs text-white/70 leading-relaxed">
             {COMPANY.email}
             {COMPANY.phone && (
               <>
@@ -89,7 +89,7 @@ export default async function Footer() {
         </div>
       </div>
 
-      <div className="border-t border-white/10 py-6 text-center text-xs text-white/40 px-6">
+      <div className="border-t border-white/10 py-6 text-center text-xs text-white/70 px-6">
         © {new Date().getFullYear()} {COMPANY.brandName}. Wszelkie prawa zastrzeżone.
         {isFilled(COMPANY.nip) && (
           <>

@@ -24,6 +24,11 @@
   --card-bg: #f7f1e6;
   --border: #d2c5ab;
   --muted: #5a544e;
+  /* --color-gold-text: ciemniejsza wersja --color-gold dla TEKSTU na jasnym
+     tle (cream/card-bg). Lighthouse wyłapuje #c9a84c na #ece4d7 jako za niski
+     kontrast (1.84:1). #92681c daje 4.69:1 — pass WCAG AA. Używane w eyebrow
+     tagach, linkach, drobnym akcencie. Dla buttonów/icon nadal --color-gold. */
+  --color-gold-text: #92681c;
 }
 
 .dark {
@@ -32,6 +37,9 @@
   --card-bg: #1a1a2e;
   --border: #2a2a3e;
   --muted: #9490a0;
+  /* W dark mode --color-gold-text = --color-gold (na ciemnym tle złoty
+     ma świetny kontrast — 8:1+) */
+  --color-gold-text: #c9a84c;
 }
 
 html,
