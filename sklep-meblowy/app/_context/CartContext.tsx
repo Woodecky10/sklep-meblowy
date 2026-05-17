@@ -132,6 +132,11 @@ type CartContextValue = {
   count: number;
   notification: CartNotification | null;
   appliedPromo: AppliedPromo | null;
+  // True dopiero po wczytaniu z localStorage. Komponenty które robią coś
+  // destrukcyjnego (np. ClearCart na /checkout/success) MUSZĄ poczekać aż
+  // hydrated=true — inaczej clear leci na pustym stanie a HYDRATE potem
+  // przywraca koszyk z localStorage.
+  hydrated: boolean;
   add: (item: CartItem) => void;
   remove: (id: string, variantValues?: Record<string, string>) => void;
   updateQty: (
@@ -220,6 +225,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const clear = useCallback(() => {
     dispatch({ type: "CLEAR" });
     setAppliedPromo(null);
+    // Defensywnie czyścimy też localStorage natychmiastowo, niezależnie od
+    // efektu persist — race z hydrate'em mógłby zapisać tu coś z powrotem.
+    try {
+      localStorage.removeItem(LS_ITEMS);
+      localStorage.removeItem(LS_PROMO);
+    } catch {}
   }, []);
   const dismissNotification = useCallback(() => setNotification(null), []);
   const applyPromo = useCallback((promo: AppliedPromo) => setAppliedPromo(promo), []);
@@ -234,6 +245,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       count,
       notification,
       appliedPromo,
+      hydrated,
       add,
       remove,
       updateQty,
@@ -243,7 +255,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       applyPromo,
       clearPromo,
     };
-  }, [state.items, notification, appliedPromo, add, remove, updateQty, updateNotes, clear, dismissNotification, applyPromo, clearPromo]);
+  }, [state.items, notification, appliedPromo, hydrated, add, remove, updateQty, updateNotes, clear, dismissNotification, applyPromo, clearPromo]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

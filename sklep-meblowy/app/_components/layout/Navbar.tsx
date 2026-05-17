@@ -6,9 +6,11 @@ import CartIcon from "./CartIcon";
 import MobileMenu from "./MobileMenu";
 import UserMenu from "./UserMenu";
 import SearchBox from "./SearchBox";
+import WishlistIcon from "./WishlistIcon";
 import { createClient } from "@/app/_lib/supabase/server";
 import { isAdmin } from "@/app/_lib/admin";
 import { getSections, getCategories } from "@/app/_lib/categories";
+import { getWishlistCount } from "@/app/_lib/wishlist";
 import { COMPANY } from "@/app/_lib/company";
 
 export default async function Navbar() {
@@ -19,10 +21,12 @@ export default async function Navbar() {
     },
     sections,
     categories,
+    wishlistCount,
   ] = await Promise.all([
     supabase.auth.getUser(),
     getSections(),
     getCategories(),
+    getWishlistCount(),
   ]);
 
   // Grupowanie kategorii pod sekcjami — jedna iteracja zamiast N+1 zapytań.
@@ -118,6 +122,7 @@ export default async function Navbar() {
           </div>
           <ThemeToggle />
           <UserMenu />
+          <WishlistIcon count={wishlistCount} />
           <CartIcon />
           <MobileMenu
             isLoggedIn={!!user}

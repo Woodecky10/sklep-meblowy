@@ -108,8 +108,13 @@ export type Order = {
   total: number;
   shipping_address: Address;
   stripe_payment_intent: string | null;
+  promo_code_id: string | null;
+  promo_discount: number;
   created_at: string;
   items?: OrderItem[];
+  // Dołączane przez query — kod promo z joina. Null jeśli zamówienie bez kuponu
+  // albo gdy admin usunął kod (FK ON DELETE SET NULL).
+  promo_code?: { code: string } | null;
 };
 
 export type OrderItem = {

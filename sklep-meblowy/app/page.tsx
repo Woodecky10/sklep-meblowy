@@ -7,19 +7,28 @@ import { getActiveTiles, DEFAULT_FALLBACK_TILES } from "./_lib/home-tiles";
 import { getFeaturedOrFallback } from "./_lib/featured";
 import { getCategories } from "./_lib/categories";
 import { getCollectionsForHome } from "./_lib/collections";
+import { getUserWishlistIds } from "./_lib/wishlist";
 import ProductCard from "./_components/ui/ProductCard";
 
 export const metadata: Metadata = {
   title: "Meble Premium | Eleganckie Meble do Twojego Domu",
 };
 
+// Polski poprawnik typograficzny: ostatnia pojedyncza litera (np. "L", "U")
+// nigdy nie powinna zawijać się na nową linię ("sierota"). Zamieniamy ostatnią
+// spację+literę na non-breaking space + literę, żeby trzymały się razem.
+function protectOrphans(text: string): string {
+  return text.replace(/ ([A-ZĄĆĘŁŃÓŚŹŻa-ząćęłńóśźż])$/, " $1");
+}
+
 export default async function HomePage() {
-  const [dbSlides, dbTiles, featured, allCategories, collectionsForHome] = await Promise.all([
+  const [dbSlides, dbTiles, featured, allCategories, collectionsForHome, wishlistIds] = await Promise.all([
     getActiveSlides(),
     getActiveTiles(),
     getFeaturedOrFallback(),
     getCategories(),
     getCollectionsForHome(),
+    getUserWishlistIds(),
   ]);
   const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
   // Fallback gdy admin jeszcze nic nie dodał — żeby home nie była pusta.
@@ -59,8 +68,14 @@ export default async function HomePage() {
               ) : null}
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
               <div className="relative h-full p-4 sm:p-5 md:p-6 flex flex-col justify-end gap-1.5 sm:gap-2">
-                <span className="font-display text-lg sm:text-xl md:text-2xl font-bold text-white leading-tight break-words hyphens-auto group-hover:text-[var(--color-gold)] transition-colors">
-                  {tile.label}
+                {/* Wrapper z min-h = 2 linie tekstu × leading-tight (1.25) ≈ 2.5em.
+                    Single-line tytuł rezerwuje miejsce na 2 linie, items-end
+                    dokuje tekst do dołu — wszystkie kafelki wyrównane bez
+                    względu na długość etykiety. */}
+                <span className="flex items-end min-h-[2.5em] text-lg sm:text-xl md:text-2xl">
+                  <span className="font-display font-bold text-white leading-tight text-balance break-words hyphens-auto group-hover:text-[var(--color-gold)] transition-colors">
+                    {protectOrphans(tile.label)}
+                  </span>
                 </span>
                 {tile.description && (
                   <span className="hidden sm:block text-sm text-white/80 leading-snug">
@@ -108,6 +123,7 @@ export default async function HomePage() {
                   product={product}
                   badge={badge}
                   categoryLabel={categoryLabels.get(product.category)}
+                  isInWishlist={wishlistIds.has(product.id)}
                 />
               ))}
             </div>
