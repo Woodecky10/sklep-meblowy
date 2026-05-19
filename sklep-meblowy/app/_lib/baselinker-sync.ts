@@ -68,12 +68,23 @@ export type SyncSkippedProduct = {
   reason: string;
 };
 
+// Pojedynczy produkt który został dodany/zaktualizowany — id z BL + nazwa
+// (dla podglądu w admin panelu).
+export type SyncedProduct = {
+  id: string;
+  name: string;
+};
+
 export type SyncInventoryResult = {
   inventory_id: number;
   inventory_name: string;
   total_in_bl: number;
   inserted: number;
   updated: number;
+  // Listy nazw dodanych i zaktualizowanych produktów (do podglądu w panelu).
+  // Stare logi z DB nie miały tych pól — UI musi traktować undefined jak [].
+  inserted_products?: SyncedProduct[];
+  updated_products?: SyncedProduct[];
   skipped: SyncSkippedProduct[];
 };
 
@@ -122,6 +133,42 @@ function getFeature(
     (x) => x.name?.toLowerCase().trim() === target
   );
   return f?.value ?? null;
+}
+
+// Zbiera WSZYSTKIE cechy z BL jako array {key, value} — zachowuje kolejność
+// którą admin ustawił w BL. Filtruje puste wartości. Używane do uniwersalnego
+// wyświetlania na karcie produktu (Allegro template parametry).
+function extractAllFeatures(
+  features: BLInventoryProduct["features"]
+): { key: string; value: string }[] {
+  if (!features) return [];
+
+  // Format 1 (aktualny BL): Record<string, string>
+  if (!Array.isArray(features)) {
+    const out: { key: string; value: string }[] = [];
+    for (const [k, v] of Object.entries(features)) {
+      if (
+        typeof k === "string" &&
+        k.trim().length > 0 &&
+        typeof v === "string" &&
+        v.trim().length > 0
+      ) {
+        out.push({ key: k.trim(), value: v.trim() });
+      }
+    }
+    return out;
+  }
+
+  // Format 2 (legacy): array {name, value}[]
+  return features
+    .filter(
+      (f) =>
+        typeof f.name === "string" &&
+        f.name.trim().length > 0 &&
+        typeof f.value === "string" &&
+        f.value.trim().length > 0
+    )
+    .map((f) => ({ key: f.name.trim(), value: f.value.trim() }));
 }
 
 function buildDimensions(bl: BLInventoryProduct): ProductDimensions | null {
@@ -337,6 +384,10 @@ async function mapBlToProduct(
     construction: getFeature(bl.features, "Konstrukcja"),
     delivery_time: getFeature(bl.features, "Czas realizacji"),
     warranty: getFeature(bl.features, "Gwarancja"),
+    // WSZYSTKIE cechy z BL — Allegro template parametry w pełnym zestawie.
+    // Wyświetlane na karcie produktu w "Szczegóły produktu" z deduplikacją
+    // względem dedykowanych kolumn (Kolor/Materiał/itd. już mają swoje miejsca).
+    features: extractAllFeatures(bl.features),
     variants: parseVariantsFromBl(bl.variants, defaultPriceGroup, price),
     baselinker_id: blId,
     // Kolekcję przypisuje admin ręcznie w /admin/kolekcje — sync nie ustawia.
@@ -399,6 +450,8 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
         total_in_bl: allIds.length,
         inserted: 0,
         updated: 0,
+        inserted_products: [],
+        updated_products: [],
         skipped: [],
       };
 
@@ -450,8 +503,14 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
         // Heurystyka insert vs update — created_at "świeże" (< 5s) = insert
         const isNew =
           data && new Date(data.created_at).getTime() > Date.now() - 5000;
-        if (isNew) result.inserted += 1;
-        else result.updated += 1;
+        const synced: SyncedProduct = { id: blId, name: mapped.product.name };
+        if (isNew) {
+          result.inserted += 1;
+          result.inserted_products!.push(synced);
+        } else {
+          result.updated += 1;
+          result.updated_products!.push(synced);
+        }
       }
 
       results.push(result);

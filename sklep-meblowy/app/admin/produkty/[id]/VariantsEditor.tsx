@@ -260,6 +260,30 @@ export default function VariantsEditor({
     });
   }
 
+  // Pool wszystkich zdjęć ze WSZYSTKICH wariantów (deduplikowane przez URL).
+  // Każda kombinacja może z tego wybrać zdjęcie zamiast uploadować nowe —
+  // np. produkt ma 4 kolory × 2 strony = 8 kombinacji, ale tylko 4 zestawy
+  // zdjęć (per kolor). Admin uploaduje raz dla "Granatowy/Lewa", potem dla
+  // "Granatowy/Prawa" tylko klika "Wybierz z istniejących".
+  const allVariantImages = useMemo<string[]>(() => {
+    if (!variants) return [];
+    const seen = new Set<string>();
+    for (const c of variants.combinations) {
+      for (const url of c.images ?? []) {
+        if (url) seen.add(url);
+      }
+    }
+    return Array.from(seen);
+  }, [variants]);
+
+  function addExistingImage(comboIdx: number, url: string) {
+    if (!variants) return;
+    const combo = variants.combinations[comboIdx];
+    const current = combo.images ?? [];
+    if (current.includes(url)) return; // już jest, ignoruj
+    setComboImages(comboIdx, [...current, url]);
+  }
+
   // ============================================================
   // Render
   // ============================================================
@@ -359,11 +383,13 @@ export default function VariantsEditor({
                   key={key}
                   combo={combo}
                   uploading={uploadingKeys.has(key)}
+                  allVariantImages={allVariantImages}
                   onStockChange={(stock) => patchCombination(i, { stock })}
                   onPriceModifierChange={(price_modifier) =>
                     patchCombination(i, { price_modifier })
                   }
                   onUpload={(file) => uploadComboImage(i, file)}
+                  onAddExisting={(url) => addExistingImage(i, url)}
                   onMoveImage={(imgIdx, dir) => moveComboImage(i, imgIdx, dir)}
                   onRemoveImage={(imgIdx) => removeComboImage(i, imgIdx)}
                 />
@@ -493,22 +519,34 @@ function OptionRow({
 function CombinationRow({
   combo,
   uploading,
+  allVariantImages,
   onStockChange,
   onPriceModifierChange,
   onUpload,
+  onAddExisting,
   onMoveImage,
   onRemoveImage,
 }: {
   combo: ProductVariant;
   uploading: boolean;
+  // Wszystkie URL-e zdjęć ze WSZYSTKICH wariantów (z VariantsEditor).
+  // CombinationRow filtruje te które już są w bieżącej kombinacji.
+  allVariantImages: string[];
   onStockChange: (stock: number) => void;
   onPriceModifierChange: (mod: number) => void;
   onUpload: (file: File) => void;
+  onAddExisting: (url: string) => void;
   onMoveImage: (imgIdx: number, dir: -1 | 1) => void;
   onRemoveImage: (imgIdx: number) => void;
 }) {
   const label = formatVariantLabel(combo.values);
   const images = combo.images ?? [];
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Picker pokazuje zdjęcia z innych wariantów, jeszcze nie dodane do tej
+  // kombinacji. Pusty pool = nie ma żadnych zdjęć w innych wariantach (klient
+  // ma tylko upload jako opcję).
+  const availableImages = allVariantImages.filter((url) => !images.includes(url));
 
   return (
     <li className="bg-[var(--bg)] border border-[var(--border)] rounded-xl p-4 flex flex-col gap-3">
@@ -539,25 +577,73 @@ function CombinationRow({
       </div>
 
       <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
             Zdjęcia tej kombinacji ({images.length})
           </span>
-          <label className="shrink-0 px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors cursor-pointer disabled:opacity-50">
-            {uploading ? "Wgrywam..." : "+ Dodaj zdjęcie"}
-            <input
-              type="file"
-              accept="image/*"
-              disabled={uploading}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = "";
-                if (f) onUpload(f);
-              }}
-              className="hidden"
-            />
-          </label>
+          <div className="flex items-center gap-2">
+            {availableImages.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setPickerOpen((v) => !v)}
+                className="shrink-0 px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--border)] text-[var(--fg)] rounded-full hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
+              >
+                {pickerOpen ? "Zamknij wybór" : `Wybierz z istniejących (${availableImages.length})`}
+              </button>
+            )}
+            <label className="shrink-0 px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors cursor-pointer disabled:opacity-50">
+              {uploading ? "Wgrywam..." : "+ Dodaj zdjęcie"}
+              <input
+                type="file"
+                accept="image/*"
+                disabled={uploading}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) onUpload(f);
+                }}
+                className="hidden"
+              />
+            </label>
+          </div>
         </div>
+
+        {pickerOpen && availableImages.length > 0 && (
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg p-3 mt-1">
+            <p className="text-[10px] font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
+              Zdjęcia z innych wariantów — kliknij żeby dodać do tej kombinacji
+            </p>
+            <ul className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2">
+              {availableImages.map((url) => (
+                <li key={url}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onAddExisting(url);
+                    }}
+                    aria-label="Dodaj to zdjęcie do bieżącej kombinacji"
+                    className="relative aspect-square w-full bg-stone-100 dark:bg-stone-800 rounded-lg overflow-hidden border border-[var(--border)] hover:border-[var(--color-gold)] hover:ring-2 hover:ring-[var(--color-gold)]/30 transition-all group"
+                  >
+                    <Image
+                      src={url}
+                      alt="Zdjęcie z innego wariantu"
+                      fill
+                      sizes="150px"
+                      className="object-cover"
+                    />
+                    <div className="absolute inset-0 bg-[var(--color-navy)]/0 group-hover:bg-[var(--color-navy)]/40 flex items-center justify-center transition-colors">
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity w-8 h-8 rounded-full bg-[var(--color-gold)] text-[var(--color-navy)] flex items-center justify-center">
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                      </span>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {images.length === 0 ? (
           <p className="text-xs text-[var(--muted)] italic">
             Brak zdjęć — klient zobaczy globalną galerię produktu.

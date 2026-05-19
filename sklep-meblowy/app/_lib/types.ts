@@ -42,6 +42,14 @@ export type ProductVariants = {
   overrides?: ProductVariantOverrides;
 };
 
+// Cecha produktu z BL — wszystko co admin wrzuca w "Cechy produktu" w BL
+// trafia tutaj jako para {key, value}. Array (nie obiekt) żeby zachować
+// kolejność z BL — admin może świadomie ustawić kolejność wyświetlania.
+export type ProductFeature = {
+  key: string;
+  value: string;
+};
+
 export type Product = {
   id: string;
   name: string;
@@ -57,6 +65,10 @@ export type Product = {
   construction: string | null;
   delivery_time: string | null;
   warranty: string | null;
+  // Pełen zestaw cech z BL — duplikuje też te które mają dedykowane
+  // kolumny (kolor, materiał itd.) dla wygody wyświetlania. Pusta tablica
+  // gdy produkt nie ma żadnych cech w BL.
+  features: ProductFeature[];
   variants: ProductVariants | null;
   baselinker_id: string | null;
   collection_id: string | null;

@@ -50,12 +50,12 @@ export default async function HomePage() {
             Znajdź swój styl
           </h2>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {tiles.map((tile) => (
             <Link
               key={tile.id}
               href={tile.href}
-              className="group relative aspect-square rounded-2xl overflow-hidden bg-[var(--color-navy)] hover:ring-2 hover:ring-[var(--color-gold)] transition-all"
+              className="group relative aspect-[4/3] sm:aspect-square rounded-2xl overflow-hidden bg-[var(--color-navy)] hover:ring-2 hover:ring-[var(--color-gold)] transition-all"
             >
               {tile.image_url ? (
                 <Image

@@ -9,6 +9,7 @@ import {
 import type {
   SyncInventoryResult,
   SyncSkippedProduct,
+  SyncedProduct,
 } from "@/app/_lib/baselinker-sync";
 
 type Toast = { type: "success" | "error" | "warning"; message: string } | null;
@@ -190,6 +191,11 @@ function InventoryResult({ inv }: { inv: SyncInventoryResult }) {
   const [showAllSkipped, setShowAllSkipped] = useState(false);
   const visibleSkipped = showAllSkipped ? inv.skipped : inv.skipped.slice(0, 5);
 
+  // Stare logi w DB nie miały inserted_products/updated_products. Bezpieczny
+  // fallback to pusta lista — pokażemy tylko liczbę bez nazw.
+  const insertedProducts = inv.inserted_products ?? [];
+  const updatedProducts = inv.updated_products ?? [];
+
   return (
     <div className="border border-[var(--border)] rounded-xl p-4">
       <p className="font-sans text-sm font-semibold text-[var(--fg)] mb-2">
@@ -199,6 +205,23 @@ function InventoryResult({ inv }: { inv: SyncInventoryResult }) {
         {inv.total_in_bl} produktów · {inv.inserted} nowych · {inv.updated} zaktualizowanych
         {inv.skipped.length > 0 && ` · ${inv.skipped.length} pominiętych`}
       </p>
+
+      {insertedProducts.length > 0 && (
+        <ProductList
+          label="Nowe produkty"
+          products={insertedProducts}
+          variant="success"
+        />
+      )}
+
+      {updatedProducts.length > 0 && (
+        <ProductList
+          label="Zaktualizowane produkty"
+          products={updatedProducts}
+          variant="info"
+        />
+      )}
+
       {inv.skipped.length > 0 && (
         <div className="mt-3">
           <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
@@ -220,6 +243,59 @@ function InventoryResult({ inv }: { inv: SyncInventoryResult }) {
             </button>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Lista nazw zsynchronizowanych produktów (dodane/zaktualizowane).
+// Domyślnie pokazuje pierwsze 5, z opcją "Pokaż wszystkie".
+function ProductList({
+  label,
+  products,
+  variant,
+}: {
+  label: string;
+  products: SyncedProduct[];
+  variant: "success" | "info";
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? products : products.slice(0, 5);
+  const badgeColors = {
+    success: "bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200",
+    info: "bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-200",
+  };
+  return (
+    <div className="mt-3">
+      <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
+        {label} ({products.length}):
+      </p>
+      <div className="flex flex-col gap-1.5">
+        {visible.map((p) => (
+          <div
+            key={p.id}
+            className="flex items-start gap-3 p-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg"
+          >
+            <span
+              className={`px-2 py-0.5 text-[10px] font-sans rounded shrink-0 mt-0.5 ${badgeColors[variant]}`}
+            >
+              BL: {p.id}
+            </span>
+            <p className="text-sm text-[var(--fg)] truncate flex-1 min-w-0">
+              {p.name}
+            </p>
+          </div>
+        ))}
+      </div>
+      {products.length > 5 && (
+        <button
+          onClick={() => setShowAll(!showAll)}
+          className="mt-2 text-xs text-[var(--color-gold)] hover:underline"
+        >
+          {showAll
+            ? "Pokaż mniej"
+            : `Pokaż wszystkie (${products.length - 5} więcej)`}
+        </button>
       )}
     </div>
   );

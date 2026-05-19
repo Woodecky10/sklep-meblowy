@@ -18,10 +18,7 @@ import ProductCard from "@/app/_components/ui/ProductCard";
 import StarRating from "@/app/_components/ui/StarRating";
 import ReviewList from "@/app/_components/ui/ReviewList";
 import ReviewForm from "@/app/_components/ui/ReviewForm";
-import {
-  sanitizeProductHtml,
-  extractShortDescription,
-} from "@/app/_lib/product-html";
+import { sanitizeProductHtml } from "@/app/_lib/product-html";
 import { COMPANY } from "@/app/_lib/company";
 
 type Props = { params: Promise<{ id: string }> };
@@ -107,6 +104,26 @@ export default async function ProduktPage({ params }: Props) {
     details.push({ label: "Gwarancja", value: product.warranty });
   }
 
+  // Dodatkowe cechy z BL (features) — Allegro template parametry. Pomijamy
+  // te które już są dedykowane (Kolor, Materiał, Wymiary, Konstrukcja, Czas
+  // realizacji, Gwarancja) — żeby nie dublować linii w specyfikacji.
+  const DEDICATED_KEYS = new Set(
+    [
+      "kolor",
+      "materiał",
+      "material",
+      "wymiary",
+      "konstrukcja",
+      "czas realizacji",
+      "gwarancja",
+      "waga",
+    ].map((s) => s.toLowerCase())
+  );
+  for (const f of product.features ?? []) {
+    if (DEDICATED_KEYS.has(f.key.toLowerCase().trim())) continue;
+    details.push({ label: f.key, value: f.value });
+  }
+
   // Structured data dla Google (schema.org/Product) — rich snippets w SERP-ach:
   // cena, dostępność, gwiazdki/ocena prosto w wynikach wyszukiwania.
   // Plain text description (bez HTML tagów) wymagany przez Google.
@@ -166,40 +183,15 @@ export default async function ProduktPage({ params }: Props) {
         <span className="text-[var(--fg)] normal-case tracking-normal">{product.name}</span>
       </nav>
 
-      {/* Główna sekcja (client wrapper — galeria reaguje na wybór wariantu) */}
+      {/* Główna sekcja — galeria + akcje + specyfikacja w lewej kolumnie.
+          Specyfikacja przeniesiona z osobnej sekcji do ProductMainSection
+          żeby wypełniała pustą przestrzeń pod galerią. */}
       <ProductMainSection
         product={product}
         categoryLabel={categoryLabel ?? null}
         rating={rating}
-        descriptionText={extractShortDescription(product.description)}
+        specifications={details}
       />
-
-      {/* Sekcja Szczegóły */}
-      {details.length > 0 && (
-        <section className="mb-24">
-          <div className="mb-8">
-            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-              Specyfikacja
-            </p>
-            <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
-              Szczegóły produktu
-            </h2>
-          </div>
-          <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 max-w-4xl">
-            {details.map((d) => (
-              <div
-                key={d.label}
-                className="flex justify-between gap-6 py-3 border-b border-[var(--border)]"
-              >
-                <dt className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] shrink-0 pt-1">
-                  {d.label}
-                </dt>
-                <dd className="text-sm text-[var(--fg)] text-right">{d.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-      )}
 
       {/* Sekcja: pełen opis HTML (z BL / admina, sanitized) */}
       {product.description && product.description.trim().length > 0 && (
