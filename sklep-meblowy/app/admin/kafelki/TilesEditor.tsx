@@ -337,7 +337,9 @@ function TileForm({
       const imageCompression = (await import("browser-image-compression")).default;
       const compressed = await imageCompression(file, {
         maxSizeMB: 1,
-        maxWidthOrHeight: 1600,
+        // Tile rendered max ~640px (mobile 1-col po krok-22). 1280 daje
+        // 2x na retina = wystarczy. 1600 było overkill (50% za duże pliki).
+        maxWidthOrHeight: 1280,
         useWebWorker: true,
         fileType: file.type === "image/png" ? "image/jpeg" : file.type,
         initialQuality: 0.82,

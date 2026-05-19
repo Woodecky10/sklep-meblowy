@@ -376,7 +376,9 @@ function SlideForm({
       const imageCompression = (await import("browser-image-compression")).default;
       const compressed = await imageCompression(file, {
         maxSizeMB: 1, // <1MB po kompresji
-        maxWidthOrHeight: 2400, // hero szerokie ale nie 4K
+        // Hero rendered max 100vw — typical desktop ~1920px. 2400 było overkill.
+        // 1920 daje pełną ostrość na retina przy display ~960px (np. mobile/tablet).
+        maxWidthOrHeight: 1920,
         useWebWorker: true,
         fileType: file.type === "image/png" ? "image/jpeg" : file.type, // PNG → JPEG (mniejsze)
         initialQuality: 0.82,
