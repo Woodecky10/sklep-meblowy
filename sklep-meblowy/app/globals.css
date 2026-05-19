@@ -52,6 +52,39 @@ body {
   color: var(--fg);
 }
 
+/* Slide-in z fade dla dropdownów filtrów (i innych popoverów).
+   Krótka 150ms animacja — premium feel bez opóźniania interakcji. */
+@keyframes dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-dropdown-in {
+  animation: dropdown-in 150ms ease-out;
+}
+
+/* Thin scrollbar dla horyzontalnego scrolla filtrów na mobile.
+   WebKit + Firefox. */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  height: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
 /* Typografia stron prawnych (regulamin, polityka prywatności itp.) */
 .legal-prose h1 {
   font-family: var(--font-display);

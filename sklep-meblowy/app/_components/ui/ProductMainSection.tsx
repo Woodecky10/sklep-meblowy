@@ -11,25 +11,58 @@ import InquiryModal from "./InquiryModal";
 // Client wrapper łączący galerię i akcje, żeby wybór wariantu mógł
 // jednocześnie zmieniać zdjęcia (galeria) i cenę / przycisk dodaj-do-koszyka
 // (ProductActions). Trzyma `selected` lokalnie i przekazuje obu stronom.
+//
+// Specyfikacja produktu (lista cech) renderuje się w LEWEJ kolumnie pod galerią
+// — wypełnia pustą przestrzeń gdy prawa kolumna (akcje + warianty + info)
+// jest dłuższa od galerii. Przekazana jako prop z page.tsx żeby zachować
+// jeden punkt prawdy o cechach.
 export default function ProductMainSection({
   product,
   categoryLabel,
   rating,
-  descriptionText,
+  specifications,
 }: {
   product: Product;
   categoryLabel: string | null;
   rating: ProductRating;
-  // Plain text opis (HTML strip-owany na serwerze, żeby uniknąć kopiowania
-  // sanitizera do klienta — pełny HTML zostawiamy do pkt 11).
-  descriptionText: string;
+  // Cechy produktu w sekcji "Specyfikacja" — Wymiary, Waga, Materiał, etc.
+  // plus dodatkowe features z BL. Renderowane w lewej kolumnie pod galerią.
+  specifications: { label: string; value: string }[];
 }) {
   const [selected, setSelected] = useState<Record<string, string>>({});
   const images = getVariantImages(product, selected);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-24">
-      <ImageGallery images={images} name={product.name} />
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-16">
+      <div className="flex flex-col gap-8">
+        <ImageGallery images={images} name={product.name} />
+
+        {specifications.length > 0 && (
+          <div>
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
+              Specyfikacja
+            </p>
+            <h2 className="font-display text-2xl font-bold text-[var(--fg)] mb-5">
+              Szczegóły produktu
+            </h2>
+            <dl className="flex flex-col">
+              {specifications.map((s) => (
+                <div
+                  key={s.label}
+                  className="flex justify-between gap-6 py-3 border-b border-[var(--border)] last:border-b-0"
+                >
+                  <dt className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] shrink-0 pt-0.5">
+                    {s.label}
+                  </dt>
+                  <dd className="text-sm text-[var(--fg)] text-right">
+                    {s.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
+      </div>
 
       <div className="flex flex-col gap-8">
         <div>
@@ -58,10 +91,6 @@ export default function ProductMainSection({
           </p>
         </div>
 
-        <div className="text-[var(--muted)] leading-relaxed whitespace-pre-line">
-          {descriptionText}
-        </div>
-
         <div className="inline-flex items-center gap-2 text-sm text-[var(--muted)]">
           <span className="w-2 h-2 rounded-full bg-[var(--color-gold)]" />
           <span>
@@ -81,6 +110,12 @@ export default function ProductMainSection({
         <div className="border-t border-[var(--border)] pt-6 text-sm text-[var(--muted)] space-y-2">
           <p>✓ Zwrot do 30 dni</p>
           <p>✓ Gwarancja 2 lata</p>
+          <p>
+            ✓ Czas dostawy:{" "}
+            <strong className="text-[var(--fg)]">
+              {product.delivery_time || "14–21 dni roboczych"}
+            </strong>
+          </p>
         </div>
       </div>
     </div>
