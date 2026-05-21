@@ -124,7 +124,7 @@ export default function InquiryModal({
                     type="tel"
                     name="customer_phone"
                     maxLength={50}
-                    placeholder="+48 600 123 456"
+                    placeholder="+48 789 826 403"
                     className={inputCls}
                   />
                 </Field>

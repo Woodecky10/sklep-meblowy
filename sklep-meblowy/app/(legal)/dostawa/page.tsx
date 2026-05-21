@@ -29,20 +29,33 @@ export default function DostawaPage() {
         płatniczych – obsługuje je operator płatności.
       </p>
 
-      <h2>Koszty i czas dostawy</h2>
+      <h2>Koszt dostawy</h2>
+      <p>
+        Koszt dostawy mieści się w przedziale <strong>99–599 zł</strong> i zależy od wagi,
+        gabarytów oraz miejsca dostawy:
+      </p>
       <ul>
         <li>
-          <strong>Koszt dostawy:</strong> 299 zł (stała stawka, niezależnie od wartości zamówienia).
+          <strong>Materace, mniejsze meble</strong> – ok. <strong>99–199 zł</strong>
         </li>
         <li>
-          <strong>Czas realizacji:</strong> od 7 do 35 dni roboczych, w zależności od produktu –
-          szczegóły zawsze w karcie produktu.
+          <strong>Łóżka, sofy 2-osobowe</strong> – ok. <strong>199–399 zł</strong>
+        </li>
+        <li>
+          <strong>Narożniki, łóżka kontynentalne, sofy 3-osobowe</strong> – ok.{" "}
+          <strong>399–599 zł</strong>
         </li>
       </ul>
       <p>
-        Czas realizacji liczymy od momentu zaksięgowania płatności. Po skompletowaniu zamówienia
-        kurier lub firma transportowa skontaktuje się z Tobą telefonicznie, aby ustalić dogodny
-        termin dostawy.
+        Dokładny koszt podajemy klientowi <strong>po złożeniu zamówienia</strong> drogą
+        telefoniczną lub mailową, przed wysyłką. Klient akceptuje wycenę przed jej realizacją.
+      </p>
+
+      <h2>Czas dostawy</h2>
+      <p>
+        Czas realizacji jest podany w karcie każdego produktu. Liczymy go od momentu zaksięgowania
+        płatności. Po skompletowaniu zamówienia kurier lub firma transportowa skontaktuje się z
+        Tobą telefonicznie, aby ustalić dogodny termin dostawy.
       </p>
 
       <h2>Obszar dostawy</h2>

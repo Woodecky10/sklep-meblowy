@@ -156,13 +156,15 @@ export default async function OrderDetailPage({
               <dd>−{promoDiscount.toLocaleString("pl-PL")} zł</dd>
             </div>
           )}
-          <div className="flex justify-between text-[var(--muted)]">
-            <dt>Dostawa</dt>
-            <dd>
-              {shipping <= 0 ? (
-                <span className="text-green-600 font-semibold">Gratis</span>
-              ) : (
+          <div className="flex justify-between items-start text-[var(--muted)] gap-3">
+            <dt className="shrink-0">Dostawa</dt>
+            <dd className="text-right">
+              {shipping > 0 ? (
                 `${shipping.toLocaleString("pl-PL")} zł`
+              ) : (
+                <span className="text-xs leading-snug">
+                  ustalana indywidualnie
+                </span>
               )}
             </dd>
           </div>

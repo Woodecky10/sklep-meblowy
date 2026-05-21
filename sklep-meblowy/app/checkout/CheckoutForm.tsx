@@ -30,6 +30,9 @@ export default function CheckoutForm({
   const [country, setCountry] = useState(defaultAddress?.country ?? "Polska");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Wymagana akceptacja regulaminu + polityki przed płatnością.
+  // Wymóg art. 17 ustawy o prawach konsumenta + kryteria weryfikacji Przelewy24.
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   useEffect(() => {
     if (items.length === 0) {
@@ -37,12 +40,17 @@ export default function CheckoutForm({
     }
   }, [items.length, router]);
 
-  const shipping = total >= 2000 ? 0 : 299;
+  // Koszt dostawy ustalany indywidualnie po zamówieniu — meble różnią się
+  // wagą i gabarytami, ten sam koszt 299 zł dla wszystkich nie miał sensu.
   const discount = appliedPromo?.discount ?? 0;
-  const grandTotal = Math.max(0, total - discount) + shipping;
+  const grandTotal = Math.max(0, total - discount);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!acceptedTerms) {
+      setError("Musisz zaakceptować regulamin i politykę prywatności, żeby kontynuować.");
+      return;
+    }
     setError(null);
     setLoading(true);
 
@@ -175,9 +183,40 @@ export default function CheckoutForm({
           </div>
         )}
 
+        {/* Wymagana akceptacja regulaminu + polityki — wymóg art. 17 ustawy
+            o prawach konsumenta + kryterium weryfikacji Przelewy24 (§2 ust. 11 OWU) */}
+        <label className="flex items-start gap-3 text-sm text-[var(--fg)] cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={acceptedTerms}
+            onChange={(e) => setAcceptedTerms(e.target.checked)}
+            required
+            className="mt-0.5 w-4 h-4 accent-[var(--color-gold)] cursor-pointer shrink-0"
+          />
+          <span className="leading-relaxed">
+            Zapoznałem/am się i akceptuję{" "}
+            <Link
+              href="/regulamin"
+              target="_blank"
+              className="text-[var(--color-gold-text)] underline hover:opacity-80"
+            >
+              regulamin sklepu
+            </Link>{" "}
+            oraz{" "}
+            <Link
+              href="/prywatnosc"
+              target="_blank"
+              className="text-[var(--color-gold-text)] underline hover:opacity-80"
+            >
+              politykę prywatności
+            </Link>
+            . <span className="text-red-500">*</span>
+          </span>
+        </label>
+
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !acceptedTerms}
           className="w-full py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? "Przekierowuję..." : "Zapłać bezpiecznie →"}
@@ -246,14 +285,14 @@ export default function CheckoutForm({
                 <span>−{discount.toLocaleString("pl-PL")} zł</span>
               </div>
             )}
-            <div className="flex justify-between text-[var(--muted)]">
-              <span>Dostawa</span>
-              <span>
-                {shipping === 0 ? (
-                  <span className="text-green-600 font-semibold">Gratis</span>
-                ) : (
-                  `${shipping} zł`
-                )}
+            <div className="flex justify-between items-start text-[var(--muted)] gap-3">
+              <span className="shrink-0">Dostawa</span>
+              <span className="text-right text-xs leading-snug">
+                99–599&nbsp;zł
+                <br />
+                <span className="text-[var(--muted)]">
+                  dokładny koszt po&nbsp;złożeniu zamówienia
+                </span>
               </span>
             </div>
             <div className="border-t border-[var(--border)] pt-2 flex justify-between font-bold text-base text-[var(--fg)]">

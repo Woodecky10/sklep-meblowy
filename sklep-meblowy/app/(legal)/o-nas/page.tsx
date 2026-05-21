@@ -48,12 +48,12 @@ export default function OnasPage() {
       <p>
         Większość naszych mebli realizujemy na zamówienie — dzięki temu możemy
         zaoferować dobór tkanin, konfigurację narożnika czy wybór rozmiaru łóżka.
-        Zwykle czas realizacji mieści się w przedziale 7–35 dni roboczych. Dokładny
-        termin znajdziesz przy każdym produkcie.
+        Dokładny czas realizacji znajdziesz przy każdym produkcie.
       </p>
       <p>
-        Dostarczamy na terenie całej Polski. Przy zamówieniach powyżej 2000 zł
-        dostawa jest bezpłatna.
+        Dostarczamy na terenie całej Polski. Koszt dostawy ustalamy
+        indywidualnie po złożeniu zamówienia — zależy od wagi, gabarytów
+        i miejsca dostawy.
       </p>
 
       <h2>Jakość i gwarancja</h2>

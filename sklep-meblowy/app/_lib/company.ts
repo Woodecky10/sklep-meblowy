@@ -18,7 +18,7 @@ export const COMPANY = {
   address: {
     street: "Dworzyszcze 4",
     postalCode: "63-630",
-    city: "Dworzyszcze",
+    city: "Rychtal",
     country: "Polska",
   },
 
@@ -30,8 +30,8 @@ export const COMPANY = {
 
   // Kontakt z klientami
   email: "mollien.shop@gmail.com",
-  // Format: "+48 XXX XXX XXX" — wymyślony do czasu uzyskania rzeczywistego numeru
-  phone: "+48 600 123 456" as string | null,
+  // Format: "+48 XXX XXX XXX"
+  phone: "+48 789 826 403" as string | null,
 
   // Godziny kontaktu (wyświetlane w /kontakt)
   contactHours: "pon.–pt., 9:00–17:00",
