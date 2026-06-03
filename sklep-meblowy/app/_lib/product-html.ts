@@ -25,15 +25,54 @@ const ALLOWED_TAGS = [
 
 const ALLOWED_ATTR = ["href", "target", "rel"];
 
+// Domeny które wycinamy z linków w opisie BL — koleżanka prowadzi sprzedaż
+// na Allegro, więc w opisach z BL regularnie pojawiają się linki "Zobacz
+// inne aukcje" i podobne CTA niespójne ze sklepem Mollien.
+// Strategia: zachowaj tekst linku, usuń sam tag <a>.
+const BLOCKED_LINK_DOMAINS = [
+  "allegro.pl",
+  "allegrolokalnie.pl",
+  "allegro.cz",
+  "allegro.sk",
+];
+
+function isBlockedHref(href: string): boolean {
+  if (!href) return false;
+  const lower = href.toLowerCase();
+  return BLOCKED_LINK_DOMAINS.some(
+    (d) => lower.includes(`://${d}`) || lower.includes(`://www.${d}`)
+  );
+}
+
+// Usuwa tagi <a href="..."> wskazujące na zablokowane domeny, zachowując
+// tekst wewnątrz. Działa post-DOMPurify (przy okazji upraszczając ścieżkę
+// sanitization — sam DOMPurify domyślnie nie filtruje per-domena).
+function stripBlockedLinks(html: string): string {
+  // Regex prosty — DOMPurify już wcześniej znormalizował HTML do prostej
+  // struktury (bez script/style/iframe), więc zagnieżdżenia <a> wewnątrz <a>
+  // nie powinny występować. Match-uje <a ... href="..."> ... </a>.
+  return html.replace(
+    /<a\b([^>]*)>([\s\S]*?)<\/a>/gi,
+    (full, attrs: string, inner: string) => {
+      const hrefMatch = attrs.match(/href\s*=\s*["']([^"']+)["']/i);
+      if (hrefMatch && isBlockedHref(hrefMatch[1])) {
+        return inner;
+      }
+      return full;
+    }
+  );
+}
+
 export function sanitizeProductHtml(html: string | null | undefined): string {
   if (!html) return "";
-  return DOMPurify.sanitize(html, {
+  const purified = DOMPurify.sanitize(html, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
     // Linki w opisach BL otwierają się w tej samej karcie domyślnie —
     // forsujemy noopener/noreferrer jeśli target=_blank.
     ADD_ATTR: ["target"],
   });
+  return stripBlockedLinks(purified);
 }
 
 // ============================================================

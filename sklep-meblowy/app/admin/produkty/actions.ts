@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
 import type {
+  ProductDescriptionSection,
   ProductDimensions,
   ProductVariants,
 } from "@/app/_lib/types";
@@ -258,4 +259,59 @@ export async function updateProductVariants(
   revalidatePath(`/produkt/${productId}`);
   revalidatePath("/sklep");
   return { ok: true, message: "Zapisano warianty" };
+}
+
+// ============================================================
+// updateProductDescriptionSections — zapisuje sekcje opisu
+// ============================================================
+// Admin może dodawać/usuwać/przesuwać image sekcje między text sekcjami
+// (które przychodzą z BL i są read-only z poziomu sklepu).
+// Walidacja: każda sekcja musi mieć poprawne pola dla swojego kind.
+export async function updateProductDescriptionSections(
+  productId: string,
+  sections: ProductDescriptionSection[]
+): Promise<ActionResult> {
+  await requireAdmin();
+
+  if (!productId) return { ok: false, error: "Brak id produktu" };
+  if (!Array.isArray(sections)) {
+    return { ok: false, error: "Sekcje muszą być tablicą" };
+  }
+
+  // Walidacja każdej sekcji
+  for (let i = 0; i < sections.length; i++) {
+    const s = sections[i];
+    if (!s || typeof s !== "object") {
+      return { ok: false, error: `Sekcja ${i + 1}: nieprawidłowy obiekt` };
+    }
+    if (s.kind === "text") {
+      if (typeof s.title !== "string" || s.title.trim().length === 0) {
+        return { ok: false, error: `Sekcja ${i + 1}: brak tytułu text sekcji` };
+      }
+      if (typeof s.body !== "string") {
+        return { ok: false, error: `Sekcja ${i + 1}: body text sekcji musi być stringiem` };
+      }
+    } else if (s.kind === "image") {
+      if (typeof s.image_url !== "string" || s.image_url.trim().length === 0) {
+        return { ok: false, error: `Sekcja ${i + 1}: brak URL obrazu` };
+      }
+      if (typeof s.image_alt !== "string") {
+        return { ok: false, error: `Sekcja ${i + 1}: alt obrazu musi być stringiem` };
+      }
+    } else {
+      return { ok: false, error: `Sekcja ${i + 1}: nieznany kind` };
+    }
+  }
+
+  const supabase = await createAdminClient();
+  const { error } = await supabase
+    .from("products")
+    .update({ description_sections: sections } as never)
+    .eq("id", productId);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/admin/produkty/${productId}`);
+  revalidatePath(`/produkt/${productId}`);
+  return { ok: true, message: "Zapisano sekcje opisu" };
 }

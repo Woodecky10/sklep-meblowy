@@ -31,24 +31,38 @@ export default function DostawaPage() {
 
       <h2>Koszt dostawy</h2>
       <p>
-        Koszt dostawy mieści się w przedziale <strong>99–599 zł</strong> i zależy od wagi,
-        gabarytów oraz miejsca dostawy:
+        Koszt dostawy zaczyna się <strong>od 99 zł</strong> i jest ustalany{" "}
+        <strong>indywidualnie dla każdego zamówienia</strong>. Wpływ na ostateczną
+        kwotę mają:
       </p>
       <ul>
         <li>
-          <strong>Materace, mniejsze meble</strong> – ok. <strong>99–199 zł</strong>
+          <strong>Waga i gabaryty mebla</strong> – im większy i cięższy produkt, tym
+          droższy transport (mebel wielkogabarytowy wymaga transportu meblowego, nie
+          standardowego kuriera).
         </li>
         <li>
-          <strong>Łóżka, sofy 2-osobowe</strong> – ok. <strong>199–399 zł</strong>
+          <strong>Miejsce dostawy</strong> – odległość od naszego magazynu wpływa na
+          stawkę paliwa; dostawa do dużych miast bywa tańsza niż do mniejszych
+          miejscowości.
         </li>
         <li>
-          <strong>Narożniki, łóżka kontynentalne, sofy 3-osobowe</strong> – ok.{" "}
-          <strong>399–599 zł</strong>
+          <strong>Liczba produktów w zamówieniu</strong> – wysyłka kilku mebli jednym
+          transportem jest często korzystniejsza niż wielokrotne dostawy.
+        </li>
+        <li>
+          <strong>Wymagana usługa dodatkowa</strong> – wniesienie na konkretne piętro
+          (jeśli nie ma windy), montaż, utylizacja starego mebla.
         </li>
       </ul>
       <p>
-        Dokładny koszt podajemy klientowi <strong>po złożeniu zamówienia</strong> drogą
-        telefoniczną lub mailową, przed wysyłką. Klient akceptuje wycenę przed jej realizacją.
+        Po złożeniu zamówienia kontaktujemy się z Tobą <strong>telefonicznie lub
+        mailowo</strong> z konkretną wyceną. Wycena wymaga Twojej akceptacji – jeśli
+        nie zgadzasz się z kwotą, masz prawo zrezygnować z zamówienia bez kosztów.
+      </p>
+      <p>
+        Wycenę podajemy zwykle w ciągu <strong>1 dnia roboczego</strong> od otrzymania
+        zamówienia.
       </p>
 
       <h2>Czas dostawy</h2>

@@ -14,6 +14,7 @@ import type { CategoryDef } from "@/app/_lib/categories";
 import { hasVariants } from "@/app/_lib/variants";
 import { Field, IconBtn, compressIfNeeded, inputClass, type Toast } from "./_shared";
 import VariantsEditor from "./VariantsEditor";
+import DescriptionSectionsEditor from "./DescriptionSectionsEditor";
 
 export default function ProductEditor({
   product,
@@ -377,6 +378,15 @@ export default function ProductEditor({
           Sekcja: Warianty (pełny editor)
           ============================================================ */}
       <VariantsEditor productId={product.id} initial={product.variants} onToast={showToast} />
+
+      {/* ============================================================
+          Sekcja: Edytor sekcji opisu (BL text + admin images)
+          ============================================================ */}
+      <DescriptionSectionsEditor
+        productId={product.id}
+        initial={product.description_sections ?? []}
+        onToast={showToast}
+      />
 
       {/* ============================================================
           Sekcja: Surowe dane z BaseLinker (debug / diagnostyka)

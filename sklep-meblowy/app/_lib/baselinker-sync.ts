@@ -75,6 +75,20 @@ export type SyncedProduct = {
   name: string;
 };
 
+// Statystyki uzupełnienia sekcji opisu (description + 4 extras) dla
+// jednego magazynu. Pokazuje koleżance ile produktów ma wypełnione kolejne
+// sekcje — żeby wiedziała co dopisać w BL bez ręcznego sprawdzania per produkt.
+export type SyncSectionsCoverage = {
+  // Sumaryczna liczba produktów po sync (zmapowanych = ok)
+  total: number;
+  // Ile produktów ma WYPEŁNIONĄ daną sekcję
+  with_opis: number; // description (główny opis)
+  with_material: number; // description_extra1
+  with_pielegnacja: number; // description_extra2
+  with_wymiary: number; // description_extra3
+  with_faq: number; // description_extra4
+};
+
 export type SyncInventoryResult = {
   inventory_id: number;
   inventory_name: string;
@@ -86,6 +100,10 @@ export type SyncInventoryResult = {
   inserted_products?: SyncedProduct[];
   updated_products?: SyncedProduct[];
   skipped: SyncSkippedProduct[];
+  // Statystyki uzupełnienia sekcji opisu (description + extras). Pomaga
+  // koleżance widzieć ile produktów ma wypełnione kolejne sekcje BL.
+  // Niekompatybilne wstecz — stare logi nie mają tego pola.
+  sections_coverage?: SyncSectionsCoverage;
 };
 
 export type SyncTotals = {
@@ -135,9 +153,35 @@ function getFeature(
   return f?.value ?? null;
 }
 
+// Blacklist cech specyficznych dla Allegro (które admin musi wypełnić w BL
+// dla aukcji ale nie mają sensu w sklepie). Filtrowane case-insensitive.
+// Powód: koleżanka prowadzi sprzedaż na Allegro przez BL, więc te cechy
+// regularnie pojawiają się w BL features i bez filtra leciałyby na Mollien.pl.
+const ALLEGRO_JUNK_KEYS = new Set(
+  [
+    "stan",
+    "faktura",
+    "faktura vat",
+    "numer aukcji",
+    "numer oferty",
+    "czas wysyłki",
+    "czas wysylki",
+    "forma płatności",
+    "forma platnosci",
+    "sprzedawca",
+    "kraj pochodzenia produktu",
+    "gwarancja sprzedawcy",
+  ].map((s) => s.toLowerCase())
+);
+
+function isAllegroJunkKey(key: string): boolean {
+  return ALLEGRO_JUNK_KEYS.has(key.toLowerCase().trim());
+}
+
 // Zbiera WSZYSTKIE cechy z BL jako array {key, value} — zachowuje kolejność
-// którą admin ustawił w BL. Filtruje puste wartości. Używane do uniwersalnego
-// wyświetlania na karcie produktu (Allegro template parametry).
+// którą admin ustawił w BL. Filtruje puste wartości + allegro-junk (Stan,
+// Faktura VAT, Numer aukcji, etc. — te które koleżanka wypełnia dla
+// publikacji na Allegro a nie mają sensu w sklepie).
 function extractAllFeatures(
   features: BLInventoryProduct["features"]
 ): { key: string; value: string }[] {
@@ -151,7 +195,8 @@ function extractAllFeatures(
         typeof k === "string" &&
         k.trim().length > 0 &&
         typeof v === "string" &&
-        v.trim().length > 0
+        v.trim().length > 0 &&
+        !isAllegroJunkKey(k)
       ) {
         out.push({ key: k.trim(), value: v.trim() });
       }
@@ -166,9 +211,95 @@ function extractAllFeatures(
         typeof f.name === "string" &&
         f.name.trim().length > 0 &&
         typeof f.value === "string" &&
-        f.value.trim().length > 0
+        f.value.trim().length > 0 &&
+        !isAllegroJunkKey(f.name)
     )
     .map((f) => ({ key: f.name.trim(), value: f.value.trim() }));
+}
+
+// Hardcoded labelki sekcji opisu — mapowanie 5 pól BL na akordeony IKEA-style.
+// Konwencja stała dla wszystkich produktów. Koleżanka uczy się raz: która
+// informacja idzie w które pole BL.
+const DESCRIPTION_SECTION_LABELS: { field: string; title: string }[] = [
+  { field: "description", title: "Opis" },
+  { field: "description_extra1", title: "Materiał i wykonanie" },
+  { field: "description_extra2", title: "Pielęgnacja i czyszczenie" },
+  { field: "description_extra3", title: "Wymiary szczegółowe" },
+  { field: "description_extra4", title: "Najczęstsze pytania (FAQ)" },
+];
+
+// Builduje sekcje opisu z 5 pól BL text_fields. Pomija sekcje gdzie BL
+// nie ma treści — żeby na karcie produktu nie pokazywać pustych akordeonów.
+function extractDescriptionSections(
+  textFields: BLInventoryProduct["text_fields"]
+): { title: string; body: string; kind: "text" }[] {
+  if (!textFields) return [];
+  const sections: { title: string; body: string; kind: "text" }[] = [];
+  for (const { field, title } of DESCRIPTION_SECTION_LABELS) {
+    const raw = (textFields as Record<string, string | undefined>)[field];
+    if (typeof raw !== "string") continue;
+    const trimmed = raw.trim();
+    if (trimmed.length === 0) continue;
+    sections.push({ title, body: trimmed, kind: "text" });
+  }
+  return sections;
+}
+
+// Sekcja opisu (uniwersalny typ pomocniczy dla merge logic)
+type AnySection =
+  | { kind: "text"; title: string; body: string }
+  | {
+      kind: "image";
+      image_url: string;
+      image_alt: string;
+      caption?: string;
+    };
+
+// Merge nowych text sekcji z BL ze starymi z DB — zachowuje image sekcje
+// dodane przez admina w ich pozycjach (między text sekcjami). BL jest źródłem
+// prawdy dla treści tekstowej, admin dla obrazów.
+//
+// Strategia: dla każdej istniejącej sekcji w DB:
+// - jeśli image → zachowaj
+// - jeśli text → znajdź matching w nowych BL (po title), użyj nowego body
+//   (jeśli BL już nie ma takiej sekcji → drop)
+// Następnie dopisz na końcu te BL sekcje które nie miały odpowiednika w DB.
+export function mergeSectionsPreserveAdminImages(
+  fresh: AnySection[],
+  existing: AnySection[]
+): AnySection[] {
+  if (existing.length === 0) return fresh;
+
+  const freshByTitle = new Map<string, AnySection>();
+  for (const s of fresh) {
+    if (s.kind === "text") freshByTitle.set(s.title, s);
+  }
+
+  const matchedTitles = new Set<string>();
+  const merged: AnySection[] = [];
+
+  for (const s of existing) {
+    if (s.kind === "image") {
+      merged.push(s); // zachowaj obraz admina
+    } else {
+      // text — sprawdź czy BL nadal ma sekcję o tym samym title
+      const updated = freshByTitle.get(s.title);
+      if (updated && updated.kind === "text") {
+        merged.push(updated);
+        matchedTitles.add(s.title);
+      }
+      // jeśli BL już nie ma → drop (admin nie ma kontroli nad text content)
+    }
+  }
+
+  // Dopisz na końcu nowe text sekcje z BL których nie było w DB
+  for (const s of fresh) {
+    if (s.kind === "text" && !matchedTitles.has(s.title)) {
+      merged.push(s);
+    }
+  }
+
+  return merged;
 }
 
 function buildDimensions(bl: BLInventoryProduct): ProductDimensions | null {
@@ -388,6 +519,10 @@ async function mapBlToProduct(
     // Wyświetlane na karcie produktu w "Szczegóły produktu" z deduplikacją
     // względem dedykowanych kolumn (Kolor/Materiał/itd. już mają swoje miejsca).
     features: extractAllFeatures(bl.features),
+    // Sekcje opisu (IKEA-style akordeony) — 5 pól BL → 5 nazwanych sekcji.
+    // Karta produktu renderuje je jako rozwijalne sekcje. Stary description
+    // (joined) zostaje jako legacy fallback + SEO.
+    description_sections: extractDescriptionSections(bl.text_fields),
     variants: parseVariantsFromBl(bl.variants, defaultPriceGroup, price),
     baselinker_id: blId,
     // Kolekcję przypisuje admin ręcznie w /admin/kolekcje — sync nie ustawia.
@@ -453,6 +588,14 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
         inserted_products: [],
         updated_products: [],
         skipped: [],
+        sections_coverage: {
+          total: 0,
+          with_opis: 0,
+          with_material: 0,
+          with_pielegnacja: 0,
+          with_wymiary: 0,
+          with_faq: 0,
+        },
       };
 
       for (const [blId, bl] of Object.entries(products)) {
@@ -467,22 +610,33 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
           continue;
         }
 
-        // Zachowaj manualne mapowania admina (zdjęcia per wariant + overrides).
-        // BL nie ma tych danych — admin ustawia je w panelu /admin/produkty.
-        if (mapped.product.variants) {
-          const { data: existing } = await supabase
-            .from("products")
-            .select("variants")
-            .eq("baselinker_id", blId)
-            .maybeSingle();
-          const existingVariants = (existing as { variants: ProductVariants | null } | null)
-            ?.variants;
-          if (existingVariants) {
-            mapped.product.variants = mergeVariantsPreserveAdminEdits(
-              mapped.product.variants,
-              existingVariants
-            );
-          }
+        // Zachowaj manualne mapowania admina (zdjęcia per wariant + overrides
+        // + image sekcje opisu). BL nie ma tych danych — admin ustawia je
+        // w panelu /admin/produkty.
+        const { data: existing } = await supabase
+          .from("products")
+          .select("variants, description_sections")
+          .eq("baselinker_id", blId)
+          .maybeSingle();
+
+        const existingVariants = (
+          existing as { variants: ProductVariants | null } | null
+        )?.variants;
+        if (mapped.product.variants && existingVariants) {
+          mapped.product.variants = mergeVariantsPreserveAdminEdits(
+            mapped.product.variants,
+            existingVariants
+          );
+        }
+
+        const existingSections = (
+          existing as { description_sections: AnySection[] | null } | null
+        )?.description_sections;
+        if (existingSections && existingSections.length > 0) {
+          mapped.product.description_sections = mergeSectionsPreserveAdminImages(
+            mapped.product.description_sections,
+            existingSections
+          );
         }
 
         const { data, error } = await supabase
@@ -510,6 +664,21 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
         } else {
           result.updated += 1;
           result.updated_products!.push(synced);
+        }
+
+        // Statystyki uzupełnienia sekcji opisu. Sprawdzamy text_fields (BL),
+        // bo description_sections w mapped.product mogłaby być pusta jeśli
+        // pole BL było puste — to ten sam wynik. text_fields jest źródłem
+        // prawdy o tym co admin wpisał w BL.
+        const tf = bl.text_fields as Record<string, string | undefined> | undefined;
+        if (tf) {
+          const cov = result.sections_coverage!;
+          cov.total += 1;
+          if (tf.description?.trim()) cov.with_opis += 1;
+          if (tf.description_extra1?.trim()) cov.with_material += 1;
+          if (tf.description_extra2?.trim()) cov.with_pielegnacja += 1;
+          if (tf.description_extra3?.trim()) cov.with_wymiary += 1;
+          if (tf.description_extra4?.trim()) cov.with_faq += 1;
         }
       }
 

@@ -288,10 +288,10 @@ export default function CheckoutForm({
             <div className="flex justify-between items-start text-[var(--muted)] gap-3">
               <span className="shrink-0">Dostawa</span>
               <span className="text-right text-xs leading-snug">
-                99–599&nbsp;zł
+                od&nbsp;99&nbsp;zł
                 <br />
                 <span className="text-[var(--muted)]">
-                  dokładny koszt po&nbsp;złożeniu zamówienia
+                  dokładną wycenę podajemy kontaktowo po&nbsp;zamówieniu
                 </span>
               </span>
             </div>
