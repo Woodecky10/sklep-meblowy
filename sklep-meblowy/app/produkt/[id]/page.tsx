@@ -209,7 +209,11 @@ export default async function ProduktPage({ params }: Props) {
               Wszystko, co musisz wiedzieć
             </h2>
           </div>
-          <ProductDescriptionSections sections={product.description_sections} />
+          <ProductDescriptionSections
+            sections={product.description_sections.map((s) =>
+              s.kind === "text" ? { ...s, body: sanitizeProductHtml(s.body) } : s
+            )}
+          />
         </section>
       ) : product.description && product.description.trim().length > 0 ? (
         <section className="mb-24">

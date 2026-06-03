@@ -2,8 +2,13 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { sanitizeProductHtml } from "@/app/_lib/product-html";
 import type { ProductDescriptionSection } from "@/app/_lib/types";
+
+// Sekcje text przekazywane TUTAJ mają już sanityzowane body (server-side
+// w page.tsx). Nie importujemy sanitizera tutaj — żeby isomorphic-dompurify
+// (które ciągnie jsdom + html-encoding-sniffer + @exodus/bytes ESM-only)
+// nie wpadało w SSR-of-client-component bundle na Vercelu. Lokalny build
+// wybacza ten ESM/CJS mismatch, runtime Vercela nie.
 
 // Opis produktu na karcie — kombinacja text (akordeony z BL) i image
 // (kontekstowe zdjęcia wstawione przez admina między text sekcjami).
@@ -97,9 +102,9 @@ function TextSection({
       {isOpen && (
         <div
           className="product-description pb-6 text-[var(--fg)] leading-relaxed"
-          dangerouslySetInnerHTML={{
-            __html: sanitizeProductHtml(body),
-          }}
+          // body jest już sanityzowany na serwerze (w page.tsx) przed
+          // przekazaniem tutaj. Nie wywołujemy DOMPurify w client bundle.
+          dangerouslySetInnerHTML={{ __html: body }}
         />
       )}
     </div>
