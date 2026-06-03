@@ -1,12 +1,16 @@
-import DOMPurify from "isomorphic-dompurify";
-
 // ============================================================
 // Sanitize HTML opisu produktu (z BaseLinkera lub admina)
 // ============================================================
+// Regex-based whitelist sanitizer — bez external deps (zero jsdom,
+// zero @exodus/bytes ESM mismatch w runtime Vercela).
+//
 // Whitelist tagów odpowiednich dla opisów mebli — strukturalne paragrafy,
-// listy, podkreślenia, nagłówki H2-H4 i linki. Bez img/video/script/iframe
-// (nie chcemy żeby BL importował niezaufaną treść w DOM klienta).
-const ALLOWED_TAGS = [
+// listy, podkreślenia, nagłówki H2-H4 i linki. Bez img/video/script/iframe.
+//
+// Source produktu jest zaufany (admin lub BL → sklep), więc nie potrzebujemy
+// pełnej HTML5 spec compliance. Wystarczy whitelist + block javascript:.
+
+const ALLOWED_TAGS = new Set([
   "p",
   "br",
   "ul",
@@ -21,9 +25,12 @@ const ALLOWED_TAGS = [
   "h3",
   "h4",
   "span",
-];
+]);
 
-const ALLOWED_ATTR = ["href", "target", "rel"];
+// Atrybuty dozwolone per tag. Domyślnie brak — dla <a> wyjątek.
+const ALLOWED_ATTRS_PER_TAG: Record<string, Set<string>> = {
+  a: new Set(["href", "target", "rel"]),
+};
 
 // Domeny które wycinamy z linków w opisie BL — koleżanka prowadzi sprzedaż
 // na Allegro, więc w opisach z BL regularnie pojawiają się linki "Zobacz
@@ -44,13 +51,101 @@ function isBlockedHref(href: string): boolean {
   );
 }
 
+// Tagi w całości wycinane wraz z zawartością — niezaufana treść skryptowa.
+const DANGEROUS_BLOCK_TAGS = [
+  "script",
+  "style",
+  "iframe",
+  "noscript",
+  "object",
+  "form",
+  "svg",
+  "math",
+];
+
+function escapeHtmlAttr(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+export function sanitizeProductHtml(html: string | null | undefined): string {
+  if (!html) return "";
+
+  let cleaned = html;
+
+  // 1. Usuń niebezpieczne tagi blokowe wraz z całą zawartością
+  for (const tag of DANGEROUS_BLOCK_TAGS) {
+    const blockRegex = new RegExp(`<${tag}\\b[\\s\\S]*?</${tag}>`, "gi");
+    const selfClosingRegex = new RegExp(`<${tag}\\b[^>]*/>`, "gi");
+    cleaned = cleaned.replace(blockRegex, "").replace(selfClosingRegex, "");
+  }
+
+  // 2. Usuń komentarze HTML (mogą zawierać conditional comments, IE hacks)
+  cleaned = cleaned.replace(/<!--[\s\S]*?-->/g, "");
+
+  // 3. Każdy tag — albo zachowaj (jeśli whitelist), albo wytnij (zachowując
+  // wewnętrzny tekst dla nie-whitelistowanych).
+  cleaned = cleaned.replace(
+    /<\/?([a-zA-Z][a-zA-Z0-9]*)\b([^>]*?)\/?>/g,
+    (full, rawTag: string, attrs: string) => {
+      const tag = rawTag.toLowerCase();
+      if (!ALLOWED_TAGS.has(tag)) {
+        // Drop tag, keep content (content jest poza match-em)
+        return "";
+      }
+
+      // Closing tag
+      if (full.startsWith("</")) return `</${tag}>`;
+
+      // Self-closing void elements (np. <br/>)
+      const isSelfClosing = /\/\s*>$/.test(full);
+      const closingSlash = isSelfClosing ? " /" : "";
+
+      // Opening tag — filtruj atrybuty
+      const allowedAttrs = ALLOWED_ATTRS_PER_TAG[tag];
+      if (!allowedAttrs || allowedAttrs.size === 0) {
+        return `<${tag}${closingSlash}>`;
+      }
+
+      const cleanAttrs: string[] = [];
+      const attrRegex = /\s+([a-zA-Z][a-zA-Z0-9\-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+      let m: RegExpExecArray | null;
+      while ((m = attrRegex.exec(attrs)) !== null) {
+        const attrName = m[1].toLowerCase();
+        const attrValue = m[2] ?? m[3] ?? "";
+        if (!allowedAttrs.has(attrName)) continue;
+
+        // Block javascript:, data:, vbscript: URLs w href/src
+        if (attrName === "href" || attrName === "src") {
+          const lower = attrValue.toLowerCase().trim();
+          if (
+            lower.startsWith("javascript:") ||
+            lower.startsWith("vbscript:") ||
+            lower.startsWith("data:")
+          ) {
+            continue;
+          }
+        }
+
+        cleanAttrs.push(`${attrName}="${escapeHtmlAttr(attrValue)}"`);
+      }
+
+      return `<${tag}${cleanAttrs.length > 0 ? " " + cleanAttrs.join(" ") : ""}${closingSlash}>`;
+    }
+  );
+
+  // 4. Usuń linki do zablokowanych domen (allegro.pl etc.) zachowując tekst.
+  cleaned = stripBlockedLinks(cleaned);
+
+  return cleaned;
+}
+
 // Usuwa tagi <a href="..."> wskazujące na zablokowane domeny, zachowując
-// tekst wewnątrz. Działa post-DOMPurify (przy okazji upraszczając ścieżkę
-// sanitization — sam DOMPurify domyślnie nie filtruje per-domena).
+// tekst wewnątrz. Wywoływane po podstawowej sanityzacji.
 function stripBlockedLinks(html: string): string {
-  // Regex prosty — DOMPurify już wcześniej znormalizował HTML do prostej
-  // struktury (bez script/style/iframe), więc zagnieżdżenia <a> wewnątrz <a>
-  // nie powinny występować. Match-uje <a ... href="..."> ... </a>.
   return html.replace(
     /<a\b([^>]*)>([\s\S]*?)<\/a>/gi,
     (full, attrs: string, inner: string) => {
@@ -61,18 +156,6 @@ function stripBlockedLinks(html: string): string {
       return full;
     }
   );
-}
-
-export function sanitizeProductHtml(html: string | null | undefined): string {
-  if (!html) return "";
-  const purified = DOMPurify.sanitize(html, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR,
-    // Linki w opisach BL otwierają się w tej samej karcie domyślnie —
-    // forsujemy noopener/noreferrer jeśli target=_blank.
-    ADD_ATTR: ["target"],
-  });
-  return stripBlockedLinks(purified);
 }
 
 // ============================================================
