@@ -19,6 +19,7 @@ import StarRating from "@/app/_components/ui/StarRating";
 import ReviewList from "@/app/_components/ui/ReviewList";
 import ReviewForm from "@/app/_components/ui/ReviewForm";
 import { sanitizeProductHtml } from "@/app/_lib/product-html";
+import ProductDescriptionSections from "@/app/_components/ui/ProductDescriptionSections";
 import { COMPANY } from "@/app/_lib/company";
 
 type Props = { params: Promise<{ id: string }> };
@@ -193,8 +194,24 @@ export default async function ProduktPage({ params }: Props) {
         specifications={details}
       />
 
-      {/* Sekcja: pełen opis HTML (z BL / admina, sanitized) */}
-      {product.description && product.description.trim().length > 0 && (
+      {/* Sekcja: opis produktu.
+          - Jeśli mamy description_sections (IKEA-style 5 akordeonów z BL) →
+            renderujemy ProductDescriptionSections.
+          - Inaczej fallback do legacy flat description (stare produkty
+            sprzed migracji 22, albo BL pełnia opisu w polu głównym). */}
+      {(product.description_sections?.length ?? 0) > 0 ? (
+        <section className="mb-24">
+          <div className="mb-8">
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
+              Opis produktu
+            </p>
+            <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
+              Wszystko, co musisz wiedzieć
+            </h2>
+          </div>
+          <ProductDescriptionSections sections={product.description_sections} />
+        </section>
+      ) : product.description && product.description.trim().length > 0 ? (
         <section className="mb-24">
           <div className="mb-8">
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
@@ -209,7 +226,7 @@ export default async function ProduktPage({ params }: Props) {
             dangerouslySetInnerHTML={{ __html: sanitizeProductHtml(product.description) }}
           />
         </section>
-      )}
+      ) : null}
 
       {/* Cross-sell — np. dla łóżka pokaż "Polecane materace" */}
       {crossSell.length > 0 && (

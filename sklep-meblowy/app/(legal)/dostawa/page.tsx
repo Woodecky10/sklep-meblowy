@@ -29,20 +29,47 @@ export default function DostawaPage() {
         płatniczych – obsługuje je operator płatności.
       </p>
 
-      <h2>Koszty i czas dostawy</h2>
+      <h2>Koszt dostawy</h2>
+      <p>
+        Koszt dostawy zaczyna się <strong>od 99 zł</strong> i jest ustalany{" "}
+        <strong>indywidualnie dla każdego zamówienia</strong>. Wpływ na ostateczną
+        kwotę mają:
+      </p>
       <ul>
         <li>
-          <strong>Koszt dostawy:</strong> 299 zł (stała stawka, niezależnie od wartości zamówienia).
+          <strong>Waga i gabaryty mebla</strong> – im większy i cięższy produkt, tym
+          droższy transport (mebel wielkogabarytowy wymaga transportu meblowego, nie
+          standardowego kuriera).
         </li>
         <li>
-          <strong>Czas realizacji:</strong> od 7 do 35 dni roboczych, w zależności od produktu –
-          szczegóły zawsze w karcie produktu.
+          <strong>Miejsce dostawy</strong> – odległość od naszego magazynu wpływa na
+          stawkę paliwa; dostawa do dużych miast bywa tańsza niż do mniejszych
+          miejscowości.
+        </li>
+        <li>
+          <strong>Liczba produktów w zamówieniu</strong> – wysyłka kilku mebli jednym
+          transportem jest często korzystniejsza niż wielokrotne dostawy.
+        </li>
+        <li>
+          <strong>Wymagana usługa dodatkowa</strong> – wniesienie na konkretne piętro
+          (jeśli nie ma windy), montaż, utylizacja starego mebla.
         </li>
       </ul>
       <p>
-        Czas realizacji liczymy od momentu zaksięgowania płatności. Po skompletowaniu zamówienia
-        kurier lub firma transportowa skontaktuje się z Tobą telefonicznie, aby ustalić dogodny
-        termin dostawy.
+        Po złożeniu zamówienia kontaktujemy się z Tobą <strong>telefonicznie lub
+        mailowo</strong> z konkretną wyceną. Wycena wymaga Twojej akceptacji – jeśli
+        nie zgadzasz się z kwotą, masz prawo zrezygnować z zamówienia bez kosztów.
+      </p>
+      <p>
+        Wycenę podajemy zwykle w ciągu <strong>1 dnia roboczego</strong> od otrzymania
+        zamówienia.
+      </p>
+
+      <h2>Czas dostawy</h2>
+      <p>
+        Czas realizacji jest podany w karcie każdego produktu. Liczymy go od momentu zaksięgowania
+        płatności. Po skompletowaniu zamówienia kurier lub firma transportowa skontaktuje się z
+        Tobą telefonicznie, aby ustalić dogodny termin dostawy.
       </p>
 
       <h2>Obszar dostawy</h2>

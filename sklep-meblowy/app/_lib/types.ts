@@ -50,6 +50,30 @@ export type ProductFeature = {
   value: string;
 };
 
+// Sekcja opisu produktu — IKEA-style akordeony na karcie produktu.
+// Discriminated union: text (treść z BL) lub image (wstawione przez admina).
+// Text sekcje wypełnia automatycznie sync BL z 5 pól text_fields
+// (description + description_extra1-4) z hardcoded labelkami.
+// Image sekcje dodaje admin w /admin/produkty/[id] między text sekcjami.
+// Sync NIE nadpisuje image sekcji — admin ma kontrolę nad obrazami,
+// BL ma kontrolę nad tekstem (single source of truth dla treści).
+export type ProductDescriptionSectionText = {
+  kind: "text";
+  title: string;
+  body: string;
+};
+
+export type ProductDescriptionSectionImage = {
+  kind: "image";
+  image_url: string;
+  image_alt: string;
+  caption?: string;
+};
+
+export type ProductDescriptionSection =
+  | ProductDescriptionSectionText
+  | ProductDescriptionSectionImage;
+
 export type Product = {
   id: string;
   name: string;
@@ -69,6 +93,9 @@ export type Product = {
   // kolumny (kolor, materiał itd.) dla wygody wyświetlania. Pusta tablica
   // gdy produkt nie ma żadnych cech w BL.
   features: ProductFeature[];
+  // Sekcje opisu (IKEA-style akordeony). Wypełniane przez sync z 5 pól BL.
+  // Pusta tablica gdy BL nie ma description + extras.
+  description_sections: ProductDescriptionSection[];
   variants: ProductVariants | null;
   baselinker_id: string | null;
   collection_id: string | null;

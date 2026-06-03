@@ -167,18 +167,11 @@ export async function POST(request: NextRequest) {
       stripeCouponId = coupon.id;
     }
 
-    // Stała stawka dostawy 299 zł
-    const shipping = 299;
-    const finalTotal = Math.max(0, total - promoDiscount) + shipping;
-
-    stripeLineItems.push({
-      quantity: 1,
-      price_data: {
-        currency: "pln",
-        unit_amount: shipping * 100,
-        product_data: { name: "Dostawa" },
-      },
-    });
+    // Koszt dostawy NIE jest doliczany do Stripe — meble różnią się wagą
+    // i gabarytami. Po zamówieniu admin kontaktuje klienta i ustala koszt
+    // dostawy indywidualnie (płatność osobno: przelew albo doliczone do BL
+    // jako delivery_price).
+    const finalTotal = Math.max(0, total - promoDiscount);
 
     // Użytkownik zalogowany?
     const {

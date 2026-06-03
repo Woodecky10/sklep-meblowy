@@ -43,9 +43,10 @@ export default function KoszykPage() {
     );
   }
 
-  const shipping = 299;
+  // Koszt dostawy ustalany indywidualnie per zamówienie po kontakcie z klientem
+  // — meble różnią się wagą i gabarytami. Stripe pobiera tylko cenę produktów.
   const discount = appliedPromo?.discount ?? 0;
-  const grandTotal = Math.max(0, total - discount) + shipping;
+  const grandTotal = Math.max(0, total - discount);
 
   // Cross-sell — "Może Cię zainteresować"
   const [crossSell, setCrossSell] = useState<Product[]>([]);
@@ -234,9 +235,15 @@ export default function KoszykPage() {
                   <span>−{discount.toLocaleString("pl-PL")} zł</span>
                 </div>
               )}
-              <div className="flex justify-between text-[var(--muted)]">
-                <span>Dostawa</span>
-                <span>{shipping} zł</span>
+              <div className="flex justify-between items-start text-[var(--muted)] gap-3">
+                <span className="shrink-0">Dostawa</span>
+                <span className="text-right text-xs leading-snug">
+                  od&nbsp;99&nbsp;zł
+                  <br />
+                  <span className="text-[var(--muted)]">
+                    dokładną wycenę podajemy kontaktowo po&nbsp;zamówieniu
+                  </span>
+                </span>
               </div>
               <div className="border-t border-[var(--border)] pt-3 flex justify-between font-bold text-base text-[var(--fg)]">
                 <span>Razem</span>

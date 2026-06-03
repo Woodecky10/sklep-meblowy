@@ -46,8 +46,8 @@ export default function PrywatnoscPage() {
       <h3>c) Obsługa płatności</h3>
       <p>
         Dane płatności (numer karty, dane transakcji) <strong>nie są przechowywane</strong> przez
-        Sklep. Obsługuje je operator płatności (Stripe/Przelewy24), który jest odrębnym
-        administratorem tych danych.
+        Sklep. Obsługuje je operator płatności <strong>PayPro S.A. (Przelewy24)</strong>, który
+        jest odrębnym administratorem tych danych — szczegóły w § 9 niniejszej Polityki.
       </p>
 
       <h3>d) Korzystanie ze strony</h3>
@@ -69,8 +69,9 @@ export default function PrywatnoscPage() {
           adres, telefon).
         </li>
         <li>
-          <strong>Operatorom płatności</strong> (Stripe Inc. / PayPro S.A. – Przelewy24) – w
-          zakresie niezbędnym do realizacji transakcji.
+          <strong>Operatorowi płatności</strong> PayPro S.A. (Przelewy24), ul. Pastelowa 8, 60-198
+          Poznań, KRS 0000347935, NIP 7792369887 – w zakresie niezbędnym do realizacji transakcji
+          (szczegóły w § 9).
         </li>
         <li>
           <strong>Dostawcom infrastruktury</strong> – Supabase (hosting bazy danych), Vercel
@@ -86,10 +87,11 @@ export default function PrywatnoscPage() {
 
       <h2>§ 4. Przekazywanie danych poza EOG</h2>
       <p>
-        Część dostawców (Stripe, Vercel) ma siedzibę poza Europejskim Obszarem Gospodarczym.
-        Przekazanie danych odbywa się na podstawie standardowych klauzul umownych zatwierdzonych
-        przez Komisję Europejską oraz decyzji o odpowiednim poziomie ochrony danych (EU-US Data
-        Privacy Framework).
+        Część dostawców infrastruktury (Vercel) ma siedzibę poza Europejskim Obszarem
+        Gospodarczym. Przekazanie danych odbywa się na podstawie standardowych klauzul umownych
+        zatwierdzonych przez Komisję Europejską oraz decyzji o odpowiednim poziomie ochrony
+        danych (EU-US Data Privacy Framework). Operator płatności PayPro S.A. (Przelewy24) ma
+        siedzibę w Polsce — dane do operatora płatności nie są przekazywane poza EOG.
       </p>
 
       <h2>§ 5. Okres przechowywania danych</h2>
@@ -163,6 +165,41 @@ export default function PrywatnoscPage() {
         Polityka prywatności może być aktualizowana. Data ostatniej aktualizacji wskazana jest
         na początku dokumentu. O istotnych zmianach poinformujemy użytkowników z aktywnym kontem
         drogą e-mailową.
+      </p>
+
+      <h2>§ 9. Dane przekazywane operatorowi płatności (Przelewy24)</h2>
+      <p>
+        W celu realizacji płatności za zamówienie udostępniamy operatorowi płatności następujące
+        dane osobowe Klienta: <strong>adres e-mail, imię, nazwisko, adres</strong>. Dane te
+        przekazywane są w zakresie niezbędnym do przeprowadzenia transakcji płatniczej.
+      </p>
+      <p>
+        <strong>Odbiorca tych danych (odrębny administrator):</strong>
+        <br />
+        PayPro Spółka Akcyjna z siedzibą w Poznaniu, ul. Pastelowa 8, 60-198 Poznań, wpisana do
+        Rejestru Przedsiębiorców Krajowego Rejestru Sądowego prowadzonego przez Sąd Rejonowy
+        Poznań Nowe Miasto i Wilda w Poznaniu, VIII Wydział Gospodarczy KRS pod numerem KRS{" "}
+        <strong>0000347935</strong>, NIP <strong>7792369887</strong>, REGON 301345068, krajowa
+        instytucja płatnicza wpisana do rejestru KNF pod numerem IP24/2014.
+      </p>
+      <p>
+        <strong>Cele przetwarzania danych przez PayPro:</strong> świadczenie usług płatniczych
+        (przyjmowanie i rozliczanie płatności na rzecz Sklepu), w szczególności w zakresie
+        niezbędnym do zapobiegania oszustwom związanym z wykonywanymi usługami płatniczymi oraz
+        dochodzenia i wykrywania tego rodzaju oszustw, a także identyfikacji Płatnika w zakresie
+        wynikającym z przepisów prawa (Ustawa o usługach płatniczych, Ustawa AML).
+      </p>
+      <p>
+        Szczegółowa klauzula informacyjna PayPro S.A. dotycząca przetwarzania danych osobowych
+        Płatników dostępna jest pod adresem:{" "}
+        <a
+          href="https://www.przelewy24.pl/obowiazek-informacyjny-rodo-platnicy"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          przelewy24.pl/obowiazek-informacyjny-rodo-platnicy
+        </a>
+        .
       </p>
     </>
   );

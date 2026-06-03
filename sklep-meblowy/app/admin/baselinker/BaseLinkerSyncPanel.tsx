@@ -244,6 +244,74 @@ function InventoryResult({ inv }: { inv: SyncInventoryResult }) {
           )}
         </div>
       )}
+
+      {inv.sections_coverage && inv.sections_coverage.total > 0 && (
+        <SectionsCoverageBar coverage={inv.sections_coverage} />
+      )}
+    </div>
+  );
+}
+
+// Pokazuje progress bary uzupełnienia sekcji opisu dla magazynu.
+// Pomaga koleżance widzieć ile produktów ma wypełnione kolejne pola BL
+// (description + 4 extras → 5 sekcji). Bez ręcznego sprawdzania per produkt.
+function SectionsCoverageBar({
+  coverage,
+}: {
+  coverage: {
+    total: number;
+    with_opis: number;
+    with_material: number;
+    with_pielegnacja: number;
+    with_wymiary: number;
+    with_faq: number;
+  };
+}) {
+  const rows: { label: string; field: string; count: number }[] = [
+    { label: "Opis", field: "description", count: coverage.with_opis },
+    { label: "Materiał i wykonanie", field: "Opis 1", count: coverage.with_material },
+    { label: "Pielęgnacja i czyszczenie", field: "Opis 2", count: coverage.with_pielegnacja },
+    { label: "Wymiary szczegółowe", field: "Opis 3", count: coverage.with_wymiary },
+    { label: "FAQ", field: "Opis 4", count: coverage.with_faq },
+  ];
+  const total = coverage.total;
+
+  return (
+    <div className="mt-4 pt-3 border-t border-[var(--border)]">
+      <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-3">
+        Uzupełnienie sekcji opisu w BL ({total} produkt{total === 1 ? "" : "ów"})
+      </p>
+      <ul className="flex flex-col gap-2">
+        {rows.map((r) => {
+          const pct = total > 0 ? Math.round((r.count / total) * 100) : 0;
+          const color =
+            pct >= 80 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-red-500";
+          return (
+            <li key={r.label} className="flex items-center gap-3 text-xs">
+              <div className="w-44 shrink-0">
+                <span className="text-[var(--fg)] font-medium">{r.label}</span>
+                <span className="text-[var(--muted)] ml-1.5 font-mono">
+                  (BL: {r.field})
+                </span>
+              </div>
+              <div className="flex-1 h-2 bg-[var(--bg)] border border-[var(--border)] rounded-full overflow-hidden">
+                <div
+                  className={`h-full ${color} transition-all`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <div className="w-16 text-right shrink-0 text-[var(--muted)] tabular-nums">
+                {r.count}/{total} ({pct}%)
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="text-[10px] text-[var(--muted)] italic mt-2 leading-snug">
+        Jeśli sekcja ma 0% — żaden produkt nie ma tego pola wypełnionego w BL.
+        Dopisz informacje w BL → Magazyn → produkt → Opis (Opis 1-4) i odpal
+        ponownie &bdquo;Synchronizuj teraz&rdquo;.
+      </p>
     </div>
   );
 }

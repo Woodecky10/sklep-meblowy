@@ -117,15 +117,17 @@ export default function RegulaminPage() {
       <ol>
         <li>
           Czas realizacji zamówienia liczy się od dnia zaksięgowania płatności i jest każdorazowo
-          wskazany w karcie Produktu (zwykle od 7 do 35 dni roboczych, w zależności od Produktu).
+          wskazany w karcie Produktu.
         </li>
         <li>
           Dostawa odbywa się na terenie Rzeczypospolitej Polskiej za pośrednictwem firmy
           kurierskiej lub transportu meblowego (dla Produktów wielkogabarytowych).
         </li>
         <li>
-          Koszty dostawy określone są w zakładce <a href="/dostawa">Dostawa i płatności</a>.
-          Zamówienia o wartości powyżej 2000 zł są dostarczane bezpłatnie.
+          Koszt dostawy ustalany jest <strong>indywidualnie</strong> po złożeniu zamówienia – zależy
+          od wagi, gabarytów Produktu oraz miejsca dostawy. Sprzedawca skontaktuje się z Klientem
+          telefonicznie lub mailowo z wyceną dostawy przed wysyłką. Szczegóły dostępne są w zakładce{" "}
+          <a href="/dostawa">Dostawa i płatności</a>.
         </li>
         <li>
           Klient jest zobowiązany do sprawdzenia stanu przesyłki w obecności kuriera. W razie
