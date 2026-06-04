@@ -1,16 +1,18 @@
 # Jak wypełniać opisy produktów w BaseLinkerze
 
-## Konwencja 5 pól = 5 sekcji na stronie
+## Konwencja: pola BL → 3 sekcje na stronie
 
-W BL Magazyn → produkt → zakładka "Opis" widzisz 5 pól tekstowych. Każde z nich automatycznie staje się osobną sekcją (akordeonem) na karcie produktu w sklepie Mollien.pl.
+W BL Magazyn → produkt → zakładka "Opis" widzisz pola tekstowe. Łączymy je w **3 sekcje** (akordeony) na karcie produktu w sklepie Mollien.pl:
 
-| Pole w BL | Tytuł sekcji na Mollien.pl | Co tu wpisać |
+| Sekcja na Mollien.pl | Pola w BL | Co tu wpisać |
 |---|---|---|
-| **Opis** (główny) | Opis | Pierwszy paragraf — czym jest produkt, dla kogo, główne zalety. 2-4 zdania. |
-| **Opis 1** (description_extra1) | Materiał i wykonanie | Z czego zrobiony jest mebel: rodzaj tkaniny / drewna, gęstość pianki, sprężyny, lakierowanie. Dla mebli tapicerowanych: skład tkaniny obiciowej. |
-| **Opis 2** (description_extra2) | Pielęgnacja i czyszczenie | Jak utrzymać mebel w dobrym stanie. Co można prać, czego nie. Czy tkanina jest plamoodporna. Jak konserwować drewno. |
-| **Opis 3** (description_extra3) | Wymiary szczegółowe | Pełna tabelka wymiarów: szerokość, głębokość, wysokość, wymiary opakowania, waga, wymiary po rozłożeniu (dla rozkładanych). |
-| **Opis 4** (description_extra4) | Najczęstsze pytania (FAQ) | Pytania klientów: "Czy można zmienić tkaninę?", "Jaka jest wytrzymałość?", "Czy mebel jest dostarczany w częściach?". |
+| **Opis** | Opis (główny) + Opis 1 + Opis 2 (sklejone w kolejności) | Czym jest produkt, dla kogo, główne zalety, kontynuacja opisu. Wszystko co o produkcie ogólnie — łącznie pierwsze 3 pola BL idą tutaj. |
+| **Wymiary i materiały** | Opis 3 + Opis 4 (sklejone) | Wymiary szczegółowe (szerokość, głębokość, wysokość, wymiary opakowania) ORAZ materiały (rodzaj tkaniny, drewna, pianki, sprężyn). Dwa pola, jedna sekcja. |
+| **Informacje dla klienta** | Dowolne pole BL zaczynające się od „Informacje dla klienta" w treści | Uwagi specjalne dla kupującego — "Kolor może się różnić od monitora", "Składa się sam, dostarczamy w 2 paczkach", próbki tkanin itd. **Ważne**: pierwsze słowa pola muszą być „Informacje dla klienta" — wtedy sklep automatycznie wyciąga to do osobnej sekcji. |
+
+### Co jeśli pomyłka — wpisałaś co innego do niewłaściwego pola BL?
+
+Sklep łączy pola wg powyższej konwencji bez sprawdzania zawartości. Jeśli wpiszesz wymiary w Opis 2, to wylądują w sekcji **Opis** zamiast w **Wymiary i materiały**. Otwórz produkt w BL → przenieś treść między polami → kolejny sync naprawi sklep.
 
 ## Co możesz używać w treści
 
@@ -63,9 +65,10 @@ Sklep nie ufa ślepo treściom z BL — automatycznie:
 - [ ] Co najmniej 3 zdjęcia (BL → Magazyn → Zdjęcia)
 - [ ] Wymiary (BL → Magazyn → Wymiary — szerokość, głębokość, wysokość, waga)
 - [ ] Kolor + Materiał w Cechach
-- [ ] Opis główny wypełniony
-- [ ] Opis 1 (Materiał) — preferowane, znacznie poprawia UX
-- [ ] Opis 2 (Pielęgnacja) — bardzo cenione przez klientów premium
-- [ ] Opis 3 (Wymiary szczegółowe) — szczególnie dla mebli wielkogabarytowych
-- [ ] Opis 4 (FAQ) — opcjonalne, ale podnosi konwersję
+- [ ] Opis główny wypełniony (główne zalety produktu)
+- [ ] Opis 1 (kontynuacja opisu, np. styl, dla kogo) — opcjonalne
+- [ ] Opis 2 (kontynuacja opisu, np. pielęgnacja, gwarancja) — opcjonalne
+- [ ] Opis 3 (wymiary szczegółowe — tabela) — szczególnie dla wielkogabarytowych
+- [ ] Opis 4 (materiały: skład tkaniny / drewna / pianek) — preferowane
+- [ ] Pole zaczynające się od „Informacje dla klienta" — opcjonalne (jeśli są uwagi specjalne)
 - [ ] Kategoria zmapowana (BL → Magazyn → Kategoria + sprawdzenie czy ID kategorii BL jest w `/admin/kategorie`)

@@ -199,23 +199,43 @@ export default async function ProduktPage({ params }: Props) {
             renderujemy ProductDescriptionSections.
           - Inaczej fallback do legacy flat description (stare produkty
             sprzed migracji 22, albo BL pełnia opisu w polu głównym). */}
-      {(product.description_sections?.length ?? 0) > 0 ? (
-        <section className="mb-24">
-          <div className="mb-8">
-            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-              Opis produktu
-            </p>
-            <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
-              Wszystko, co musisz wiedzieć
-            </h2>
-          </div>
-          <ProductDescriptionSections
-            sections={product.description_sections.map((s) =>
-              s.kind === "text" ? { ...s, body: sanitizeProductHtml(s.body) } : s
-            )}
-          />
-        </section>
-      ) : product.description && product.description.trim().length > 0 ? (
+      {(() => {
+        // Pre-process: aplikuj admin overrides (admin_title / admin_body /
+        // hidden) — admin może per produkt naprawić rozjazd treści w BL
+        // bez konieczności edytowania w panelu BL.
+        //
+        // Sanitize body server-side (PR #35) — sanitizer jest na serwerze,
+        // ProductDescriptionSections.tsx jako "use client" otrzymuje już
+        // czysty HTML i renderuje przez dangerouslySetInnerHTML.
+        const visibleSections = (product.description_sections ?? [])
+          .filter((s) => !(s.kind === "text" && s.hidden === true))
+          .map((s) => {
+            if (s.kind !== "text") return s;
+            const hasBodyOverride = (s.admin_body?.trim().length ?? 0) > 0;
+            const rawBody = hasBodyOverride ? (s.admin_body as string) : s.body;
+            return {
+              ...s,
+              title: s.admin_title?.trim() || s.title,
+              body: sanitizeProductHtml(rawBody),
+            };
+          });
+        return visibleSections.length > 0 ? (
+          <section className="mb-24">
+            <div className="mb-8">
+              <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
+                Opis produktu
+              </p>
+              <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
+                Wszystko, co musisz wiedzieć
+              </h2>
+            </div>
+            <ProductDescriptionSections sections={visibleSections} />
+          </section>
+        ) : null;
+      })()}
+      {(product.description_sections?.length ?? 0) === 0 &&
+      product.description &&
+      product.description.trim().length > 0 ? (
         <section className="mb-24">
           <div className="mb-8">
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">

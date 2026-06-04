@@ -52,15 +52,24 @@ export type ProductFeature = {
 
 // Sekcja opisu produktu — IKEA-style akordeony na karcie produktu.
 // Discriminated union: text (treść z BL) lub image (wstawione przez admina).
-// Text sekcje wypełnia automatycznie sync BL z 5 pól text_fields
-// (description + description_extra1-4) z hardcoded labelkami.
-// Image sekcje dodaje admin w /admin/produkty/[id] między text sekcjami.
-// Sync NIE nadpisuje image sekcji — admin ma kontrolę nad obrazami,
-// BL ma kontrolę nad tekstem (single source of truth dla treści).
+// Text sekcje wypełnia automatycznie sync BL z pól text_fields wg
+// DESCRIPTION_SECTION_LABELS (3 sekcje: Opis / Wymiary i materiały /
+// Informacje dla klienta). Image sekcje dodaje admin w /admin/produkty/[id].
+// Sync NIE nadpisuje image sekcji ani admin overrides — BL jest źródłem
+// prawdy dla title/body, admin może override per produkt gdy koleżanka
+// pomyliła pola w BL.
 export type ProductDescriptionSectionText = {
   kind: "text";
+  // title + body z BL sync (mapowanie pól w baselinker-sync.ts).
   title: string;
   body: string;
+  // Per-product admin overrides — przeżywają sync z BL przez
+  // mergeSectionsPreserveAdminImages (match po `title`).
+  // Render w sklepie: admin_title || title, admin_body || body.
+  // hidden=true → sekcja ukryta przed klientem.
+  admin_title?: string;
+  admin_body?: string;
+  hidden?: boolean;
 };
 
 export type ProductDescriptionSectionImage = {

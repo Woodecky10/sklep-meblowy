@@ -7,7 +7,7 @@ import {
   getSections,
   getCategories,
 } from "@/app/_lib/categories";
-import { getCollection } from "@/app/_lib/collections";
+import { getCollection, getAllCollections } from "@/app/_lib/collections";
 import { getUserWishlistIds } from "@/app/_lib/wishlist";
 import ProductCard from "@/app/_components/ui/ProductCard";
 import FilterBar from "@/app/_components/ui/FilterBar";
@@ -51,26 +51,34 @@ export default async function SklepPage({
   const materials = sp.material?.split(",").filter(Boolean);
   const collectionSlug = sp.kolekcja?.trim() || undefined;
 
-  const [{ products, total, pages }, facets, sections, allCategories, categoryLabel, collection] =
-    await Promise.all([
-      getProducts({
-        category,
-        sort,
-        page,
-        search,
-        priceMin,
-        priceMax,
-        inStockOnly,
-        colors,
-        materials,
-        collectionSlug,
-      }),
-      getFilterFacets({ search, category }),
-      getSections(),
-      getCategories(),
-      getCategoryLabel(category),
-      collectionSlug ? getCollection(collectionSlug) : Promise.resolve(null),
-    ]);
+  const [
+    { products, total, pages },
+    facets,
+    sections,
+    allCategories,
+    allCollections,
+    categoryLabel,
+    collection,
+  ] = await Promise.all([
+    getProducts({
+      category,
+      sort,
+      page,
+      search,
+      priceMin,
+      priceMax,
+      inStockOnly,
+      colors,
+      materials,
+      collectionSlug,
+    }),
+    getFilterFacets(),
+    getSections(),
+    getCategories(),
+    getAllCollections(),
+    getCategoryLabel(category),
+    collectionSlug ? getCollection(collectionSlug) : Promise.resolve(null),
+  ]);
 
   // Batch pobrania ocen — jedno zapytanie dla całej strony list.
   const [ratings, wishlistIds] = await Promise.all([
@@ -125,6 +133,7 @@ export default async function SklepPage({
           colors={facets.colors}
           materials={facets.materials}
           sections={filterSections}
+          collections={allCollections.map((c) => ({ slug: c.slug, label: c.label }))}
         />
       </Suspense>
 
