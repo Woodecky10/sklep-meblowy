@@ -105,11 +105,12 @@ export default function DescriptionSectionsEditor({
           Sekcje opisu produktu
         </h2>
         <p className="text-sm text-[var(--muted)] mt-1 max-w-2xl leading-relaxed">
-          Sekcje <strong>tekstowe</strong> (Opis / Materiał / Pielęgnacja / Wymiary / FAQ) przychodzą z
-          BaseLinkera — edytuj je tam, sync zaktualizuje. Możesz między nimi wstawiać{" "}
-          <strong>zdjęcia kontekstowe</strong> (np. zbliżenie tkaniny, mood shot
-          salonu, infografika wymiarów) — przycisk <em>+ Dodaj zdjęcie</em> między
-          sekcjami.
+          Sekcje <strong>tekstowe</strong> (Opis / Wymiary i materiały / Informacje
+          dla klienta) przychodzą z BaseLinkera — domyślnie sync z BL je nadpisuje.
+          Możesz <strong>nadpisać per produkt</strong> (przycisk „Edytuj
+          override" na sekcji) gdy koleżanka pomyliła pola w BL — override
+          przeżywa kolejne sync. Możesz też wstawiać między nimi
+          <strong> zdjęcia kontekstowe</strong> (+ Wstaw zdjęcie tutaj).
         </p>
       </div>
 
@@ -125,6 +126,26 @@ export default function DescriptionSectionsEditor({
             {s.kind === "text" ? (
               <TextSectionRow
                 section={s}
+                onAdminTitleChange={(v) =>
+                  patchSection(idx, {
+                    admin_title: v.trim() === "" ? undefined : v,
+                  } as Partial<ProductDescriptionSection>)
+                }
+                onAdminBodyChange={(v) =>
+                  patchSection(idx, {
+                    admin_body: v.trim() === "" ? undefined : v,
+                  } as Partial<ProductDescriptionSection>)
+                }
+                onToggleHidden={(v) =>
+                  patchSection(idx, {
+                    // Trzymamy explicit boolean (true/false), nie undefined.
+                    // Bo gdy admin un-hide (true → false), merge logic
+                    // potrzebuje wiedzieć że admin nadal "ma kontrolę" nad
+                    // sekcją — żeby nie dropować jej gdy BL przestaje
+                    // dawać. Patrz override check w baselinker-sync.ts.
+                    hidden: v,
+                  } as Partial<ProductDescriptionSection>)
+                }
                 onMoveUp={idx > 0 ? () => moveSection(idx, -1) : undefined}
                 onMoveDown={idx < sections.length - 1 ? () => moveSection(idx, 1) : undefined}
               />
@@ -178,53 +199,153 @@ export default function DescriptionSectionsEditor({
 
 function TextSectionRow({
   section,
+  onAdminTitleChange,
+  onAdminBodyChange,
+  onToggleHidden,
   onMoveUp,
   onMoveDown,
 }: {
   section: Extract<ProductDescriptionSection, { kind: "text" }>;
+  onAdminTitleChange: (v: string) => void;
+  onAdminBodyChange: (v: string) => void;
+  onToggleHidden: (v: boolean) => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
 }) {
-  // Krótki preview body (strip HTML + 100 znaków)
+  // Override = admin coś realnie ustawił. Pomijamy whitespace-only stringi
+  // (puste / same spacje nie są realnym override). hidden true LUB false
+  // liczy się jako "admin tknął" — patrz onToggleHidden i merge logic.
+  const hasTitleOverride = (section.admin_title?.trim().length ?? 0) > 0;
+  const hasBodyOverride = (section.admin_body?.trim().length ?? 0) > 0;
+  const hasHiddenOverride = section.hidden !== undefined;
+  const hasOverride = hasTitleOverride || hasBodyOverride || section.hidden === true;
+
+  // Expand kontroli override gdy admin już coś nadpisał — wtedy widzi
+  // wszystkie pola od razu. Inaczej trzeba kliknąć "Edytuj override".
+  const [expanded, setExpanded] = useState(hasOverride);
+
+  // Krótki preview body (strip HTML + 120 znaków)
   const preview = section.body
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 120);
 
+  const effectiveTitle = section.admin_title?.trim() || section.title;
+  const effectiveBody = hasBodyOverride
+    ? (section.admin_body as string)
+    : section.body;
+
   return (
-    <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl p-4 flex items-start gap-3">
-      <div className="shrink-0 mt-0.5 w-9 h-9 rounded-full bg-[var(--color-navy)]/10 dark:bg-[var(--color-gold)]/10 flex items-center justify-center text-[var(--color-navy)] dark:text-[var(--color-gold)]">
-        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <line x1="4" y1="6" x2="20" y2="6" />
-          <line x1="4" y1="12" x2="20" y2="12" />
-          <line x1="4" y1="18" x2="14" y2="18" />
-        </svg>
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-display text-sm font-semibold text-[var(--fg)]">
-          {section.title}
-        </p>
-        <p className="text-xs text-[var(--muted)] mt-1 line-clamp-2">
-          {preview}
-          {section.body.length > 120 ? "…" : ""}
-        </p>
-        <p className="text-[10px] font-sans uppercase tracking-widest text-[var(--muted)] mt-2">
-          Z BaseLinkera — edytuj w BL panelu
-        </p>
-      </div>
-      <div className="flex flex-col gap-1 shrink-0">
-        <IconBtn label="W górę" onClick={onMoveUp ?? (() => {})} disabled={!onMoveUp}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="18 15 12 9 6 15" />
+    <div
+      className={`bg-[var(--bg)] border rounded-xl p-4 flex flex-col gap-3 ${
+        section.hidden
+          ? "border-red-300 dark:border-red-800 opacity-60"
+          : hasOverride
+            ? "border-[var(--color-gold)]/50"
+            : "border-[var(--border)]"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="shrink-0 mt-0.5 w-9 h-9 rounded-full bg-[var(--color-navy)]/10 dark:bg-[var(--color-gold)]/10 flex items-center justify-center text-[var(--color-navy)] dark:text-[var(--color-gold)]">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <line x1="4" y1="6" x2="20" y2="6" />
+            <line x1="4" y1="12" x2="20" y2="12" />
+            <line x1="4" y1="18" x2="14" y2="18" />
           </svg>
-        </IconBtn>
-        <IconBtn label="W dół" onClick={onMoveDown ?? (() => {})} disabled={!onMoveDown}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </IconBtn>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-display text-sm font-semibold text-[var(--fg)]">
+            {effectiveTitle}
+            {hasTitleOverride && (
+              <span className="ml-2 text-[10px] font-sans uppercase tracking-widest text-[var(--color-gold)]">
+                (tytuł override)
+              </span>
+            )}
+            {hasBodyOverride && (
+              <span className="ml-2 text-[10px] font-sans uppercase tracking-widest text-[var(--color-gold)]">
+                (treść override)
+              </span>
+            )}
+            {section.hidden === true && (
+              <span className="ml-2 text-[10px] font-sans uppercase tracking-widest text-red-500">
+                (ukryta)
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-[var(--muted)] mt-1 line-clamp-2">
+            {effectiveBody
+              .replace(/<[^>]*>/g, " ")
+              .replace(/\s+/g, " ")
+              .trim()
+              .slice(0, 120)}
+            {effectiveBody.length > 120 ? "…" : ""}
+          </p>
+          <div className="flex items-center gap-3 mt-2 flex-wrap">
+            <p className="text-[10px] font-sans uppercase tracking-widest text-[var(--muted)]">
+              {hasOverride ? "Nadpisana przez admina" : "Z BaseLinkera — edytuj w BL panelu"}
+            </p>
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="text-[10px] font-sans uppercase tracking-widest text-[var(--color-gold)] hover:underline"
+            >
+              {expanded ? "Zwiń" : "Edytuj override"}
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1 shrink-0">
+          <IconBtn label="W górę" onClick={onMoveUp ?? (() => {})} disabled={!onMoveUp}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="18 15 12 9 6 15" />
+            </svg>
+          </IconBtn>
+          <IconBtn label="W dół" onClick={onMoveDown ?? (() => {})} disabled={!onMoveDown}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </IconBtn>
+        </div>
       </div>
+
+      {expanded && (
+        <div className="border-t border-[var(--border)] pt-3 flex flex-col gap-3">
+          <div>
+            <label className="block text-[10px] font-sans uppercase tracking-widest text-[var(--muted)] mb-1">
+              Nadpisz tytuł (zostaw puste = z BL)
+            </label>
+            <input
+              type="text"
+              value={section.admin_title ?? ""}
+              onChange={(e) => onAdminTitleChange(e.target.value)}
+              placeholder={section.title}
+              maxLength={120}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-sans uppercase tracking-widest text-[var(--muted)] mb-1">
+              Nadpisz treść (zostaw puste = z BL). HTML dozwolony.
+            </label>
+            <textarea
+              value={section.admin_body ?? ""}
+              onChange={(e) => onAdminBodyChange(e.target.value)}
+              placeholder={section.body.slice(0, 200)}
+              rows={6}
+              className={`${inputClass} font-mono text-xs leading-relaxed resize-y`}
+            />
+          </div>
+          <label className="flex items-center gap-2 text-xs text-[var(--fg)] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={section.hidden === true}
+              onChange={(e) => onToggleHidden(e.target.checked)}
+              className="w-4 h-4 accent-[var(--color-gold)]"
+            />
+            Ukryj sekcję na karcie produktu (nie pokazuj klientom)
+          </label>
+        </div>
+      )}
     </div>
   );
 }

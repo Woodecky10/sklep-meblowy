@@ -380,6 +380,33 @@ export async function updateProductDescriptionSections(
       if (typeof s.body !== "string") {
         return { ok: false, error: `Sekcja ${i + 1}: body text sekcji musi być stringiem` };
       }
+      // Admin overrides — opcjonalne, ale jeśli są, muszą być stringami / boolem
+      if (
+        s.admin_title !== undefined &&
+        s.admin_title !== null &&
+        typeof s.admin_title !== "string"
+      ) {
+        return {
+          ok: false,
+          error: `Sekcja ${i + 1}: admin_title musi być stringiem`,
+        };
+      }
+      if (
+        s.admin_body !== undefined &&
+        s.admin_body !== null &&
+        typeof s.admin_body !== "string"
+      ) {
+        return {
+          ok: false,
+          error: `Sekcja ${i + 1}: admin_body musi być stringiem`,
+        };
+      }
+      if (s.hidden !== undefined && typeof s.hidden !== "boolean") {
+        return {
+          ok: false,
+          error: `Sekcja ${i + 1}: hidden musi być true/false`,
+        };
+      }
     } else if (s.kind === "image") {
       if (typeof s.image_url !== "string" || s.image_url.trim().length === 0) {
         return { ok: false, error: `Sekcja ${i + 1}: brak URL obrazu` };

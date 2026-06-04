@@ -339,14 +339,19 @@ type AnySection =
       caption?: string;
     };
 
-// Merge nowych text sekcji z BL ze starymi z DB — zachowuje image sekcje
-// dodane przez admina w ich pozycjach (między text sekcjami). BL jest źródłem
-// prawdy dla treści tekstowej, admin dla obrazów.
+// Merge nowych text sekcji z BL ze starymi z DB. Trzymamy 3 typy danych:
+// - image sekcje admina (między text) — zawsze zachowane
+// - text title/body z BL — nadpisywane przez fresh
+// - admin overrides per text section (admin_title, admin_body, hidden) —
+//   przeżywają sync, dzięki nim admin może naprawić rozjazd w polach BL
+//   bez konieczności edytowania w BL panel.
 //
 // Strategia: dla każdej istniejącej sekcji w DB:
 // - jeśli image → zachowaj
-// - jeśli text → znajdź matching w nowych BL (po title), użyj nowego body
-//   (jeśli BL już nie ma takiej sekcji → drop)
+// - jeśli text → znajdź matching w nowych BL (po title), użyj BL title/body
+//   + zachowaj admin_title/admin_body/hidden z istniejącej sekcji
+//   (jeśli BL już nie ma takiej sekcji → zachowaj jeśli admin coś zoverridował,
+//    inaczej drop)
 // Następnie dopisz na końcu te BL sekcje które nie miały odpowiednika w DB.
 export function mergeSectionsPreserveAdminImages(
   fresh: AnySection[],
@@ -365,15 +370,48 @@ export function mergeSectionsPreserveAdminImages(
   for (const s of existing) {
     if (s.kind === "image") {
       merged.push(s); // zachowaj obraz admina
-    } else {
-      // text — sprawdź czy BL nadal ma sekcję o tym samym title
-      const updated = freshByTitle.get(s.title);
-      if (updated && updated.kind === "text") {
-        merged.push(updated);
-        matchedTitles.add(s.title);
-      }
-      // jeśli BL już nie ma → drop (admin nie ma kontroli nad text content)
+      continue;
     }
+
+    // text — sprawdź czy BL nadal ma sekcję o tym samym title
+    const updated = freshByTitle.get(s.title);
+    const existingText = s as {
+      kind: "text";
+      title: string;
+      body: string;
+      admin_title?: string;
+      admin_body?: string;
+      hidden?: boolean;
+    };
+
+    if (updated && updated.kind === "text") {
+      // BL ma tę sekcję — użyj BL title/body, ZACHOWAJ admin overrides
+      merged.push({
+        ...updated,
+        ...(existingText.admin_title !== undefined && {
+          admin_title: existingText.admin_title,
+        }),
+        ...(existingText.admin_body !== undefined && {
+          admin_body: existingText.admin_body,
+        }),
+        ...(existingText.hidden !== undefined && {
+          hidden: existingText.hidden,
+        }),
+      });
+      matchedTitles.add(s.title);
+    } else if (
+      existingText.admin_title !== undefined ||
+      existingText.admin_body !== undefined ||
+      existingText.hidden !== undefined
+    ) {
+      // BL już nie ma tej sekcji ALE admin coś tu robił (override title/body
+      // albo flagował hidden) → zachowaj. Admin świadomie ustawił coś,
+      // nie usuwamy bez jego zgody. hidden !== undefined (nie === true)
+      // bo admin który UN-hide też pozostawia `hidden: false` — to znak że
+      // ma kontrolę i nie chcemy go zaskoczyć dropem.
+      merged.push(existingText);
+    }
+    // BL nie ma + admin nie zoverridował → drop
   }
 
   // Dopisz na końcu nowe text sekcje z BL których nie było w DB
