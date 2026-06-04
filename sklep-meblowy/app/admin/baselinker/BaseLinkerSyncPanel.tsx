@@ -257,26 +257,36 @@ function InventoryResult({ inv }: { inv: SyncInventoryResult }) {
 }
 
 // Pokazuje progress bary uzupełnienia sekcji opisu dla magazynu.
-// Pomaga koleżance widzieć ile produktów ma wypełnione kolejne pola BL
-// (description + 4 extras → 5 sekcji). Bez ręcznego sprawdzania per produkt.
+// Pomaga koleżance widzieć ile produktów ma wypełnione 3 sekcje sklepu:
+//   "Opis" (description + Opis 1 + Opis 2 sklejone)
+//   "Wymiary i materiały" (Opis 3 + Opis 4 sklejone)
+//   "Informacje dla klienta" (dowolny extra_field zaczynający się od tej frazy)
 function SectionsCoverageBar({
   coverage,
 }: {
   coverage: {
     total: number;
     with_opis: number;
-    with_material: number;
-    with_pielegnacja: number;
-    with_wymiary: number;
-    with_faq: number;
+    with_wymiary_materialy: number;
+    with_informacje: number;
   };
 }) {
   const rows: { label: string; field: string; count: number }[] = [
-    { label: "Opis", field: "description", count: coverage.with_opis },
-    { label: "Materiał i wykonanie", field: "Opis 1", count: coverage.with_material },
-    { label: "Pielęgnacja i czyszczenie", field: "Opis 2", count: coverage.with_pielegnacja },
-    { label: "Wymiary szczegółowe", field: "Opis 3", count: coverage.with_wymiary },
-    { label: "FAQ", field: "Opis 4", count: coverage.with_faq },
+    {
+      label: "Opis",
+      field: "Opis + Opis 1 + Opis 2",
+      count: coverage.with_opis,
+    },
+    {
+      label: "Wymiary i materiały",
+      field: "Opis 3 + Opis 4",
+      count: coverage.with_wymiary_materialy,
+    },
+    {
+      label: "Informacje dla klienta",
+      field: "extra_field „Informacje dla klienta...”",
+      count: coverage.with_informacje,
+    },
   ];
   const total = coverage.total;
 

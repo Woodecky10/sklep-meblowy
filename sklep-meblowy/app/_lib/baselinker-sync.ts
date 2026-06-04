@@ -75,18 +75,23 @@ export type SyncedProduct = {
   name: string;
 };
 
-// Statystyki uzupełnienia sekcji opisu (description + 4 extras) dla
-// jednego magazynu. Pokazuje koleżance ile produktów ma wypełnione kolejne
-// sekcje — żeby wiedziała co dopisać w BL bez ręcznego sprawdzania per produkt.
+// Statystyki uzupełnienia sekcji opisu dla jednego magazynu. Pokazuje
+// koleżance ile produktów ma wypełnione kolejne sekcje sklepu — żeby
+// wiedziała co dopisać w BL bez ręcznego sprawdzania per produkt.
+//
+// Mapowanie pól BL → sekcje sklepu zob. DESCRIPTION_SECTION_LABELS.
 export type SyncSectionsCoverage = {
   // Sumaryczna liczba produktów po sync (zmapowanych = ok)
   total: number;
-  // Ile produktów ma WYPEŁNIONĄ daną sekcję
-  with_opis: number; // description (główny opis)
-  with_material: number; // description_extra1
-  with_pielegnacja: number; // description_extra2
-  with_wymiary: number; // description_extra3
-  with_faq: number; // description_extra4
+  // Ile produktów ma wypełnioną sekcję "Opis"
+  // (description + description_extra1 + description_extra2 — przynajmniej jedno)
+  with_opis: number;
+  // Ile produktów ma wypełnioną sekcję "Wymiary i materiały"
+  // (description_extra3 + description_extra4 — przynajmniej jedno)
+  with_wymiary_materialy: number;
+  // Ile produktów ma sekcję "Informacje dla klienta" (heurystycznie
+  // wykryta w dowolnym extra_field zaczynającym się od tej frazy)
+  with_informacje: number;
 };
 
 // Statystyki sync wariantów — admin widzi ile produktów po sync ma warianty
@@ -238,31 +243,89 @@ function extractAllFeatures(
     .map((f) => ({ key: f.name.trim(), value: f.value.trim() }));
 }
 
-// Hardcoded labelki sekcji opisu — mapowanie 5 pól BL na akordeony IKEA-style.
-// Konwencja stała dla wszystkich produktów. Koleżanka uczy się raz: która
-// informacja idzie w które pole BL.
-const DESCRIPTION_SECTION_LABELS: { field: string; title: string }[] = [
-  { field: "description", title: "Opis" },
-  { field: "description_extra1", title: "Materiał i wykonanie" },
-  { field: "description_extra2", title: "Pielęgnacja i czyszczenie" },
-  { field: "description_extra3", title: "Wymiary szczegółowe" },
-  { field: "description_extra4", title: "Najczęstsze pytania (FAQ)" },
+// Hardcoded mapowanie pól BL na sekcje sklepowe (akordeony IKEA-style).
+// Każda sekcja może łączyć wiele pól BL — łączymy je separatorem \n\n.
+// Sekcja "Informacje dla klienta" wykrywana heurystycznie (BL nie ma
+// stałego pola dla niej — koleżanka wpisuje w dowolny extra_field).
+//
+// Konwencja BL (jak ma być wypełniane przez koleżankę):
+//   Opis (głównego)        + Opis 1 + Opis 2  → "Opis" w sklepie
+//   Opis 3                  + Opis 4          → "Wymiary i materiały"
+//   Dowolny extra_field zaczynający się od "Informacje dla klienta" → osobna sekcja
+//
+// Wcześniejsza konwencja (do PR #36) była z 5 oddzielnymi sekcjami
+// (Materiał i wykonanie / Pielęgnacja / Wymiary szczegółowe / FAQ).
+// Klientka zdecydowała że ją to za dużo akordeonów — uproszczenie do 3.
+const DESCRIPTION_SECTION_LABELS: { fields: string[]; title: string }[] = [
+  {
+    fields: ["description", "description_extra1", "description_extra2"],
+    title: "Opis",
+  },
+  {
+    fields: ["description_extra3", "description_extra4"],
+    title: "Wymiary i materiały",
+  },
 ];
 
-// Builduje sekcje opisu z 5 pól BL text_fields. Pomija sekcje gdzie BL
-// nie ma treści — żeby na karcie produktu nie pokazywać pustych akordeonów.
+// Klucze które już zostały spożyte przez sekcje powyżej — żebyśmy nie
+// duplikowali ich w heurystyce "Informacje dla klienta".
+const CONSUMED_FIELDS = new Set(
+  DESCRIPTION_SECTION_LABELS.flatMap((s) => s.fields)
+);
+
+// Frazy które rozpoznajemy jako początek sekcji "Informacje dla klienta".
+// Skanujemy WSZYSTKIE text_fields (description_extra5-10, extra_field_XXXX)
+// szukając pola które VALUE zaczyna się od tej frazy. Tak omijamy problem
+// niespójnego nazywania pól w BL — szukamy po treści, nie po nazwie pola.
+const INFO_SECTION_PATTERNS = [
+  /^informacje\s+dla\s+klienta/i,
+  /^uwaga\s*[:!]/i,
+  /^uwagi\s+dla\s+klienta/i,
+];
+
+// Builduje sekcje opisu z pól BL text_fields wg konwencji powyżej.
+// Pomija sekcje gdzie wszystkie pola są puste (nie pokazujemy pustych
+// akordeonów na karcie produktu).
 function extractDescriptionSections(
   textFields: BLInventoryProduct["text_fields"]
 ): { title: string; body: string; kind: "text" }[] {
   if (!textFields) return [];
+  const fields = textFields as Record<string, string | undefined>;
   const sections: { title: string; body: string; kind: "text" }[] = [];
-  for (const { field, title } of DESCRIPTION_SECTION_LABELS) {
-    const raw = (textFields as Record<string, string | undefined>)[field];
-    if (typeof raw !== "string") continue;
-    const trimmed = raw.trim();
-    if (trimmed.length === 0) continue;
-    sections.push({ title, body: trimmed, kind: "text" });
+
+  for (const { fields: blFields, title } of DESCRIPTION_SECTION_LABELS) {
+    const parts: string[] = [];
+    for (const f of blFields) {
+      const raw = fields[f];
+      if (typeof raw === "string") {
+        const trimmed = raw.trim();
+        if (trimmed.length > 0) parts.push(trimmed);
+      }
+    }
+    if (parts.length === 0) continue;
+    sections.push({ title, body: parts.join("\n\n"), kind: "text" });
   }
+
+  // Heurystycznie wykryj "Informacje dla klienta" — przeszukaj wszystkie
+  // text_fields które NIE zostały już spożyte przez sekcje powyżej.
+  // Bierzemy PIERWSZE pole którego VALUE zaczyna się od pasującej frazy
+  // (po stripie HTML tagów, żeby <p>Informacje dla klienta</p> się łapało).
+  for (const [key, value] of Object.entries(fields)) {
+    if (CONSUMED_FIELDS.has(key)) continue;
+    if (typeof value !== "string") continue;
+    const stripped = value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    if (stripped.length === 0) continue;
+    const head = stripped.slice(0, 100);
+    if (INFO_SECTION_PATTERNS.some((re) => re.test(head))) {
+      sections.push({
+        title: "Informacje dla klienta",
+        body: value.trim(),
+        kind: "text",
+      });
+      break;
+    }
+  }
+
   return sections;
 }
 
@@ -661,10 +724,8 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
         sections_coverage: {
           total: 0,
           with_opis: 0,
-          with_material: 0,
-          with_pielegnacja: 0,
-          with_wymiary: 0,
-          with_faq: 0,
+          with_wymiary_materialy: 0,
+          with_informacje: 0,
         },
         variants_coverage: {
           total: 0,
@@ -759,20 +820,20 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
           result.updated_products!.push(synced);
         }
 
-        // Statystyki uzupełnienia sekcji opisu. Sprawdzamy text_fields (BL),
-        // bo description_sections w mapped.product mogłaby być pusta jeśli
-        // pole BL było puste — to ten sam wynik. text_fields jest źródłem
-        // prawdy o tym co admin wpisał w BL.
-        const tf = bl.text_fields as Record<string, string | undefined> | undefined;
-        if (tf) {
-          const cov = result.sections_coverage!;
-          cov.total += 1;
-          if (tf.description?.trim()) cov.with_opis += 1;
-          if (tf.description_extra1?.trim()) cov.with_material += 1;
-          if (tf.description_extra2?.trim()) cov.with_pielegnacja += 1;
-          if (tf.description_extra3?.trim()) cov.with_wymiary += 1;
-          if (tf.description_extra4?.trim()) cov.with_faq += 1;
-        }
+        // Statystyki uzupełnienia sekcji opisu. Liczymy po FAKTYCZNYCH
+        // sekcjach które wyciągnęliśmy z BL (mapped.product.description_sections),
+        // żeby było zgodne z tym co user zobaczy na karcie produktu.
+        // total inkrementujemy zawsze — to liczba "candidates" do sekcji.
+        const scov = result.sections_coverage!;
+        scov.total += 1;
+        const sectionTitles = new Set(
+          (mapped.product.description_sections ?? []).map(
+            (s) => (s as { title?: string }).title ?? ""
+          )
+        );
+        if (sectionTitles.has("Opis")) scov.with_opis += 1;
+        if (sectionTitles.has("Wymiary i materiały")) scov.with_wymiary_materialy += 1;
+        if (sectionTitles.has("Informacje dla klienta")) scov.with_informacje += 1;
 
         // Statystyki variants — informuje admina ile produktów ma warianty
         // z BL i jak były sparsowane. Po sync user widzi w panelu czy BL
