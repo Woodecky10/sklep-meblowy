@@ -248,6 +248,10 @@ function InventoryResult({ inv }: { inv: SyncInventoryResult }) {
       {inv.sections_coverage && inv.sections_coverage.total > 0 && (
         <SectionsCoverageBar coverage={inv.sections_coverage} />
       )}
+
+      {inv.variants_coverage && inv.variants_coverage.total > 0 && (
+        <VariantsCoverageBar coverage={inv.variants_coverage} />
+      )}
     </div>
   );
 }
@@ -311,6 +315,91 @@ function SectionsCoverageBar({
         Jeśli sekcja ma 0% — żaden produkt nie ma tego pola wypełnionego w BL.
         Dopisz informacje w BL → Magazyn → produkt → Opis (Opis 1-4) i odpal
         ponownie &bdquo;Synchronizuj teraz&rdquo;.
+      </p>
+    </div>
+  );
+}
+
+// Pokazuje statystyki sync wariantów dla magazynu.
+// Mówi koleżance: ile produktów ma warianty z BL i czy nazwy są w czystym
+// formacie ("Kolor: Beżowy, Strona: Lewa") — co daje ładne dropdown'y w
+// sklepie — czy w brzydkim fallbacku (jedno pole "Wariant" z brzydką nazwą).
+function VariantsCoverageBar({
+  coverage,
+}: {
+  coverage: {
+    total: number;
+    with_variants: number;
+    structured: number;
+    fallback: number;
+    total_combinations: number;
+  };
+}) {
+  const total = coverage.total;
+  const withVariantsPct =
+    total > 0 ? Math.round((coverage.with_variants / total) * 100) : 0;
+  const structuredPct =
+    coverage.with_variants > 0
+      ? Math.round((coverage.structured / coverage.with_variants) * 100)
+      : 0;
+  const withColor =
+    withVariantsPct >= 50 ? "bg-emerald-500" : withVariantsPct >= 20 ? "bg-amber-500" : "bg-stone-400";
+  const structuredColor =
+    structuredPct >= 80
+      ? "bg-emerald-500"
+      : structuredPct >= 40
+        ? "bg-amber-500"
+        : "bg-red-500";
+
+  return (
+    <div className="mt-4 pt-3 border-t border-[var(--border)]">
+      <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-3">
+        Warianty z BaseLinkera ({coverage.total_combinations}{" "}
+        kombinacj{coverage.total_combinations === 1 ? "a" : "i"})
+      </p>
+      <ul className="flex flex-col gap-2">
+        <li className="flex items-center gap-3 text-xs">
+          <div className="w-44 shrink-0">
+            <span className="text-[var(--fg)] font-medium">Z wariantami</span>
+          </div>
+          <div className="flex-1 h-2 bg-[var(--bg)] border border-[var(--border)] rounded-full overflow-hidden">
+            <div
+              className={`h-full ${withColor} transition-all`}
+              style={{ width: `${withVariantsPct}%` }}
+            />
+          </div>
+          <div className="w-16 text-right shrink-0 text-[var(--muted)] tabular-nums">
+            {coverage.with_variants}/{total} ({withVariantsPct}%)
+          </div>
+        </li>
+        {coverage.with_variants > 0 && (
+          <li className="flex items-center gap-3 text-xs">
+            <div className="w-44 shrink-0">
+              <span className="text-[var(--fg)] font-medium">
+                Format „Kolor: X"
+              </span>
+              <span className="text-[var(--muted)] ml-1.5 font-mono">
+                (vs fallback)
+              </span>
+            </div>
+            <div className="flex-1 h-2 bg-[var(--bg)] border border-[var(--border)] rounded-full overflow-hidden">
+              <div
+                className={`h-full ${structuredColor} transition-all`}
+                style={{ width: `${structuredPct}%` }}
+              />
+            </div>
+            <div className="w-16 text-right shrink-0 text-[var(--muted)] tabular-nums">
+              {coverage.structured}/{coverage.with_variants} ({structuredPct}%)
+            </div>
+          </li>
+        )}
+      </ul>
+      <p className="text-[10px] text-[var(--muted)] italic mt-2 leading-snug">
+        „Z wariantami" — ile produktów ma w BL zdefiniowane warianty (kolory,
+        rozmiary). „Format Kolor: X" — ile wariantów ma czytelnie nazwane
+        opcje w BL (np. <code>Kolor: Beżowy, Strona: Lewa</code>) — daje to
+        ładne dropdown'y w sklepie. Reszta wpada w fallback („Wariant"
+        z surową nazwą).
       </p>
     </div>
   );

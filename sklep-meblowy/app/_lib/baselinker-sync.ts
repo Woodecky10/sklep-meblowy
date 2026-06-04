@@ -89,6 +89,24 @@ export type SyncSectionsCoverage = {
   with_faq: number; // description_extra4
 };
 
+// Statystyki sync wariantów — admin widzi ile produktów po sync ma warianty
+// z BL i jak były sparsowane (strukturalne "Kolor: X, Rozmiar: Y" vs fallback
+// "Wariant: <pełna nazwa>"). Jeśli z 10 wariantowych produktów 9 wpada w
+// fallback, koleżanka powinna w BL zmienić nazwy wariantów na format
+// "Kolor: Beżowy, Strona: Lewa".
+export type SyncVariantsCoverage = {
+  // Suma produktów po sync (zmapowanych = ok)
+  total: number;
+  // Ile produktów ma jakiekolwiek warianty z BL po sync
+  with_variants: number;
+  // Z tego: ile sparsowano jako STRUKTURALNE (parseNamedAttrs success)
+  structured: number;
+  // Z tego: ile wpadło w FALLBACK (jedna opcja "Wariant" z wartościami)
+  fallback: number;
+  // Łączna liczba kombinacji wariantów synced (np. 3 produkty po 6 kombinacji = 18)
+  total_combinations: number;
+};
+
 export type SyncInventoryResult = {
   inventory_id: number;
   inventory_name: string;
@@ -104,6 +122,9 @@ export type SyncInventoryResult = {
   // koleżance widzieć ile produktów ma wypełnione kolejne sekcje BL.
   // Niekompatybilne wstecz — stare logi nie mają tego pola.
   sections_coverage?: SyncSectionsCoverage;
+  // Statystyki sync wariantów — ile produktów ma warianty z BL i jak były
+  // sparsowane. Niekompatybilne wstecz — stare logi nie mają tego pola.
+  variants_coverage?: SyncVariantsCoverage;
 };
 
 export type SyncTotals = {
@@ -362,26 +383,34 @@ function parseNamedAttrs(name: string): Record<string, string> | null {
   return Object.keys(result).length > 0 ? result : null;
 }
 
+// Wynik parsowania wariantów — zawiera oryginalny ProductVariants + meta
+// info o tym jak zostały sparsowane (do telemetrii / variants_coverage).
+type ParsedVariants =
+  | { kind: "structured"; variants: ProductVariants }
+  | { kind: "fallback"; variants: ProductVariants }
+  | { kind: "none" };
+
 // Mapper: BL variants (Record<string, BLVariant>) → ProductVariants.
-// Zwraca null gdy BL nie ma wariantów albo dane są niepoprawne.
+// Zwraca {kind: "none"} gdy BL nie ma wariantów lub dane są niepoprawne.
 //
 // Strategia 2-etapowa:
 // 1) Jeśli WSZYSTKIE nazwy wariantów mają format "Nazwa: Wartość[, Nazwa2:
 //    Wartość2]" z tymi samymi kluczami — używamy strukturalnych opcji
-//    (np. Kolor + Strona).
+//    (np. Kolor + Strona). Najczystszy wynik.
 // 2) Inaczej fallback: jedna opcja "Wariant" z wartościami uzyskanymi
 //    przez strip wspólnego prefixu (np. "Sofa - Lewa" → "Lewa").
+//    Wariantowanie działa, ale UI pokazuje brzydsze nazwy.
 function parseVariantsFromBl(
   blVariants: Record<string, BLVariant> | undefined,
   defaultPriceGroup: number,
   mainPrice: number
-): ProductVariants | null {
-  if (!blVariants) return null;
+): ParsedVariants {
+  if (!blVariants) return { kind: "none" };
   const entries = Object.entries(blVariants);
-  if (entries.length === 0) return null;
+  if (entries.length === 0) return { kind: "none" };
 
   const names = entries.map(([, v]) => (v.name ?? "").trim());
-  if (names.some((n) => !n)) return null;
+  if (names.some((n) => !n)) return { kind: "none" };
 
   function priceModifier(v: BLVariant): number {
     const variantPrice =
@@ -395,6 +424,28 @@ function parseVariantsFromBl(
       (s, q) => s + (typeof q === "number" ? q : 0),
       0
     );
+  }
+
+  // Dedup wielu BL-wariantów z TYM SAMYM values map do jednej kombinacji.
+  // Sumujemy stocki (suma magazynów == łączna dostępność tej kombinacji),
+  // price_modifier bierzemy z pierwszego (zakładamy że dla danego SKU
+  // koleżanka ustawia spójną cenę, anomalie są błędem konfiguracji w BL).
+  // Klucz dedup: variantKey(values) — order-independent.
+  function dedupCombinations(combos: ProductVariant[]): ProductVariant[] {
+    const byKey = new Map<string, ProductVariant>();
+    for (const c of combos) {
+      const k = variantKey(c.values);
+      const prev = byKey.get(k);
+      if (prev) {
+        byKey.set(k, {
+          ...prev,
+          stock: prev.stock + c.stock,
+        });
+      } else {
+        byKey.set(k, c);
+      }
+    }
+    return Array.from(byKey.values());
   }
 
   // ===== Etap 1: strukturalne "Nazwa: Wartość[, ...]" =====
@@ -424,12 +475,17 @@ function parseVariantsFromBl(
         name,
         values: optionValues.get(name)!,
       }));
-      const combinations: ProductVariant[] = entries.map(([, v], idx) => ({
+      const rawCombinations: ProductVariant[] = entries.map(([, v], idx) => ({
         values: parsed[idx] as Record<string, string>,
         stock: variantStock(v),
         price_modifier: priceModifier(v),
       }));
-      return { options, combinations };
+      // BL może mieć 2 warianty parsowane do tego samego {Kolor:"X", Strona:"Y"}
+      // — dedup żeby findVariant() na karcie produktu działał deterministycznie.
+      return {
+        kind: "structured",
+        variants: { options, combinations: dedupCombinations(rawCombinations) },
+      };
     }
   }
 
@@ -440,24 +496,33 @@ function parseVariantsFromBl(
     ? names.map((n) => n.slice(prefix.length).trim())
     : names.map((n) => n.trim());
 
-  const seen = new Set<string>();
-  const valuesUnique: string[] = [];
-  for (const v of rawValues) {
-    if (!v || seen.has(v)) continue;
-    seen.add(v);
-    valuesUnique.push(v);
-  }
-  if (valuesUnique.length === 0) return null;
-
   const optionName = "Wariant";
-  const combinations: ProductVariant[] = entries.map(([, v], idx) => ({
-    values: { [optionName]: rawValues[idx] },
-    stock: variantStock(v),
-    price_modifier: priceModifier(v),
-  }));
+  // Najpierw budujemy raw kombinacje (jedna per BL variant), potem dedup
+  // łączy te z tym samym values mapem sumując stocki. Wartości opcji w UI
+  // dropdown wyciągamy z deduplikowanych combos (zachowuje kolejność).
+  const rawCombinations: ProductVariant[] = entries
+    .map(([, v], idx) => {
+      const rv = rawValues[idx];
+      if (!rv) return null;
+      return {
+        values: { [optionName]: rv },
+        stock: variantStock(v),
+        price_modifier: priceModifier(v),
+      } as ProductVariant;
+    })
+    .filter((c): c is ProductVariant => c !== null);
+
+  if (rawCombinations.length === 0) return { kind: "none" };
+
+  const combinations = dedupCombinations(rawCombinations);
+  const valuesUnique = combinations.map((c) => c.values[optionName]);
+
   return {
-    options: [{ name: optionName, values: valuesUnique }],
-    combinations,
+    kind: "fallback",
+    variants: {
+      options: [{ name: optionName, values: valuesUnique }],
+      combinations,
+    },
   };
 }
 
@@ -466,7 +531,7 @@ async function mapBlToProduct(
   bl: BLInventoryProduct,
   defaultPriceGroup: number
 ): Promise<
-  | { ok: true; product: ProductInsert }
+  | { ok: true; product: ProductInsert; parsedVariants: ParsedVariants }
   | { ok: false; reason: string }
 > {
   const name = bl.text_fields?.name ?? "";
@@ -523,13 +588,18 @@ async function mapBlToProduct(
     // Karta produktu renderuje je jako rozwijalne sekcje. Stary description
     // (joined) zostaje jako legacy fallback + SEO.
     description_sections: extractDescriptionSections(bl.text_fields),
-    variants: parseVariantsFromBl(bl.variants, defaultPriceGroup, price),
+    variants: null, // wypełnione niżej z parsedVariants
     baselinker_id: blId,
     // Kolekcję przypisuje admin ręcznie w /admin/kolekcje — sync nie ustawia.
     collection_id: null,
   };
 
-  return { ok: true, product };
+  const parsedVariants = parseVariantsFromBl(bl.variants, defaultPriceGroup, price);
+  if (parsedVariants.kind !== "none") {
+    product.variants = parsedVariants.variants;
+  }
+
+  return { ok: true, product, parsedVariants };
 }
 
 // ============================================================
@@ -596,6 +666,13 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
           with_wymiary: 0,
           with_faq: 0,
         },
+        variants_coverage: {
+          total: 0,
+          with_variants: 0,
+          structured: 0,
+          fallback: 0,
+          total_combinations: 0,
+        },
       };
 
       for (const [blId, bl] of Object.entries(products)) {
@@ -627,6 +704,22 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
             mapped.product.variants,
             existingVariants
           );
+        } else if (!mapped.product.variants && existingVariants) {
+          // BLOCKER FIX: BL chwilowo nie zwrócił wariantów (warianty błędnie
+          // skonfigurowane w BL, BL API glitch, koleżanka wyłączyła warianty
+          // w panelu), ale DB ma istniejące warianty z poprzedniego sync
+          // (włącznie z adminem-uploadowanymi zdjęciami per wariant i
+          // overrides nazw). Nie nadpisujemy null'em — zachowujemy stare
+          // warianty + zaznaczamy w skipped log że BL stracił warianty.
+          mapped.product.variants = existingVariants;
+          result.skipped.push({
+            id: blId,
+            name: mapped.product.name,
+            reason:
+              "BL nie zwrócił wariantów, ale produkt miał wcześniej warianty w DB — " +
+              "zachowano stare warianty z zdjęciami admina. Sprawdź w BL czy warianty " +
+              "są poprawnie skonfigurowane.",
+          });
         }
 
         const existingSections = (
@@ -679,6 +772,22 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
           if (tf.description_extra2?.trim()) cov.with_pielegnacja += 1;
           if (tf.description_extra3?.trim()) cov.with_wymiary += 1;
           if (tf.description_extra4?.trim()) cov.with_faq += 1;
+        }
+
+        // Statystyki variants — informuje admina ile produktów ma warianty
+        // z BL i jak były sparsowane. Po sync user widzi w panelu czy BL
+        // używa czytelnego formatu nazw ("Kolor: Beżowy") czy wpada w
+        // brzydkawy fallback ("Wariant: 01 beż drewniany stelaż").
+        const vcov = result.variants_coverage!;
+        vcov.total += 1;
+        if (mapped.parsedVariants.kind === "structured") {
+          vcov.with_variants += 1;
+          vcov.structured += 1;
+          vcov.total_combinations += mapped.parsedVariants.variants.combinations.length;
+        } else if (mapped.parsedVariants.kind === "fallback") {
+          vcov.with_variants += 1;
+          vcov.fallback += 1;
+          vcov.total_combinations += mapped.parsedVariants.variants.combinations.length;
         }
       }
 
