@@ -166,45 +166,44 @@ export async function getRelatedProducts(productId: string, category: Category, 
   return (data ?? []) as Product[];
 }
 
-// Pobiera unikalne wartości color/material — użyte do dynamicznego budowania filtrów.
-// Facets respektują obecne search (q) i kategorię, żeby pokazywać tylko
-// opcje obecne w faktycznym widoku (np. "sofa" w q pokaże tylko kolory sof).
-// Color/material filters z URL NIE są stosowane — żeby user mógł je toggle'ować
-// niezależnie i widzieć pełen zakres opcji w bieżącym zawężeniu.
-export async function getFilterFacets(
-  filters: { search?: string; category?: Category } = {}
-) {
+// Pobiera unikalne wartości color/material z CAŁEJ bazy produktów — użyte
+// do budowania filtrów na /sklep.
+//
+// Decyzja: nie ograniczamy facets do bieżącego search/category. User
+// zgłaszał że "tylko beżowy" pojawiał się w filtrze, bo poprzednia wersja
+// kaskadowała — w wybranej kategorii istniał tylko 1 kolor, więc filtr
+// pokazywał ten 1 kolor. Lepiej zawsze pokazać pełną paletę: klient widzi
+// co jest dostępne w sklepie ogólnie, może kliknąć "biały" i zobaczyć
+// czy taki kolor jest w wybranej kategorii.
+//
+// Jeśli kolor nie ma żadnego produktu spełniającego pozostałe filtry —
+// kliknięcie zwróci pustą listę i user wyczyści filtry sam.
+export async function getFilterFacets() {
   const supabase = await createClient();
-  const term = filters.search?.trim()
-    ? filters.search.trim().replace(/[%_]/g, "\\$&")
-    : null;
 
-  let colorsQuery = supabase.from("products").select("color").not("color", "is", null);
-  let materialsQuery = supabase
-    .from("products")
-    .select("material")
-    .not("material", "is", null);
-
-  if (filters.category) {
-    colorsQuery = colorsQuery.eq("category", filters.category);
-    materialsQuery = materialsQuery.eq("category", filters.category);
-  }
-  if (term) {
-    colorsQuery = colorsQuery.or(`name.ilike.%${term}%,description.ilike.%${term}%`);
-    materialsQuery = materialsQuery.or(`name.ilike.%${term}%,description.ilike.%${term}%`);
-  }
-
-  const [{ data: colorsData }, { data: materialsData }] = await Promise.all([
-    colorsQuery,
-    materialsQuery,
+  const [
+    { data: colorsData },
+    { data: materialsData },
+  ] = await Promise.all([
+    supabase.from("products").select("color").not("color", "is", null),
+    supabase.from("products").select("material").not("material", "is", null),
   ]);
 
   const colors = Array.from(
-    new Set((colorsData ?? []).map((r) => (r as { color: string }).color))
-  ).sort();
+    new Set(
+      (colorsData ?? [])
+        .map((r) => (r as { color: string | null }).color?.trim() ?? "")
+        .filter((c) => c.length > 0)
+    )
+  ).sort((a, b) => a.localeCompare(b, "pl"));
+
   const materials = Array.from(
-    new Set((materialsData ?? []).map((r) => (r as { material: string }).material))
-  ).sort();
+    new Set(
+      (materialsData ?? [])
+        .map((r) => (r as { material: string | null }).material?.trim() ?? "")
+        .filter((m) => m.length > 0)
+    )
+  ).sort((a, b) => a.localeCompare(b, "pl"));
 
   return { colors, materials };
 }

@@ -4,6 +4,7 @@ import { requireAdmin } from "@/app/_lib/admin";
 import { createClient } from "@/app/_lib/supabase/server";
 import type { Product } from "@/app/_lib/types";
 import { hasVariants, totalProductStock } from "@/app/_lib/variants";
+import DeleteProductButton from "./DeleteProductButton";
 
 export const metadata = { title: "Produkty — Admin" };
 
@@ -87,6 +88,7 @@ export default async function AdminProductsPage() {
                 >
                   Edytuj
                 </Link>
+                <DeleteProductButton productId={p.id} productName={p.name} />
               </li>
             );
           })}

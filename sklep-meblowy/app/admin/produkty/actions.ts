@@ -262,6 +262,95 @@ export async function updateProductVariants(
 }
 
 // ============================================================
+// deleteProduct — usuwa produkt z DB + storage cleanup
+// ============================================================
+// Blokuje usuwanie produktu, który jest w aktywnych zamówieniach (FK
+// order_items.product_id ma ON DELETE RESTRICT — historię zamówień
+// chronimy). Pozostałe powiązania (reviews, wishlists, featured_products)
+// są CASCADE, inquiries SET NULL — usuną się automatycznie.
+//
+// Storage cleanup: tylko URL-e w naszym bucket "products" są usuwane
+// fizycznie. URL-e zewnętrzne (BaseLinker, Unsplash) zostają w sieci
+// — nie nasze, nie nasz problem. Czyścimy też zdjęcia variantów.
+//
+// UWAGA: nie usuwa produktu z BaseLinkera. BL to osobne źródło prawdy —
+// koleżanka usuwa produkt w panelu BL niezależnie. Tu czyścimy tylko
+// kopię w naszej bazie.
+export async function deleteProduct(formData: FormData): Promise<ActionResult> {
+  await requireAdmin();
+
+  const id = sanitize(formData.get("id"));
+  if (!id) return { ok: false, error: "Brak id produktu" };
+
+  const supabase = await createAdminClient();
+
+  // 1. Pobierz dane produktu (images + variants) zanim usuniemy
+  const { data: product, error: fetchErr } = await supabase
+    .from("products")
+    .select("name, images, variants")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (fetchErr) return { ok: false, error: fetchErr.message };
+  if (!product) return { ok: false, error: "Produkt nie istnieje" };
+
+  // 2. Sprawdź czy istnieją order_items wskazujące na ten produkt.
+  // FK jest RESTRICT, więc delete tak czy tak by się wywalił — ale lepiej
+  // dać jasny komunikat zamiast wpadać na error 23503 z Postgresa.
+  const { count: orderCount, error: orderErr } = await supabase
+    .from("order_items")
+    .select("id", { count: "exact", head: true })
+    .eq("product_id", id);
+
+  if (orderErr) return { ok: false, error: orderErr.message };
+  if ((orderCount ?? 0) > 0) {
+    return {
+      ok: false,
+      error: `Nie można usunąć — produkt jest w ${orderCount} zamówieni${
+        orderCount === 1 ? "u" : "ach"
+      }. Historia zamówień musi zostać. Możesz tylko ustawić stock=0, żeby ukryć produkt ze sklepu.`,
+    };
+  }
+
+  // 3. Usuń wiersz — reviews/wishlists/featured CASCADE'ują, inquiries
+  // SET NULL'ują automatycznie (zob. supabase/migrations).
+  const productRow = product as {
+    name: string;
+    images: string[] | null;
+    variants: { combinations: { images?: string[] | null }[] } | null;
+  };
+
+  const { error: deleteErr } = await supabase
+    .from("products")
+    .delete()
+    .eq("id", id);
+
+  if (deleteErr) return { ok: false, error: deleteErr.message };
+
+  // 4. Posprzątaj storage — best effort, nie blokujemy sukcesu jeśli się
+  // nie uda (zdjęcie sierota w bucket'cie to mniejszy problem niż wisząca
+  // operacja). Zbieramy URL-e z globalnej galerii + każdej kombinacji.
+  const allImageUrls: string[] = [];
+  if (Array.isArray(productRow.images)) {
+    allImageUrls.push(...productRow.images.filter((u): u is string => typeof u === "string"));
+  }
+  if (productRow.variants?.combinations) {
+    for (const c of productRow.variants.combinations) {
+      if (Array.isArray(c.images)) {
+        allImageUrls.push(...c.images.filter((u): u is string => typeof u === "string"));
+      }
+    }
+  }
+  await Promise.all(allImageUrls.map((url) => deleteStorageImage(url)));
+
+  revalidatePath("/admin/produkty");
+  revalidatePath("/sklep");
+  revalidatePath(`/produkt/${id}`);
+
+  return { ok: true, message: `Produkt "${productRow.name}" usunięty` };
+}
+
+// ============================================================
 // updateProductDescriptionSections — zapisuje sekcje opisu
 // ============================================================
 // Admin może dodawać/usuwać/przesuwać image sekcje między text sekcjami

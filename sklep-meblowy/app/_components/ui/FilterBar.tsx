@@ -15,19 +15,38 @@ export type FilterBarSection = {
   categories: { slug: string; label: string }[];
 };
 
+export type FilterBarCollection = {
+  slug: string;
+  label: string;
+};
+
 type Props = {
   colors: string[];
   materials: string[];
   sections?: FilterBarSection[];
+  collections?: FilterBarCollection[];
 };
 
-type DropdownKey = "category" | "color" | "material" | "price" | "sort" | null;
+type DropdownKey =
+  | "category"
+  | "color"
+  | "material"
+  | "collection"
+  | "price"
+  | "sort"
+  | null;
 
-export default function FilterBar({ colors, materials, sections = [] }: Props) {
+export default function FilterBar({
+  colors,
+  materials,
+  sections = [],
+  collections = [],
+}: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const category = searchParams.get("kategoria") ?? "";
+  const collection = searchParams.get("kolekcja") ?? "";
   const sort = searchParams.get("sortuj") ?? "newest";
   const inStockOnly = searchParams.get("dostepne") === "1";
   const selectedColors = (searchParams.get("kolor") ?? "").split(",").filter(Boolean);
@@ -110,12 +129,16 @@ export default function FilterBar({ colors, materials, sections = [] }: Props) {
     .flatMap((s) => s.categories)
     .find((c) => c.slug === category);
 
+  const activeCollection = collections.find((c) => c.slug === collection);
+
   const priceActive = priceMin !== "" || priceMax !== "";
   const categoryCount = category ? 1 : 0;
+  const collectionCount = collection ? 1 : 0;
   const priceCount = priceActive ? 1 : 0;
 
   const totalActiveFilters =
     categoryCount +
+    collectionCount +
     selectedColors.length +
     selectedMaterials.length +
     priceCount +
@@ -145,6 +168,14 @@ export default function FilterBar({ colors, materials, sections = [] }: Props) {
             count={categoryCount}
             open={openDropdown === "category"}
             onClick={() => toggleDropdown("category")}
+          />
+        )}
+        {collections.length > 0 && (
+          <FilterPill
+            label="Kolekcja"
+            count={collectionCount}
+            open={openDropdown === "collection"}
+            onClick={() => toggleDropdown("collection")}
           />
         )}
         {colors.length > 0 && (
@@ -241,6 +272,45 @@ export default function FilterBar({ colors, materials, sections = [] }: Props) {
               </div>
             </div>
           ))}
+        </DropdownPanel>
+      )}
+
+      {openDropdown === "collection" && (
+        <DropdownPanel align="left">
+          <button
+            onClick={() => {
+              update("kolekcja", "");
+              setOpenDropdown(null);
+            }}
+            className={`mb-3 px-3 py-1.5 rounded-full text-xs font-sans uppercase tracking-widest transition-colors ${
+              collection === ""
+                ? "bg-[var(--color-navy)] text-white"
+                : "border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
+            }`}
+          >
+            Wszystkie kolekcje
+          </button>
+          <div className="flex flex-wrap gap-1.5">
+            {collections.map((col) => {
+              const active = collection === col.slug;
+              return (
+                <button
+                  key={col.slug}
+                  onClick={() => {
+                    update("kolekcja", col.slug);
+                    setOpenDropdown(null);
+                  }}
+                  className={`px-3 py-1.5 rounded-full text-xs font-sans transition-colors ${
+                    active
+                      ? "bg-[var(--color-navy)] text-white"
+                      : "border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
+                  }`}
+                >
+                  {col.label}
+                </button>
+              );
+            })}
+          </div>
         </DropdownPanel>
       )}
 
@@ -358,6 +428,12 @@ export default function FilterBar({ colors, materials, sections = [] }: Props) {
             <ActiveChip
               label={`Kategoria: ${activeCategory.label}`}
               onRemove={() => update("kategoria", "")}
+            />
+          )}
+          {activeCollection && (
+            <ActiveChip
+              label={`Kolekcja: ${activeCollection.label}`}
+              onRemove={() => update("kolekcja", "")}
             />
           )}
           {selectedColors.map((c) => (
