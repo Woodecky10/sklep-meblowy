@@ -79,6 +79,10 @@ poziom. Produkty są źródłowo zarządzane w BaseLinkerze (BL = source of trut
 
 **Migracja `supabase/migrations/23_products_is_active.sql`:**
 - `alter table products add column is_active boolean not null default true;`
+- `alter table products add column deactivation_source text;` — `null` = aktywny,
+  `'auto'` = ukryty przez sync (znikł z BL), `'manual'` = ukryty ręcznie przez admina.
+  Steruje zachowaniem reaktywacji (patrz 4.2) i pozwala rozróżnić, kto ukrył produkt.
+  Constraint: `check (deactivation_source in ('auto','manual') or deactivation_source is null)`.
 - `create index ... on products (is_active) where is_active = false;` (ukrytych mało — szybki
   lookup w adminie).
 - **RLS jako jedyny punkt egzekwowania widoczności publicznej:** polityka publicznego
@@ -88,7 +92,9 @@ poziom. Produkty są źródłowo zarządzane w BaseLinkerze (BL = source of trut
 - Implementacja musi **podmienić** istniejącą politykę publicznego SELECT-a (znaleźć jej
   dokładną nazwę w dotychczasowych migracjach), a nie tworzyć drugą równoległą.
 
-**Zmiany w typie:** `Product.is_active: boolean` w `app/_lib/types.ts` (+ `Insert`/`Update`).
+**Zmiany w typie:** `Product.is_active: boolean` oraz
+`Product.deactivation_source: "auto" | "manual" | null` w `app/_lib/types.ts`
+(+ `Insert`/`Update`).
 
 **Strona produktu:** `getProduct(id)` dla ukrytego (RLS) zwróci `null` → `app/produkt/[id]/page.tsx`
 renderuje 404. Klient nie wejdzie ukrytym deep-linkiem.
@@ -128,14 +134,21 @@ planDeactivations(
 - W trakcie pętli zbieramy `seenBlIds` (wszystkie `blId` przetworzone z sukcesem upsertu)
   oraz flagę `completedFully` (czy każda lista/dane każdego magazynu pobrały się w całości).
 - Po pętli wszystkich magazynów: pobieramy aktywne produkty BL z DB (service role),
-  wołamy `planDeactivations`, i dla `toDeactivate` robimy batchowy `update is_active=false`.
-- **Auto-reaktywacja:** każdy upsert produktu widzianego w BL ustawia `is_active = true`
-  (produkt, który wrócił do BL, automatycznie wraca do sklepu). Realizowane przez dopisanie
-  `is_active: true` do mapowanego rekordu w `mapBlToProduct`/upsert — bez osobnej logiki.
+  wołamy `planDeactivations`, i dla `toDeactivate` robimy batchowy
+  `update is_active=false, deactivation_source='auto'`.
+- **Auto-reaktywacja (z poszanowaniem ręcznego ukrycia):** produkt widziany w BL, który
+  został wcześniej ukryty przez sync (`deactivation_source='auto'`), wraca do sklepu
+  (`is_active=true, deactivation_source=null`). Natomiast produkt ukryty **ręcznie**
+  (`deactivation_source='manual'`) **nie jest reaktywowany** — sync respektuje decyzję admina.
+  Implementacyjnie: w istniejącym `select` po istniejący rekord (już pobieramy `variants`,
+  `description_sections`) dociągamy `is_active, deactivation_source`; przy upsercie ustawiamy
+  `is_active`/`deactivation_source` warunkowo — nowy produkt i auto-ukryty → aktywny;
+  manual → zostaje ukryty.
 
 **Raport (rozszerzenie `SyncOutcome`/wyniku):**
 - `deactivated: SyncedProduct[]` — co ukryto (id BL + nazwa).
-- `reactivated: SyncedProduct[]` — co wróciło i zostało przywrócone.
+- `reactivated: SyncedProduct[]` — co wróciło z BL i zostało przywrócone (tylko produkty
+  wcześniej auto-ukryte; ręcznie ukryte nie wchodzą tu, bo sync ich nie reaktywuje).
 - `hide_skipped_reason: string | null` — gdy próg wstrzymał ukrywanie.
 - Zapisywane do `baselinker_sync_log.results` i pokazywane w panelu jako osobne sekcje.
 
@@ -223,7 +236,8 @@ poprawnie. Testy regresyjne na obecnych przypadkach są obowiązkowe.
   grupowanie pominiętych owner/technical
 - `app/admin/baselinker/actions.ts` — przeniesienie nowych pól wyniku
 - `app/admin/produkty/page.tsx` — badge „ukryty" + ręczny toggle
-- `app/admin/produkty/actions.ts` — akcja `setProductActive(id, active)` (chroniona `requireAdmin`)
+- `app/admin/produkty/actions.ts` — akcja `setProductActive(id, active)` (chroniona `requireAdmin`);
+  Ukryj → `is_active=false, deactivation_source='manual'`; Przywróć → `is_active=true, deactivation_source=null`
 - `package.json` + `vitest.config.ts` *(runner testów)*
 - Testy: `app/_lib/__tests__/*.test.ts` (lub kolokowane)
 - *(weryfikacja, możliwe drobne zmiany)* `app/sitemap.ts`, istniejące polityki RLS produktów,
@@ -255,6 +269,8 @@ Po każdym kroku: `npm run build` + `npm test` muszą przejść; diff do review 
 - Produkt usunięty z BL po sync ma `is_active=false`, znika z listingów/wyszukiwarki/sitemap,
   jego strona daje 404, ale rekord i historia zamówień zostają; powrót do BL → automatyczna
   reaktywacja.
+- Produkt ukryty **ręcznie** w panelu, który nadal jest w BL, **nie zostaje reaktywowany**
+  przez kolejny sync (`deactivation_source='manual'` jest respektowane).
 - Przy niekompletnym pobraniu BL (symulowany błąd) sync **nie ukrywa** żadnego produktu.
 - Gdy do ukrycia kwalifikuje się > próg — sync nie ukrywa, raportuje powód.
 - Przejściowy błąd BL jest ponawiany; trwały — kończy sync czytelnym błędem, bez ukrywania.
