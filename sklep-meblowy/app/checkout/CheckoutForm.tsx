@@ -41,7 +41,9 @@ export default function CheckoutForm({
   }, [items.length, router]);
 
   // Koszt dostawy ustalany indywidualnie po zamówieniu — meble różnią się
-  // wagą i gabarytami, ten sam koszt 299 zł dla wszystkich nie miał sensu.
+  // wagą, gabarytami i miejscem dostawy, ten sam ryczałtowy koszt dla
+  // wszystkich nie miał sensu. Pełne uzasadnienie + 4 czynniki wyceny
+  // na stronie /dostawa.
   const discount = appliedPromo?.discount ?? 0;
   const grandTotal = Math.max(0, total - discount);
 
@@ -291,7 +293,7 @@ export default function CheckoutForm({
                 od&nbsp;99&nbsp;zł
                 <br />
                 <span className="text-[var(--muted)]">
-                  dokładną wycenę podajemy kontaktowo po&nbsp;zamówieniu
+                  dokładną wycenę podajemy telefonicznie lub mailowo po&nbsp;zamówieniu
                 </span>
               </span>
             </div>
