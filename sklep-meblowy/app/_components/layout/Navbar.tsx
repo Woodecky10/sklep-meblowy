@@ -74,9 +74,18 @@ export default async function Navbar() {
           <nav className="flex items-center gap-6">
             {sections.map((section) => {
               const cats = categoriesBySection.get(section.slug) ?? [];
+              // Sam HEADER sekcji jest klikalny — prowadzi do /sklep?sekcja=<slug>
+              // pokazując WSZYSTKIE produkty z tej sekcji (bez wyboru
+              // sub-kategorii). Hover wciąż otwiera dropdown z sub-kategoriami
+              // dla bardziej precyzyjnego filtra. CSS group-hover na divie
+              // działa tak samo niezależnie od tego czy headerem jest Link
+              // czy button.
               return (
                 <div key={section.slug} className="relative group shrink-0">
-                  <button className="font-sans text-xs uppercase tracking-widest text-[var(--muted)] group-hover:text-[var(--color-gold)] transition-colors flex items-center gap-1 h-24 whitespace-nowrap">
+                  <Link
+                    href={`/sklep?sekcja=${section.slug}`}
+                    className="font-sans text-xs uppercase tracking-widest text-[var(--muted)] group-hover:text-[var(--color-gold)] transition-colors flex items-center gap-1 h-24 whitespace-nowrap"
+                  >
                     {section.label}
                     <svg
                       width="10"
@@ -90,8 +99,16 @@ export default async function Navbar() {
                     >
                       <polyline points="6 9 12 15 18 9" />
                     </svg>
-                  </button>
+                  </Link>
                   <div className="absolute top-full left-1/2 -translate-x-1/2 min-w-[220px] bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-2xl py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                    {/* Pierwszy item = link do całej sekcji (skrót dla użytkownika
+                        który najechał na dropdown i chce zobaczyć wszystko). */}
+                    <Link
+                      href={`/sklep?sekcja=${section.slug}`}
+                      className="block px-5 py-2.5 text-sm text-[var(--color-gold)] hover:bg-[var(--bg)] transition-colors border-b border-[var(--border)] mb-1 font-medium"
+                    >
+                      Wszystkie {section.label.toLowerCase()}
+                    </Link>
                     {cats.map((c) => (
                       <Link
                         key={c.slug}

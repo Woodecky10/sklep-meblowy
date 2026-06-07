@@ -1,4 +1,5 @@
 import { createClient } from "./supabase/server";
+import { getCategories } from "./categories";
 import type { Category, Product } from "./types";
 
 export type ProductFilters = {
@@ -15,6 +16,12 @@ export type ProductFilters = {
   // Slug kolekcji — filtruje produkty należące do konkretnej kolekcji
   // (np. ?kolekcja=lisbon w URL).
   collectionSlug?: string;
+  // Slug sekcji (grupy kategorii) — np. "naroznik" pokaże WSZYSTKIE produkty
+  // z naroznik-l + naroznik-u. Używane gdy user kliknie na sam HEADER
+  // sekcji w Navbarze (?sekcja=naroznik), zamiast wybierać konkretną
+  // sub-kategorię. Gdy oba `category` i `sectionSlug` są ustawione,
+  // `category` wygrywa (bardziej szczegółowy filtr).
+  sectionSlug?: string;
 };
 
 export async function getProducts(filters: ProductFilters = {}) {
@@ -31,11 +38,28 @@ export async function getProducts(filters: ProductFilters = {}) {
     colors,
     materials,
     collectionSlug,
+    sectionSlug,
   } = filters;
 
   let query = supabase.from("products").select("*", { count: "exact" });
 
-  if (category) query = query.eq("category", category);
+  if (category) {
+    query = query.eq("category", category);
+  } else if (sectionSlug) {
+    // Filtr po sekcji = pokaż wszystkie produkty których kategoria należy
+    // do tej sekcji. Robione przez lookup wszystkich kategorii z
+    // group_slug = sectionSlug + .in("category", [slugs]).
+    const allCats = await getCategories();
+    const sectionCategorySlugs = allCats
+      .filter((c) => c.group_slug === sectionSlug)
+      .map((c) => c.slug);
+    if (sectionCategorySlugs.length === 0) {
+      // Brak kategorii w tej sekcji → zwracamy puste wyniki
+      query = query.eq("id", "00000000-0000-0000-0000-000000000000");
+    } else {
+      query = query.in("category", sectionCategorySlugs);
+    }
+  }
 
   // Filter po kolekcji — najpierw lookup collection.id po slug, potem in()
   if (collectionSlug) {
