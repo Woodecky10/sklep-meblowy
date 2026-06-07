@@ -373,8 +373,7 @@ export function mergeSectionsPreserveAdminImages(
       continue;
     }
 
-    // text — sprawdź czy BL nadal ma sekcję o tym samym title
-    const updated = freshByTitle.get(s.title);
+    // text — typ rozszerzony o pola admin
     const existingText = s as {
       kind: "text";
       title: string;
@@ -382,7 +381,18 @@ export function mergeSectionsPreserveAdminImages(
       admin_title?: string;
       admin_body?: string;
       hidden?: boolean;
+      admin_custom?: boolean;
     };
+
+    // Admin custom sekcja (dodana ręcznie, nie z BL) — zachowaj zawsze,
+    // niezależnie od stanu BL. Nie próbujemy jej match-ować po title.
+    if (existingText.admin_custom) {
+      merged.push(existingText);
+      continue;
+    }
+
+    // BL sekcja — sprawdź czy nadal istnieje w fresh
+    const updated = freshByTitle.get(s.title);
 
     if (updated && updated.kind === "text") {
       // BL ma tę sekcję — użyj BL title/body, ZACHOWAJ admin overrides

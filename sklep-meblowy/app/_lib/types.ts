@@ -60,16 +60,25 @@ export type ProductFeature = {
 // pomyliła pola w BL.
 export type ProductDescriptionSectionText = {
   kind: "text";
-  // title + body z BL sync (mapowanie pól w baselinker-sync.ts).
+  // title + body z BL sync (mapowanie pól w baselinker-sync.ts) ALBO
+  // wpisane przez admina (gdy admin_custom=true).
   title: string;
   body: string;
   // Per-product admin overrides — przeżywają sync z BL przez
   // mergeSectionsPreserveAdminImages (match po `title`).
   // Render w sklepie: admin_title || title, admin_body || body.
   // hidden=true → sekcja ukryta przed klientem.
+  // Override-y mają sens tylko dla sekcji z BL — dla admin_custom
+  // sekcji edytujemy bezpośrednio title/body.
   admin_title?: string;
   admin_body?: string;
   hidden?: boolean;
+  // Sekcja dodana przez admina (NIE pochodzi z BL). Merge logic NIE
+  // próbuje match-ować jej do żadnego pola BL — istnieje niezależnie,
+  // przeżywa sync analogicznie do image sekcji. Title/body są edytowalne
+  // bezpośrednio (nie przez admin_title/admin_body), bo nie ma "BL truth"
+  // do nadpisania.
+  admin_custom?: boolean;
 };
 
 export type ProductDescriptionSectionImage = {

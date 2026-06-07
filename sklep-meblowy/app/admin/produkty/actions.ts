@@ -407,6 +407,15 @@ export async function updateProductDescriptionSections(
           error: `Sekcja ${i + 1}: hidden musi być true/false`,
         };
       }
+      if (
+        s.admin_custom !== undefined &&
+        typeof s.admin_custom !== "boolean"
+      ) {
+        return {
+          ok: false,
+          error: `Sekcja ${i + 1}: admin_custom musi być true/false`,
+        };
+      }
     } else if (s.kind === "image") {
       if (typeof s.image_url !== "string" || s.image_url.trim().length === 0) {
         return { ok: false, error: `Sekcja ${i + 1}: brak URL obrazu` };
