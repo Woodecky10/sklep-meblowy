@@ -31,23 +31,73 @@ function variantKey(values: Record<string, string>): string {
 }
 
 // Merge nowych wariantów (z BL) ze starymi (z DB) — zachowuje ręczne edycje
-// admina (per-variant images, overrides nazw). BL jest źródłem prawdy dla
-// nazw/cen/stocku, admin dla images i overrides.
+// admina (per-variant images, overrides nazw, CASE wartości).
+// BL jest źródłem prawdy dla zbioru wariantów (lista + ceny + stock),
+// admin dla images, overrides nazw i konkretnego CASE wartości.
+//
+// Case preservation: gdy admin zmienił "róż" → "Różowy" w VariantsEditor,
+// po sync z BL ("róż") merge szuka case-insensitive match w existing.values
+// i preferuje formę admina. Bez tego sync nadpisywałby admin's pretty
+// names lowercased BL surowymi.
 export function mergeVariantsPreserveAdminEdits(
   fresh: ProductVariants,
   existing: ProductVariants
 ): ProductVariants {
-  const existingByKey = new Map<string, ProductVariant>();
-  for (const c of existing.combinations) {
-    existingByKey.set(variantKey(c.values), c);
+  // Mapa: optionName → (lowercase value → existing display form admina).
+  // Używana do remap fresh values na admin's case-preserve formę.
+  const lowerToExistingValue = new Map<string, Map<string, string>>();
+  for (const opt of existing.options) {
+    const m = new Map<string, string>();
+    for (const v of opt.values) m.set(v.toLowerCase(), v);
+    lowerToExistingValue.set(opt.name, m);
   }
 
+  // Helper: remap fresh value na admin's case-preserve formę (lub default).
+  function preferAdminCase(optionName: string, freshValue: string): string {
+    return (
+      lowerToExistingValue.get(optionName)?.get(freshValue.toLowerCase()) ??
+      freshValue
+    );
+  }
+
+  // Options: BL daje zbiór wartości, ale każdą mapujemy na admin's case.
+  // Jeśli admin dodał EXTRA wartość której BL nie ma → dropujemy ją (BL
+  // jest źródłem prawdy dla istnienia wariantu; admin EXTRA wartości
+  // bez kombinacji w BL nie miały by sensu w sklepie).
+  const mergedOptions = fresh.options.map((o) => ({
+    name: o.name,
+    values: o.values.map((v) => preferAdminCase(o.name, v)),
+  }));
+
+  // Mapa istniejących combinations dla matching images. Klucz =
+  // case-INSENSITIVE variantKey żeby "Beżowy" matchował "beż" admina
+  // (i bez admina — fresh tymi już capital-zd przez parser).
+  function lowerVariantKey(values: Record<string, string>): string {
+    return Object.keys(values)
+      .sort()
+      .map((k) => `${k.toLowerCase()}=${(values[k] ?? "").toLowerCase()}`)
+      .join("|");
+  }
+
+  const existingByLowerKey = new Map<string, ProductVariant>();
+  for (const c of existing.combinations) {
+    existingByLowerKey.set(lowerVariantKey(c.values), c);
+  }
+
+  // Combinations: dla każdej fresh kombinacji
+  // 1) remapuj jej values na admin's case-preserve formę
+  // 2) znajdź existing po case-insensitive klucz → preserve images
   const merged: ProductVariant[] = fresh.combinations.map((c) => {
-    const old = existingByKey.get(variantKey(c.values));
-    if (old?.images && old.images.length > 0) {
-      return { ...c, images: old.images };
+    const remappedValues: Record<string, string> = {};
+    for (const [k, v] of Object.entries(c.values)) {
+      remappedValues[k] = preferAdminCase(k, v);
     }
-    return c;
+    const old = existingByLowerKey.get(lowerVariantKey(c.values));
+    const base: ProductVariant = { ...c, values: remappedValues };
+    if (old?.images && old.images.length > 0) {
+      return { ...base, images: old.images };
+    }
+    return base;
   });
 
   // Overrides zachowujemy w całości — to świadoma zmiana admina.
@@ -56,7 +106,7 @@ export function mergeVariantsPreserveAdminEdits(
     : undefined;
 
   return {
-    options: fresh.options,
+    options: mergedOptions,
     combinations: merged,
     ...(overrides ? { overrides } : {}),
   };
@@ -476,6 +526,14 @@ function commonPrefix(strings: string[]): string {
 // Krótsze prefixy → fallback: pełne nazwy jako wartości.
 const PREFIX_THRESHOLD = 5;
 
+// Pierwsza litera dużą — bo BL z koleżanki przychodzi lowercase ("róż",
+// "beż"), a w UI sklepu wygląda lepiej "Róż", "Beż". Apply przed
+// merge'em, żeby raw values w DB były już capitalize'd.
+function capitalizeFirst(s: string): string {
+  if (!s) return s;
+  return s.charAt(0).toLocaleUpperCase("pl-PL") + s.slice(1);
+}
+
 // ============================================================
 // Auto-detekcja nazwy opcji w Stage 2 fallback
 // ============================================================
@@ -561,7 +619,8 @@ function parseNamedAttrs(name: string): Record<string, string> | null {
     const key = match[1].trim();
     const value = match[2].trim();
     if (!key || !value) return null;
-    result[key] = value;
+    // Capitalize żeby "Kolor: róż" → {Kolor: "Róż"}
+    result[capitalizeFirst(key)] = capitalizeFirst(value);
   }
   return Object.keys(result).length > 0 ? result : null;
 }
@@ -675,9 +734,10 @@ function parseVariantsFromBl(
   // ===== Etap 2: fallback — strip wspólnego prefixu =====
   const prefix = commonPrefix(names);
   const useStripped = prefix.length >= PREFIX_THRESHOLD;
+  // Capitalize pierwszej litery — BL daje "róż", chcemy "Róż" w UI.
   const rawValues = useStripped
-    ? names.map((n) => n.slice(prefix.length).trim())
-    : names.map((n) => n.trim());
+    ? names.map((n) => capitalizeFirst(n.slice(prefix.length).trim()))
+    : names.map((n) => capitalizeFirst(n.trim()));
 
   // Auto-detekcja nazwy opcji wg semantyki wartości — "Kolor" gdy wszystkie
   // wartości pasują do znanej palety, "Rozmiar" gdy wszystkie pasują do

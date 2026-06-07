@@ -4,7 +4,12 @@ import type { Category, Product } from "./types";
 
 export type ProductFilters = {
   category?: Category;
-  sort?: "price_asc" | "price_desc" | "newest";
+  // Sort:
+  //   "alphabetic" (default) — nazwa A-Z, z numerycznym matchingiem dla
+  //     pozycji typu "Łóżko 120x200" przed "Łóżko 140x200"
+  //   "newest" — od najnowszych w katalogu (data dodania)
+  //   "price_asc" / "price_desc" — cena rosnąco/malejąco
+  sort?: "alphabetic" | "price_asc" | "price_desc" | "newest";
   page?: number;
   limit?: number;
   search?: string;
@@ -28,7 +33,7 @@ export async function getProducts(filters: ProductFilters = {}) {
   const supabase = await createClient();
   const {
     category,
-    sort = "newest",
+    sort = "alphabetic",
     page = 1,
     limit = 12,
     search,
@@ -89,9 +94,23 @@ export async function getProducts(filters: ProductFilters = {}) {
   if (colors?.length) query = query.in("color", colors);
   if (materials?.length) query = query.in("material", materials);
 
-  if (sort === "price_asc") query = query.order("price", { ascending: true });
-  else if (sort === "price_desc") query = query.order("price", { ascending: false });
-  else query = query.order("created_at", { ascending: false });
+  if (sort === "price_asc") {
+    query = query.order("price", { ascending: true });
+  } else if (sort === "price_desc") {
+    query = query.order("price", { ascending: false });
+  } else if (sort === "newest") {
+    query = query.order("created_at", { ascending: false });
+  } else {
+    // Alfabetycznie (default): A-Z po nazwie. Postgres używa domyślnego
+    // collate bazy — dla pl_PL.UTF-8 daje polski porządek alfabetyczny
+    // (Ą po A, Ć po C itd.) plus cyfry zachowują kolejność numeryczną
+    // jeśli nazwa zaczyna się od liczby ("120 łóżko" przed "140 łóżko").
+    // Secondary sort po created_at — żeby produkty z identyczną nazwą
+    // miały deterministyczną kolejność.
+    query = query
+      .order("name", { ascending: true })
+      .order("created_at", { ascending: false });
+  }
 
   const from = (page - 1) * limit;
   query = query.range(from, from + limit - 1);

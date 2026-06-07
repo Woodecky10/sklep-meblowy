@@ -45,7 +45,9 @@ export default async function SklepPage({
   // sekcja działa tylko jeśli kategoria nie jest ustawiona — kategoria
   // bardziej szczegółowa wygrywa (user kliknął sub-kategorię z dropdown).
   const sectionSlug = !category && sp.sekcja ? sp.sekcja.trim() : undefined;
-  const sort = (sp.sortuj as "price_asc" | "price_desc" | "newest") ?? "newest";
+  const sort =
+    (sp.sortuj as "alphabetic" | "price_asc" | "price_desc" | "newest") ??
+    "alphabetic";
   const page = Number(sp.strona ?? 1);
   const search = sp.q?.trim() || undefined;
   const priceMin = parsePositiveNumber(sp.cena_od);
