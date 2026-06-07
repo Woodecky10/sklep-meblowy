@@ -476,6 +476,78 @@ function commonPrefix(strings: string[]): string {
 // Krótsze prefixy → fallback: pełne nazwy jako wartości.
 const PREFIX_THRESHOLD = 5;
 
+// ============================================================
+// Auto-detekcja nazwy opcji w Stage 2 fallback
+// ============================================================
+// Gdy BL nie używa formatu "Klucz: Wartość" tylko dorzuca nazwę wariantu
+// na końcu długiego stringa ("Łóżko ... boxspring **róż**"), nasz parser
+// strip-uje wspólny prefix i dostaje czyste wartości ("róż", "beż"...)
+// ale nazwa opcji domyślnie była generyczną "Wariant".
+//
+// Te funkcje rozpoznają typ wartości i zwracają lepszą nazwę:
+//   ["beż", "szary", "brąz"]         → "Kolor"
+//   ["120x200", "140x200"]           → "Rozmiar"
+//   ["mix something"]                → "Wariant" (fallback)
+//
+// Strategia konserwatywna: WSZYSTKIE values muszą pasować do danego typu,
+// inaczej fallback. Zapobiega false positives gdy koleżanka ma mieszane
+// dane (np. 3 kolory + 1 rozmiar = brak czytelnej semantyki).
+
+const COLOR_KEYWORDS = new Set([
+  // Kolory podstawowe (skróty i pełne formy)
+  "beż", "bez", "beżowy", "bezowy",
+  "ecru", "kremowy", "kremowa", "krem",
+  "naturalny", "naturalna",
+  "biały", "biala", "bialy", "śnieżny", "snieg",
+  "czarny", "czarna", "antracyt", "anthracyt",
+  "szary", "szara", "popielaty", "jasnoszary", "ciemnoszary", "grafit", "grafitowy",
+  "srebrny", "srebrna",
+  "brąz", "braz", "brązowy", "brazowy", "czekolada", "czekoladowy", "kawowy", "kawa",
+  "róż", "roz", "różowy", "rozowy", "pudrowy", "łososiowy", "lososiowy", "łosoś", "losos",
+  "czerwony", "czerwona", "bordo", "bordowy", "burgund", "burgundowy", "malinowy",
+  "pomarańczowy", "pomaranczowy", "ochra", "ochrowy", "miedziany", "miedź", "miedz",
+  "żółty", "zolty", "musztardowy", "musztarda",
+  "zielony", "zielona", "oliwkowy", "oliwka", "khaki", "miętowy", "mietowy", "morski",
+  "niebieski", "niebieska", "granat", "granatowy", "turkusowy", "turkus",
+  "fioletowy", "fiolet", "lawendowy", "lawenda", "wrzosowy", "wrzos",
+  "złoty", "zloty",
+  // Tkaniny/drewno typowe dla mebli (mogą być w BL jako "kolor")
+  "dąb", "dab", "dębowy", "debowy", "orzech", "orzechowy",
+  "wenge", "sosna", "sosnowy", "buk", "bukowy",
+]);
+
+// Rozmiary mebli: format NxN (120x200), N x N, lub literowe (S/M/L/XL)
+const SIZE_PATTERNS = [
+  /^\d+\s*[x×]\s*\d+(?:\s*[x×]\s*\d+)?$/i, // 120x200, 120 x 200, 80x180x40
+  /^(xs|s|m|l|xl|xxl|xxxl)$/i,
+  /^(mały|maly|średni|sredni|duży|duzy)$/i,
+];
+
+function isColorValue(v: string): boolean {
+  // Sprawdza czy stripped value to kolor (czysta nazwa lub fraza zawierająca
+  // znany keyword na początku/końcu). Case-insensitive.
+  const trimmed = v.trim().toLowerCase();
+  if (!trimmed) return false;
+  if (COLOR_KEYWORDS.has(trimmed)) return true;
+  // Wieloczęściowa nazwa typu "ciemny brąz" — sprawdź każde słowo
+  const tokens = trimmed.split(/\s+/);
+  return tokens.some((t) => COLOR_KEYWORDS.has(t));
+}
+
+function isSizeValue(v: string): boolean {
+  const trimmed = v.trim();
+  return SIZE_PATTERNS.some((re) => re.test(trimmed));
+}
+
+// Zwraca nazwę opcji wnioskowaną z wartości. "Kolor" / "Rozmiar" / "Wariant".
+// Konserwatywnie: wszystkie values muszą pasować do danego typu.
+function detectOptionName(values: string[]): string {
+  if (values.length === 0) return "Wariant";
+  if (values.every(isColorValue)) return "Kolor";
+  if (values.every(isSizeValue)) return "Rozmiar";
+  return "Wariant";
+}
+
 // Próbuje sparsować nazwę wariantu jako "Nazwa1: Wartość1, Nazwa2: Wartość2".
 // Zwraca obiekt {Nazwa1: Wartość1, ...} albo null jeśli format nie pasuje.
 // Wspiera separatory: ',' i ';'.
@@ -600,14 +672,21 @@ function parseVariantsFromBl(
     }
   }
 
-  // ===== Etap 2: fallback — strip wspólnego prefixu, opcja "Wariant" =====
+  // ===== Etap 2: fallback — strip wspólnego prefixu =====
   const prefix = commonPrefix(names);
   const useStripped = prefix.length >= PREFIX_THRESHOLD;
   const rawValues = useStripped
     ? names.map((n) => n.slice(prefix.length).trim())
     : names.map((n) => n.trim());
 
-  const optionName = "Wariant";
+  // Auto-detekcja nazwy opcji wg semantyki wartości — "Kolor" gdy wszystkie
+  // wartości pasują do znanej palety, "Rozmiar" gdy wszystkie pasują do
+  // wzorca rozmiaru (NxN / S/M/L), inaczej fallback do "Wariant".
+  // Wartości deduplikowane i niepuste — bo z nich budujemy dropdown w UI.
+  const dedupedValuesForDetection = Array.from(
+    new Set(rawValues.filter((v) => v && v.length > 0))
+  );
+  const optionName = detectOptionName(dedupedValuesForDetection);
   // Najpierw budujemy raw kombinacje (jedna per BL variant), potem dedup
   // łączy te z tym samym values mapem sumując stocki. Wartości opcji w UI
   // dropdown wyciągamy z deduplikowanych combos (zachowuje kolejność).
