@@ -1,9 +1,21 @@
 # Spec: utwardzenie synchronizacji BaseLinker
 
-- **Data:** 2026-06-07
+- **Data:** 2026-06-07 (rozszerzony 2026-06-08 o znaleziska audytu — patrz callout poniżej)
 - **Autor:** Mikołaj (+ Claude, brainstorming)
 - **Status:** zaakceptowany design, przed planem implementacji
 - **Branch docelowy:** do ustalenia przy planie (sugestia: `feat/bl-sync-hardening`)
+
+> **Rozszerzenie 2026-06-08 (audyt `docs/audyt-baselinker-2026-06-08.md`).**
+> Wieloagentowy audyt integracji potwierdził priorytety tego specu i dorzucił znaleziska
+> dotyczące ścieżki **produktów + opisów**, których pierwotny design nie pokrywał. Wpięte
+> w sekcje 4.3 / 4.4 / 4.5 / 5 / 8 / 9 i oznaczone tagiem **[audyt 2026-06-08]**:
+> - **K2** — niezmapowana kategoria BL: produkt nadal pomijany (brak półproduktów), ale
+>   głośny, zbiorczy banner w panelu z listą niezmapowanych ID + CTA do `/admin/kategorie` (§4.3).
+> - **K3/W6** — determinizm sekcji „Informacje dla klienta": stabilne sortowanie pól przed
+>   skanem + log przy >1 kandydacie; heurystyka zostaje (bez nowej konwencji dla koleżanki) (§4.4).
+> - **features** — czytać cechy z `text_fields.features ?? features` (tolerancja źródła), żeby
+>   Kolor/Materiał/Konstrukcja/Specyfikacja nie zerowały się po cichu (§4.4).
+> - **Kolejność zdjęć** — sortować klucze obiektu `images {1,2,3}` numerycznie przed `Object.values` (§4.4).
 
 ## 1. Cel i kontekst
 
@@ -63,6 +75,8 @@ poziom. Produkty są źródłowo zarządzane w BaseLinkerze (BL = source of trut
 - Ręczny toggle Ukryj/Przywróć w `/admin/produkty`.
 - Auto-retry odczytów BL (backoff), kategoryzacja błędów (`owner`/`technical`).
 - Ulepszenia parsera wariantów i mapowania sekcji opisu (konserwatywne).
+- **[audyt 2026-06-08]** K2 (banner niezmapowanych kategorii), K3/W6 (determinizm sekcji opisu),
+  tolerancja źródła `features` (`text_fields.features ?? features`), stabilna kolejność zdjęć.
 - Vitest + testy jednostkowe czystych funkcji.
 
 **Poza zakresem (świadomie):**
@@ -178,6 +192,21 @@ planDeactivations(
 - Panel grupuje pominięte w dwie sekcje z różnym wordingiem:
   „Do poprawienia w BaseLinkerze" vs „Błąd techniczny — zgłoś Mikołajowi".
 
+**[audyt 2026-06-08] K2 — głośny alert o niezmapowanych kategoriach.**
+Niezmapowana kategoria BL pozostaje skipem klasy `owner` — produkt **NIE jest wstawiany**
+(świadoma decyzja: brak fallbackowych półproduktów „bez kategorii", bo i tak nie miałyby
+miejsca w nawigacji). Ale zamiast tonąć w długiej liście pominiętych, te przypadki są
+**agregowane** i pokazywane jako wyróżniony banner na górze raportu sync — to najczęstsza
+przyczyna „produkt zniknął" i jest jednoklikowa do naprawy.
+- Nowe pole wyniku (`SyncOutcome`/typ wyniku):
+  `unmapped_categories: { bl_category_id: number; sample_product_name: string; count: number }[]`
+  — deduplikacja po `bl_category_id`, zliczenie produktów per ID, jedna przykładowa nazwa.
+- Panel (`BaseLinkerSyncPanel.tsx`): banner „⚠️ N produktów nie trafiło do sklepu — brak
+  mapowania kategorii BL", lista `bl_category_id` + przykładowa nazwa + liczba, CTA
+  „Dodaj mapowanie → /admin/kategorie".
+- Te skipy dalej liczą się do `skipped_count` i pojawiają w grupie „Do poprawienia
+  w BaseLinkerze"; banner to dodatkowa, nieprzeoczalna warstwa (nie zastępuje listy).
+
 **Gwarancja braku utraty danych admina:**
 - Zostaje istniejący `mergeVariantsPreserveAdminEdits` (zdjęcia/case/overrides) oraz
   `mergeSectionsPreserveAdminImages` (image-sekcje, override, custom).
@@ -203,9 +232,35 @@ planDeactivations(
   `DESCRIPTION_SECTION_LABELS` — utrzymać/rozbudować jako jedyne źródło konwencji).
 - Szersze wzorce wykrywania „Informacje dla klienta" (`INFO_SECTION_PATTERNS`) + skan
   wszystkich niespożytych `text_fields` po nagłówkach sekcji (nie tylko jeden wzorzec).
+- **[audyt 2026-06-08] K3/W6 — determinizm:** przed skanem niespożytych `text_fields`
+  sortuj `Object.entries(fields)` po kluczu. Kolejność iteracji V8 nie jest gwarantowana
+  dla kluczy mieszanych/string-numerycznych (`extra_field_NNN`), więc wybór „pierwszego
+  pasującego pola" bywał niedeterministyczny — ta sama treść BL dawała różne sekcje.
+  Dodatkowo **log** (sync log + console) gdy >1 pole pasuje do wzorca tej samej sekcji —
+  niejednoznaczność staje się widoczna zamiast cichego wyboru. **Heurystyka zostaje**
+  (bez nowej konwencji wypełniania pól dla koleżanki — decyzja właściciela).
 - **Siatka bezpieczeństwa:** istniejący edytor override per-produkt
   (`admin_title`/`admin_body`/`hidden`/`admin_custom`) pozostaje gwarantowanym sposobem
   ręcznej korekty, gdy heurystyka się myli.
+
+**[audyt 2026-06-08] Źródło cech (`features`) — tolerancja:**
+- `mapBlToProduct` czyta dziś `bl.features` (top-level). Audyt na żywych danych BL wskazuje,
+  że cechy realnie siedzą pod `bl.text_fields.features`. Helpery `getFeature` /
+  `extractAllFeatures` **już** obsługują oba kształty (obiekt `{nazwa:wartość}` / legacy
+  `{name,value}[]`) — problem jest w ŹRÓDLE przekazywanym do helperów, nie w nich.
+- Fix: jeden resolver `resolveBlFeatures(bl) = bl.text_fields?.features ?? bl.features`,
+  wynik podawany do istniejących helperów. Chroni Kolor / Materiał / Konstrukcja /
+  Czas realizacji / Gwarancja + sekcję Specyfikacja przed cichym wyzerowaniem.
+- Typ: do `BLInventoryProduct.text_fields` dopisać `features?: Record<string,string> | { name: string; value: string }[]`.
+- Open item (§9): potwierdzić realny kształt przez `/api/baselinker/test`; resolver
+  działa niezależnie od wyniku (po potwierdzeniu można usunąć martwą gałąź).
+
+**[audyt 2026-06-08] Kolejność zdjęć — determinizm:**
+- `bl.images` bywa obiektem `{ "1": url, "2": url, ... }`. Dziś wyciąganie przez
+  `Object.values` / `pickFirstImage` nie sortuje kluczy → „pierwsze zdjęcie" i kolejność
+  galerii mogą się przestawić między syncami.
+- Fix: przy obiekcie sortować klucze numerycznie (`Number(a) - Number(b)`) przed
+  wyciągnięciem wartości; dla tablicy bez zmian. Mały, lokalny fix w helperze obrazów.
 
 **Zasada konserwatywna:** wszystkie zmiany parsera mają **nie psuć** tego, co dziś parsuje się
 poprawnie. Testy regresyjne na obecnych przypadkach są obowiązkowe.
@@ -224,6 +279,15 @@ poprawnie. Testy regresyjne na obecnych przypadkach są obowiązkowe.
     pomijanie pustych sekcji.
   - `planDeactivations` — abort przy `completedFully=false`, próg procentowy, podłoga
     bezwzględna, pomijanie produktów bez `baselinker_id`, poprawny zbiór `toDeactivate`.
+  - **[audyt 2026-06-08]** `extractDescriptionSections` determinizm — ten sam zestaw pól
+    (w tym klucze podane w różnej kolejności) → ten sam zestaw sekcji; >1 kandydat loguje
+    ostrzeżenie.
+  - **[audyt 2026-06-08]** `resolveBlFeatures` — cechy pod `text_fields.features`, pod
+    top-level `features`, pod oboma (preferencja `text_fields`), brak cech → `null`/`[]`.
+  - **[audyt 2026-06-08]** helper obrazów — obiekt `{ "2":a, "1":b, "10":c }` → kolejność
+    numeryczna `b, a, c`; tablica zachowana bez zmian.
+  - **[audyt 2026-06-08]** agregacja `unmapped_categories` — wiele produktów w tej samej
+    niezmapowanej kategorii → jeden wpis z `count`, dedup po `bl_category_id`.
 
 ## 5. Pliki do zmiany
 
@@ -243,14 +307,25 @@ poprawnie. Testy regresyjne na obecnych przypadkach są obowiązkowe.
 - *(weryfikacja, możliwe drobne zmiany)* `app/sitemap.ts`, istniejące polityki RLS produktów,
   `app/produkt/[id]/page.tsx` (404 dla ukrytego)
 
+**[audyt 2026-06-08] dodatkowo (ścieżka produktów+opisów):**
+- `app/_lib/baselinker-sync.ts` — `resolveBlFeatures` + użycie w `mapBlToProduct`, sort pól
+  w `extractDescriptionSections` + log, sort kluczy obiektu `images`, agregacja
+  `unmapped_categories` w wyniku sync
+- `app/_lib/baselinker.ts` — `text_fields.features?` w typie `BLInventoryProduct`
+- `app/_lib/types.ts` — `unmapped_categories` w typie wyniku sync
+- `app/admin/baselinker/BaseLinkerSyncPanel.tsx` — banner niezmapowanych kategorii (lista
+  ID + przykładowa nazwa + liczba, CTA → `/admin/kategorie`)
+
 ## 6. Sekwencja implementacji (safest-first)
 
 1. Migracja `is_active` + RLS + typ + 404 + filtr w sitemap/weryfikacja widoczności.
 2. Vitest + testy obecnego zachowania parsera/merge (baseline regresji).
 3. `planDeactivations` (TDD) + wpięcie kroku ukrywania + reaktywacja + raport.
-4. Retry odczytów BL + kategoryzacja błędów.
-5. Ulepszenia parsera (warianty: tolerancja + suffix + materiał; sekcje: wzorce/skan).
-6. UI panelu (raport ukrytych/przywróconych, grupy błędów) + toggle Ukryj/Przywróć w produktach.
+4. Retry odczytów BL + kategoryzacja błędów + **[audyt]** agregacja `unmapped_categories` (K2).
+5. Ulepszenia parsera (warianty: tolerancja + suffix + materiał; sekcje: wzorce/skan)
+   + **[audyt]** determinizm sekcji opisu (K3), `resolveBlFeatures`, sort kluczy obrazów.
+6. UI panelu (raport ukrytych/przywróconych, grupy błędów) + **[audyt]** banner niezmapowanych
+   kategorii (K2) + toggle Ukryj/Przywróć w produktach.
 
 Po każdym kroku: `npm run build` + `npm test` muszą przejść; diff do review przed kolejnym
 (workflow per-punkt, zgodnie z preferencją użytkownika).
@@ -277,6 +352,13 @@ Po każdym kroku: `npm run build` + `npm test` muszą przejść; diff do review 
 - Pominięte produkty są w panelu rozdzielone na „do poprawienia w BL" i „błąd techniczny".
 - Parser: brak regresji na obecnych przypadkach; nowe przypadki (suffix, materiał, tolerancja
   kluczy) pokryte testami.
+- **[audyt 2026-06-08]** Produkt z niezmapowaną kategorią BL: nadal pomijany, ale panel pokazuje
+  zbiorczy banner z listą niezmapowanych ID + CTA do `/admin/kategorie` (nie tonie w liście pominiętych).
+- **[audyt 2026-06-08]** `extractDescriptionSections` jest deterministyczne — ten sam zestaw pól BL
+  (niezależnie od kolejności iteracji) daje ten sam zestaw sekcji; >1 kandydat → log.
+- **[audyt 2026-06-08]** Cechy czytane z `text_fields.features` gdy tam są — Kolor/Materiał/
+  Specyfikacja wypełnione na produktach z cechami pod tym kluczem.
+- **[audyt 2026-06-08]** Kolejność zdjęć z obiektu `{1,2,3}` jest stabilna między syncami.
 - `npm test` zielony; `npm run build` przechodzi.
 
 ## 9. Open items (nie blokują)
@@ -286,3 +368,8 @@ Po każdym kroku: `npm run build` + `npm test` muszą przejść; diff do review 
   użytkownika; w międzyczasie strojenie konserwatywne + override.
 - Dokładny kod błędu rate-limit BL — do potwierdzenia przy implementacji retry.
 - Dokładne nazwy istniejących polityk RLS na `products` — do potwierdzenia przy migracji.
+- **[audyt 2026-06-08]** Realny kształt odpowiedzi `getInventoryProductsData` — czy cechy są
+  pod `text_fields.features` czy top-level `features` (potwierdzić przez `/api/baselinker/test`
+  na żywym koncie). Resolver tolerancyjny działa niezależnie; potwierdzenie pozwoli usunąć
+  martwą gałąź. Powiązane: audyt oznaczył to jako „punkt sporny" (2 wymiary zgłosiły, 2
+  weryfikatorów odrzuciło) — tolerancja źródła zamyka temat bez rozstrzygania sporu.
