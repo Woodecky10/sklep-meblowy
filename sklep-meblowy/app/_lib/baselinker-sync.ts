@@ -27,42 +27,6 @@ export type SyncedProduct = {
   name: string;
 };
 
-// Statystyki uzupełnienia sekcji opisu dla jednego magazynu. Pokazuje
-// koleżance ile produktów ma wypełnione kolejne sekcje sklepu — żeby
-// wiedziała co dopisać w BL bez ręcznego sprawdzania per produkt.
-//
-// Mapowanie pól BL → sekcje sklepu zob. DESCRIPTION_SECTION_LABELS.
-export type SyncSectionsCoverage = {
-  // Sumaryczna liczba produktów po sync (zmapowanych = ok)
-  total: number;
-  // Ile produktów ma wypełnioną sekcję "Opis"
-  // (description + description_extra1 + description_extra2 — przynajmniej jedno)
-  with_opis: number;
-  // Ile produktów ma wypełnioną sekcję "Wymiary i materiały"
-  // (description_extra3 + description_extra4 — przynajmniej jedno)
-  with_wymiary_materialy: number;
-  // Ile produktów ma sekcję "Informacje dla klienta" (heurystycznie
-  // wykryta w dowolnym extra_field zaczynającym się od tej frazy)
-  with_informacje: number;
-};
-
-// Statystyki sync wariantów — admin widzi ile produktów po sync ma warianty
-// z BL i jak były sparsowane (strukturalne "Kolor: X, Rozmiar: Y" vs fallback
-// "Wariant: <pełna nazwa>"). Jeśli z 10 wariantowych produktów 9 wpada w
-// fallback, koleżanka powinna w BL zmienić nazwy wariantów na format
-// "Kolor: Beżowy, Strona: Lewa".
-export type SyncVariantsCoverage = {
-  // Suma produktów po sync (zmapowanych = ok)
-  total: number;
-  // Ile produktów ma jakiekolwiek warianty z BL po sync
-  with_variants: number;
-  // Z tego: ile sparsowano jako STRUKTURALNE (parseNamedAttrs success)
-  structured: number;
-  // Z tego: ile wpadło w FALLBACK (jedna opcja "Wariant" z wartościami)
-  fallback: number;
-  // Łączna liczba kombinacji wariantów synced (np. 3 produkty po 6 kombinacji = 18)
-  total_combinations: number;
-};
 
 export type SyncInventoryResult = {
   inventory_id: number;
@@ -75,13 +39,6 @@ export type SyncInventoryResult = {
   inserted_products?: SyncedProduct[];
   updated_products?: SyncedProduct[];
   skipped: SyncSkippedProduct[];
-  // Statystyki uzupełnienia sekcji opisu (description + extras). Pomaga
-  // koleżance widzieć ile produktów ma wypełnione kolejne sekcje BL.
-  // Niekompatybilne wstecz — stare logi nie mają tego pola.
-  sections_coverage?: SyncSectionsCoverage;
-  // Statystyki sync wariantów — ile produktów ma warianty z BL i jak były
-  // sparsowane. Niekompatybilne wstecz — stare logi nie mają tego pola.
-  variants_coverage?: SyncVariantsCoverage;
 };
 
 export type SyncTotals = {
