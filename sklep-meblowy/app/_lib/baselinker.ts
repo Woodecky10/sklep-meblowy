@@ -100,7 +100,9 @@ export type BLInventoryProduct = {
     description_extra2?: string;
     description_extra3?: string;
     description_extra4?: string;
-    [k: string]: string | undefined;
+    // Audyt 2026-06-08: BL bywa trzyma cechy pod text_fields.features.
+    features?: Record<string, string> | { name: string; value: string }[];
+    [k: string]: string | Record<string, string> | { name: string; value: string }[] | undefined;
   };
   category_id?: number;
   prices?: Record<string, number>; // {price_group_id: price}

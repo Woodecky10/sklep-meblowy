@@ -197,12 +197,23 @@ export type SyncOutcome =
 // Mappery: BL inventory product → schema products (Supabase)
 // ============================================================
 
-function pickFirstImage(images: BLInventoryProduct["images"]): string[] {
+export function pickFirstImage(images: BLInventoryProduct["images"]): string[] {
   if (!images) return [];
-  const values = Object.values(images).filter(
-    (v): v is string => typeof v === "string" && v.length > 0
-  );
-  return values;
+  // Obiekt {1,2,3} → sortuj klucze numerycznie (stabilna kolejność galerii
+  // między syncami). Tablica → bez zmian.
+  const ordered = Array.isArray(images)
+    ? images
+    : Object.keys(images)
+        .sort((a, b) => Number(a) - Number(b))
+        .map((k) => (images as Record<string, string>)[k]);
+  return ordered.filter((v): v is string => typeof v === "string" && v.length > 0);
+}
+
+// Tolerancja źródła cech: audyt pokazał, że cechy realnie siedzą pod
+// text_fields.features (a kod czytał top-level bl.features). Chroni Kolor/
+// Materiał/Konstrukcję/Specyfikację przed cichym wyzerowaniem.
+export function resolveBlFeatures(bl: BLInventoryProduct): BLInventoryProduct["features"] {
+  return (bl.text_fields?.features as BLInventoryProduct["features"]) ?? bl.features;
 }
 
 function getFeature(
@@ -816,6 +827,8 @@ async function mapBlToProduct(
     .filter((s) => s.length > 0)
     .join("\n\n");
 
+  const blFeatures = resolveBlFeatures(bl);
+
   const product: ProductInsert = {
     name: name.trim(),
     description,
@@ -823,17 +836,17 @@ async function mapBlToProduct(
     category: cat.slug,
     images: pickFirstImage(bl.images),
     stock: 0, // meble na zamówienie — nieużywane
-    color: getFeature(bl.features, "Kolor"),
-    material: getFeature(bl.features, "Materiał"),
+    color: getFeature(blFeatures, "Kolor"),
+    material: getFeature(blFeatures, "Materiał"),
     dimensions: buildDimensions(bl),
     weight: bl.weight && bl.weight > 0 ? Number(bl.weight) : null,
-    construction: getFeature(bl.features, "Konstrukcja"),
-    delivery_time: getFeature(bl.features, "Czas realizacji"),
-    warranty: getFeature(bl.features, "Gwarancja"),
+    construction: getFeature(blFeatures, "Konstrukcja"),
+    delivery_time: getFeature(blFeatures, "Czas realizacji"),
+    warranty: getFeature(blFeatures, "Gwarancja"),
     // WSZYSTKIE cechy z BL — Allegro template parametry w pełnym zestawie.
     // Wyświetlane na karcie produktu w "Szczegóły produktu" z deduplikacją
     // względem dedykowanych kolumn (Kolor/Materiał/itd. już mają swoje miejsca).
-    features: extractAllFeatures(bl.features),
+    features: extractAllFeatures(blFeatures),
     // Sekcje opisu (IKEA-style akordeony) — 5 pól BL → 5 nazwanych sekcji.
     // Karta produktu renderuje je jako rozwijalne sekcje. Stary description
     // (joined) zostaje jako legacy fallback + SEO.
