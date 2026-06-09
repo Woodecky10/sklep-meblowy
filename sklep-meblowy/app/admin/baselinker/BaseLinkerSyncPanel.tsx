@@ -180,6 +180,7 @@ function ResultSummary({
         Czas: {(result.duration_ms / 1000).toFixed(1)}s
         {result.outcome.warning && ` · ${result.outcome.warning}`}
       </p>
+      <SyncReport report={result.outcome as SyncReportData} />
       {result.outcome.results.map((inv) => (
         <InventoryResult key={inv.inventory_id} inv={inv} />
       ))}
@@ -316,6 +317,108 @@ function SkippedRow({ skipped }: { skipped: SyncSkippedProduct }) {
   );
 }
 
+type SyncReportData = {
+  deactivated?: { id: string; name: string }[];
+  reactivated?: { id: string; name: string }[];
+  hide_skipped_reason?: string | null;
+  unmapped_categories?: {
+    bl_category_id: number;
+    sample_product_name: string;
+    count: number;
+  }[];
+};
+
+function SyncReport({ report }: { report: SyncReportData }) {
+  const deactivated = report.deactivated ?? [];
+  const reactivated = report.reactivated ?? [];
+  const unmapped = report.unmapped_categories ?? [];
+  const hideSkipped = report.hide_skipped_reason ?? null;
+
+  if (
+    deactivated.length === 0 &&
+    reactivated.length === 0 &&
+    unmapped.length === 0 &&
+    !hideSkipped
+  ) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-3">
+      {unmapped.length > 0 && (
+        <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl">
+          <p className="font-sans text-sm font-semibold text-amber-900 dark:text-amber-200">
+            ⚠️ {unmapped.reduce((s, c) => s + c.count, 0)} produkt(ów) nie trafiło do
+            sklepu — brak mapowania kategorii BaseLinker
+          </p>
+          <ul className="mt-2 flex flex-col gap-1 text-xs text-amber-900 dark:text-amber-200">
+            {unmapped.map((c) => (
+              <li key={c.bl_category_id}>
+                Kategoria BL <span className="font-mono">{c.bl_category_id}</span> ·{" "}
+                {c.count} szt. · np. &bdquo;{c.sample_product_name}&rdquo;
+              </li>
+            ))}
+          </ul>
+          <a
+            href="/admin/kategorie"
+            className="mt-2 inline-block text-xs font-sans uppercase tracking-widest text-amber-900 dark:text-amber-200 underline"
+          >
+            Dodaj mapowanie → /admin/kategorie
+          </a>
+        </div>
+      )}
+
+      {hideSkipped && (
+        <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 rounded-xl text-xs text-red-800 dark:text-red-300">
+          Auto-ukrywanie wstrzymane: {hideSkipped}
+        </div>
+      )}
+
+      {deactivated.length > 0 && (
+        <div>
+          <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
+            Ukryto (znikły z BL) ({deactivated.length}):
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {deactivated.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-start gap-3 p-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg"
+              >
+                <span className="px-2 py-0.5 text-[10px] font-sans rounded shrink-0 mt-0.5 bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300">
+                  BL: {p.id}
+                </span>
+                <p className="text-sm text-[var(--fg)] truncate flex-1 min-w-0">{p.name}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {reactivated.length > 0 && (
+        <div>
+          <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
+            Przywrócono (wróciły do BL) ({reactivated.length}):
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {reactivated.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-start gap-3 p-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg"
+              >
+                <span className="px-2 py-0.5 text-[10px] font-sans rounded shrink-0 mt-0.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200">
+                  BL: {p.id}
+                </span>
+                <p className="text-sm text-[var(--fg)] truncate flex-1 min-w-0">{p.name}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ============================================================
 // Historia: wiersz logu z rozwijanym detalami
 // ============================================================
@@ -340,6 +443,11 @@ function LogRow({
     log.results && typeof log.results === "object"
       ? (log.results as SyncInventoryResult[])
       : [];
+
+  const report =
+    log.report && typeof log.report === "object"
+      ? (log.report as SyncReportData)
+      : null;
 
   return (
     <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl overflow-hidden">
@@ -403,6 +511,7 @@ function LogRow({
           {results.length === 0 && !log.error_message && (
             <p className="text-sm text-[var(--muted)] italic">Brak szczegółowych danych.</p>
           )}
+          {report && <SyncReport report={report} />}
           {results.map((inv) => (
             <InventoryResult key={inv.inventory_id} inv={inv} />
           ))}
