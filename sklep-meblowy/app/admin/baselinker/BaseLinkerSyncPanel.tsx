@@ -190,7 +190,6 @@ function ResultSummary({
 
 function InventoryResult({ inv }: { inv: SyncInventoryResult }) {
   const [showAllSkipped, setShowAllSkipped] = useState(false);
-  const visibleSkipped = showAllSkipped ? inv.skipped : inv.skipped.slice(0, 5);
 
   // Stare logi w DB nie miały inserted_products/updated_products. Bezpieczny
   // fallback to pusta lista — pokażemy tylko liczbę bez nazw.
@@ -224,25 +223,49 @@ function InventoryResult({ inv }: { inv: SyncInventoryResult }) {
       )}
 
       {inv.skipped.length > 0 && (
-        <div className="mt-3">
-          <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
-            Pominięte produkty:
-          </p>
-          <div className="flex flex-col gap-2">
-            {visibleSkipped.map((s) => (
-              <SkippedRow key={s.id} skipped={s} />
-            ))}
-          </div>
-          {inv.skipped.length > 5 && (
-            <button
-              onClick={() => setShowAllSkipped(!showAllSkipped)}
-              className="mt-2 text-xs text-[var(--color-gold)] hover:underline"
-            >
-              {showAllSkipped
-                ? "Pokaż mniej"
-                : `Pokaż wszystkie (${inv.skipped.length - 5} więcej)`}
-            </button>
-          )}
+        <div className="mt-3 space-y-3">
+          {(() => {
+            const technical = inv.skipped.filter((s) => s.kind === "technical");
+            const owner = inv.skipped.filter((s) => s.kind !== "technical");
+            return (
+              <>
+                {owner.length > 0 && (
+                  <div>
+                    <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
+                      Do poprawienia w BaseLinkerze ({owner.length}):
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {(showAllSkipped ? owner : owner.slice(0, 5)).map((s) => (
+                        <SkippedRow key={s.id} skipped={s} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {technical.length > 0 && (
+                  <div>
+                    <p className="text-xs font-sans uppercase tracking-widest text-red-700 dark:text-red-400 mb-2">
+                      Błąd techniczny — zgłoś Mikołajowi ({technical.length}):
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {technical.map((s) => (
+                        <SkippedRow key={s.id} skipped={s} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {owner.length > 5 && (
+                  <button
+                    onClick={() => setShowAllSkipped(!showAllSkipped)}
+                    className="text-xs text-[var(--color-gold)] hover:underline"
+                  >
+                    {showAllSkipped
+                      ? "Pokaż mniej"
+                      : `Pokaż wszystkie (${owner.length - 5} więcej)`}
+                  </button>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 
