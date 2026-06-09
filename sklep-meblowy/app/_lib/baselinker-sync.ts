@@ -53,6 +53,44 @@ export type SyncOutcome =
   | { ok: false; error: string; where?: "BaseLinker API" | "internal"; code?: string };
 
 // ============================================================
+// Bezpieczne auto-ukrywanie znikłych produktów (czysta, testowalna funkcja)
+// ============================================================
+export function planDeactivations(
+  dbBlProducts: { baselinker_id: string }[],
+  seenBlIds: Set<string>,
+  guards: { completedFully: boolean; maxRatio: number; maxAbsoluteFloor: number }
+): { toDeactivate: string[]; skippedReason: string | null } {
+  if (!guards.completedFully) {
+    return {
+      toDeactivate: [],
+      skippedReason:
+        "pobranie z BaseLinkera było niekompletne — pominięto auto-ukrywanie dla bezpieczeństwa",
+    };
+  }
+
+  const candidates = dbBlProducts
+    .map((p) => p.baselinker_id)
+    .filter((id) => !!id && !seenBlIds.has(id));
+
+  if (candidates.length === 0) {
+    return { toDeactivate: [], skippedReason: null };
+  }
+
+  const threshold = Math.max(
+    guards.maxRatio * dbBlProducts.length,
+    guards.maxAbsoluteFloor
+  );
+  if (candidates.length > threshold) {
+    return {
+      toDeactivate: [],
+      skippedReason: `podejrzanie dużo (${candidates.length}) produktów do ukrycia — sprawdź BaseLinker i potwierdź ręcznie`,
+    };
+  }
+
+  return { toDeactivate: candidates, skippedReason: null };
+}
+
+// ============================================================
 // Mappery: BL inventory product → schema products (Supabase)
 // ============================================================
 
