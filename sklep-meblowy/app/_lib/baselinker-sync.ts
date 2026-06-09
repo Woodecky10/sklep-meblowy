@@ -48,8 +48,24 @@ export type SyncTotals = {
   skipped_count: number;
 };
 
+export type UnmappedCategory = {
+  bl_category_id: number;
+  sample_product_name: string;
+  count: number;
+};
+
 export type SyncOutcome =
-  | { ok: true; results: SyncInventoryResult[]; totals: SyncTotals; warning?: string }
+  | {
+      ok: true;
+      results: SyncInventoryResult[];
+      totals: SyncTotals;
+      warning?: string;
+      // Raport run-level (utwardzenie). Opcjonalne — stare logi ich nie mają.
+      deactivated?: SyncedProduct[];
+      reactivated?: SyncedProduct[];
+      hide_skipped_reason?: string | null;
+      unmapped_categories?: UnmappedCategory[];
+    }
   | { ok: false; error: string; where?: "BaseLinker API" | "internal"; code?: string };
 
 // ============================================================
@@ -314,6 +330,11 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
     }
 
     const results: SyncInventoryResult[] = [];
+    const seenBlIds = new Set<string>(); // baselinker_id z udanych upsertów
+    const reactivated: SyncedProduct[] = []; // wcześniej auto-ukryte, wróciły z BL
+    // completedFully: nieudany ODCZYT BL rzuca → catch → ok:false (krok
+    // ukrywania jest poza tą ścieżką), więc gdy tu dotrzemy pobranie jest pełne.
+    const completedFully = true;
 
     for (const inv of inventories) {
       // BL paginuje listę produktów po 1000 — pobierajmy wszystkie strony
@@ -365,6 +386,22 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
           continue;
         }
 
+        const { data: existing } = await supabase
+          .from("products")
+          .select("is_active, deactivation_source")
+          .eq("baselinker_id", blId)
+          .maybeSingle();
+        const existingRow = existing as
+          | { is_active: boolean | null; deactivation_source: "auto" | "manual" | null }
+          | null;
+        // manual → zostaje ukryty (respektujemy admina); auto/aktywny/nowy → aktywny.
+        const wasManuallyHidden = existingRow?.deactivation_source === "manual";
+        mapped.product.is_active = !wasManuallyHidden;
+        mapped.product.deactivation_source = wasManuallyHidden ? "manual" : null;
+        if (existingRow?.is_active === false && existingRow?.deactivation_source === "auto") {
+          reactivated.push({ id: blId, name: mapped.product.name });
+        }
+
         const { data, error } = await supabase
           .from("products")
           .upsert(mapped.product as never, { onConflict: "baselinker_id" })
@@ -379,6 +416,8 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
           });
           continue;
         }
+
+        seenBlIds.add(blId);
 
         // Heurystyka insert vs update — created_at "świeże" (< 5s) = insert
         const isNew =
@@ -396,6 +435,33 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
       results.push(result);
     }
 
+    // ---- Auto-ukrywanie znikłych produktów (raz, po wszystkich magazynach) ----
+    const { data: activeBlRows } = await supabase
+      .from("products")
+      .select("baselinker_id")
+      .eq("is_active", true)
+      .not("baselinker_id", "is", null);
+    const dbBlProducts = ((activeBlRows ?? []) as { baselinker_id: string | null }[])
+      .filter((p): p is { baselinker_id: string } => !!p.baselinker_id);
+
+    const { toDeactivate, skippedReason } = planDeactivations(dbBlProducts, seenBlIds, {
+      completedFully,
+      maxRatio: 0.2,
+      maxAbsoluteFloor: 5,
+    });
+
+    const deactivated: SyncedProduct[] = [];
+    if (toDeactivate.length > 0) {
+      const { data: deactivatedRows } = await supabase
+        .from("products")
+        .update({ is_active: false, deactivation_source: "auto" } as never)
+        .in("baselinker_id", toDeactivate)
+        .select("baselinker_id, name");
+      for (const row of (deactivatedRows ?? []) as { baselinker_id: string; name: string }[]) {
+        deactivated.push({ id: row.baselinker_id, name: row.name });
+      }
+    }
+
     const totals: SyncTotals = results.reduce(
       (acc, r) => ({
         total_in_bl: acc.total_in_bl + r.total_in_bl,
@@ -406,7 +472,15 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
       { total_in_bl: 0, inserted: 0, updated: 0, skipped_count: 0 }
     );
 
-    return { ok: true, results, totals };
+    return {
+      ok: true,
+      results,
+      totals,
+      deactivated,
+      reactivated,
+      hide_skipped_reason: skippedReason,
+      // unmapped_categories dochodzi w następnym tasku
+    };
   } catch (err) {
     if (err instanceof BaseLinkerError) {
       return {
