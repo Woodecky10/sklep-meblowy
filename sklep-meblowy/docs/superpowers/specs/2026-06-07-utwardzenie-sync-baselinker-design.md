@@ -17,6 +17,38 @@
 >   Kolor/Materiał/Konstrukcja/Specyfikacja nie zerowały się po cichu (§4.4).
 > - **Kolejność zdjęć** — sortować klucze obiektu `images {1,2,3}` numerycznie przed `Object.values` (§4.4).
 
+> **Rewizja 2026-06-09 (zmiana zakresu — decyzja właściciela). Ma pierwszeństwo nad pozostałymi sekcjami (§3–§9) tam, gdzie się różni** (np. w §5 „ulepszenia parsera" → czytaj „usunięcie martwego parsera"; w §9 odpada open item o realnych przykładach wariantów do strojenia parsera).
+> Synchronizacja **przestaje ciągnąć z BL opisy i warianty** — będą zarządzane wyłącznie
+> ręcznie w panelu admina (`DescriptionSectionsEditor`, `VariantsEditor` już istnieją),
+> a sklep dalej je wyświetla. Sync ustawia tylko: **nazwę, cenę, kategorię, zdjęcia i cechy**
+> (`color`/`material`/`dimensions`/`weight`/`construction`/`delivery_time`/`warranty`/`features`).
+> Powód: warianty „nie działają jak powinny", opisy mają być wklejane ręcznie.
+>
+> Skutki dla tego specu:
+> - **§4.4 (jakość parsera) — WYCOFANE w całości.** Nie ulepszamy parsera wariantów/sekcji;
+>   przeciwnie — **usuwamy go jako martwy kod** (`parseVariantsFromBl` + helpery, `COLOR_KEYWORDS`/
+>   `SIZE_PATTERNS`, `detectOptionName`, `parseNamedAttrs`, `capitalizeFirst`, `commonPrefix`,
+>   `extractDescriptionSections` + `DESCRIPTION_SECTION_LABELS`/`INFO_SECTION_PATTERNS`,
+>   `mergeVariantsPreserveAdminEdits`, `mergeSectionsPreserveAdminImages`, typy `ParsedVariants`/`AnySection`).
+>   Zostaje TYLKO ścieżka cech/zdjęć: `resolveBlFeatures` (tolerancja `text_fields.features ?? features`,
+>   chroni `color`/`material`/`features`) + numeryczny sort kluczy obiektu `images` — bo cechy
+>   i zdjęcia DALEJ się synchronizują. (Helpery `getFeature`/`extractAllFeatures`/`pickFirstImage` zostają.)
+> - **`mapBlToProduct`** pomija `variants`/`description_sections`/`description` w budowanym
+>   obiekcie → `upsert(onConflict: baselinker_id)` nie nadpisuje ich na UPDATE (ręczne edycje
+>   admina zachowane), a na INSERT nowego produktu lecą defaulty DB (puste). Zero merge'owania, zero kasowania.
+> - **Panel:** usuwamy paski pokrycia sekcji/wariantów (`SectionsCoverageBar`/`VariantsCoverageBar`
+>   + pola `*_coverage` w wyniku sync) jako nieaktualne. Skip „BL nie zwrócił wariantów" znika
+>   (nie ma już sync wariantów) — pozostają tylko skipy owner (nazwa/kategoria/cena) i technical (błąd zapisu).
+> - **SEO/fallback opisu:** strona produktu (`app/produkt/[id]/page.tsx`) wyprowadza meta-description
+>   i fallbackowy widok z `description_sections`, gdy plain `description` jest puste — jedno źródło
+>   prawdy = sekcje edytowane przez admina.
+> - **Utwardzenie POZOSTAJE bez zmian:** §4.1 (`is_active` + RLS), §4.2 (`planDeactivations` +
+>   auto-ukrywanie + reaktywacja + raport), §4.3 (retry odczytów, kategoryzacja owner/technical,
+>   banner K2 niezmapowanych kategorii), ręczny toggle Ukryj/Przywróć. Auto-ukrywanie znikłych
+>   produktów to nadal sedno specu.
+> - **Testy (§4.5):** wypadają testy parsera wariantów/sekcji; zostają `planDeactivations`,
+>   retry/`isTransientBlError`, `resolveBlFeatures`, sort kluczy zdjęć, agregacja `unmapped_categories`.
+
 ## 1. Cel i kontekst
 
 Mechanizm synchronizacji produktów BaseLinker → Supabase (`app/_lib/baselinker-sync.ts`,
@@ -74,9 +106,12 @@ poziom. Produkty są źródłowo zarządzane w BaseLinkerze (BL = source of trut
 - Auto-ukrywanie znikłych produktów z bezpiecznikami + raport + auto-reaktywacja.
 - Ręczny toggle Ukryj/Przywróć w `/admin/produkty`.
 - Auto-retry odczytów BL (backoff), kategoryzacja błędów (`owner`/`technical`).
-- Ulepszenia parsera wariantów i mapowania sekcji opisu (konserwatywne).
-- **[audyt 2026-06-08]** K2 (banner niezmapowanych kategorii), K3/W6 (determinizm sekcji opisu),
-  tolerancja źródła `features` (`text_fields.features ?? features`), stabilna kolejność zdjęć.
+- **[rewizja 2026-06-09]** Wycięcie z syncu opisów i wariantów (ręczne w panelu) + usunięcie
+  martwego po tym parsera/merge, oraz pasków pokrycia w panelu.
+- **[rewizja 2026-06-09]** Wyprowadzenie meta-SEO / fallbacku opisu z `description_sections`.
+- **[audyt 2026-06-08]** K2 (banner niezmapowanych kategorii), tolerancja źródła `features`
+  (`text_fields.features ?? features`), stabilna kolejność zdjęć. *(K3 determinizm sekcji opisu
+  WYPADA — sekcje nie są już synchronizowane.)*
 - Vitest + testy jednostkowe czystych funkcji.
 
 **Poza zakresem (świadomie):**
@@ -212,7 +247,13 @@ przyczyna „produkt zniknął" i jest jednoklikowa do naprawy.
   `mergeSectionsPreserveAdminImages` (image-sekcje, override, custom).
 - Jedyny destrukcyjny krok (ukrywanie) jest zablokowany przy niekompletnym pobraniu (4.2 reguła 1).
 
-### 4.4. Jakość parsera
+### 4.4. Jakość parsera — ⛔ WYCOFANE (Rewizja 2026-06-09)
+
+> **Cała ta sekcja jest nieaktualna.** Opisy i warianty NIE są już synchronizowane, więc
+> parsera wariantów/sekcji nie ulepszamy — usuwamy go jako martwy kod (patrz callout
+> „Rewizja 2026-06-09" na górze). Z opisanych niżej zmian utrzymujemy **wyłącznie** ścieżkę
+> cech/zdjęć: `resolveBlFeatures` (tolerancja `text_fields.features ?? features`) oraz
+> numeryczny sort kluczy obiektu `images`. Reszta poniżej zostawiona dla kontekstu historycznego.
 
 **Warianty (`parseVariantsFromBl` + helpery):**
 - **Tolerancyjny tryb strukturalny:** grupowanie kluczy case-insensitive + trim, żeby
@@ -318,14 +359,17 @@ poprawnie. Testy regresyjne na obecnych przypadkach są obowiązkowe.
 
 ## 6. Sekwencja implementacji (safest-first)
 
+*(Zaktualizowana Rewizją 2026-06-09 — krok 5 zamieniony z „ulepszenia parsera" na „chudy sync + sprzątanie".)*
+
 1. Migracja `is_active` + RLS + typ + 404 + filtr w sitemap/weryfikacja widoczności.
-2. Vitest + testy obecnego zachowania parsera/merge (baseline regresji).
+2. Vitest (config `.mts`, env node) — runner pod czyste funkcje (bez baseline parsera, który znika).
 3. `planDeactivations` (TDD) + wpięcie kroku ukrywania + reaktywacja + raport.
 4. Retry odczytów BL + kategoryzacja błędów + **[audyt]** agregacja `unmapped_categories` (K2).
-5. Ulepszenia parsera (warianty: tolerancja + suffix + materiał; sekcje: wzorce/skan)
-   + **[audyt]** determinizm sekcji opisu (K3), `resolveBlFeatures`, sort kluczy obrazów.
-6. UI panelu (raport ukrytych/przywróconych, grupy błędów) + **[audyt]** banner niezmapowanych
-   kategorii (K2) + toggle Ukryj/Przywróć w produktach.
+5. **[rewizja 2026-06-09]** Chudy sync: `mapBlToProduct` pomija `variants`/`description_sections`/
+   `description`; `resolveBlFeatures` + sort kluczy zdjęć (cechy/zdjęcia zostają); usunięcie martwego
+   parsera/merge + pasków pokrycia w panelu; SEO/fallback opisu z `description_sections`.
+6. UI panelu (raport ukrytych/przywróconych, grupy błędów owner/technical) + **[audyt]** banner
+   niezmapowanych kategorii (K2) + toggle Ukryj/Przywróć w produktach.
 
 Po każdym kroku: `npm run build` + `npm test` muszą przejść; diff do review przed kolejnym
 (workflow per-punkt, zgodnie z preferencją użytkownika).
@@ -350,14 +394,18 @@ Po każdym kroku: `npm run build` + `npm test` muszą przejść; diff do review 
 - Gdy do ukrycia kwalifikuje się > próg — sync nie ukrywa, raportuje powód.
 - Przejściowy błąd BL jest ponawiany; trwały — kończy sync czytelnym błędem, bez ukrywania.
 - Pominięte produkty są w panelu rozdzielone na „do poprawienia w BL" i „błąd techniczny".
-- Parser: brak regresji na obecnych przypadkach; nowe przypadki (suffix, materiał, tolerancja
-  kluczy) pokryte testami.
+- **[rewizja 2026-06-09]** Sync NIE nadpisuje `variants`/`description_sections`/`description`:
+  produkt z ręcznie ustawionymi wariantami/opisem w panelu zachowuje je po kolejnym syncu;
+  nowy produkt z BL wchodzi bez wariantów/opisu (admin uzupełnia ręcznie). Sklep i edytory
+  (`VariantsEditor`/`DescriptionSectionsEditor`) działają jak dotąd.
+- **[rewizja 2026-06-09]** Martwy parser/merge (warianty + sekcje) i paski pokrycia w panelu
+  usunięte; `npm run build` + `npm run lint` czyste (brak nieużywanych symboli).
+- **[rewizja 2026-06-09]** Nowy produkt bez plain `description`: strona produktu generuje
+  meta-SEO i fallbackowy opis z `description_sections`.
 - **[audyt 2026-06-08]** Produkt z niezmapowaną kategorią BL: nadal pomijany, ale panel pokazuje
   zbiorczy banner z listą niezmapowanych ID + CTA do `/admin/kategorie` (nie tonie w liście pominiętych).
-- **[audyt 2026-06-08]** `extractDescriptionSections` jest deterministyczne — ten sam zestaw pól BL
-  (niezależnie od kolejności iteracji) daje ten sam zestaw sekcji; >1 kandydat → log.
-- **[audyt 2026-06-08]** Cechy czytane z `text_fields.features` gdy tam są — Kolor/Materiał/
-  Specyfikacja wypełnione na produktach z cechami pod tym kluczem.
+- **[audyt 2026-06-08]** Cechy czytane z `text_fields.features` gdy tam są — Kolor/Materiał
+  wypełnione na produktach z cechami pod tym kluczem.
 - **[audyt 2026-06-08]** Kolejność zdjęć z obiektu `{1,2,3}` jest stabilna między syncami.
 - `npm test` zielony; `npm run build` przechodzi.
 
