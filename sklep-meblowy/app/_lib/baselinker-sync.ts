@@ -10,107 +10,9 @@ import {
   getInventoryProductsList,
   getInventoryProductsData,
   type BLInventoryProduct,
-  type BLVariant,
 } from "./baselinker";
 import { getCategoryByBaselinkerId } from "./categories";
-import type {
-  Product,
-  ProductDimensions,
-  ProductVariants,
-  ProductVariant,
-  ProductVariantOverrides,
-} from "./types";
-
-// Klucz do dopasowania wariantów — wartości opcji posortowane po nazwie,
-// żeby kolejność nie miała znaczenia: {Kolor:"róż", Rozmiar:"M"} == {Rozmiar:"M", Kolor:"róż"}
-function variantKey(values: Record<string, string>): string {
-  return Object.keys(values)
-    .sort()
-    .map((k) => `${k}=${values[k]}`)
-    .join("|");
-}
-
-// Merge nowych wariantów (z BL) ze starymi (z DB) — zachowuje ręczne edycje
-// admina (per-variant images, overrides nazw, CASE wartości).
-// BL jest źródłem prawdy dla zbioru wariantów (lista + ceny + stock),
-// admin dla images, overrides nazw i konkretnego CASE wartości.
-//
-// Case preservation: gdy admin zmienił "róż" → "Różowy" w VariantsEditor,
-// po sync z BL ("róż") merge szuka case-insensitive match w existing.values
-// i preferuje formę admina. Bez tego sync nadpisywałby admin's pretty
-// names lowercased BL surowymi.
-export function mergeVariantsPreserveAdminEdits(
-  fresh: ProductVariants,
-  existing: ProductVariants
-): ProductVariants {
-  // Mapa: optionName → (lowercase value → existing display form admina).
-  // Używana do remap fresh values na admin's case-preserve formę.
-  const lowerToExistingValue = new Map<string, Map<string, string>>();
-  for (const opt of existing.options) {
-    const m = new Map<string, string>();
-    for (const v of opt.values) m.set(v.toLowerCase(), v);
-    lowerToExistingValue.set(opt.name, m);
-  }
-
-  // Helper: remap fresh value na admin's case-preserve formę (lub default).
-  function preferAdminCase(optionName: string, freshValue: string): string {
-    return (
-      lowerToExistingValue.get(optionName)?.get(freshValue.toLowerCase()) ??
-      freshValue
-    );
-  }
-
-  // Options: BL daje zbiór wartości, ale każdą mapujemy na admin's case.
-  // Jeśli admin dodał EXTRA wartość której BL nie ma → dropujemy ją (BL
-  // jest źródłem prawdy dla istnienia wariantu; admin EXTRA wartości
-  // bez kombinacji w BL nie miały by sensu w sklepie).
-  const mergedOptions = fresh.options.map((o) => ({
-    name: o.name,
-    values: o.values.map((v) => preferAdminCase(o.name, v)),
-  }));
-
-  // Mapa istniejących combinations dla matching images. Klucz =
-  // case-INSENSITIVE variantKey żeby "Beżowy" matchował "beż" admina
-  // (i bez admina — fresh tymi już capital-zd przez parser).
-  function lowerVariantKey(values: Record<string, string>): string {
-    return Object.keys(values)
-      .sort()
-      .map((k) => `${k.toLowerCase()}=${(values[k] ?? "").toLowerCase()}`)
-      .join("|");
-  }
-
-  const existingByLowerKey = new Map<string, ProductVariant>();
-  for (const c of existing.combinations) {
-    existingByLowerKey.set(lowerVariantKey(c.values), c);
-  }
-
-  // Combinations: dla każdej fresh kombinacji
-  // 1) remapuj jej values na admin's case-preserve formę
-  // 2) znajdź existing po case-insensitive klucz → preserve images
-  const merged: ProductVariant[] = fresh.combinations.map((c) => {
-    const remappedValues: Record<string, string> = {};
-    for (const [k, v] of Object.entries(c.values)) {
-      remappedValues[k] = preferAdminCase(k, v);
-    }
-    const old = existingByLowerKey.get(lowerVariantKey(c.values));
-    const base: ProductVariant = { ...c, values: remappedValues };
-    if (old?.images && old.images.length > 0) {
-      return { ...base, images: old.images };
-    }
-    return base;
-  });
-
-  // Overrides zachowujemy w całości — to świadoma zmiana admina.
-  const overrides: ProductVariantOverrides | undefined = existing.overrides
-    ? { ...existing.overrides }
-    : undefined;
-
-  return {
-    options: mergedOptions,
-    combinations: merged,
-    ...(overrides ? { overrides } : {}),
-  };
-}
+import type { Product, ProductDimensions } from "./types";
 
 export type SyncSkippedProduct = {
   id: string;
@@ -304,197 +206,6 @@ function extractAllFeatures(
     .map((f) => ({ key: f.name.trim(), value: f.value.trim() }));
 }
 
-// Hardcoded mapowanie pól BL na sekcje sklepowe (akordeony IKEA-style).
-// Każda sekcja może łączyć wiele pól BL — łączymy je separatorem \n\n.
-// Sekcja "Informacje dla klienta" wykrywana heurystycznie (BL nie ma
-// stałego pola dla niej — koleżanka wpisuje w dowolny extra_field).
-//
-// Konwencja BL (jak ma być wypełniane przez koleżankę):
-//   Opis (głównego)        + Opis 1 + Opis 2  → "Opis" w sklepie
-//   Opis 3                  + Opis 4          → "Wymiary i materiały"
-//   Dowolny extra_field zaczynający się od "Informacje dla klienta" → osobna sekcja
-//
-// Wcześniejsza konwencja (do PR #36) była z 5 oddzielnymi sekcjami
-// (Materiał i wykonanie / Pielęgnacja / Wymiary szczegółowe / FAQ).
-// Klientka zdecydowała że ją to za dużo akordeonów — uproszczenie do 3.
-const DESCRIPTION_SECTION_LABELS: { fields: string[]; title: string }[] = [
-  {
-    fields: ["description", "description_extra1", "description_extra2"],
-    title: "Opis",
-  },
-  {
-    fields: ["description_extra3", "description_extra4"],
-    title: "Wymiary i materiały",
-  },
-];
-
-// Klucze które już zostały spożyte przez sekcje powyżej — żebyśmy nie
-// duplikowali ich w heurystyce "Informacje dla klienta".
-const CONSUMED_FIELDS = new Set(
-  DESCRIPTION_SECTION_LABELS.flatMap((s) => s.fields)
-);
-
-// Frazy które rozpoznajemy jako początek sekcji "Informacje dla klienta".
-// Skanujemy WSZYSTKIE text_fields (description_extra5-10, extra_field_XXXX)
-// szukając pola które VALUE zaczyna się od tej frazy. Tak omijamy problem
-// niespójnego nazywania pól w BL — szukamy po treści, nie po nazwie pola.
-const INFO_SECTION_PATTERNS = [
-  /^informacje\s+dla\s+klienta/i,
-  /^uwaga\s*[:!]/i,
-  /^uwagi\s+dla\s+klienta/i,
-];
-
-// Builduje sekcje opisu z pól BL text_fields wg konwencji powyżej.
-// Pomija sekcje gdzie wszystkie pola są puste (nie pokazujemy pustych
-// akordeonów na karcie produktu).
-function extractDescriptionSections(
-  textFields: BLInventoryProduct["text_fields"]
-): { title: string; body: string; kind: "text" }[] {
-  if (!textFields) return [];
-  const fields = textFields as Record<string, string | undefined>;
-  const sections: { title: string; body: string; kind: "text" }[] = [];
-
-  for (const { fields: blFields, title } of DESCRIPTION_SECTION_LABELS) {
-    const parts: string[] = [];
-    for (const f of blFields) {
-      const raw = fields[f];
-      if (typeof raw === "string") {
-        const trimmed = raw.trim();
-        if (trimmed.length > 0) parts.push(trimmed);
-      }
-    }
-    if (parts.length === 0) continue;
-    sections.push({ title, body: parts.join("\n\n"), kind: "text" });
-  }
-
-  // Heurystycznie wykryj "Informacje dla klienta" — przeszukaj wszystkie
-  // text_fields które NIE zostały już spożyte przez sekcje powyżej.
-  // Bierzemy PIERWSZE pole którego VALUE zaczyna się od pasującej frazy
-  // (po stripie HTML tagów, żeby <p>Informacje dla klienta</p> się łapało).
-  for (const [key, value] of Object.entries(fields)) {
-    if (CONSUMED_FIELDS.has(key)) continue;
-    if (typeof value !== "string") continue;
-    const stripped = value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-    if (stripped.length === 0) continue;
-    const head = stripped.slice(0, 100);
-    if (INFO_SECTION_PATTERNS.some((re) => re.test(head))) {
-      sections.push({
-        title: "Informacje dla klienta",
-        body: value.trim(),
-        kind: "text",
-      });
-      break;
-    }
-  }
-
-  return sections;
-}
-
-// Sekcja opisu (uniwersalny typ pomocniczy dla merge logic)
-type AnySection =
-  | { kind: "text"; title: string; body: string }
-  | {
-      kind: "image";
-      image_url: string;
-      image_alt: string;
-      caption?: string;
-    };
-
-// Merge nowych text sekcji z BL ze starymi z DB. Trzymamy 3 typy danych:
-// - image sekcje admina (między text) — zawsze zachowane
-// - text title/body z BL — nadpisywane przez fresh
-// - admin overrides per text section (admin_title, admin_body, hidden) —
-//   przeżywają sync, dzięki nim admin może naprawić rozjazd w polach BL
-//   bez konieczności edytowania w BL panel.
-//
-// Strategia: dla każdej istniejącej sekcji w DB:
-// - jeśli image → zachowaj
-// - jeśli text → znajdź matching w nowych BL (po title), użyj BL title/body
-//   + zachowaj admin_title/admin_body/hidden z istniejącej sekcji
-//   (jeśli BL już nie ma takiej sekcji → zachowaj jeśli admin coś zoverridował,
-//    inaczej drop)
-// Następnie dopisz na końcu te BL sekcje które nie miały odpowiednika w DB.
-export function mergeSectionsPreserveAdminImages(
-  fresh: AnySection[],
-  existing: AnySection[]
-): AnySection[] {
-  if (existing.length === 0) return fresh;
-
-  const freshByTitle = new Map<string, AnySection>();
-  for (const s of fresh) {
-    if (s.kind === "text") freshByTitle.set(s.title, s);
-  }
-
-  const matchedTitles = new Set<string>();
-  const merged: AnySection[] = [];
-
-  for (const s of existing) {
-    if (s.kind === "image") {
-      merged.push(s); // zachowaj obraz admina
-      continue;
-    }
-
-    // text — typ rozszerzony o pola admin
-    const existingText = s as {
-      kind: "text";
-      title: string;
-      body: string;
-      admin_title?: string;
-      admin_body?: string;
-      hidden?: boolean;
-      admin_custom?: boolean;
-    };
-
-    // Admin custom sekcja (dodana ręcznie, nie z BL) — zachowaj zawsze,
-    // niezależnie od stanu BL. Nie próbujemy jej match-ować po title.
-    if (existingText.admin_custom) {
-      merged.push(existingText);
-      continue;
-    }
-
-    // BL sekcja — sprawdź czy nadal istnieje w fresh
-    const updated = freshByTitle.get(s.title);
-
-    if (updated && updated.kind === "text") {
-      // BL ma tę sekcję — użyj BL title/body, ZACHOWAJ admin overrides
-      merged.push({
-        ...updated,
-        ...(existingText.admin_title !== undefined && {
-          admin_title: existingText.admin_title,
-        }),
-        ...(existingText.admin_body !== undefined && {
-          admin_body: existingText.admin_body,
-        }),
-        ...(existingText.hidden !== undefined && {
-          hidden: existingText.hidden,
-        }),
-      });
-      matchedTitles.add(s.title);
-    } else if (
-      existingText.admin_title !== undefined ||
-      existingText.admin_body !== undefined ||
-      existingText.hidden !== undefined
-    ) {
-      // BL już nie ma tej sekcji ALE admin coś tu robił (override title/body
-      // albo flagował hidden) → zachowaj. Admin świadomie ustawił coś,
-      // nie usuwamy bez jego zgody. hidden !== undefined (nie === true)
-      // bo admin który UN-hide też pozostawia `hidden: false` — to znak że
-      // ma kontrolę i nie chcemy go zaskoczyć dropem.
-      merged.push(existingText);
-    }
-    // BL nie ma + admin nie zoverridował → drop
-  }
-
-  // Dopisz na końcu nowe text sekcje z BL których nie było w DB
-  for (const s of fresh) {
-    if (s.kind === "text" && !matchedTitles.has(s.title)) {
-      merged.push(s);
-    }
-  }
-
-  return merged;
-}
-
 function buildDimensions(bl: BLInventoryProduct): ProductDimensions | null {
   const w = Number(bl.width ?? 0);
   const h = Number(bl.height ?? 0);
@@ -520,279 +231,20 @@ type ProductInsert = Omit<Product, "id" | "created_at"> & {
   created_at?: string;
 };
 
-// Longest common prefix (case-sensitive) — pomocnicze do parsera wariantów.
-function commonPrefix(strings: string[]): string {
-  if (strings.length === 0) return "";
-  let p = strings[0];
-  for (let i = 1; i < strings.length; i++) {
-    while (!strings[i].startsWith(p)) {
-      p = p.slice(0, -1);
-      if (!p) return "";
-    }
-  }
-  return p;
-}
-
-// Najmniejszy próg długości prefixu żeby uznać że "warto stripować".
-// Krótsze prefixy → fallback: pełne nazwy jako wartości.
-const PREFIX_THRESHOLD = 5;
-
-// Pierwsza litera dużą — bo BL z koleżanki przychodzi lowercase ("róż",
-// "beż"), a w UI sklepu wygląda lepiej "Róż", "Beż". Apply przed
-// merge'em, żeby raw values w DB były już capitalize'd.
-function capitalizeFirst(s: string): string {
-  if (!s) return s;
-  return s.charAt(0).toLocaleUpperCase("pl-PL") + s.slice(1);
-}
-
-// ============================================================
-// Auto-detekcja nazwy opcji w Stage 2 fallback
-// ============================================================
-// Gdy BL nie używa formatu "Klucz: Wartość" tylko dorzuca nazwę wariantu
-// na końcu długiego stringa ("Łóżko ... boxspring **róż**"), nasz parser
-// strip-uje wspólny prefix i dostaje czyste wartości ("róż", "beż"...)
-// ale nazwa opcji domyślnie była generyczną "Wariant".
-//
-// Te funkcje rozpoznają typ wartości i zwracają lepszą nazwę:
-//   ["beż", "szary", "brąz"]         → "Kolor"
-//   ["120x200", "140x200"]           → "Rozmiar"
-//   ["mix something"]                → "Wariant" (fallback)
-//
-// Strategia konserwatywna: WSZYSTKIE values muszą pasować do danego typu,
-// inaczej fallback. Zapobiega false positives gdy koleżanka ma mieszane
-// dane (np. 3 kolory + 1 rozmiar = brak czytelnej semantyki).
-
-const COLOR_KEYWORDS = new Set([
-  // Kolory podstawowe (skróty i pełne formy)
-  "beż", "bez", "beżowy", "bezowy",
-  "ecru", "kremowy", "kremowa", "krem",
-  "naturalny", "naturalna",
-  "biały", "biala", "bialy", "śnieżny", "snieg",
-  "czarny", "czarna", "antracyt", "anthracyt",
-  "szary", "szara", "popielaty", "jasnoszary", "ciemnoszary", "grafit", "grafitowy",
-  "srebrny", "srebrna",
-  "brąz", "braz", "brązowy", "brazowy", "czekolada", "czekoladowy", "kawowy", "kawa",
-  "róż", "roz", "różowy", "rozowy", "pudrowy", "łososiowy", "lososiowy", "łosoś", "losos",
-  "czerwony", "czerwona", "bordo", "bordowy", "burgund", "burgundowy", "malinowy",
-  "pomarańczowy", "pomaranczowy", "ochra", "ochrowy", "miedziany", "miedź", "miedz",
-  "żółty", "zolty", "musztardowy", "musztarda",
-  "zielony", "zielona", "oliwkowy", "oliwka", "khaki", "miętowy", "mietowy", "morski",
-  "niebieski", "niebieska", "granat", "granatowy", "turkusowy", "turkus",
-  "fioletowy", "fiolet", "lawendowy", "lawenda", "wrzosowy", "wrzos",
-  "złoty", "zloty",
-  // Tkaniny/drewno typowe dla mebli (mogą być w BL jako "kolor")
-  "dąb", "dab", "dębowy", "debowy", "orzech", "orzechowy",
-  "wenge", "sosna", "sosnowy", "buk", "bukowy",
-]);
-
-// Rozmiary mebli: format NxN (120x200), N x N, lub literowe (S/M/L/XL)
-const SIZE_PATTERNS = [
-  /^\d+\s*[x×]\s*\d+(?:\s*[x×]\s*\d+)?$/i, // 120x200, 120 x 200, 80x180x40
-  /^(xs|s|m|l|xl|xxl|xxxl)$/i,
-  /^(mały|maly|średni|sredni|duży|duzy)$/i,
-];
-
-function isColorValue(v: string): boolean {
-  // Sprawdza czy stripped value to kolor (czysta nazwa lub fraza zawierająca
-  // znany keyword na początku/końcu). Case-insensitive.
-  const trimmed = v.trim().toLowerCase();
-  if (!trimmed) return false;
-  if (COLOR_KEYWORDS.has(trimmed)) return true;
-  // Wieloczęściowa nazwa typu "ciemny brąz" — sprawdź każde słowo
-  const tokens = trimmed.split(/\s+/);
-  return tokens.some((t) => COLOR_KEYWORDS.has(t));
-}
-
-function isSizeValue(v: string): boolean {
-  const trimmed = v.trim();
-  return SIZE_PATTERNS.some((re) => re.test(trimmed));
-}
-
-// Zwraca nazwę opcji wnioskowaną z wartości. "Kolor" / "Rozmiar" / "Wariant".
-// Konserwatywnie: wszystkie values muszą pasować do danego typu.
-function detectOptionName(values: string[]): string {
-  if (values.length === 0) return "Wariant";
-  if (values.every(isColorValue)) return "Kolor";
-  if (values.every(isSizeValue)) return "Rozmiar";
-  return "Wariant";
-}
-
-// Próbuje sparsować nazwę wariantu jako "Nazwa1: Wartość1, Nazwa2: Wartość2".
-// Zwraca obiekt {Nazwa1: Wartość1, ...} albo null jeśli format nie pasuje.
-// Wspiera separatory: ',' i ';'.
-function parseNamedAttrs(name: string): Record<string, string> | null {
-  const pairs = name.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
-  if (pairs.length === 0) return null;
-  const result: Record<string, string> = {};
-  for (const pair of pairs) {
-    const match = pair.match(/^([^:]+?)\s*:\s*(.+)$/);
-    if (!match) return null;
-    const key = match[1].trim();
-    const value = match[2].trim();
-    if (!key || !value) return null;
-    // Capitalize żeby "Kolor: róż" → {Kolor: "Róż"}
-    result[capitalizeFirst(key)] = capitalizeFirst(value);
-  }
-  return Object.keys(result).length > 0 ? result : null;
-}
-
-// Wynik parsowania wariantów — zawiera oryginalny ProductVariants + meta
-// info o tym jak zostały sparsowane (do telemetrii / variants_coverage).
-type ParsedVariants =
-  | { kind: "structured"; variants: ProductVariants }
-  | { kind: "fallback"; variants: ProductVariants }
-  | { kind: "none" };
-
-// Mapper: BL variants (Record<string, BLVariant>) → ProductVariants.
-// Zwraca {kind: "none"} gdy BL nie ma wariantów lub dane są niepoprawne.
-//
-// Strategia 2-etapowa:
-// 1) Jeśli WSZYSTKIE nazwy wariantów mają format "Nazwa: Wartość[, Nazwa2:
-//    Wartość2]" z tymi samymi kluczami — używamy strukturalnych opcji
-//    (np. Kolor + Strona). Najczystszy wynik.
-// 2) Inaczej fallback: jedna opcja "Wariant" z wartościami uzyskanymi
-//    przez strip wspólnego prefixu (np. "Sofa - Lewa" → "Lewa").
-//    Wariantowanie działa, ale UI pokazuje brzydsze nazwy.
-function parseVariantsFromBl(
-  blVariants: Record<string, BLVariant> | undefined,
-  defaultPriceGroup: number,
-  mainPrice: number
-): ParsedVariants {
-  if (!blVariants) return { kind: "none" };
-  const entries = Object.entries(blVariants);
-  if (entries.length === 0) return { kind: "none" };
-
-  const names = entries.map(([, v]) => (v.name ?? "").trim());
-  if (names.some((n) => !n)) return { kind: "none" };
-
-  function priceModifier(v: BLVariant): number {
-    const variantPrice =
-      v.prices?.[String(defaultPriceGroup)] ??
-      Object.values(v.prices ?? {}).find((p) => typeof p === "number" && p > 0) ??
-      mainPrice;
-    return variantPrice - mainPrice;
-  }
-  function variantStock(v: BLVariant): number {
-    return Object.values(v.stock ?? {}).reduce(
-      (s, q) => s + (typeof q === "number" ? q : 0),
-      0
-    );
-  }
-
-  // Dedup wielu BL-wariantów z TYM SAMYM values map do jednej kombinacji.
-  // Sumujemy stocki (suma magazynów == łączna dostępność tej kombinacji),
-  // price_modifier bierzemy z pierwszego (zakładamy że dla danego SKU
-  // koleżanka ustawia spójną cenę, anomalie są błędem konfiguracji w BL).
-  // Klucz dedup: variantKey(values) — order-independent.
-  function dedupCombinations(combos: ProductVariant[]): ProductVariant[] {
-    const byKey = new Map<string, ProductVariant>();
-    for (const c of combos) {
-      const k = variantKey(c.values);
-      const prev = byKey.get(k);
-      if (prev) {
-        byKey.set(k, {
-          ...prev,
-          stock: prev.stock + c.stock,
-        });
-      } else {
-        byKey.set(k, c);
-      }
-    }
-    return Array.from(byKey.values());
-  }
-
-  // ===== Etap 1: strukturalne "Nazwa: Wartość[, ...]" =====
-  const parsed = names.map(parseNamedAttrs);
-  if (parsed.every((p) => p !== null)) {
-    const firstKeys = Object.keys(parsed[0] as Record<string, string>);
-    const allSameKeys = parsed.every((p) => {
-      const keys = Object.keys(p as Record<string, string>);
-      return (
-        keys.length === firstKeys.length &&
-        firstKeys.every((k) => k in (p as Record<string, string>))
-      );
-    });
-    if (allSameKeys && firstKeys.length > 0) {
-      // Wartości per opcja (zachowując kolejność pierwszego wystąpienia)
-      const optionValues = new Map<string, string[]>(
-        firstKeys.map((k) => [k, []])
-      );
-      for (const p of parsed) {
-        for (const k of firstKeys) {
-          const v = (p as Record<string, string>)[k];
-          const arr = optionValues.get(k)!;
-          if (!arr.includes(v)) arr.push(v);
-        }
-      }
-      const options = firstKeys.map((name) => ({
-        name,
-        values: optionValues.get(name)!,
-      }));
-      const rawCombinations: ProductVariant[] = entries.map(([, v], idx) => ({
-        values: parsed[idx] as Record<string, string>,
-        stock: variantStock(v),
-        price_modifier: priceModifier(v),
-      }));
-      // BL może mieć 2 warianty parsowane do tego samego {Kolor:"X", Strona:"Y"}
-      // — dedup żeby findVariant() na karcie produktu działał deterministycznie.
-      return {
-        kind: "structured",
-        variants: { options, combinations: dedupCombinations(rawCombinations) },
-      };
-    }
-  }
-
-  // ===== Etap 2: fallback — strip wspólnego prefixu =====
-  const prefix = commonPrefix(names);
-  const useStripped = prefix.length >= PREFIX_THRESHOLD;
-  // Capitalize pierwszej litery — BL daje "róż", chcemy "Róż" w UI.
-  const rawValues = useStripped
-    ? names.map((n) => capitalizeFirst(n.slice(prefix.length).trim()))
-    : names.map((n) => capitalizeFirst(n.trim()));
-
-  // Auto-detekcja nazwy opcji wg semantyki wartości — "Kolor" gdy wszystkie
-  // wartości pasują do znanej palety, "Rozmiar" gdy wszystkie pasują do
-  // wzorca rozmiaru (NxN / S/M/L), inaczej fallback do "Wariant".
-  // Wartości deduplikowane i niepuste — bo z nich budujemy dropdown w UI.
-  const dedupedValuesForDetection = Array.from(
-    new Set(rawValues.filter((v) => v && v.length > 0))
-  );
-  const optionName = detectOptionName(dedupedValuesForDetection);
-  // Najpierw budujemy raw kombinacje (jedna per BL variant), potem dedup
-  // łączy te z tym samym values mapem sumując stocki. Wartości opcji w UI
-  // dropdown wyciągamy z deduplikowanych combos (zachowuje kolejność).
-  const rawCombinations: ProductVariant[] = entries
-    .map(([, v], idx) => {
-      const rv = rawValues[idx];
-      if (!rv) return null;
-      return {
-        values: { [optionName]: rv },
-        stock: variantStock(v),
-        price_modifier: priceModifier(v),
-      } as ProductVariant;
-    })
-    .filter((c): c is ProductVariant => c !== null);
-
-  if (rawCombinations.length === 0) return { kind: "none" };
-
-  const combinations = dedupCombinations(rawCombinations);
-  const valuesUnique = combinations.map((c) => c.values[optionName]);
-
-  return {
-    kind: "fallback",
-    variants: {
-      options: [{ name: optionName, values: valuesUnique }],
-      combinations,
-    },
-  };
-}
+// Sync ustawia tylko te pola. variants/description_sections/description są
+// zarządzane ręcznie w panelu (DescriptionSectionsEditor/VariantsEditor) —
+// pominięcie ich w upsert: UPDATE nie nadpisuje (preserve), INSERT → default DB.
+type SyncProductFields = Omit<
+  ProductInsert,
+  "variants" | "description_sections" | "description"
+>;
 
 async function mapBlToProduct(
   blId: string,
   bl: BLInventoryProduct,
   defaultPriceGroup: number
 ): Promise<
-  | { ok: true; product: ProductInsert; parsedVariants: ParsedVariants }
+  | { ok: true; product: SyncProductFields }
   | { ok: false; reason: string }
 > {
   const name = bl.text_fields?.name ?? "";
@@ -812,26 +264,15 @@ async function mapBlToProduct(
   const price = defaultPrice(bl, defaultPriceGroup);
   if (!price) return { ok: false, reason: "brak ceny lub cena = 0" };
 
-  // Sklej Opis 1-5 z BL (description + description_extra1..4) z separatorem
-  // \n\n. Każde pole to osobny "Opis N" w panelu BL — koleżanka dopisuje
-  // kolejne i pojawiają się jeden pod drugim na karcie produktu.
-  // NIE strip-ujemy HTML — sanitize robi front (sanitizeProductHtml w product-html.ts).
-  const description = [
-    bl.text_fields?.description,
-    bl.text_fields?.description_extra1,
-    bl.text_fields?.description_extra2,
-    bl.text_fields?.description_extra3,
-    bl.text_fields?.description_extra4,
-  ]
-    .map((s) => (typeof s === "string" ? s.trim() : ""))
-    .filter((s) => s.length > 0)
-    .join("\n\n");
-
   const blFeatures = resolveBlFeatures(bl);
 
-  const product: ProductInsert = {
+  // Sync ustawia tylko pola „twarde" z BL (nazwa, cena, kategoria, zdjęcia,
+  // cechy). description/description_sections/variants są pominięte celowo —
+  // zarządza nimi admin ręcznie w panelu. Pominięcie ich w upsert sprawia, że
+  // UPDATE nie nadpisuje istniejących wartości (preserve), a INSERT dostaje
+  // default DB (description '', description_sections '[]', variants null).
+  const product: SyncProductFields = {
     name: name.trim(),
-    description,
     price,
     category: cat.slug,
     images: pickFirstImage(bl.images),
@@ -847,11 +288,6 @@ async function mapBlToProduct(
     // Wyświetlane na karcie produktu w "Szczegóły produktu" z deduplikacją
     // względem dedykowanych kolumn (Kolor/Materiał/itd. już mają swoje miejsca).
     features: extractAllFeatures(blFeatures),
-    // Sekcje opisu (IKEA-style akordeony) — 5 pól BL → 5 nazwanych sekcji.
-    // Karta produktu renderuje je jako rozwijalne sekcje. Stary description
-    // (joined) zostaje jako legacy fallback + SEO.
-    description_sections: extractDescriptionSections(bl.text_fields),
-    variants: null, // wypełnione niżej z parsedVariants
     // Nowy/wrócony produkt domyślnie widoczny. Warunkowe utrzymanie ręcznego
     // ukrycia (deactivation_source='manual') ustawiane w pętli sync (późniejszy task).
     is_active: true,
@@ -861,12 +297,7 @@ async function mapBlToProduct(
     collection_id: null,
   };
 
-  const parsedVariants = parseVariantsFromBl(bl.variants, defaultPriceGroup, price);
-  if (parsedVariants.kind !== "none") {
-    product.variants = parsedVariants.variants;
-  }
-
-  return { ok: true, product, parsedVariants };
+  return { ok: true, product };
 }
 
 // ============================================================
@@ -925,19 +356,6 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
         inserted_products: [],
         updated_products: [],
         skipped: [],
-        sections_coverage: {
-          total: 0,
-          with_opis: 0,
-          with_wymiary_materialy: 0,
-          with_informacje: 0,
-        },
-        variants_coverage: {
-          total: 0,
-          with_variants: 0,
-          structured: 0,
-          fallback: 0,
-          total_combinations: 0,
-        },
       };
 
       for (const [blId, bl] of Object.entries(products)) {
@@ -950,51 +368,6 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
             reason: mapped.reason,
           });
           continue;
-        }
-
-        // Zachowaj manualne mapowania admina (zdjęcia per wariant + overrides
-        // + image sekcje opisu). BL nie ma tych danych — admin ustawia je
-        // w panelu /admin/produkty.
-        const { data: existing } = await supabase
-          .from("products")
-          .select("variants, description_sections")
-          .eq("baselinker_id", blId)
-          .maybeSingle();
-
-        const existingVariants = (
-          existing as { variants: ProductVariants | null } | null
-        )?.variants;
-        if (mapped.product.variants && existingVariants) {
-          mapped.product.variants = mergeVariantsPreserveAdminEdits(
-            mapped.product.variants,
-            existingVariants
-          );
-        } else if (!mapped.product.variants && existingVariants) {
-          // BLOCKER FIX: BL chwilowo nie zwrócił wariantów (warianty błędnie
-          // skonfigurowane w BL, BL API glitch, koleżanka wyłączyła warianty
-          // w panelu), ale DB ma istniejące warianty z poprzedniego sync
-          // (włącznie z adminem-uploadowanymi zdjęciami per wariant i
-          // overrides nazw). Nie nadpisujemy null'em — zachowujemy stare
-          // warianty + zaznaczamy w skipped log że BL stracił warianty.
-          mapped.product.variants = existingVariants;
-          result.skipped.push({
-            id: blId,
-            name: mapped.product.name,
-            reason:
-              "BL nie zwrócił wariantów, ale produkt miał wcześniej warianty w DB — " +
-              "zachowano stare warianty z zdjęciami admina. Sprawdź w BL czy warianty " +
-              "są poprawnie skonfigurowane.",
-          });
-        }
-
-        const existingSections = (
-          existing as { description_sections: AnySection[] | null } | null
-        )?.description_sections;
-        if (existingSections && existingSections.length > 0) {
-          mapped.product.description_sections = mergeSectionsPreserveAdminImages(
-            mapped.product.description_sections,
-            existingSections
-          );
         }
 
         const { data, error } = await supabase
@@ -1022,37 +395,6 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
         } else {
           result.updated += 1;
           result.updated_products!.push(synced);
-        }
-
-        // Statystyki uzupełnienia sekcji opisu. Liczymy po FAKTYCZNYCH
-        // sekcjach które wyciągnęliśmy z BL (mapped.product.description_sections),
-        // żeby było zgodne z tym co user zobaczy na karcie produktu.
-        // total inkrementujemy zawsze — to liczba "candidates" do sekcji.
-        const scov = result.sections_coverage!;
-        scov.total += 1;
-        const sectionTitles = new Set(
-          (mapped.product.description_sections ?? []).map(
-            (s) => (s as { title?: string }).title ?? ""
-          )
-        );
-        if (sectionTitles.has("Opis")) scov.with_opis += 1;
-        if (sectionTitles.has("Wymiary i materiały")) scov.with_wymiary_materialy += 1;
-        if (sectionTitles.has("Informacje dla klienta")) scov.with_informacje += 1;
-
-        // Statystyki variants — informuje admina ile produktów ma warianty
-        // z BL i jak były sparsowane. Po sync user widzi w panelu czy BL
-        // używa czytelnego formatu nazw ("Kolor: Beżowy") czy wpada w
-        // brzydkawy fallback ("Wariant: 01 beż drewniany stelaż").
-        const vcov = result.variants_coverage!;
-        vcov.total += 1;
-        if (mapped.parsedVariants.kind === "structured") {
-          vcov.with_variants += 1;
-          vcov.structured += 1;
-          vcov.total_combinations += mapped.parsedVariants.variants.combinations.length;
-        } else if (mapped.parsedVariants.kind === "fallback") {
-          vcov.with_variants += 1;
-          vcov.fallback += 1;
-          vcov.total_combinations += mapped.parsedVariants.variants.combinations.length;
         }
       }
 
