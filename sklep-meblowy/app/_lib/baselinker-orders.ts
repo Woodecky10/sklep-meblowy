@@ -27,6 +27,58 @@ type OrderWithItems = Order & {
   baselinker_order_id?: string | null;
 };
 
+// Czyść tylko to, co czyta mapowanie — pozwala testować bez pełnego Product/OrderItem.
+export type BlOrderSourceItem = {
+  product?: { name?: string | null; baselinker_id?: string | null; weight?: number | null } | null;
+  variant_values?: Record<string, string> | null;
+  notes?: string | null;
+  price: number;
+  quantity: number;
+};
+
+// Pozycje zamówienia → format BL. Klient mógł dopisać uwagi (item.notes) —
+// dołączamy do `attributes` obok wariantu. Gdy był rabat (promo_discount > 0),
+// doklejamy ujemną pozycję „Rabat", żeby suma zamówienia w BL = kwota faktycznie
+// zapłacona przez klienta (rabat stosowany na poziomie zamówienia, nie per-pozycja).
+// Bez tego BL pokazywał pełną cenę → błędne faktury/zwroty (K1).
+export function buildBlOrderProducts(
+  items: BlOrderSourceItem[],
+  promoDiscount: number
+): BLOrderProduct[] {
+  const products: BLOrderProduct[] = items.map((item) => {
+    const p = item.product;
+    const baseName = p?.name ?? "Produkt";
+    const variantLabel = item.variant_values
+      ? formatVariantLabel(item.variant_values)
+      : "";
+    const itemNotes = item.notes?.trim() ?? "";
+    const variantSuffix = variantLabel ? ` — ${variantLabel}` : "";
+    const attributes = [variantLabel, itemNotes ? `Uwagi: ${itemNotes}` : ""]
+      .filter(Boolean)
+      .join(" | ");
+    return {
+      product_id: p?.baselinker_id ?? undefined,
+      name: baseName + variantSuffix,
+      attributes: attributes || undefined,
+      price_brutto: Number(item.price),
+      tax_rate: DEFAULT_TAX_RATE,
+      quantity: item.quantity,
+      weight: p?.weight ?? undefined,
+    };
+  });
+
+  if (promoDiscount > 0) {
+    products.push({
+      name: "Rabat",
+      price_brutto: -promoDiscount,
+      tax_rate: DEFAULT_TAX_RATE,
+      quantity: 1,
+    });
+  }
+
+  return products;
+}
+
 export async function pushOrderToBaseLinker(orderId: string): Promise<{
   baselinker_order_id: number | null;
   reason?: string;
@@ -90,36 +142,8 @@ export async function pushOrderToBaseLinker(orderId: string): Promise<{
     (address.fullname ?? "").trim() ||
     "Klient (dane do uzupełnienia)";
 
-  // Mapuj pozycje zamówienia. Klient mógł dopisać uwagi (item.notes) —
-  // dołączamy do `attributes` BL żeby były widoczne pracownikom obok wariantu.
-  const products: BLOrderProduct[] = o.items.map((item) => {
-    const p = item.product;
-    const baseName = p?.name ?? "Produkt";
-    const variantLabel = item.variant_values
-      ? formatVariantLabel(item.variant_values)
-      : "";
-    const itemNotes = (item as { notes?: string | null }).notes?.trim() ?? "";
-    const variantSuffix = variantLabel ? ` — ${variantLabel}` : "";
-    const attributes = [variantLabel, itemNotes ? `Uwagi: ${itemNotes}` : ""]
-      .filter(Boolean)
-      .join(" | ");
-    return {
-      product_id: p?.baselinker_id ?? undefined,
-      name: baseName + variantSuffix,
-      attributes: attributes || undefined,
-      price_brutto: Number(item.price),
-      tax_rate: DEFAULT_TAX_RATE,
-      quantity: item.quantity,
-      weight: p?.weight ?? undefined,
-    };
-  });
-
-  // Koszt dostawy = total - sum(items*qty). Może być 0 (darmowa).
-  const itemsTotal = o.items.reduce(
-    (s, i) => s + Number(i.price) * i.quantity,
-    0
-  );
-  const deliveryPrice = Math.max(0, Number(o.total) - itemsTotal);
+  // Pozycje + ujemna linia „Rabat" gdy był promo_discount (K1).
+  const products = buildBlOrderProducts(o.items, Number(o.promo_discount ?? 0));
 
   const input: BLAddOrderInput = {
     order_status_id: statusId,
@@ -131,7 +155,9 @@ export async function pushOrderToBaseLinker(orderId: string): Promise<{
     email,
     phone: address.phone,
     delivery_method: "Kurier",
-    delivery_price: deliveryPrice,
+    // Dostawa NIE jest wliczana do `total` (checkout: koszt mebli ustala admin
+    // po zamówieniu i dolicza w BL osobno) → tu zawsze 0.
+    delivery_price: 0,
     delivery_fullname: fullname,
     delivery_address: address.street,
     delivery_postcode: address.postal_code,
