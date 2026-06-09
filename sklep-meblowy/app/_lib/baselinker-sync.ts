@@ -839,6 +839,10 @@ async function mapBlToProduct(
     // (joined) zostaje jako legacy fallback + SEO.
     description_sections: extractDescriptionSections(bl.text_fields),
     variants: null, // wypełnione niżej z parsedVariants
+    // Nowy/wrócony produkt domyślnie widoczny. Warunkowe utrzymanie ręcznego
+    // ukrycia (deactivation_source='manual') ustawiane w pętli sync (późniejszy task).
+    is_active: true,
+    deactivation_source: null,
     baselinker_id: blId,
     // Kolekcję przypisuje admin ręcznie w /admin/kolekcje — sync nie ustawia.
     collection_id: null,

@@ -117,6 +117,9 @@ export type Product = {
   variants: ProductVariants | null;
   baselinker_id: string | null;
   collection_id: string | null;
+  // Widoczność w sklepie (RLS). false = ukryty. deactivation_source: kto ukrył.
+  is_active: boolean;
+  deactivation_source: "auto" | "manual" | null;
   created_at: string;
 };
 
