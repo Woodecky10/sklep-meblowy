@@ -11,8 +11,8 @@ import { compressIfNeeded, IconBtn, inputClass, type Toast } from "./_shared";
 // - Sekcje image (admin) — pełna edycja: alt, caption, usuń, move up/down
 // - Między każdą parą sekcji przycisk "+ Dodaj zdjęcie" wstawia image section
 //
-// BL sync nie ruszą image sekcji (mergeSectionsPreserveAdminImages w sync).
-// Text sekcje przychodzą z BL — admin musi je edytować w BL panelu.
+// Wszystkie sekcje opisu (tekst i obrazy) są w pełni zarządzane tutaj,
+// ręcznie przez admina — sync BL ich nie dotyka (od rewizji 2026-06-09).
 export default function DescriptionSectionsEditor({
   productId,
   initial,

@@ -437,9 +437,8 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
         const wasManuallyHidden = existingRow?.deactivation_source === "manual";
         mapped.product.is_active = !wasManuallyHidden;
         mapped.product.deactivation_source = wasManuallyHidden ? "manual" : null;
-        if (existingRow?.is_active === false && existingRow?.deactivation_source === "auto") {
-          reactivated.push({ id: blId, name: mapped.product.name });
-        }
+        const wasAutoHidden =
+          existingRow?.is_active === false && existingRow?.deactivation_source === "auto";
 
         const { data, error } = await supabase
           .from("products")
@@ -458,6 +457,9 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
         }
 
         seenBlIds.add(blId);
+        if (wasAutoHidden) {
+          reactivated.push({ id: blId, name: mapped.product.name });
+        }
 
         // Heurystyka insert vs update — created_at "świeże" (< 5s) = insert
         const isNew =

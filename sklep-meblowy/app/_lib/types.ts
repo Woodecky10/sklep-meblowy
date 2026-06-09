@@ -51,25 +51,20 @@ export type ProductFeature = {
 };
 
 // Sekcja opisu produktu — IKEA-style akordeony na karcie produktu.
-// Discriminated union: text (treść z BL) lub image (wstawione przez admina).
-// Text sekcje wypełnia automatycznie sync BL z pól text_fields wg
-// DESCRIPTION_SECTION_LABELS (3 sekcje: Opis / Wymiary i materiały /
-// Informacje dla klienta). Image sekcje dodaje admin w /admin/produkty/[id].
-// Sync NIE nadpisuje image sekcji ani admin overrides — BL jest źródłem
-// prawdy dla title/body, admin może override per produkt gdy koleżanka
-// pomyliła pola w BL.
+// Discriminated union: text lub image (oba zarządzane ręcznie w panelu).
+// Sekcje opisu są zarządzane ręcznie przez admina w /admin/produkty/[id]
+// (DescriptionSectionsEditor) — sync BL ich nie ustawia (od rewizji 2026-06-09).
 export type ProductDescriptionSectionText = {
   kind: "text";
-  // title + body z BL sync (mapowanie pól w baselinker-sync.ts) ALBO
-  // wpisane przez admina (gdy admin_custom=true).
+  // title + body wpisane przez admina (gdy admin_custom=true) lub
+  // zaimportowane historycznie — w każdym razie niezależne od BL sync.
   title: string;
   body: string;
-  // Per-product admin overrides — przeżywają sync z BL przez
-  // mergeSectionsPreserveAdminImages (match po `title`).
+  // Per-product admin overrides (ukrycie sekcji itp.).
   // Render w sklepie: admin_title || title, admin_body || body.
   // hidden=true → sekcja ukryta przed klientem.
-  // Override-y mają sens tylko dla sekcji z BL — dla admin_custom
-  // sekcji edytujemy bezpośrednio title/body.
+  // Override-y mają sens tylko dla sekcji z admin_custom=false —
+  // dla admin_custom sekcji edytujemy bezpośrednio title/body.
   admin_title?: string;
   admin_body?: string;
   hidden?: boolean;
@@ -111,8 +106,8 @@ export type Product = {
   // kolumny (kolor, materiał itd.) dla wygody wyświetlania. Pusta tablica
   // gdy produkt nie ma żadnych cech w BL.
   features: ProductFeature[];
-  // Sekcje opisu (IKEA-style akordeony). Wypełniane przez sync z 5 pól BL.
-  // Pusta tablica gdy BL nie ma description + extras.
+  // Sekcje opisu (IKEA-style akordeony). Zarządzane ręcznie przez admina
+  // w DescriptionSectionsEditor — sync BL ich nie ustawia.
   description_sections: ProductDescriptionSection[];
   variants: ProductVariants | null;
   baselinker_id: string | null;

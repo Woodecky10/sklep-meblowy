@@ -144,9 +144,9 @@ export async function updateProductBasics(
     dimensions = { width, depth, height };
   }
 
-  // UWAGA: pole `description` celowo pomijane w updates — opis jest single
-  // source of truth z BaseLinkera (sklejone Opis 1-5 w mapBlToProduct).
-  // Admin nie edytuje opisu — robi to inna osoba w panelu BL.
+  // UWAGA: pole `description` celowo pomijane w updates — opis nie jest
+  // synchronizowany z BL (mapBlToProduct go nie ustawia). Opis edytuje się
+  // przez sekcje w DescriptionSectionsEditor, nie przez to pole.
   const updates: Record<string, unknown> = {
     name,
     price,
