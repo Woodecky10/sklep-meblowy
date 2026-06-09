@@ -21,12 +21,30 @@ import ReviewForm from "@/app/_components/ui/ReviewForm";
 import { sanitizeProductHtml } from "@/app/_lib/product-html";
 import ProductDescriptionSections from "@/app/_components/ui/ProductDescriptionSections";
 import { COMPANY } from "@/app/_lib/company";
+import type { Product } from "@/app/_lib/types";
 
 type Props = { params: Promise<{ id: string }> };
 
 // Strip HTML tagów dla meta description (Google nie chce tagów w meta).
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+}
+
+// Plain-text opis dla SEO/JSON-LD. Po wyłączeniu sync opisów plain `description`
+// bywa puste dla nowych produktów — wtedy składamy z widocznych tekstowych
+// sekcji (jedyne źródło opisu, wpisywane ręcznie w panelu).
+function productPlainDescription(product: Product): string {
+  if (product.description && product.description.trim().length > 0) {
+    return product.description;
+  }
+  return (product.description_sections ?? [])
+    .filter(
+      (s): s is Extract<typeof s, { kind: "text" }> =>
+        s.kind === "text" && s.hidden !== true
+    )
+    .map((s) => (s.admin_body ?? s.body).trim())
+    .filter((b) => b.length > 0)
+    .join("\n\n");
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -36,7 +54,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: product.name,
     // Meta description = plain text (bez HTML, max 160 znaków)
-    description: stripHtml(product.description).slice(0, 160),
+    description: stripHtml(productPlainDescription(product)).slice(0, 160),
     openGraph: {
       images: product.images?.[0] ? [{ url: product.images[0] }] : [],
     },
@@ -128,7 +146,7 @@ export default async function ProduktPage({ params }: Props) {
   // Structured data dla Google (schema.org/Product) — rich snippets w SERP-ach:
   // cena, dostępność, gwiazdki/ocena prosto w wynikach wyszukiwania.
   // Plain text description (bez HTML tagów) wymagany przez Google.
-  const plainDescription = stripHtml(product.description).slice(0, 5000);
+  const plainDescription = stripHtml(productPlainDescription(product)).slice(0, 5000);
   const productUrl = `https://${COMPANY.domain}/produkt/${product.id}`;
   const jsonLd: Record<string, unknown> = {
     "@context": "https://schema.org",
