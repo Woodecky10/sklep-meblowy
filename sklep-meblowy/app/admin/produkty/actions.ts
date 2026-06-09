@@ -351,6 +351,36 @@ export async function deleteProduct(formData: FormData): Promise<ActionResult> {
 }
 
 // ============================================================
+// setProductActive — ręczne ukrycie/przywrócenie produktu
+// ============================================================
+// Ukrycie → is_active=false, deactivation_source='manual'
+// (sync BaseLinker NIE reaktywuje produktów ukrytych ręcznie).
+// Przywrócenie → is_active=true, deactivation_source=null.
+export async function setProductActive(
+  productId: string,
+  active: boolean
+): Promise<ActionResult> {
+  await requireAdmin();
+  if (!productId) return { ok: false, error: "Brak id produktu" };
+
+  const supabase = await createAdminClient();
+  const { error } = await supabase
+    .from("products")
+    .update({
+      is_active: active,
+      deactivation_source: active ? null : "manual",
+    } as never)
+    .eq("id", productId);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/admin/produkty");
+  revalidatePath("/sklep");
+  revalidatePath("/");
+  return { ok: true, message: active ? "Produkt przywrócony" : "Produkt ukryty" };
+}
+
+// ============================================================
 // updateProductDescriptionSections — zapisuje sekcje opisu
 // ============================================================
 // Admin może dodawać/usuwać/przesuwać image sekcje między text sekcjami
