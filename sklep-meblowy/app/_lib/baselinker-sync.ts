@@ -321,6 +321,28 @@ async function mapBlToProduct(
 }
 
 // ============================================================
+// Agregacja niezmapowanych kategorii (K2 — banner przeżywa reload)
+// ============================================================
+export function aggregateUnmappedCategories(
+  items: { bl_category_id: number; product_name: string }[]
+): UnmappedCategory[] {
+  const byId = new Map<number, UnmappedCategory>();
+  for (const it of items) {
+    const prev = byId.get(it.bl_category_id);
+    if (prev) {
+      prev.count += 1;
+    } else {
+      byId.set(it.bl_category_id, {
+        bl_category_id: it.bl_category_id,
+        sample_product_name: it.product_name,
+        count: 1,
+      });
+    }
+  }
+  return Array.from(byId.values());
+}
+
+// ============================================================
 // Główna funkcja sync — pull z BL → upsert do Supabase
 // ============================================================
 
@@ -341,6 +363,7 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
     const results: SyncInventoryResult[] = [];
     const seenBlIds = new Set<string>(); // baselinker_id z udanych upsertów
     const reactivated: SyncedProduct[] = []; // wcześniej auto-ukryte, wróciły z BL
+    const unmappedRaw: { bl_category_id: number; product_name: string }[] = [];
     // completedFully: nieudany ODCZYT BL rzuca → catch → ok:false (krok
     // ukrywania jest poza tą ścieżką), więc gdy tu dotrzemy pobranie jest pełne.
     const completedFully = true;
@@ -393,6 +416,12 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
             reason: mapped.reason,
             kind: mapped.kind,
           });
+          if (mapped.unmappedCategoryId != null) {
+            unmappedRaw.push({
+              bl_category_id: mapped.unmappedCategoryId,
+              product_name: bl.text_fields?.name ?? "(brak nazwy)",
+            });
+          }
           continue;
         }
 
@@ -473,6 +502,8 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
       }
     }
 
+    const unmapped_categories = aggregateUnmappedCategories(unmappedRaw);
+
     const totals: SyncTotals = results.reduce(
       (acc, r) => ({
         total_in_bl: acc.total_in_bl + r.total_in_bl,
@@ -490,7 +521,7 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
       deactivated,
       reactivated,
       hide_skipped_reason: skippedReason,
-      // unmapped_categories dochodzi w następnym tasku
+      unmapped_categories,
     };
   } catch (err) {
     if (err instanceof BaseLinkerError) {
@@ -534,6 +565,12 @@ export async function logSyncOutcome(
       skipped_count: outcome.totals.skipped_count,
       results: outcome.results as unknown as Record<string, unknown>,
       error_message: null,
+      report: {
+        deactivated: outcome.deactivated ?? [],
+        reactivated: outcome.reactivated ?? [],
+        hide_skipped_reason: outcome.hide_skipped_reason ?? null,
+        unmapped_categories: outcome.unmapped_categories ?? [],
+      } as unknown as Record<string, unknown>,
     } as never);
   } else {
     await supabase.from("baselinker_sync_log").insert({
@@ -546,6 +583,7 @@ export async function logSyncOutcome(
       skipped_count: 0,
       results: null,
       error_message: outcome.error,
+      report: null,
     } as never);
   }
 }
