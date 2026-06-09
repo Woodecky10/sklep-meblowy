@@ -22,6 +22,9 @@ export type SyncSkippedProduct = {
   id: string;
   name: string;
   reason: string;
+  // owner = właścicielka poprawia w BL; technical = bug dla Mikołaja.
+  // Opcjonalne — stare logi bez tego pola (UI domyśla owner).
+  kind?: "owner" | "technical";
 };
 
 // Pojedynczy produkt który został dodany/zaktualizowany — id z BL + nazwa
@@ -260,24 +263,26 @@ async function mapBlToProduct(
   defaultPriceGroup: number
 ): Promise<
   | { ok: true; product: SyncProductFields }
-  | { ok: false; reason: string }
+  | { ok: false; reason: string; kind: "owner" | "technical"; unmappedCategoryId?: number }
 > {
   const name = bl.text_fields?.name ?? "";
-  if (!name.trim()) return { ok: false, reason: "brak nazwy" };
+  if (!name.trim()) return { ok: false, reason: "brak nazwy", kind: "owner" };
 
   const blCategoryId = Number(bl.category_id ?? 0);
-  if (!blCategoryId) return { ok: false, reason: "brak kategorii w BL" };
+  if (!blCategoryId) return { ok: false, reason: "brak kategorii w BL", kind: "owner" };
 
   const cat = await getCategoryByBaselinkerId(blCategoryId);
   if (!cat) {
     return {
       ok: false,
       reason: `kategoria BL ${blCategoryId} nie zmapowana — dodaj mapowanie w admin panelu /admin/kategorie`,
+      kind: "owner",
+      unmappedCategoryId: blCategoryId,
     };
   }
 
   const price = defaultPrice(bl, defaultPriceGroup);
-  if (!price) return { ok: false, reason: "brak ceny lub cena = 0" };
+  if (!price) return { ok: false, reason: "brak ceny lub cena = 0", kind: "owner" };
 
   const blFeatures = resolveBlFeatures(bl);
 
@@ -386,6 +391,7 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
             id: blId,
             name: bl.text_fields?.name ?? "(brak nazwy)",
             reason: mapped.reason,
+            kind: mapped.kind,
           });
           continue;
         }
@@ -417,6 +423,7 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
             id: blId,
             name: mapped.product.name,
             reason: `błąd zapisu: ${error.message}`,
+            kind: "technical",
           });
           continue;
         }
