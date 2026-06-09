@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const SORTS = [
+  { value: "alphabetic", label: "Alfabetycznie A-Z" },
   { value: "newest", label: "Najnowsze" },
   { value: "price_asc", label: "Cena: rosnąco" },
   { value: "price_desc", label: "Cena: malejąco" },
@@ -47,7 +48,7 @@ export default function FilterBar({
 
   const category = searchParams.get("kategoria") ?? "";
   const collection = searchParams.get("kolekcja") ?? "";
-  const sort = searchParams.get("sortuj") ?? "newest";
+  const sort = searchParams.get("sortuj") ?? "alphabetic";
   const inStockOnly = searchParams.get("dostepne") === "1";
   const selectedColors = (searchParams.get("kolor") ?? "").split(",").filter(Boolean);
   const selectedMaterials = (searchParams.get("material") ?? "").split(",").filter(Boolean);
@@ -150,7 +151,8 @@ export default function FilterBar({
     const params = new URLSearchParams();
     const q = searchParams.get("q");
     if (q) params.set("q", q);
-    if (sort && sort !== "newest") params.set("sortuj", sort);
+    // Sortowanie zachowujemy jeśli różne od default (alphabetic).
+    if (sort && sort !== "alphabetic") params.set("sortuj", sort);
     setPriceMin("");
     setPriceMax("");
     setOpenDropdown(null);

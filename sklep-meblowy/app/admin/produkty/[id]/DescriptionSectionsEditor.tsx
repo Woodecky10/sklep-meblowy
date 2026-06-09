@@ -11,8 +11,8 @@ import { compressIfNeeded, IconBtn, inputClass, type Toast } from "./_shared";
 // - Sekcje image (admin) — pełna edycja: alt, caption, usuń, move up/down
 // - Między każdą parą sekcji przycisk "+ Dodaj zdjęcie" wstawia image section
 //
-// BL sync nie ruszą image sekcji (mergeSectionsPreserveAdminImages w sync).
-// Text sekcje przychodzą z BL — admin musi je edytować w BL panelu.
+// Wszystkie sekcje opisu (tekst i obrazy) są w pełni zarządzane tutaj,
+// ręcznie przez admina — sync BL ich nie dotyka (od rewizji 2026-06-09).
 export default function DescriptionSectionsEditor({
   productId,
   initial,
@@ -50,6 +50,23 @@ export default function DescriptionSectionsEditor({
   function removeSection(idx: number) {
     if (!window.confirm("Usunąć tę sekcję?")) return;
     setSections((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  // Wstawia nową pustą custom text sekcję (admin może edytować inline).
+  // admin_custom=true sprawia że merge logic NIE próbuje match-ować jej
+  // do BL — sekcja przeżywa kolejne sync.
+  function insertCustomTextAt(insertIdx: number) {
+    const newText: ProductDescriptionSection = {
+      kind: "text",
+      title: "",
+      body: "",
+      admin_custom: true,
+    };
+    setSections((prev) => {
+      const next = prev.slice();
+      next.splice(insertIdx, 0, newText);
+      return next;
+    });
   }
 
   async function insertImageAt(insertIdx: number, file: File) {
@@ -105,20 +122,22 @@ export default function DescriptionSectionsEditor({
           Sekcje opisu produktu
         </h2>
         <p className="text-sm text-[var(--muted)] mt-1 max-w-2xl leading-relaxed">
-          Sekcje <strong>tekstowe</strong> (Opis / Wymiary i materiały / Informacje
-          dla klienta) przychodzą z BaseLinkera — domyślnie sync z BL je nadpisuje.
-          Możesz <strong>nadpisać per produkt</strong> (przycisk „Edytuj
-          override" na sekcji) gdy koleżanka pomyliła pola w BL — override
-          przeżywa kolejne sync. Możesz też wstawiać między nimi
-          <strong> zdjęcia kontekstowe</strong> (+ Wstaw zdjęcie tutaj).
+          Sekcje <strong>z BaseLinkera</strong> (Opis / Wymiary i materiały /
+          Informacje dla klienta) przychodzą z sync — domyślnie BL je nadpisuje.
+          Możesz <strong>nadpisać per produkt</strong> (przycisk „Edytuj override")
+          gdy koleżanka pomyliła pola w BL.
+          <br />
+          Możesz też dodać <strong>własne sekcje</strong> (przycisk „+ Dodaj
+          sekcję" → Tekst lub Zdjęcie) — przeżywają kolejne sync z BL.
         </p>
       </div>
 
       <div className="flex flex-col">
         {/* Insert button na samej górze */}
-        <InsertImageButton
+        <InsertSectionButton
           uploading={uploadingIdx === 0}
-          onUpload={(file) => insertImageAt(0, file)}
+          onUploadImage={(file) => insertImageAt(0, file)}
+          onAddCustomText={() => insertCustomTextAt(0)}
         />
 
         {sections.map((s, idx) => (
@@ -146,6 +165,13 @@ export default function DescriptionSectionsEditor({
                     hidden: v,
                   } as Partial<ProductDescriptionSection>)
                 }
+                onTitleChange={(v) =>
+                  patchSection(idx, { title: v } as Partial<ProductDescriptionSection>)
+                }
+                onBodyChange={(v) =>
+                  patchSection(idx, { body: v } as Partial<ProductDescriptionSection>)
+                }
+                onRemove={s.admin_custom ? () => removeSection(idx) : undefined}
                 onMoveUp={idx > 0 ? () => moveSection(idx, -1) : undefined}
                 onMoveDown={idx < sections.length - 1 ? () => moveSection(idx, 1) : undefined}
               />
@@ -161,9 +187,10 @@ export default function DescriptionSectionsEditor({
                 onMoveDown={idx < sections.length - 1 ? () => moveSection(idx, 1) : undefined}
               />
             )}
-            <InsertImageButton
+            <InsertSectionButton
               uploading={uploadingIdx === idx + 1}
-              onUpload={(file) => insertImageAt(idx + 1, file)}
+              onUploadImage={(file) => insertImageAt(idx + 1, file)}
+              onAddCustomText={() => insertCustomTextAt(idx + 1)}
             />
           </div>
         ))}
@@ -202,6 +229,9 @@ function TextSectionRow({
   onAdminTitleChange,
   onAdminBodyChange,
   onToggleHidden,
+  onTitleChange,
+  onBodyChange,
+  onRemove,
   onMoveUp,
   onMoveDown,
 }: {
@@ -209,9 +239,30 @@ function TextSectionRow({
   onAdminTitleChange: (v: string) => void;
   onAdminBodyChange: (v: string) => void;
   onToggleHidden: (v: boolean) => void;
+  // Dla admin_custom sekcji edytujemy title/body bezpośrednio (nie przez
+  // override) — bo nie ma BL truth. Dla BL sekcji te callbacki nie są
+  // używane.
+  onTitleChange: (v: string) => void;
+  onBodyChange: (v: string) => void;
+  // onRemove obecne tylko dla admin_custom sekcji — sekcji z BL nie można
+  // usunąć (sync je odtworzy). Można je tylko ukryć (hidden=true).
+  onRemove?: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
 }) {
+  // Admin custom sekcja — render zupełnie inny (inline editable inputs)
+  if (section.admin_custom) {
+    return (
+      <CustomTextSectionRow
+        section={section}
+        onTitleChange={onTitleChange}
+        onBodyChange={onBodyChange}
+        onRemove={onRemove}
+        onMoveUp={onMoveUp}
+        onMoveDown={onMoveDown}
+      />
+    );
+  }
   // Override = admin coś realnie ustawił. Pomijamy whitespace-only stringi
   // (puste / same spacje nie są realnym override). hidden true LUB false
   // liczy się jako "admin tknął" — patrz onToggleHidden i merge logic.
@@ -418,36 +469,121 @@ function ImageSectionRow({
   );
 }
 
-// Cienki przycisk wstawiający zdjęcie między sekcjami. Ukrywa się gdy brak
-// hover-u (po hover na container). Klik otwiera file picker.
-function InsertImageButton({
-  uploading,
-  onUpload,
+// Inline editable text section (admin custom) — admin pisze title i body
+// bezpośrednio, bez override panel. Sekcja jest niezależna od BL i przeżywa
+// kolejne sync.
+function CustomTextSectionRow({
+  section,
+  onTitleChange,
+  onBodyChange,
+  onRemove,
+  onMoveUp,
+  onMoveDown,
 }: {
-  uploading: boolean;
-  onUpload: (file: File) => void;
+  section: Extract<ProductDescriptionSection, { kind: "text" }>;
+  onTitleChange: (v: string) => void;
+  onBodyChange: (v: string) => void;
+  onRemove?: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }) {
   return (
-    <label className="block py-1 group cursor-pointer">
-      <span className="flex items-center justify-center gap-2 py-1.5 text-xs font-sans uppercase tracking-widest text-[var(--muted)] opacity-40 group-hover:opacity-100 transition-opacity border-y border-dashed border-transparent group-hover:border-[var(--color-gold)]/50">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <circle cx="8.5" cy="8.5" r="1.5" />
-          <polyline points="21 15 16 10 5 21" />
+    <div className="bg-[var(--bg)] border border-[var(--color-gold)]/30 rounded-xl p-4 flex items-start gap-3">
+      <div className="shrink-0 mt-0.5 w-9 h-9 rounded-full bg-[var(--color-gold)]/10 flex items-center justify-center text-[var(--color-gold)]">
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path d="M12 5v14M5 12h14" />
         </svg>
-        {uploading ? "Wgrywam…" : "+ Wstaw zdjęcie tutaj"}
+      </div>
+      <div className="flex-1 min-w-0 flex flex-col gap-2">
+        <p className="text-[10px] font-sans uppercase tracking-widest text-[var(--color-gold)]">
+          Własna sekcja (twoja) — przeżyje sync z BL
+        </p>
         <input
-          type="file"
-          accept="image/*"
-          disabled={uploading}
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            e.target.value = "";
-            if (f) onUpload(f);
-          }}
-          className="hidden"
+          type="text"
+          value={section.title}
+          onChange={(e) => onTitleChange(e.target.value)}
+          placeholder="Tytuł sekcji (np. „Dostępne tkaniny”)"
+          maxLength={120}
+          className={inputClass}
         />
-      </span>
-    </label>
+        <textarea
+          value={section.body}
+          onChange={(e) => onBodyChange(e.target.value)}
+          placeholder="Treść sekcji. HTML dozwolony (akapity, listy, pogrubienia)."
+          rows={6}
+          className={`${inputClass} font-mono text-xs leading-relaxed resize-y`}
+        />
+      </div>
+      <div className="flex flex-col gap-1 shrink-0">
+        <IconBtn label="W górę" onClick={onMoveUp ?? (() => {})} disabled={!onMoveUp}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="18 15 12 9 6 15" />
+          </svg>
+        </IconBtn>
+        <IconBtn label="W dół" onClick={onMoveDown ?? (() => {})} disabled={!onMoveDown}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </IconBtn>
+        {onRemove && (
+          <IconBtn label="Usuń" onClick={onRemove} danger>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z" />
+            </svg>
+          </IconBtn>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Cienki przycisk wstawiający NOWĄ sekcję między istniejące. Po hover
+// pokazuje 2 opcje: Zdjęcie kontekstowe lub Własna sekcja tekstowa.
+function InsertSectionButton({
+  uploading,
+  onUploadImage,
+  onAddCustomText,
+}: {
+  uploading: boolean;
+  onUploadImage: (file: File) => void;
+  onAddCustomText: () => void;
+}) {
+  return (
+    <div className="py-1 group">
+      <div className="flex items-center justify-center gap-3 py-1.5 opacity-40 group-hover:opacity-100 transition-opacity border-y border-dashed border-transparent group-hover:border-[var(--color-gold)]/50">
+        <label className="cursor-pointer inline-flex items-center gap-1.5 text-xs font-sans uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <polyline points="21 15 16 10 5 21" />
+          </svg>
+          {uploading ? "Wgrywam…" : "+ Zdjęcie"}
+          <input
+            type="file"
+            accept="image/*"
+            disabled={uploading}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (f) onUploadImage(f);
+            }}
+            className="hidden"
+          />
+        </label>
+        <span className="text-[var(--muted)] opacity-50">·</span>
+        <button
+          type="button"
+          onClick={onAddCustomText}
+          className="inline-flex items-center gap-1.5 text-xs font-sans uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="4" y1="6" x2="20" y2="6" />
+            <line x1="4" y1="12" x2="20" y2="12" />
+            <line x1="4" y1="18" x2="14" y2="18" />
+          </svg>
+          + Własna sekcja
+        </button>
+      </div>
+    </div>
   );
 }

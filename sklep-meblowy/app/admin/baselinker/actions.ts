@@ -67,6 +67,7 @@ export type SyncLogRow = {
   updated: number;
   skipped_count: number;
   results: unknown;
+  report: unknown;
   error_message: string | null;
 };
 

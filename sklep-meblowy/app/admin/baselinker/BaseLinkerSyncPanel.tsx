@@ -180,6 +180,7 @@ function ResultSummary({
         Czas: {(result.duration_ms / 1000).toFixed(1)}s
         {result.outcome.warning && ` · ${result.outcome.warning}`}
       </p>
+      <SyncReport report={result.outcome as SyncReportData} />
       {result.outcome.results.map((inv) => (
         <InventoryResult key={inv.inventory_id} inv={inv} />
       ))}
@@ -189,7 +190,6 @@ function ResultSummary({
 
 function InventoryResult({ inv }: { inv: SyncInventoryResult }) {
   const [showAllSkipped, setShowAllSkipped] = useState(false);
-  const visibleSkipped = showAllSkipped ? inv.skipped : inv.skipped.slice(0, 5);
 
   // Stare logi w DB nie miały inserted_products/updated_products. Bezpieczny
   // fallback to pusta lista — pokażemy tylko liczbę bez nazw.
@@ -223,194 +223,52 @@ function InventoryResult({ inv }: { inv: SyncInventoryResult }) {
       )}
 
       {inv.skipped.length > 0 && (
-        <div className="mt-3">
-          <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
-            Pominięte produkty:
-          </p>
-          <div className="flex flex-col gap-2">
-            {visibleSkipped.map((s) => (
-              <SkippedRow key={s.id} skipped={s} />
-            ))}
-          </div>
-          {inv.skipped.length > 5 && (
-            <button
-              onClick={() => setShowAllSkipped(!showAllSkipped)}
-              className="mt-2 text-xs text-[var(--color-gold)] hover:underline"
-            >
-              {showAllSkipped
-                ? "Pokaż mniej"
-                : `Pokaż wszystkie (${inv.skipped.length - 5} więcej)`}
-            </button>
-          )}
+        <div className="mt-3 space-y-3">
+          {(() => {
+            const technical = inv.skipped.filter((s) => s.kind === "technical");
+            const owner = inv.skipped.filter((s) => s.kind !== "technical");
+            return (
+              <>
+                {owner.length > 0 && (
+                  <div>
+                    <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
+                      Do poprawienia w BaseLinkerze ({owner.length}):
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {(showAllSkipped ? owner : owner.slice(0, 5)).map((s) => (
+                        <SkippedRow key={s.id} skipped={s} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {technical.length > 0 && (
+                  <div>
+                    <p className="text-xs font-sans uppercase tracking-widest text-red-700 dark:text-red-400 mb-2">
+                      Błąd techniczny — zgłoś Mikołajowi ({technical.length}):
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {technical.map((s) => (
+                        <SkippedRow key={s.id} skipped={s} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {owner.length > 5 && (
+                  <button
+                    onClick={() => setShowAllSkipped(!showAllSkipped)}
+                    className="text-xs text-[var(--color-gold)] hover:underline"
+                  >
+                    {showAllSkipped
+                      ? "Pokaż mniej"
+                      : `Pokaż wszystkie (${owner.length - 5} więcej)`}
+                  </button>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 
-      {inv.sections_coverage && inv.sections_coverage.total > 0 && (
-        <SectionsCoverageBar coverage={inv.sections_coverage} />
-      )}
-
-      {inv.variants_coverage && inv.variants_coverage.total > 0 && (
-        <VariantsCoverageBar coverage={inv.variants_coverage} />
-      )}
-    </div>
-  );
-}
-
-// Pokazuje progress bary uzupełnienia sekcji opisu dla magazynu.
-// Pomaga koleżance widzieć ile produktów ma wypełnione 3 sekcje sklepu:
-//   "Opis" (description + Opis 1 + Opis 2 sklejone)
-//   "Wymiary i materiały" (Opis 3 + Opis 4 sklejone)
-//   "Informacje dla klienta" (dowolny extra_field zaczynający się od tej frazy)
-function SectionsCoverageBar({
-  coverage,
-}: {
-  coverage: {
-    total: number;
-    with_opis: number;
-    with_wymiary_materialy: number;
-    with_informacje: number;
-  };
-}) {
-  const rows: { label: string; field: string; count: number }[] = [
-    {
-      label: "Opis",
-      field: "Opis + Opis 1 + Opis 2",
-      count: coverage.with_opis,
-    },
-    {
-      label: "Wymiary i materiały",
-      field: "Opis 3 + Opis 4",
-      count: coverage.with_wymiary_materialy,
-    },
-    {
-      label: "Informacje dla klienta",
-      field: "extra_field „Informacje dla klienta...”",
-      count: coverage.with_informacje,
-    },
-  ];
-  const total = coverage.total;
-
-  return (
-    <div className="mt-4 pt-3 border-t border-[var(--border)]">
-      <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-3">
-        Uzupełnienie sekcji opisu w BL ({total} produkt{total === 1 ? "" : "ów"})
-      </p>
-      <ul className="flex flex-col gap-2">
-        {rows.map((r) => {
-          const pct = total > 0 ? Math.round((r.count / total) * 100) : 0;
-          const color =
-            pct >= 80 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-red-500";
-          return (
-            <li key={r.label} className="flex items-center gap-3 text-xs">
-              <div className="w-44 shrink-0">
-                <span className="text-[var(--fg)] font-medium">{r.label}</span>
-                <span className="text-[var(--muted)] ml-1.5 font-mono">
-                  (BL: {r.field})
-                </span>
-              </div>
-              <div className="flex-1 h-2 bg-[var(--bg)] border border-[var(--border)] rounded-full overflow-hidden">
-                <div
-                  className={`h-full ${color} transition-all`}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <div className="w-16 text-right shrink-0 text-[var(--muted)] tabular-nums">
-                {r.count}/{total} ({pct}%)
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-      <p className="text-[10px] text-[var(--muted)] italic mt-2 leading-snug">
-        Jeśli sekcja ma 0% — żaden produkt nie ma tego pola wypełnionego w BL.
-        Dopisz informacje w BL → Magazyn → produkt → Opis (Opis 1-4) i odpal
-        ponownie &bdquo;Synchronizuj teraz&rdquo;.
-      </p>
-    </div>
-  );
-}
-
-// Pokazuje statystyki sync wariantów dla magazynu.
-// Mówi koleżance: ile produktów ma warianty z BL i czy nazwy są w czystym
-// formacie ("Kolor: Beżowy, Strona: Lewa") — co daje ładne dropdown'y w
-// sklepie — czy w brzydkim fallbacku (jedno pole "Wariant" z brzydką nazwą).
-function VariantsCoverageBar({
-  coverage,
-}: {
-  coverage: {
-    total: number;
-    with_variants: number;
-    structured: number;
-    fallback: number;
-    total_combinations: number;
-  };
-}) {
-  const total = coverage.total;
-  const withVariantsPct =
-    total > 0 ? Math.round((coverage.with_variants / total) * 100) : 0;
-  const structuredPct =
-    coverage.with_variants > 0
-      ? Math.round((coverage.structured / coverage.with_variants) * 100)
-      : 0;
-  const withColor =
-    withVariantsPct >= 50 ? "bg-emerald-500" : withVariantsPct >= 20 ? "bg-amber-500" : "bg-stone-400";
-  const structuredColor =
-    structuredPct >= 80
-      ? "bg-emerald-500"
-      : structuredPct >= 40
-        ? "bg-amber-500"
-        : "bg-red-500";
-
-  return (
-    <div className="mt-4 pt-3 border-t border-[var(--border)]">
-      <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-3">
-        Warianty z BaseLinkera ({coverage.total_combinations}{" "}
-        kombinacj{coverage.total_combinations === 1 ? "a" : "i"})
-      </p>
-      <ul className="flex flex-col gap-2">
-        <li className="flex items-center gap-3 text-xs">
-          <div className="w-44 shrink-0">
-            <span className="text-[var(--fg)] font-medium">Z wariantami</span>
-          </div>
-          <div className="flex-1 h-2 bg-[var(--bg)] border border-[var(--border)] rounded-full overflow-hidden">
-            <div
-              className={`h-full ${withColor} transition-all`}
-              style={{ width: `${withVariantsPct}%` }}
-            />
-          </div>
-          <div className="w-16 text-right shrink-0 text-[var(--muted)] tabular-nums">
-            {coverage.with_variants}/{total} ({withVariantsPct}%)
-          </div>
-        </li>
-        {coverage.with_variants > 0 && (
-          <li className="flex items-center gap-3 text-xs">
-            <div className="w-44 shrink-0">
-              <span className="text-[var(--fg)] font-medium">
-                Format „Kolor: X"
-              </span>
-              <span className="text-[var(--muted)] ml-1.5 font-mono">
-                (vs fallback)
-              </span>
-            </div>
-            <div className="flex-1 h-2 bg-[var(--bg)] border border-[var(--border)] rounded-full overflow-hidden">
-              <div
-                className={`h-full ${structuredColor} transition-all`}
-                style={{ width: `${structuredPct}%` }}
-              />
-            </div>
-            <div className="w-16 text-right shrink-0 text-[var(--muted)] tabular-nums">
-              {coverage.structured}/{coverage.with_variants} ({structuredPct}%)
-            </div>
-          </li>
-        )}
-      </ul>
-      <p className="text-[10px] text-[var(--muted)] italic mt-2 leading-snug">
-        „Z wariantami" — ile produktów ma w BL zdefiniowane warianty (kolory,
-        rozmiary). „Format Kolor: X" — ile wariantów ma czytelnie nazwane
-        opcje w BL (np. <code>Kolor: Beżowy, Strona: Lewa</code>) — daje to
-        ładne dropdown'y w sklepie. Reszta wpada w fallback („Wariant"
-        z surową nazwą).
-      </p>
     </div>
   );
 }
@@ -482,6 +340,108 @@ function SkippedRow({ skipped }: { skipped: SyncSkippedProduct }) {
   );
 }
 
+type SyncReportData = {
+  deactivated?: { id: string; name: string }[];
+  reactivated?: { id: string; name: string }[];
+  hide_skipped_reason?: string | null;
+  unmapped_categories?: {
+    bl_category_id: number;
+    sample_product_name: string;
+    count: number;
+  }[];
+};
+
+function SyncReport({ report }: { report: SyncReportData }) {
+  const deactivated = report.deactivated ?? [];
+  const reactivated = report.reactivated ?? [];
+  const unmapped = report.unmapped_categories ?? [];
+  const hideSkipped = report.hide_skipped_reason ?? null;
+
+  if (
+    deactivated.length === 0 &&
+    reactivated.length === 0 &&
+    unmapped.length === 0 &&
+    !hideSkipped
+  ) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-3">
+      {unmapped.length > 0 && (
+        <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl">
+          <p className="font-sans text-sm font-semibold text-amber-900 dark:text-amber-200">
+            ⚠️ {unmapped.reduce((s, c) => s + c.count, 0)} produkt(ów) nie trafiło do
+            sklepu — brak mapowania kategorii BaseLinker
+          </p>
+          <ul className="mt-2 flex flex-col gap-1 text-xs text-amber-900 dark:text-amber-200">
+            {unmapped.map((c) => (
+              <li key={c.bl_category_id}>
+                Kategoria BL <span className="font-mono">{c.bl_category_id}</span> ·{" "}
+                {c.count} szt. · np. &bdquo;{c.sample_product_name}&rdquo;
+              </li>
+            ))}
+          </ul>
+          <a
+            href="/admin/kategorie"
+            className="mt-2 inline-block text-xs font-sans uppercase tracking-widest text-amber-900 dark:text-amber-200 underline"
+          >
+            Dodaj mapowanie → /admin/kategorie
+          </a>
+        </div>
+      )}
+
+      {hideSkipped && (
+        <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 rounded-xl text-xs text-red-800 dark:text-red-300">
+          Auto-ukrywanie wstrzymane: {hideSkipped}
+        </div>
+      )}
+
+      {deactivated.length > 0 && (
+        <div>
+          <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
+            Ukryto (znikły z BL) ({deactivated.length}):
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {deactivated.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-start gap-3 p-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg"
+              >
+                <span className="px-2 py-0.5 text-[10px] font-sans rounded shrink-0 mt-0.5 bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300">
+                  BL: {p.id}
+                </span>
+                <p className="text-sm text-[var(--fg)] truncate flex-1 min-w-0">{p.name}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {reactivated.length > 0 && (
+        <div>
+          <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
+            Przywrócono (wróciły do BL) ({reactivated.length}):
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {reactivated.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-start gap-3 p-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg"
+              >
+                <span className="px-2 py-0.5 text-[10px] font-sans rounded shrink-0 mt-0.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200">
+                  BL: {p.id}
+                </span>
+                <p className="text-sm text-[var(--fg)] truncate flex-1 min-w-0">{p.name}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ============================================================
 // Historia: wiersz logu z rozwijanym detalami
 // ============================================================
@@ -506,6 +466,11 @@ function LogRow({
     log.results && typeof log.results === "object"
       ? (log.results as SyncInventoryResult[])
       : [];
+
+  const report =
+    log.report && typeof log.report === "object"
+      ? (log.report as SyncReportData)
+      : null;
 
   return (
     <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl overflow-hidden">
@@ -569,6 +534,7 @@ function LogRow({
           {results.length === 0 && !log.error_message && (
             <p className="text-sm text-[var(--muted)] italic">Brak szczegółowych danych.</p>
           )}
+          {report && <SyncReport report={report} />}
           {results.map((inv) => (
             <InventoryResult key={inv.inventory_id} inv={inv} />
           ))}

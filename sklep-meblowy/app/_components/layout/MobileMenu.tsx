@@ -68,6 +68,14 @@ export default function MobileMenu({
                   </button>
                   {isOpen && (
                     <div className="flex flex-col gap-2 mt-2 pl-4 border-l border-[var(--border)]">
+                      {/* Skrót do całej sekcji bez wybierania sub-kategorii. */}
+                      <Link
+                        href={`/sklep?sekcja=${section.slug}`}
+                        onClick={() => setOpen(false)}
+                        className="text-sm text-[var(--color-gold)] hover:underline transition-colors font-medium"
+                      >
+                        Wszystkie {section.label.toLowerCase()}
+                      </Link>
                       {cats.map((c) => (
                         <Link
                           key={c.slug}

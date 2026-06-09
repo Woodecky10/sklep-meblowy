@@ -45,8 +45,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
-  // Wszystkie produkty — pobieramy bez RLS żeby załapać wszystko co publiczne
-  // (RLS produktów jest read-all bo to public storefront).
+  // Produkty publiczne — RLS (polityka „is_active = true") automatycznie pomija
+  // produkty ukryte, więc sitemap nie indeksuje znikłych z BL.
   const supabase = await createClient();
   const { data: products } = await supabase
     .from("products")

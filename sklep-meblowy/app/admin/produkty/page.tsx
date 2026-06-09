@@ -5,6 +5,7 @@ import { createClient } from "@/app/_lib/supabase/server";
 import type { Product } from "@/app/_lib/types";
 import { hasVariants, totalProductStock } from "@/app/_lib/variants";
 import DeleteProductButton from "./DeleteProductButton";
+import ToggleProductActiveButton from "./ToggleProductActiveButton";
 
 export const metadata = { title: "Produkty — Admin" };
 
@@ -75,6 +76,11 @@ export default async function AdminProductsPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-display text-base font-semibold text-[var(--fg)] truncate">
                     {p.name}
+                    {!p.is_active && (
+                      <span className="ml-2 align-middle px-2 py-0.5 text-[10px] font-sans uppercase tracking-widest rounded bg-stone-200 dark:bg-stone-800 text-stone-600 dark:text-stone-400">
+                        ukryty
+                      </span>
+                    )}
                   </p>
                   <p className="text-xs text-[var(--muted)] mt-0.5">
                     {p.category} · {p.price.toFixed(2)} zł · stock: {stock}
@@ -88,6 +94,7 @@ export default async function AdminProductsPage() {
                 >
                   Edytuj
                 </Link>
+                <ToggleProductActiveButton productId={p.id} isActive={p.is_active} />
                 <DeleteProductButton productId={p.id} productName={p.name} />
               </li>
             );

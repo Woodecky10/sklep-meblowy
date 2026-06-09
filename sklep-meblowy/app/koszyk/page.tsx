@@ -241,7 +241,7 @@ export default function KoszykPage() {
                   od&nbsp;99&nbsp;zł
                   <br />
                   <span className="text-[var(--muted)]">
-                    dokładną wycenę podajemy kontaktowo po&nbsp;zamówieniu
+                    dokładną wycenę podajemy telefonicznie lub mailowo po&nbsp;zamówieniu
                   </span>
                 </span>
               </div>

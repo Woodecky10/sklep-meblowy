@@ -10,62 +10,21 @@ import {
   getInventoryProductsList,
   getInventoryProductsData,
   type BLInventoryProduct,
-  type BLVariant,
+  type BlRetryOptions,
 } from "./baselinker";
+
+// Retry idempotentnych odczytów BL: 3 próby, backoff 0.5s → 1s → 2s.
+const BL_READ_RETRY: BlRetryOptions = { attempts: 3, baseDelayMs: 500 };
 import { getCategoryByBaselinkerId } from "./categories";
-import type {
-  Product,
-  ProductDimensions,
-  ProductVariants,
-  ProductVariant,
-  ProductVariantOverrides,
-} from "./types";
-
-// Klucz do dopasowania wariantów — wartości opcji posortowane po nazwie,
-// żeby kolejność nie miała znaczenia: {Kolor:"róż", Rozmiar:"M"} == {Rozmiar:"M", Kolor:"róż"}
-function variantKey(values: Record<string, string>): string {
-  return Object.keys(values)
-    .sort()
-    .map((k) => `${k}=${values[k]}`)
-    .join("|");
-}
-
-// Merge nowych wariantów (z BL) ze starymi (z DB) — zachowuje ręczne edycje
-// admina (per-variant images, overrides nazw). BL jest źródłem prawdy dla
-// nazw/cen/stocku, admin dla images i overrides.
-export function mergeVariantsPreserveAdminEdits(
-  fresh: ProductVariants,
-  existing: ProductVariants
-): ProductVariants {
-  const existingByKey = new Map<string, ProductVariant>();
-  for (const c of existing.combinations) {
-    existingByKey.set(variantKey(c.values), c);
-  }
-
-  const merged: ProductVariant[] = fresh.combinations.map((c) => {
-    const old = existingByKey.get(variantKey(c.values));
-    if (old?.images && old.images.length > 0) {
-      return { ...c, images: old.images };
-    }
-    return c;
-  });
-
-  // Overrides zachowujemy w całości — to świadoma zmiana admina.
-  const overrides: ProductVariantOverrides | undefined = existing.overrides
-    ? { ...existing.overrides }
-    : undefined;
-
-  return {
-    options: fresh.options,
-    combinations: merged,
-    ...(overrides ? { overrides } : {}),
-  };
-}
+import type { Product, ProductDimensions } from "./types";
 
 export type SyncSkippedProduct = {
   id: string;
   name: string;
   reason: string;
+  // owner = właścicielka poprawia w BL; technical = bug dla Mikołaja.
+  // Opcjonalne — stare logi bez tego pola (UI domyśla owner).
+  kind?: "owner" | "technical";
 };
 
 // Pojedynczy produkt który został dodany/zaktualizowany — id z BL + nazwa
@@ -75,42 +34,6 @@ export type SyncedProduct = {
   name: string;
 };
 
-// Statystyki uzupełnienia sekcji opisu dla jednego magazynu. Pokazuje
-// koleżance ile produktów ma wypełnione kolejne sekcje sklepu — żeby
-// wiedziała co dopisać w BL bez ręcznego sprawdzania per produkt.
-//
-// Mapowanie pól BL → sekcje sklepu zob. DESCRIPTION_SECTION_LABELS.
-export type SyncSectionsCoverage = {
-  // Sumaryczna liczba produktów po sync (zmapowanych = ok)
-  total: number;
-  // Ile produktów ma wypełnioną sekcję "Opis"
-  // (description + description_extra1 + description_extra2 — przynajmniej jedno)
-  with_opis: number;
-  // Ile produktów ma wypełnioną sekcję "Wymiary i materiały"
-  // (description_extra3 + description_extra4 — przynajmniej jedno)
-  with_wymiary_materialy: number;
-  // Ile produktów ma sekcję "Informacje dla klienta" (heurystycznie
-  // wykryta w dowolnym extra_field zaczynającym się od tej frazy)
-  with_informacje: number;
-};
-
-// Statystyki sync wariantów — admin widzi ile produktów po sync ma warianty
-// z BL i jak były sparsowane (strukturalne "Kolor: X, Rozmiar: Y" vs fallback
-// "Wariant: <pełna nazwa>"). Jeśli z 10 wariantowych produktów 9 wpada w
-// fallback, koleżanka powinna w BL zmienić nazwy wariantów na format
-// "Kolor: Beżowy, Strona: Lewa".
-export type SyncVariantsCoverage = {
-  // Suma produktów po sync (zmapowanych = ok)
-  total: number;
-  // Ile produktów ma jakiekolwiek warianty z BL po sync
-  with_variants: number;
-  // Z tego: ile sparsowano jako STRUKTURALNE (parseNamedAttrs success)
-  structured: number;
-  // Z tego: ile wpadło w FALLBACK (jedna opcja "Wariant" z wartościami)
-  fallback: number;
-  // Łączna liczba kombinacji wariantów synced (np. 3 produkty po 6 kombinacji = 18)
-  total_combinations: number;
-};
 
 export type SyncInventoryResult = {
   inventory_id: number;
@@ -123,13 +46,6 @@ export type SyncInventoryResult = {
   inserted_products?: SyncedProduct[];
   updated_products?: SyncedProduct[];
   skipped: SyncSkippedProduct[];
-  // Statystyki uzupełnienia sekcji opisu (description + extras). Pomaga
-  // koleżance widzieć ile produktów ma wypełnione kolejne sekcje BL.
-  // Niekompatybilne wstecz — stare logi nie mają tego pola.
-  sections_coverage?: SyncSectionsCoverage;
-  // Statystyki sync wariantów — ile produktów ma warianty z BL i jak były
-  // sparsowane. Niekompatybilne wstecz — stare logi nie mają tego pola.
-  variants_coverage?: SyncVariantsCoverage;
 };
 
 export type SyncTotals = {
@@ -139,20 +55,85 @@ export type SyncTotals = {
   skipped_count: number;
 };
 
+export type UnmappedCategory = {
+  bl_category_id: number;
+  sample_product_name: string;
+  count: number;
+};
+
 export type SyncOutcome =
-  | { ok: true; results: SyncInventoryResult[]; totals: SyncTotals; warning?: string }
+  | {
+      ok: true;
+      results: SyncInventoryResult[];
+      totals: SyncTotals;
+      warning?: string;
+      // Raport run-level (utwardzenie). Opcjonalne — stare logi ich nie mają.
+      deactivated?: SyncedProduct[];
+      reactivated?: SyncedProduct[];
+      hide_skipped_reason?: string | null;
+      unmapped_categories?: UnmappedCategory[];
+    }
   | { ok: false; error: string; where?: "BaseLinker API" | "internal"; code?: string };
+
+// ============================================================
+// Bezpieczne auto-ukrywanie znikłych produktów (czysta, testowalna funkcja)
+// ============================================================
+export function planDeactivations(
+  dbBlProducts: { baselinker_id: string }[],
+  seenBlIds: Set<string>,
+  guards: { completedFully: boolean; maxRatio: number; maxAbsoluteFloor: number }
+): { toDeactivate: string[]; skippedReason: string | null } {
+  if (!guards.completedFully) {
+    return {
+      toDeactivate: [],
+      skippedReason:
+        "pobranie z BaseLinkera było niekompletne — pominięto auto-ukrywanie dla bezpieczeństwa",
+    };
+  }
+
+  const candidates = dbBlProducts
+    .map((p) => p.baselinker_id)
+    .filter((id) => !!id && !seenBlIds.has(id));
+
+  if (candidates.length === 0) {
+    return { toDeactivate: [], skippedReason: null };
+  }
+
+  const threshold = Math.max(
+    guards.maxRatio * dbBlProducts.length,
+    guards.maxAbsoluteFloor
+  );
+  if (candidates.length > threshold) {
+    return {
+      toDeactivate: [],
+      skippedReason: `podejrzanie dużo (${candidates.length}) produktów do ukrycia — sprawdź BaseLinker i potwierdź ręcznie`,
+    };
+  }
+
+  return { toDeactivate: candidates, skippedReason: null };
+}
 
 // ============================================================
 // Mappery: BL inventory product → schema products (Supabase)
 // ============================================================
 
-function pickFirstImage(images: BLInventoryProduct["images"]): string[] {
+export function pickFirstImage(images: BLInventoryProduct["images"]): string[] {
   if (!images) return [];
-  const values = Object.values(images).filter(
-    (v): v is string => typeof v === "string" && v.length > 0
-  );
-  return values;
+  // Obiekt {1,2,3} → sortuj klucze numerycznie (stabilna kolejność galerii
+  // między syncami). Tablica → bez zmian.
+  const ordered = Array.isArray(images)
+    ? images
+    : Object.keys(images)
+        .sort((a, b) => Number(a) - Number(b))
+        .map((k) => (images as Record<string, string>)[k]);
+  return ordered.filter((v): v is string => typeof v === "string" && v.length > 0);
+}
+
+// Tolerancja źródła cech: audyt pokazał, że cechy realnie siedzą pod
+// text_fields.features (a kod czytał top-level bl.features). Chroni Kolor/
+// Materiał/Konstrukcję/Specyfikację przed cichym wyzerowaniem.
+export function resolveBlFeatures(bl: BLInventoryProduct): BLInventoryProduct["features"] {
+  return (bl.text_fields?.features as BLInventoryProduct["features"]) ?? bl.features;
 }
 
 function getFeature(
@@ -243,187 +224,6 @@ function extractAllFeatures(
     .map((f) => ({ key: f.name.trim(), value: f.value.trim() }));
 }
 
-// Hardcoded mapowanie pól BL na sekcje sklepowe (akordeony IKEA-style).
-// Każda sekcja może łączyć wiele pól BL — łączymy je separatorem \n\n.
-// Sekcja "Informacje dla klienta" wykrywana heurystycznie (BL nie ma
-// stałego pola dla niej — koleżanka wpisuje w dowolny extra_field).
-//
-// Konwencja BL (jak ma być wypełniane przez koleżankę):
-//   Opis (głównego)        + Opis 1 + Opis 2  → "Opis" w sklepie
-//   Opis 3                  + Opis 4          → "Wymiary i materiały"
-//   Dowolny extra_field zaczynający się od "Informacje dla klienta" → osobna sekcja
-//
-// Wcześniejsza konwencja (do PR #36) była z 5 oddzielnymi sekcjami
-// (Materiał i wykonanie / Pielęgnacja / Wymiary szczegółowe / FAQ).
-// Klientka zdecydowała że ją to za dużo akordeonów — uproszczenie do 3.
-const DESCRIPTION_SECTION_LABELS: { fields: string[]; title: string }[] = [
-  {
-    fields: ["description", "description_extra1", "description_extra2"],
-    title: "Opis",
-  },
-  {
-    fields: ["description_extra3", "description_extra4"],
-    title: "Wymiary i materiały",
-  },
-];
-
-// Klucze które już zostały spożyte przez sekcje powyżej — żebyśmy nie
-// duplikowali ich w heurystyce "Informacje dla klienta".
-const CONSUMED_FIELDS = new Set(
-  DESCRIPTION_SECTION_LABELS.flatMap((s) => s.fields)
-);
-
-// Frazy które rozpoznajemy jako początek sekcji "Informacje dla klienta".
-// Skanujemy WSZYSTKIE text_fields (description_extra5-10, extra_field_XXXX)
-// szukając pola które VALUE zaczyna się od tej frazy. Tak omijamy problem
-// niespójnego nazywania pól w BL — szukamy po treści, nie po nazwie pola.
-const INFO_SECTION_PATTERNS = [
-  /^informacje\s+dla\s+klienta/i,
-  /^uwaga\s*[:!]/i,
-  /^uwagi\s+dla\s+klienta/i,
-];
-
-// Builduje sekcje opisu z pól BL text_fields wg konwencji powyżej.
-// Pomija sekcje gdzie wszystkie pola są puste (nie pokazujemy pustych
-// akordeonów na karcie produktu).
-function extractDescriptionSections(
-  textFields: BLInventoryProduct["text_fields"]
-): { title: string; body: string; kind: "text" }[] {
-  if (!textFields) return [];
-  const fields = textFields as Record<string, string | undefined>;
-  const sections: { title: string; body: string; kind: "text" }[] = [];
-
-  for (const { fields: blFields, title } of DESCRIPTION_SECTION_LABELS) {
-    const parts: string[] = [];
-    for (const f of blFields) {
-      const raw = fields[f];
-      if (typeof raw === "string") {
-        const trimmed = raw.trim();
-        if (trimmed.length > 0) parts.push(trimmed);
-      }
-    }
-    if (parts.length === 0) continue;
-    sections.push({ title, body: parts.join("\n\n"), kind: "text" });
-  }
-
-  // Heurystycznie wykryj "Informacje dla klienta" — przeszukaj wszystkie
-  // text_fields które NIE zostały już spożyte przez sekcje powyżej.
-  // Bierzemy PIERWSZE pole którego VALUE zaczyna się od pasującej frazy
-  // (po stripie HTML tagów, żeby <p>Informacje dla klienta</p> się łapało).
-  for (const [key, value] of Object.entries(fields)) {
-    if (CONSUMED_FIELDS.has(key)) continue;
-    if (typeof value !== "string") continue;
-    const stripped = value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-    if (stripped.length === 0) continue;
-    const head = stripped.slice(0, 100);
-    if (INFO_SECTION_PATTERNS.some((re) => re.test(head))) {
-      sections.push({
-        title: "Informacje dla klienta",
-        body: value.trim(),
-        kind: "text",
-      });
-      break;
-    }
-  }
-
-  return sections;
-}
-
-// Sekcja opisu (uniwersalny typ pomocniczy dla merge logic)
-type AnySection =
-  | { kind: "text"; title: string; body: string }
-  | {
-      kind: "image";
-      image_url: string;
-      image_alt: string;
-      caption?: string;
-    };
-
-// Merge nowych text sekcji z BL ze starymi z DB. Trzymamy 3 typy danych:
-// - image sekcje admina (między text) — zawsze zachowane
-// - text title/body z BL — nadpisywane przez fresh
-// - admin overrides per text section (admin_title, admin_body, hidden) —
-//   przeżywają sync, dzięki nim admin może naprawić rozjazd w polach BL
-//   bez konieczności edytowania w BL panel.
-//
-// Strategia: dla każdej istniejącej sekcji w DB:
-// - jeśli image → zachowaj
-// - jeśli text → znajdź matching w nowych BL (po title), użyj BL title/body
-//   + zachowaj admin_title/admin_body/hidden z istniejącej sekcji
-//   (jeśli BL już nie ma takiej sekcji → zachowaj jeśli admin coś zoverridował,
-//    inaczej drop)
-// Następnie dopisz na końcu te BL sekcje które nie miały odpowiednika w DB.
-export function mergeSectionsPreserveAdminImages(
-  fresh: AnySection[],
-  existing: AnySection[]
-): AnySection[] {
-  if (existing.length === 0) return fresh;
-
-  const freshByTitle = new Map<string, AnySection>();
-  for (const s of fresh) {
-    if (s.kind === "text") freshByTitle.set(s.title, s);
-  }
-
-  const matchedTitles = new Set<string>();
-  const merged: AnySection[] = [];
-
-  for (const s of existing) {
-    if (s.kind === "image") {
-      merged.push(s); // zachowaj obraz admina
-      continue;
-    }
-
-    // text — sprawdź czy BL nadal ma sekcję o tym samym title
-    const updated = freshByTitle.get(s.title);
-    const existingText = s as {
-      kind: "text";
-      title: string;
-      body: string;
-      admin_title?: string;
-      admin_body?: string;
-      hidden?: boolean;
-    };
-
-    if (updated && updated.kind === "text") {
-      // BL ma tę sekcję — użyj BL title/body, ZACHOWAJ admin overrides
-      merged.push({
-        ...updated,
-        ...(existingText.admin_title !== undefined && {
-          admin_title: existingText.admin_title,
-        }),
-        ...(existingText.admin_body !== undefined && {
-          admin_body: existingText.admin_body,
-        }),
-        ...(existingText.hidden !== undefined && {
-          hidden: existingText.hidden,
-        }),
-      });
-      matchedTitles.add(s.title);
-    } else if (
-      existingText.admin_title !== undefined ||
-      existingText.admin_body !== undefined ||
-      existingText.hidden !== undefined
-    ) {
-      // BL już nie ma tej sekcji ALE admin coś tu robił (override title/body
-      // albo flagował hidden) → zachowaj. Admin świadomie ustawił coś,
-      // nie usuwamy bez jego zgody. hidden !== undefined (nie === true)
-      // bo admin który UN-hide też pozostawia `hidden: false` — to znak że
-      // ma kontrolę i nie chcemy go zaskoczyć dropem.
-      merged.push(existingText);
-    }
-    // BL nie ma + admin nie zoverridował → drop
-  }
-
-  // Dopisz na końcu nowe text sekcje z BL których nie było w DB
-  for (const s of fresh) {
-    if (s.kind === "text" && !matchedTitles.has(s.title)) {
-      merged.push(s);
-    }
-  }
-
-  return merged;
-}
-
 function buildDimensions(bl: BLInventoryProduct): ProductDimensions | null {
   const w = Number(bl.width ?? 0);
   const h = Number(bl.height ?? 0);
@@ -449,258 +249,97 @@ type ProductInsert = Omit<Product, "id" | "created_at"> & {
   created_at?: string;
 };
 
-// Longest common prefix (case-sensitive) — pomocnicze do parsera wariantów.
-function commonPrefix(strings: string[]): string {
-  if (strings.length === 0) return "";
-  let p = strings[0];
-  for (let i = 1; i < strings.length; i++) {
-    while (!strings[i].startsWith(p)) {
-      p = p.slice(0, -1);
-      if (!p) return "";
-    }
-  }
-  return p;
-}
-
-// Najmniejszy próg długości prefixu żeby uznać że "warto stripować".
-// Krótsze prefixy → fallback: pełne nazwy jako wartości.
-const PREFIX_THRESHOLD = 5;
-
-// Próbuje sparsować nazwę wariantu jako "Nazwa1: Wartość1, Nazwa2: Wartość2".
-// Zwraca obiekt {Nazwa1: Wartość1, ...} albo null jeśli format nie pasuje.
-// Wspiera separatory: ',' i ';'.
-function parseNamedAttrs(name: string): Record<string, string> | null {
-  const pairs = name.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
-  if (pairs.length === 0) return null;
-  const result: Record<string, string> = {};
-  for (const pair of pairs) {
-    const match = pair.match(/^([^:]+?)\s*:\s*(.+)$/);
-    if (!match) return null;
-    const key = match[1].trim();
-    const value = match[2].trim();
-    if (!key || !value) return null;
-    result[key] = value;
-  }
-  return Object.keys(result).length > 0 ? result : null;
-}
-
-// Wynik parsowania wariantów — zawiera oryginalny ProductVariants + meta
-// info o tym jak zostały sparsowane (do telemetrii / variants_coverage).
-type ParsedVariants =
-  | { kind: "structured"; variants: ProductVariants }
-  | { kind: "fallback"; variants: ProductVariants }
-  | { kind: "none" };
-
-// Mapper: BL variants (Record<string, BLVariant>) → ProductVariants.
-// Zwraca {kind: "none"} gdy BL nie ma wariantów lub dane są niepoprawne.
-//
-// Strategia 2-etapowa:
-// 1) Jeśli WSZYSTKIE nazwy wariantów mają format "Nazwa: Wartość[, Nazwa2:
-//    Wartość2]" z tymi samymi kluczami — używamy strukturalnych opcji
-//    (np. Kolor + Strona). Najczystszy wynik.
-// 2) Inaczej fallback: jedna opcja "Wariant" z wartościami uzyskanymi
-//    przez strip wspólnego prefixu (np. "Sofa - Lewa" → "Lewa").
-//    Wariantowanie działa, ale UI pokazuje brzydsze nazwy.
-function parseVariantsFromBl(
-  blVariants: Record<string, BLVariant> | undefined,
-  defaultPriceGroup: number,
-  mainPrice: number
-): ParsedVariants {
-  if (!blVariants) return { kind: "none" };
-  const entries = Object.entries(blVariants);
-  if (entries.length === 0) return { kind: "none" };
-
-  const names = entries.map(([, v]) => (v.name ?? "").trim());
-  if (names.some((n) => !n)) return { kind: "none" };
-
-  function priceModifier(v: BLVariant): number {
-    const variantPrice =
-      v.prices?.[String(defaultPriceGroup)] ??
-      Object.values(v.prices ?? {}).find((p) => typeof p === "number" && p > 0) ??
-      mainPrice;
-    return variantPrice - mainPrice;
-  }
-  function variantStock(v: BLVariant): number {
-    return Object.values(v.stock ?? {}).reduce(
-      (s, q) => s + (typeof q === "number" ? q : 0),
-      0
-    );
-  }
-
-  // Dedup wielu BL-wariantów z TYM SAMYM values map do jednej kombinacji.
-  // Sumujemy stocki (suma magazynów == łączna dostępność tej kombinacji),
-  // price_modifier bierzemy z pierwszego (zakładamy że dla danego SKU
-  // koleżanka ustawia spójną cenę, anomalie są błędem konfiguracji w BL).
-  // Klucz dedup: variantKey(values) — order-independent.
-  function dedupCombinations(combos: ProductVariant[]): ProductVariant[] {
-    const byKey = new Map<string, ProductVariant>();
-    for (const c of combos) {
-      const k = variantKey(c.values);
-      const prev = byKey.get(k);
-      if (prev) {
-        byKey.set(k, {
-          ...prev,
-          stock: prev.stock + c.stock,
-        });
-      } else {
-        byKey.set(k, c);
-      }
-    }
-    return Array.from(byKey.values());
-  }
-
-  // ===== Etap 1: strukturalne "Nazwa: Wartość[, ...]" =====
-  const parsed = names.map(parseNamedAttrs);
-  if (parsed.every((p) => p !== null)) {
-    const firstKeys = Object.keys(parsed[0] as Record<string, string>);
-    const allSameKeys = parsed.every((p) => {
-      const keys = Object.keys(p as Record<string, string>);
-      return (
-        keys.length === firstKeys.length &&
-        firstKeys.every((k) => k in (p as Record<string, string>))
-      );
-    });
-    if (allSameKeys && firstKeys.length > 0) {
-      // Wartości per opcja (zachowując kolejność pierwszego wystąpienia)
-      const optionValues = new Map<string, string[]>(
-        firstKeys.map((k) => [k, []])
-      );
-      for (const p of parsed) {
-        for (const k of firstKeys) {
-          const v = (p as Record<string, string>)[k];
-          const arr = optionValues.get(k)!;
-          if (!arr.includes(v)) arr.push(v);
-        }
-      }
-      const options = firstKeys.map((name) => ({
-        name,
-        values: optionValues.get(name)!,
-      }));
-      const rawCombinations: ProductVariant[] = entries.map(([, v], idx) => ({
-        values: parsed[idx] as Record<string, string>,
-        stock: variantStock(v),
-        price_modifier: priceModifier(v),
-      }));
-      // BL może mieć 2 warianty parsowane do tego samego {Kolor:"X", Strona:"Y"}
-      // — dedup żeby findVariant() na karcie produktu działał deterministycznie.
-      return {
-        kind: "structured",
-        variants: { options, combinations: dedupCombinations(rawCombinations) },
-      };
-    }
-  }
-
-  // ===== Etap 2: fallback — strip wspólnego prefixu, opcja "Wariant" =====
-  const prefix = commonPrefix(names);
-  const useStripped = prefix.length >= PREFIX_THRESHOLD;
-  const rawValues = useStripped
-    ? names.map((n) => n.slice(prefix.length).trim())
-    : names.map((n) => n.trim());
-
-  const optionName = "Wariant";
-  // Najpierw budujemy raw kombinacje (jedna per BL variant), potem dedup
-  // łączy te z tym samym values mapem sumując stocki. Wartości opcji w UI
-  // dropdown wyciągamy z deduplikowanych combos (zachowuje kolejność).
-  const rawCombinations: ProductVariant[] = entries
-    .map(([, v], idx) => {
-      const rv = rawValues[idx];
-      if (!rv) return null;
-      return {
-        values: { [optionName]: rv },
-        stock: variantStock(v),
-        price_modifier: priceModifier(v),
-      } as ProductVariant;
-    })
-    .filter((c): c is ProductVariant => c !== null);
-
-  if (rawCombinations.length === 0) return { kind: "none" };
-
-  const combinations = dedupCombinations(rawCombinations);
-  const valuesUnique = combinations.map((c) => c.values[optionName]);
-
-  return {
-    kind: "fallback",
-    variants: {
-      options: [{ name: optionName, values: valuesUnique }],
-      combinations,
-    },
-  };
-}
+// Sync ustawia tylko te pola. variants/description_sections/description są
+// zarządzane ręcznie w panelu (DescriptionSectionsEditor/VariantsEditor) —
+// pominięcie ich w upsert: UPDATE nie nadpisuje (preserve), INSERT → default DB.
+type SyncProductFields = Omit<
+  ProductInsert,
+  "variants" | "description_sections" | "description"
+>;
 
 async function mapBlToProduct(
   blId: string,
   bl: BLInventoryProduct,
   defaultPriceGroup: number
 ): Promise<
-  | { ok: true; product: ProductInsert; parsedVariants: ParsedVariants }
-  | { ok: false; reason: string }
+  | { ok: true; product: SyncProductFields }
+  | { ok: false; reason: string; kind: "owner" | "technical"; unmappedCategoryId?: number }
 > {
   const name = bl.text_fields?.name ?? "";
-  if (!name.trim()) return { ok: false, reason: "brak nazwy" };
+  if (!name.trim()) return { ok: false, reason: "brak nazwy", kind: "owner" };
 
   const blCategoryId = Number(bl.category_id ?? 0);
-  if (!blCategoryId) return { ok: false, reason: "brak kategorii w BL" };
+  if (!blCategoryId) return { ok: false, reason: "brak kategorii w BL", kind: "owner" };
 
   const cat = await getCategoryByBaselinkerId(blCategoryId);
   if (!cat) {
     return {
       ok: false,
       reason: `kategoria BL ${blCategoryId} nie zmapowana — dodaj mapowanie w admin panelu /admin/kategorie`,
+      kind: "owner",
+      unmappedCategoryId: blCategoryId,
     };
   }
 
   const price = defaultPrice(bl, defaultPriceGroup);
-  if (!price) return { ok: false, reason: "brak ceny lub cena = 0" };
+  if (!price) return { ok: false, reason: "brak ceny lub cena = 0", kind: "owner" };
 
-  // Sklej Opis 1-5 z BL (description + description_extra1..4) z separatorem
-  // \n\n. Każde pole to osobny "Opis N" w panelu BL — koleżanka dopisuje
-  // kolejne i pojawiają się jeden pod drugim na karcie produktu.
-  // NIE strip-ujemy HTML — sanitize robi front (sanitizeProductHtml w product-html.ts).
-  const description = [
-    bl.text_fields?.description,
-    bl.text_fields?.description_extra1,
-    bl.text_fields?.description_extra2,
-    bl.text_fields?.description_extra3,
-    bl.text_fields?.description_extra4,
-  ]
-    .map((s) => (typeof s === "string" ? s.trim() : ""))
-    .filter((s) => s.length > 0)
-    .join("\n\n");
+  const blFeatures = resolveBlFeatures(bl);
 
-  const product: ProductInsert = {
+  // Sync ustawia tylko pola „twarde" z BL (nazwa, cena, kategoria, zdjęcia,
+  // cechy). description/description_sections/variants są pominięte celowo —
+  // zarządza nimi admin ręcznie w panelu. Pominięcie ich w upsert sprawia, że
+  // UPDATE nie nadpisuje istniejących wartości (preserve), a INSERT dostaje
+  // default DB (description '', description_sections '[]', variants null).
+  const product: SyncProductFields = {
     name: name.trim(),
-    description,
     price,
     category: cat.slug,
     images: pickFirstImage(bl.images),
     stock: 0, // meble na zamówienie — nieużywane
-    color: getFeature(bl.features, "Kolor"),
-    material: getFeature(bl.features, "Materiał"),
+    color: getFeature(blFeatures, "Kolor"),
+    material: getFeature(blFeatures, "Materiał"),
     dimensions: buildDimensions(bl),
     weight: bl.weight && bl.weight > 0 ? Number(bl.weight) : null,
-    construction: getFeature(bl.features, "Konstrukcja"),
-    delivery_time: getFeature(bl.features, "Czas realizacji"),
-    warranty: getFeature(bl.features, "Gwarancja"),
+    construction: getFeature(blFeatures, "Konstrukcja"),
+    delivery_time: getFeature(blFeatures, "Czas realizacji"),
+    warranty: getFeature(blFeatures, "Gwarancja"),
     // WSZYSTKIE cechy z BL — Allegro template parametry w pełnym zestawie.
     // Wyświetlane na karcie produktu w "Szczegóły produktu" z deduplikacją
     // względem dedykowanych kolumn (Kolor/Materiał/itd. już mają swoje miejsca).
-    features: extractAllFeatures(bl.features),
-    // Sekcje opisu (IKEA-style akordeony) — 5 pól BL → 5 nazwanych sekcji.
-    // Karta produktu renderuje je jako rozwijalne sekcje. Stary description
-    // (joined) zostaje jako legacy fallback + SEO.
-    description_sections: extractDescriptionSections(bl.text_fields),
-    variants: null, // wypełnione niżej z parsedVariants
+    features: extractAllFeatures(blFeatures),
+    // Nowy/wrócony produkt domyślnie widoczny. Warunkowe utrzymanie ręcznego
+    // ukrycia (deactivation_source='manual') ustawiane w pętli sync (późniejszy task).
+    is_active: true,
+    deactivation_source: null,
     baselinker_id: blId,
     // Kolekcję przypisuje admin ręcznie w /admin/kolekcje — sync nie ustawia.
     collection_id: null,
   };
 
-  const parsedVariants = parseVariantsFromBl(bl.variants, defaultPriceGroup, price);
-  if (parsedVariants.kind !== "none") {
-    product.variants = parsedVariants.variants;
-  }
+  return { ok: true, product };
+}
 
-  return { ok: true, product, parsedVariants };
+// ============================================================
+// Agregacja niezmapowanych kategorii (K2 — banner przeżywa reload)
+// ============================================================
+export function aggregateUnmappedCategories(
+  items: { bl_category_id: number; product_name: string }[]
+): UnmappedCategory[] {
+  const byId = new Map<number, UnmappedCategory>();
+  for (const it of items) {
+    const prev = byId.get(it.bl_category_id);
+    if (prev) {
+      prev.count += 1;
+    } else {
+      byId.set(it.bl_category_id, {
+        bl_category_id: it.bl_category_id,
+        sample_product_name: it.product_name,
+        count: 1,
+      });
+    }
+  }
+  return Array.from(byId.values());
 }
 
 // ============================================================
@@ -710,7 +349,7 @@ async function mapBlToProduct(
 export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
   try {
     const supabase = await createAdminClient();
-    const inventories = await getInventories();
+    const inventories = await getInventories(BL_READ_RETRY);
 
     if (inventories.length === 0) {
       return {
@@ -722,13 +361,19 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
     }
 
     const results: SyncInventoryResult[] = [];
+    const seenBlIds = new Set<string>(); // baselinker_id z udanych upsertów
+    const reactivated: SyncedProduct[] = []; // wcześniej auto-ukryte, wróciły z BL
+    const unmappedRaw: { bl_category_id: number; product_name: string }[] = [];
+    // completedFully: nieudany ODCZYT BL rzuca → catch → ok:false (krok
+    // ukrywania jest poza tą ścieżką), więc gdy tu dotrzemy pobranie jest pełne.
+    const completedFully = true;
 
     for (const inv of inventories) {
       // BL paginuje listę produktów po 1000 — pobierajmy wszystkie strony
       const allIds: string[] = [];
       let page = 1;
       while (true) {
-        const list = await getInventoryProductsList(inv.inventory_id, page);
+        const list = await getInventoryProductsList(inv.inventory_id, page, BL_READ_RETRY);
         const ids = Object.keys(list.products ?? {});
         if (ids.length === 0) break;
         allIds.push(...ids);
@@ -746,7 +391,7 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
       const products: Record<string, BLInventoryProduct> = {};
       for (let i = 0; i < allIds.length; i += 1000) {
         const chunk = allIds.slice(i, i + 1000);
-        const data = await getInventoryProductsData(inv.inventory_id, chunk);
+        const data = await getInventoryProductsData(inv.inventory_id, chunk, BL_READ_RETRY);
         Object.assign(products, data.products ?? {});
       }
 
@@ -759,19 +404,6 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
         inserted_products: [],
         updated_products: [],
         skipped: [],
-        sections_coverage: {
-          total: 0,
-          with_opis: 0,
-          with_wymiary_materialy: 0,
-          with_informacje: 0,
-        },
-        variants_coverage: {
-          total: 0,
-          with_variants: 0,
-          structured: 0,
-          fallback: 0,
-          total_combinations: 0,
-        },
       };
 
       for (const [blId, bl] of Object.entries(products)) {
@@ -782,54 +414,31 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
             id: blId,
             name: bl.text_fields?.name ?? "(brak nazwy)",
             reason: mapped.reason,
+            kind: mapped.kind,
           });
+          if (mapped.unmappedCategoryId != null) {
+            unmappedRaw.push({
+              bl_category_id: mapped.unmappedCategoryId,
+              product_name: bl.text_fields?.name ?? "(brak nazwy)",
+            });
+          }
           continue;
         }
 
-        // Zachowaj manualne mapowania admina (zdjęcia per wariant + overrides
-        // + image sekcje opisu). BL nie ma tych danych — admin ustawia je
-        // w panelu /admin/produkty.
         const { data: existing } = await supabase
           .from("products")
-          .select("variants, description_sections")
+          .select("is_active, deactivation_source")
           .eq("baselinker_id", blId)
           .maybeSingle();
-
-        const existingVariants = (
-          existing as { variants: ProductVariants | null } | null
-        )?.variants;
-        if (mapped.product.variants && existingVariants) {
-          mapped.product.variants = mergeVariantsPreserveAdminEdits(
-            mapped.product.variants,
-            existingVariants
-          );
-        } else if (!mapped.product.variants && existingVariants) {
-          // BLOCKER FIX: BL chwilowo nie zwrócił wariantów (warianty błędnie
-          // skonfigurowane w BL, BL API glitch, koleżanka wyłączyła warianty
-          // w panelu), ale DB ma istniejące warianty z poprzedniego sync
-          // (włącznie z adminem-uploadowanymi zdjęciami per wariant i
-          // overrides nazw). Nie nadpisujemy null'em — zachowujemy stare
-          // warianty + zaznaczamy w skipped log że BL stracił warianty.
-          mapped.product.variants = existingVariants;
-          result.skipped.push({
-            id: blId,
-            name: mapped.product.name,
-            reason:
-              "BL nie zwrócił wariantów, ale produkt miał wcześniej warianty w DB — " +
-              "zachowano stare warianty z zdjęciami admina. Sprawdź w BL czy warianty " +
-              "są poprawnie skonfigurowane.",
-          });
-        }
-
-        const existingSections = (
-          existing as { description_sections: AnySection[] | null } | null
-        )?.description_sections;
-        if (existingSections && existingSections.length > 0) {
-          mapped.product.description_sections = mergeSectionsPreserveAdminImages(
-            mapped.product.description_sections,
-            existingSections
-          );
-        }
+        const existingRow = existing as
+          | { is_active: boolean | null; deactivation_source: "auto" | "manual" | null }
+          | null;
+        // manual → zostaje ukryty (respektujemy admina); auto/aktywny/nowy → aktywny.
+        const wasManuallyHidden = existingRow?.deactivation_source === "manual";
+        mapped.product.is_active = !wasManuallyHidden;
+        mapped.product.deactivation_source = wasManuallyHidden ? "manual" : null;
+        const wasAutoHidden =
+          existingRow?.is_active === false && existingRow?.deactivation_source === "auto";
 
         const { data, error } = await supabase
           .from("products")
@@ -842,8 +451,14 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
             id: blId,
             name: mapped.product.name,
             reason: `błąd zapisu: ${error.message}`,
+            kind: "technical",
           });
           continue;
+        }
+
+        seenBlIds.add(blId);
+        if (wasAutoHidden) {
+          reactivated.push({ id: blId, name: mapped.product.name });
         }
 
         // Heurystyka insert vs update — created_at "świeże" (< 5s) = insert
@@ -857,41 +472,39 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
           result.updated += 1;
           result.updated_products!.push(synced);
         }
-
-        // Statystyki uzupełnienia sekcji opisu. Liczymy po FAKTYCZNYCH
-        // sekcjach które wyciągnęliśmy z BL (mapped.product.description_sections),
-        // żeby było zgodne z tym co user zobaczy na karcie produktu.
-        // total inkrementujemy zawsze — to liczba "candidates" do sekcji.
-        const scov = result.sections_coverage!;
-        scov.total += 1;
-        const sectionTitles = new Set(
-          (mapped.product.description_sections ?? []).map(
-            (s) => (s as { title?: string }).title ?? ""
-          )
-        );
-        if (sectionTitles.has("Opis")) scov.with_opis += 1;
-        if (sectionTitles.has("Wymiary i materiały")) scov.with_wymiary_materialy += 1;
-        if (sectionTitles.has("Informacje dla klienta")) scov.with_informacje += 1;
-
-        // Statystyki variants — informuje admina ile produktów ma warianty
-        // z BL i jak były sparsowane. Po sync user widzi w panelu czy BL
-        // używa czytelnego formatu nazw ("Kolor: Beżowy") czy wpada w
-        // brzydkawy fallback ("Wariant: 01 beż drewniany stelaż").
-        const vcov = result.variants_coverage!;
-        vcov.total += 1;
-        if (mapped.parsedVariants.kind === "structured") {
-          vcov.with_variants += 1;
-          vcov.structured += 1;
-          vcov.total_combinations += mapped.parsedVariants.variants.combinations.length;
-        } else if (mapped.parsedVariants.kind === "fallback") {
-          vcov.with_variants += 1;
-          vcov.fallback += 1;
-          vcov.total_combinations += mapped.parsedVariants.variants.combinations.length;
-        }
       }
 
       results.push(result);
     }
+
+    // ---- Auto-ukrywanie znikłych produktów (raz, po wszystkich magazynach) ----
+    const { data: activeBlRows } = await supabase
+      .from("products")
+      .select("baselinker_id")
+      .eq("is_active", true)
+      .not("baselinker_id", "is", null);
+    const dbBlProducts = ((activeBlRows ?? []) as { baselinker_id: string | null }[])
+      .filter((p): p is { baselinker_id: string } => !!p.baselinker_id);
+
+    const { toDeactivate, skippedReason } = planDeactivations(dbBlProducts, seenBlIds, {
+      completedFully,
+      maxRatio: 0.2,
+      maxAbsoluteFloor: 5,
+    });
+
+    const deactivated: SyncedProduct[] = [];
+    if (toDeactivate.length > 0) {
+      const { data: deactivatedRows } = await supabase
+        .from("products")
+        .update({ is_active: false, deactivation_source: "auto" } as never)
+        .in("baselinker_id", toDeactivate)
+        .select("baselinker_id, name");
+      for (const row of (deactivatedRows ?? []) as { baselinker_id: string; name: string }[]) {
+        deactivated.push({ id: row.baselinker_id, name: row.name });
+      }
+    }
+
+    const unmapped_categories = aggregateUnmappedCategories(unmappedRaw);
 
     const totals: SyncTotals = results.reduce(
       (acc, r) => ({
@@ -903,7 +516,15 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
       { total_in_bl: 0, inserted: 0, updated: 0, skipped_count: 0 }
     );
 
-    return { ok: true, results, totals };
+    return {
+      ok: true,
+      results,
+      totals,
+      deactivated,
+      reactivated,
+      hide_skipped_reason: skippedReason,
+      unmapped_categories,
+    };
   } catch (err) {
     if (err instanceof BaseLinkerError) {
       return {
@@ -946,6 +567,12 @@ export async function logSyncOutcome(
       skipped_count: outcome.totals.skipped_count,
       results: outcome.results as unknown as Record<string, unknown>,
       error_message: null,
+      report: {
+        deactivated: outcome.deactivated ?? [],
+        reactivated: outcome.reactivated ?? [],
+        hide_skipped_reason: outcome.hide_skipped_reason ?? null,
+        unmapped_categories: outcome.unmapped_categories ?? [],
+      } as unknown as Record<string, unknown>,
     } as never);
   } else {
     await supabase.from("baselinker_sync_log").insert({
@@ -958,6 +585,7 @@ export async function logSyncOutcome(
       skipped_count: 0,
       results: null,
       error_message: outcome.error,
+      report: null,
     } as never);
   }
 }
