@@ -10,7 +10,11 @@ import {
   getInventoryProductsList,
   getInventoryProductsData,
   type BLInventoryProduct,
+  type BlRetryOptions,
 } from "./baselinker";
+
+// Retry idempotentnych odczytów BL: 3 próby, backoff 0.5s → 1s → 2s.
+const BL_READ_RETRY: BlRetryOptions = { attempts: 3, baseDelayMs: 500 };
 import { getCategoryByBaselinkerId } from "./categories";
 import type { Product, ProductDimensions } from "./types";
 
@@ -318,7 +322,7 @@ async function mapBlToProduct(
 export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
   try {
     const supabase = await createAdminClient();
-    const inventories = await getInventories();
+    const inventories = await getInventories(BL_READ_RETRY);
 
     if (inventories.length === 0) {
       return {
@@ -341,7 +345,7 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
       const allIds: string[] = [];
       let page = 1;
       while (true) {
-        const list = await getInventoryProductsList(inv.inventory_id, page);
+        const list = await getInventoryProductsList(inv.inventory_id, page, BL_READ_RETRY);
         const ids = Object.keys(list.products ?? {});
         if (ids.length === 0) break;
         allIds.push(...ids);
@@ -359,7 +363,7 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
       const products: Record<string, BLInventoryProduct> = {};
       for (let i = 0; i < allIds.length; i += 1000) {
         const chunk = allIds.slice(i, i + 1000);
-        const data = await getInventoryProductsData(inv.inventory_id, chunk);
+        const data = await getInventoryProductsData(inv.inventory_id, chunk, BL_READ_RETRY);
         Object.assign(products, data.products ?? {});
       }
 

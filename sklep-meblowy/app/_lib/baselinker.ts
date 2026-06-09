@@ -21,8 +21,34 @@ export class BaseLinkerError extends Error {
   }
 }
 
-// Generyczne wywołanie metody BL.
-export async function blRequest<T = unknown>(
+export class BaseLinkerHttpError extends Error {
+  constructor(public status: number) {
+    super(`BaseLinker HTTP ${status}`);
+    this.name = "BaseLinkerHttpError";
+  }
+}
+
+// Kody błędów BL uznawane za PRZEJŚCIOWE. Rate-limit BL — kod do potwierdzenia
+// na żywym koncie (open item); zbiór łatwy do uzupełnienia bez zmian w logice.
+const TRANSIENT_BL_ERROR_CODES = new Set<string>(["ERROR_RATE_LIMIT"]);
+
+export function isTransientBlError(err: unknown): boolean {
+  if (err instanceof BaseLinkerHttpError) return err.status >= 500 || err.status === 429;
+  if (err instanceof BaseLinkerError) return TRANSIENT_BL_ERROR_CODES.has(err.errorCode);
+  if (err instanceof TypeError) return true; // błąd sieciowy z fetch()
+  return false;
+}
+
+export function retryDelayMs(attempt: number, baseDelayMs: number): number {
+  return baseDelayMs * 2 ** (attempt - 1);
+}
+
+export type BlRetryOptions = { attempts: number; baseDelayMs: number };
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Pojedyncze wywołanie BL (bez retry).
+async function blRequestOnce<T = unknown>(
   method: string,
   parameters: Record<string, unknown> = {}
 ): Promise<T> {
@@ -47,7 +73,7 @@ export async function blRequest<T = unknown>(
   });
 
   if (!res.ok) {
-    throw new Error(`BaseLinker HTTP ${res.status}`);
+    throw new BaseLinkerHttpError(res.status);
   }
 
   const data = (await res.json()) as BLResponse<T>;
@@ -56,6 +82,27 @@ export async function blRequest<T = unknown>(
   }
 
   return data as T;
+}
+
+// retry = opt-in (tylko idempotentne odczyty). Ponawia WYŁĄCZNIE przejściowe.
+export async function blRequest<T = unknown>(
+  method: string,
+  parameters: Record<string, unknown> = {},
+  retry?: BlRetryOptions
+): Promise<T> {
+  const attempts = retry?.attempts ?? 1;
+  const baseDelayMs = retry?.baseDelayMs ?? 500;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await blRequestOnce<T>(method, parameters);
+    } catch (err) {
+      lastErr = err;
+      if (attempt >= attempts || !isTransientBlError(err)) throw err;
+      await sleep(retryDelayMs(attempt, baseDelayMs));
+    }
+  }
+  throw lastErr;
 }
 
 // ============================================================
@@ -137,8 +184,8 @@ export type BLInventoryProductsListResponse = {
 // Helpery — najczęstsze metody
 // ============================================================
 
-export async function getInventories(): Promise<BLInventory[]> {
-  const res = await blRequest<BLInventoryListResponse>("getInventories");
+export async function getInventories(retry?: BlRetryOptions): Promise<BLInventory[]> {
+  const res = await blRequest<BLInventoryListResponse>("getInventories", {}, retry);
   return res.inventories ?? [];
 }
 
@@ -154,22 +201,26 @@ export async function getInventoryCategories(
 // Lista produktów z magazynu — paginowana (page index 1+)
 export async function getInventoryProductsList(
   inventoryId: number,
-  page = 1
+  page = 1,
+  retry?: BlRetryOptions
 ): Promise<BLInventoryProductsListResponse> {
   return blRequest<BLInventoryProductsListResponse>(
     "getInventoryProductsList",
-    { inventory_id: inventoryId, page }
+    { inventory_id: inventoryId, page },
+    retry
   );
 }
 
 // Pełne dane produktów — bierzemy listę ID (max 1000 naraz)
 export async function getInventoryProductsData(
   inventoryId: number,
-  productIds: string[]
+  productIds: string[],
+  retry?: BlRetryOptions
 ): Promise<BLInventoryProductsListResponse> {
   return blRequest<BLInventoryProductsListResponse>(
     "getInventoryProductsData",
-    { inventory_id: inventoryId, products: productIds }
+    { inventory_id: inventoryId, products: productIds },
+    retry
   );
 }
 
