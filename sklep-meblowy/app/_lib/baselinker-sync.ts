@@ -410,6 +410,12 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
         page += 1;
       }
 
+      // Każdy id z LISTY BL ISTNIEJE w BL → chronimy go przed auto-ukryciem,
+      // nawet jeśli endpoint data pominie go w odpowiedzi (niepełny 200) albo
+      // mapowanie/zapis się nie powiedzie. Inaczej żywy produkt mógłby zostać
+      // uznany za „zniknął z BL" i auto-dezaktywowany.
+      for (const id of allIds) seenBlIds.add(id);
+
       // default_price_group prosto z typu BLInventory (zgodny z dokumentacją
       // BL po naprawie typu — wcześniej wymagał podwójnego casta).
       const defaultPriceGroup = inv.default_price_group ?? 0;
@@ -434,10 +440,8 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
       };
 
       for (const [blId, bl] of Object.entries(products)) {
-        // Widziany w BL = nie podlega auto-ukrywaniu, niezależnie od tego
-        // czy mapowanie/zapis się powiedzie.
-        seenBlIds.add(blId);
-
+        // seenBlIds zasiane wyżej z allIds (cała lista BL) — tu już tylko
+        // mapujemy/upsertujemy faktyczne dane produktu.
         const mapped = await mapBlToProduct(blId, bl, defaultPriceGroup);
 
         if (!mapped.ok) {

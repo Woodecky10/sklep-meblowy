@@ -199,7 +199,11 @@ export async function POST(request: NextRequest) {
         });
         stripeCouponId = coupon.id;
       } else {
+        // Rabat zaokrąglił się do 0 gr (np. 1% z 0,49 zł). Nie tworzymy kuponu
+        // Stripe ANI nie wiążemy zamówienia z kodem — inaczej webhook spaliłby
+        // użycie kodu (used_count++) za rabat, którego klient nie dostał.
         promoDiscount = 0;
+        promoCodeId = null;
       }
     }
 

@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
       console.error(
         `Webhook: płatność za ANULOWANE zamówienie ${orderId} — wymaga ręcznej obsługi (zwrot/przywrócenie)`
       );
-      await supabase
+      const { error: cancelTraceErr } = await supabase
         .from("orders")
         .update({
           stripe_payment_intent: paymentIntent ?? session.id,
@@ -89,6 +89,18 @@ export async function POST(request: NextRequest) {
             "płatność Stripe doszła po anulowaniu zamówienia — wymaga ręcznej obsługi",
         } as never)
         .eq("id", orderId);
+      if (cancelTraceErr) {
+        // Bez payment_intent nie da się zrobić zwrotu w Stripe — nie wolno
+        // zgubić śladu. 500 → Stripe ponowi event (jak ścieżka odczytu wyżej).
+        console.error(
+          `Webhook: zapis śladu anulowanego-opłaconego ${orderId} nieudany:`,
+          cancelTraceErr.message
+        );
+        return NextResponse.json(
+          { error: "Błąd zapisu śladu zamówienia" },
+          { status: 500 }
+        );
+      }
       return NextResponse.json({ received: true });
     }
 
