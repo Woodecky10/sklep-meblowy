@@ -272,11 +272,14 @@ type ProductInsert = Omit<Product, "id" | "created_at"> & {
 };
 
 // Sync ustawia tylko te pola. variants/description_sections/description są
-// zarządzane ręcznie w panelu (DescriptionSectionsEditor/VariantsEditor) —
-// pominięcie ich w upsert: UPDATE nie nadpisuje (preserve), INSERT → default DB.
+// zarządzane ręcznie w panelu (DescriptionSectionsEditor/VariantsEditor),
+// collection_id przypisuje admin w /admin/kolekcje — pominięcie ich w upsert:
+// UPDATE nie nadpisuje (preserve), INSERT → default DB.
+// (collection_id: null w payloadzie odpinał produkty od kolekcji przy KAŻDYM
+// sync — naprawione 2026-06-10 przez pominięcie pola, jak przy opisach.)
 type SyncProductFields = Omit<
   ProductInsert,
-  "variants" | "description_sections" | "description"
+  "variants" | "description_sections" | "description" | "collection_id"
 >;
 
 async function mapBlToProduct(
@@ -335,8 +338,6 @@ async function mapBlToProduct(
     is_active: true,
     deactivation_source: null,
     baselinker_id: blId,
-    // Kolekcję przypisuje admin ręcznie w /admin/kolekcje — sync nie ustawia.
-    collection_id: null,
   };
 
   return { ok: true, product };
