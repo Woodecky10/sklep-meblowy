@@ -94,23 +94,13 @@ export async function validatePromoCode(
 // ============================================================
 export async function incrementPromoUsage(promoId: string): Promise<void> {
   const supabase = await createAdminClient();
-  // PostgreSQL doesn't have atomic increment via Supabase select API,
-  // ale to wywołujemy z webhooka (sekwencyjnie per zamówienie) więc
-  // race condition jest minimalne. Dla bezpieczeństwa moglibyśmy zrobić RPC,
-  // ale na MVP wystarczy read-then-update.
-  const { data: row } = await supabase
-    .from("promo_codes")
-    .select("used_count")
-    .eq("id", promoId)
-    .single();
-
-  if (!row) return;
-
-  const current = (row as { used_count: number }).used_count ?? 0;
-  await supabase
-    .from("promo_codes")
-    .update({ used_count: current + 1 } as never)
-    .eq("id", promoId);
+  // Atomowy UPDATE ... SET used_count = used_count + 1 po stronie DB
+  // (RPC z migracji 25). Wcześniejsze read-then-update gubiło inkrementy
+  // przy równoległych webhookach i pozwalało przekroczyć max_uses.
+  const { error } = await supabase.rpc("increment_promo_usage", {
+    p_promo_id: promoId,
+  });
+  if (error) throw error;
 }
 
 // ============================================================

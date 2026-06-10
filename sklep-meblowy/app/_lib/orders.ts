@@ -1,4 +1,4 @@
-import { createAdminClient, createClient } from "./supabase/server";
+import { createAdminClient } from "./supabase/server";
 import type { Address, Order, OrderItem } from "./types";
 
 type CreateOrderInput = {
@@ -55,8 +55,14 @@ export async function createOrder({
   return order as unknown as Order;
 }
 
+// Admin client (service role) zamiast user-scoped: RLS na products
+// (is_active=true) ukrywałby KUPIONE produkty, które admin/sync później
+// ukrył (normalny flow dla mebli na zamówienie) — historia pokazywałaby
+// "Produkt" bez nazwy/zdjęcia. promo_codes nie ma polityki odczytu dla
+// klienta, więc embed kodu też wymagał service role. Ownership wymusza
+// filtr .eq("user_id", userId) — userId pochodzi z sesji wołającego.
 export async function getUserOrders(userId: string) {
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
   const { data, error } = await supabase
     .from("orders")
     .select(`*, items:order_items(*, product:products(*)), promo_code:promo_codes(code)`)

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   syncProductsAction,
   type SyncActionResult,
@@ -19,7 +20,11 @@ export default function BaseLinkerSyncPanel({
 }: {
   initialLogs: SyncLogRow[];
 }) {
-  const [logs, setLogs] = useState<SyncLogRow[]>(initialLogs);
+  // Logi przychodzą z serwera przez prop — router.refresh() po sync
+  // (sukces I błąd) odświeża server component i lista aktualizuje się
+  // bez pełnego reloadu (toast i karta wyniku zostają widoczne).
+  const logs = initialLogs;
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [lastResult, setLastResult] = useState<SyncActionResult | null>(null);
   const [toast, setToast] = useState<Toast>(null);
@@ -40,6 +45,8 @@ export default function BaseLinkerSyncPanel({
           type: "error",
           message: `Sync nieudany: ${result.error}`,
         });
+        // Wpis status=error też ląduje w historii — odśwież listę.
+        router.refresh();
         return;
       }
 
@@ -53,8 +60,7 @@ export default function BaseLinkerSyncPanel({
         message: msg,
       });
 
-      // Refresh page po krótkiej chwili żeby pobrać nowy log
-      setTimeout(() => window.location.reload(), 1500);
+      router.refresh();
     });
   }
 
@@ -89,6 +95,24 @@ export default function BaseLinkerSyncPanel({
       </div>
 
       {toast && <ToastView toast={toast} onClose={() => setToast(null)} />}
+
+      {/* Trwały blok błędu — toast znika po 5 s, a admin musi widzieć,
+          że sync się nie powiódł, dopóki nie spróbuje ponownie. */}
+      {lastResult && !lastResult.ok && (
+        <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-2xl p-6">
+          <h2 className="font-display text-lg font-semibold text-red-700 dark:text-red-300 mb-1">
+            Ostatnia synchronizacja nie powiodła się
+          </h2>
+          <p className="text-sm text-red-700/90 dark:text-red-300/90 leading-relaxed">
+            {lastResult.error}
+          </p>
+          <p className="text-xs text-[var(--muted)] mt-2">
+            Czas: {(lastResult.duration_ms / 1000).toFixed(1)}s · Spróbuj
+            ponownie przyciskiem „Synchronizuj teraz”. Wpis trafił też do
+            historii poniżej.
+          </p>
+        </div>
+      )}
 
       {/* Wynik ostatniej synchronizacji (świeżo zrobionej w tym okienku) */}
       {lastResult && lastResult.ok && (

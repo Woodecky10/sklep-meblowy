@@ -73,7 +73,29 @@ export type SyncOutcome =
       hide_skipped_reason?: string | null;
       unmapped_categories?: UnmappedCategory[];
     }
-  | { ok: false; error: string; where?: "BaseLinker API" | "internal"; code?: string };
+  | {
+      ok: false;
+      error: string;
+      where?: "BaseLinker API" | "internal";
+      code?: string;
+      // Częściowy postęp sprzed awarii — upserty z ukończonych magazynów już
+      // SĄ w bazie, więc log nie może udawać że nic się nie wydarzyło.
+      partial?: { results: SyncInventoryResult[]; totals: SyncTotals };
+    };
+
+// Suma totals z listy wyników per-inventory (używane dla pełnego i
+// częściowego przebiegu).
+function sumTotals(results: SyncInventoryResult[]): SyncTotals {
+  return results.reduce(
+    (acc, r) => ({
+      total_in_bl: acc.total_in_bl + r.total_in_bl,
+      inserted: acc.inserted + r.inserted,
+      updated: acc.updated + r.updated,
+      skipped_count: acc.skipped_count + r.skipped.length,
+    }),
+    { total_in_bl: 0, inserted: 0, updated: 0, skipped_count: 0 }
+  );
+}
 
 // ============================================================
 // Bezpieczne auto-ukrywanie znikłych produktów (czysta, testowalna funkcja)
@@ -347,6 +369,10 @@ export function aggregateUnmappedCategories(
 // ============================================================
 
 export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
+  // Deklaracje przed try — przy awarii w trakcie pętli upsertów część zapisów
+  // już SIĘ wykonała; catch dołącza częściowy postęp do wyniku (ok:false),
+  // żeby log nie udawał wyzerowanego przebiegu.
+  const results: SyncInventoryResult[] = [];
   try {
     const supabase = await createAdminClient();
     const inventories = await getInventories(BL_READ_RETRY);
@@ -360,8 +386,10 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
       };
     }
 
-    const results: SyncInventoryResult[] = [];
-    const seenBlIds = new Set<string>(); // baselinker_id z udanych upsertów
+    // WSZYSTKIE baselinker_id widziane w odpowiedzi BL — nie tylko udane
+    // upserty. Produkt pominięty (np. brak ceny) albo z błędem zapisu DB
+    // ISTNIEJE w BL i nie wolno go traktować jak "znikł z BL" (auto-ukrycie).
+    const seenBlIds = new Set<string>();
     const reactivated: SyncedProduct[] = []; // wcześniej auto-ukryte, wróciły z BL
     const unmappedRaw: { bl_category_id: number; product_name: string }[] = [];
     // completedFully: nieudany ODCZYT BL rzuca → catch → ok:false (krok
@@ -381,11 +409,9 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
         page += 1;
       }
 
-      const defaultPriceGroup =
-        (inv as unknown as { default_price_group?: number; price_group_id?: number })
-          .default_price_group ??
-        (inv as unknown as { price_group_id?: number }).price_group_id ??
-        0;
+      // default_price_group prosto z typu BLInventory (zgodny z dokumentacją
+      // BL po naprawie typu — wcześniej wymagał podwójnego casta).
+      const defaultPriceGroup = inv.default_price_group ?? 0;
 
       // Pełne dane (chunkowane po 1000)
       const products: Record<string, BLInventoryProduct> = {};
@@ -407,6 +433,10 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
       };
 
       for (const [blId, bl] of Object.entries(products)) {
+        // Widziany w BL = nie podlega auto-ukrywaniu, niezależnie od tego
+        // czy mapowanie/zapis się powiedzie.
+        seenBlIds.add(blId);
+
         const mapped = await mapBlToProduct(blId, bl, defaultPriceGroup);
 
         if (!mapped.ok) {
@@ -425,11 +455,23 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
           continue;
         }
 
-        const { data: existing } = await supabase
+        const { data: existing, error: existingErr } = await supabase
           .from("products")
           .select("is_active, deactivation_source")
           .eq("baselinker_id", blId)
           .maybeSingle();
+        if (existingErr) {
+          // Bez stanu sprzed upsertu nie wolno zapisywać: błąd potraktowany
+          // jako "nowy produkt" odkryłby ręcznie ukryty (deactivation_source=
+          // 'manual') i sfałszował klasyfikację inserted/updated.
+          result.skipped.push({
+            id: blId,
+            name: bl.text_fields?.name ?? "(brak nazwy)",
+            reason: `błąd odczytu stanu produktu: ${existingErr.message}`,
+            kind: "technical",
+          });
+          continue;
+        }
         const existingRow = existing as
           | { is_active: boolean | null; deactivation_source: "auto" | "manual" | null }
           | null;
@@ -440,10 +482,10 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
         const wasAutoHidden =
           existingRow?.is_active === false && existingRow?.deactivation_source === "auto";
 
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from("products")
           .upsert(mapped.product as never, { onConflict: "baselinker_id" })
-          .select("id, created_at")
+          .select("id")
           .single();
 
         if (error) {
@@ -456,14 +498,14 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
           continue;
         }
 
-        seenBlIds.add(blId);
         if (wasAutoHidden) {
           reactivated.push({ id: blId, name: mapped.product.name });
         }
 
-        // Heurystyka insert vs update — created_at "świeże" (< 5s) = insert
-        const isNew =
-          data && new Date(data.created_at).getTime() > Date.now() - 5000;
+        // insert vs update: wiersz istniał przed upsertem (odczyt existing
+        // wyżej) = update. Bez heurystyki porównywania created_at z zegarem
+        // aplikacji (rozjazd zegarów DB/app fałszował klasyfikację).
+        const isNew = existingRow === null;
         const synced: SyncedProduct = { id: blId, name: mapped.product.name };
         if (isNew) {
           result.inserted += 1;
@@ -478,66 +520,78 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
     }
 
     // ---- Auto-ukrywanie znikłych produktów (raz, po wszystkich magazynach) ----
-    const { data: activeBlRows } = await supabase
+    // Błędy SELECT/UPDATE w tym kroku NIE są ciche — lądują w
+    // hide_skipped_reason, żeby raport nie sugerował "sprawdzono, nic do
+    // ukrycia", gdy krok się w ogóle nie wykonał.
+    const deactivated: SyncedProduct[] = [];
+    let skippedReason: string | null = null;
+
+    const { data: activeBlRows, error: activeErr } = await supabase
       .from("products")
       .select("baselinker_id")
       .eq("is_active", true)
       .not("baselinker_id", "is", null);
-    const dbBlProducts = ((activeBlRows ?? []) as { baselinker_id: string | null }[])
-      .filter((p): p is { baselinker_id: string } => !!p.baselinker_id);
 
-    const { toDeactivate, skippedReason } = planDeactivations(dbBlProducts, seenBlIds, {
-      completedFully,
-      maxRatio: 0.2,
-      maxAbsoluteFloor: 5,
-    });
+    if (activeErr) {
+      skippedReason = `nie udało się pobrać listy aktywnych produktów (${activeErr.message}) — pominięto auto-ukrywanie`;
+    } else {
+      const dbBlProducts = ((activeBlRows ?? []) as { baselinker_id: string | null }[])
+        .filter((p): p is { baselinker_id: string } => !!p.baselinker_id);
 
-    const deactivated: SyncedProduct[] = [];
-    if (toDeactivate.length > 0) {
-      const { data: deactivatedRows } = await supabase
-        .from("products")
-        .update({ is_active: false, deactivation_source: "auto" } as never)
-        .in("baselinker_id", toDeactivate)
-        .select("baselinker_id, name");
-      for (const row of (deactivatedRows ?? []) as { baselinker_id: string; name: string }[]) {
-        deactivated.push({ id: row.baselinker_id, name: row.name });
+      const plan = planDeactivations(dbBlProducts, seenBlIds, {
+        completedFully,
+        maxRatio: 0.2,
+        maxAbsoluteFloor: 5,
+      });
+      skippedReason = plan.skippedReason;
+
+      if (plan.toDeactivate.length > 0) {
+        const { data: deactivatedRows, error: deactivateErr } = await supabase
+          .from("products")
+          .update({ is_active: false, deactivation_source: "auto" } as never)
+          .in("baselinker_id", plan.toDeactivate)
+          .select("baselinker_id, name");
+        if (deactivateErr) {
+          skippedReason = `błąd przy auto-ukrywaniu (${deactivateErr.message}) — produkty pozostały widoczne`;
+        } else {
+          for (const row of (deactivatedRows ?? []) as { baselinker_id: string; name: string }[]) {
+            deactivated.push({ id: row.baselinker_id, name: row.name });
+          }
+        }
       }
     }
 
     const unmapped_categories = aggregateUnmappedCategories(unmappedRaw);
 
-    const totals: SyncTotals = results.reduce(
-      (acc, r) => ({
-        total_in_bl: acc.total_in_bl + r.total_in_bl,
-        inserted: acc.inserted + r.inserted,
-        updated: acc.updated + r.updated,
-        skipped_count: acc.skipped_count + r.skipped.length,
-      }),
-      { total_in_bl: 0, inserted: 0, updated: 0, skipped_count: 0 }
-    );
-
     return {
       ok: true,
       results,
-      totals,
+      totals: sumTotals(results),
       deactivated,
       reactivated,
       hide_skipped_reason: skippedReason,
       unmapped_categories,
     };
   } catch (err) {
+    // Częściowy postęp: ukończone magazyny mają już upserty w bazie.
+    const partial =
+      results.length > 0
+        ? { results, totals: sumTotals(results) }
+        : undefined;
     if (err instanceof BaseLinkerError) {
       return {
         ok: false,
         error: err.message,
         where: "BaseLinker API",
         code: err.errorCode,
+        partial,
       };
     }
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Nieznany błąd",
       where: "internal",
+      partial,
     };
   }
 }
@@ -575,15 +629,18 @@ export async function logSyncOutcome(
       } as unknown as Record<string, unknown>,
     } as never);
   } else {
+    // Częściowy postęp sprzed awarii (jeśli jest) — bez niego log z zerami
+    // udawał, że nic się nie zapisało, mimo ukończonych magazynów.
+    const partialTotals = outcome.partial?.totals;
     await supabase.from("baselinker_sync_log").insert({
       triggered_by: triggeredBy,
       duration_ms: durationMs,
       status: "error",
-      total_in_bl: 0,
-      inserted: 0,
-      updated: 0,
-      skipped_count: 0,
-      results: null,
+      total_in_bl: partialTotals?.total_in_bl ?? 0,
+      inserted: partialTotals?.inserted ?? 0,
+      updated: partialTotals?.updated ?? 0,
+      skipped_count: partialTotals?.skipped_count ?? 0,
+      results: (outcome.partial?.results ?? null) as unknown as Record<string, unknown> | null,
       error_message: outcome.error,
       report: null,
     } as never);

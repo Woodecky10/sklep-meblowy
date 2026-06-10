@@ -12,7 +12,9 @@ import { BaseLinkerError } from "@/app/_lib/baselinker";
 
 export async function POST(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const key = searchParams.get("key");
+  // Preferuj nagłówek x-sync-secret (sekret w query lądowałby w logach);
+  // ?key= zostaje dla kompatybilności.
+  const key = request.headers.get("x-sync-secret") ?? searchParams.get("key");
   const orderId = searchParams.get("orderId");
 
   const expected = process.env.BASELINKER_SYNC_SECRET;

@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { createClient } from "@/app/_lib/supabase/server";
+import { createAdminClient } from "@/app/_lib/supabase/server";
 import { COMPANY } from "@/app/_lib/company";
 import { getCategories } from "@/app/_lib/categories";
 import { getAllCollections } from "@/app/_lib/collections";
@@ -27,41 +27,63 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/prywatnosc`,  lastModified: now, changeFrequency: "yearly",  priority: 0.3 },
   ];
 
-  // Wszystkie kategorie jako filtry /sklep?kategoria=X
-  const categories = await getCategories();
-  const categoryRoutes: MetadataRoute.Sitemap = categories.map((c) => ({
-    url: `${BASE}/sklep?kategoria=${c.slug}`,
-    lastModified: now,
-    changeFrequency: "daily",
-    priority: 0.7,
-  }));
+  // Dynamiczne wpisy wymagają Supabase. Gdy baza jest niedostępna (build bez
+  // env, chwilowa awaria), degradujemy do tras statycznych zamiast wywalać
+  // cały build/deploy — Google dostanie minimum, kolejny render uzupełni.
+  try {
+    // Wszystkie kategorie jako filtry /sklep?kategoria=X
+    const categories = await getCategories();
+    const categoryRoutes: MetadataRoute.Sitemap = categories.map((c) => ({
+      url: `${BASE}/sklep?kategoria=${c.slug}`,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.7,
+    }));
 
-  // Wszystkie kolekcje jako filtry /sklep?kolekcja=X
-  const collections = await getAllCollections();
-  const collectionRoutes: MetadataRoute.Sitemap = collections.map((c) => ({
-    url: `${BASE}/sklep?kolekcja=${c.slug}`,
-    lastModified: new Date(c.updated_at),
-    changeFrequency: "weekly",
-    priority: 0.6,
-  }));
-
-  // Produkty publiczne — RLS (polityka „is_active = true") automatycznie pomija
-  // produkty ukryte, więc sitemap nie indeksuje znikłych z BL.
-  const supabase = await createClient();
-  const { data: products } = await supabase
-    .from("products")
-    .select("id, created_at")
-    .order("created_at", { ascending: false });
-
-  const productRoutes: MetadataRoute.Sitemap = (products ?? []).map((p) => {
-    const product = p as { id: string; created_at: string };
-    return {
-      url: `${BASE}/produkt/${product.id}`,
-      lastModified: new Date(product.created_at),
+    // Wszystkie kolekcje jako filtry /sklep?kolekcja=X
+    const collections = await getAllCollections();
+    const collectionRoutes: MetadataRoute.Sitemap = collections.map((c) => ({
+      url: `${BASE}/sklep?kolekcja=${c.slug}`,
+      lastModified: new Date(c.updated_at),
       changeFrequency: "weekly",
-      priority: 0.8,
-    };
-  });
+      priority: 0.6,
+    }));
 
-  return [...staticRoutes, ...categoryRoutes, ...collectionRoutes, ...productRoutes];
+    // Produkty publiczne — admin client (bez cookies(), które w prerenderze
+    // rzuca kontrolny DynamicServerError) + jawny filtr is_active=true
+    // odtwarzający publiczną politykę RLS: sitemap nie indeksuje ukrytych.
+    const supabase = await createAdminClient();
+    const { data: products } = await supabase
+      .from("products")
+      .select("id, created_at")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false });
+
+    const productRoutes: MetadataRoute.Sitemap = (products ?? []).map((p) => {
+      const product = p as { id: string; created_at: string };
+      return {
+        url: `${BASE}/produkt/${product.id}`,
+        lastModified: new Date(product.created_at),
+        changeFrequency: "weekly",
+        priority: 0.8,
+      };
+    });
+
+    return [...staticRoutes, ...categoryRoutes, ...collectionRoutes, ...productRoutes];
+  } catch (err) {
+    // Kontrolne błędy Next (dynamic rendering, redirect itp.) mają lecieć
+    // dalej — łapiemy wyłącznie realne awarie danych.
+    if (
+      err &&
+      typeof err === "object" &&
+      "digest" in err &&
+      typeof (err as { digest: unknown }).digest === "string" &&
+      ((err as { digest: string }).digest.startsWith("DYNAMIC_") ||
+        (err as { digest: string }).digest.startsWith("NEXT_"))
+    ) {
+      throw err;
+    }
+    console.error("[sitemap] dane z Supabase niedostępne — zwracam trasy statyczne:", err);
+    return staticRoutes;
+  }
 }

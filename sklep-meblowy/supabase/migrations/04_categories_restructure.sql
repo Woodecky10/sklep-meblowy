@@ -30,16 +30,12 @@ update public.products set category = 'sofy'              where category = 'kana
 update public.products set category = 'lozko-tapicerowane' where category = 'lozka';
 -- 'fotele' i 'pufy' bez zmian (slugi te same, sekcja salon)
 
--- 3. Nowy check constraint
-alter table public.products
-  add constraint products_category_check
-  check (category in (
-    'sofy',
-    'naroznik-l',
-    'naroznik-u',
-    'fotele',
-    'pufy',
-    'lozko-kontynentalne',
-    'lozko-tapicerowane',
-    'materace'
-  ));
+-- 3. (historycznie) nowy check constraint — USUNIĘTY z pliku.
+-- Constraint był przejściowy: migracja 09 dropuje go na rzecz FK do
+-- categories. schema.sql (baseline po migracji 08) seeduje nowsze slugi
+-- ('sofa-3-osobowa', 'zestawy' itd.), więc każdy CHECK z tej listy —
+-- nawet NOT VALID — wywalałby świeży setup: NOT VALID nie waliduje
+-- istniejących wierszy, ale waliduje KAŻDY ich UPDATE, a migracja 05
+-- update'uje seedowe produkty. Na środowiskach historycznych constraint
+-- zdążył istnieć i został zdjęty w 09 — pominięcie go tutaj niczego nie
+-- zmienia w stanie końcowym.

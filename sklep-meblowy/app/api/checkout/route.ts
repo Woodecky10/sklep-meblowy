@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { stripe } from "@/app/_lib/stripe";
+import type Stripe from "stripe";
+import { getStripe } from "@/app/_lib/stripe";
 import { createClient } from "@/app/_lib/supabase/server";
 import { createOrder } from "@/app/_lib/orders";
 import { validatePromoCode } from "@/app/_lib/promo";
@@ -11,8 +12,10 @@ import {
 } from "@/app/_lib/variants";
 import type { Address, Product } from "@/app/_lib/types";
 
+// stripe v22 re-eksportuje SessionCreateParams jako alias typu (bez
+// wewnętrznego namespace), więc .LineItem nie istnieje — indeksujemy typ.
 type LineItem = NonNullable<
-  NonNullable<Parameters<typeof stripe.checkout.sessions.create>[0]>["line_items"]
+  Stripe.Checkout.SessionCreateParams["line_items"]
 >[number];
 
 type CheckoutBody = {
@@ -33,6 +36,7 @@ type CheckoutBody = {
 
 export async function POST(request: NextRequest) {
   try {
+    const stripe = getStripe();
     const body = (await request.json()) as CheckoutBody;
 
     if (!body.items?.length) {
@@ -41,6 +45,20 @@ export async function POST(request: NextRequest) {
     if (!body.email || !body.fullName) {
       return NextResponse.json(
         { error: "Brak wymaganych danych" },
+        { status: 400 }
+      );
+    }
+    // Adres dostawy wymagany w całości — bez tego zamówienie w BL powstaje
+    // bez adresu i kurier nie ma gdzie jechać. Formularz to waliduje, ale
+    // route musi być odporny na bezpośrednie wywołania.
+    const shippingAddress = body.address;
+    if (
+      !shippingAddress?.street?.trim() ||
+      !shippingAddress?.postal_code?.trim() ||
+      !shippingAddress?.city?.trim()
+    ) {
+      return NextResponse.json(
+        { error: "Brak pełnego adresu dostawy" },
         { status: 400 }
       );
     }
@@ -80,6 +98,20 @@ export async function POST(request: NextRequest) {
       if (!product) {
         return NextResponse.json(
           { error: `Produkt ${item.name} niedostępny` },
+          { status: 400 }
+        );
+      }
+
+      // Ilość z klienta — twarda walidacja (int 1..99). Bez tego ujemne /
+      // ułamkowe / absurdalne ilości tworzyły zamówienia-śmieci w DB
+      // (service role) zanim Stripe cokolwiek zwalidował.
+      if (
+        !Number.isInteger(item.quantity) ||
+        item.quantity < 1 ||
+        item.quantity > 99
+      ) {
+        return NextResponse.json(
+          { error: `Nieprawidłowa ilość dla: ${product.name}` },
           { status: 400 }
         );
       }
@@ -149,22 +181,26 @@ export async function POST(request: NextRequest) {
       promoCodeId = promoResult.promo.id;
       promoDiscount = promoResult.discount;
 
-      // Stripe Coupon (one-shot, dla tej sesji). Dla percent używamy
-      // percent_off, dla fixed — amount_off w groszach + currency.
-      const coupon =
-        promoResult.promo.discount_type === "percent"
-          ? await stripe.coupons.create({
-              percent_off: promoResult.promo.discount_value,
-              duration: "once",
-              name: promoResult.promo.code,
-            })
-          : await stripe.coupons.create({
-              amount_off: Math.round(promoDiscount * 100),
-              currency: "pln",
-              duration: "once",
-              name: promoResult.promo.code,
-            });
-      stripeCouponId = coupon.id;
+      // Stripe Coupon (one-shot, dla tej sesji). Zawsze amount_off (kwotowo,
+      // w groszach) — także dla kuponów procentowych. percent_off liczyłby
+      // Stripe po swojemu (własne zaokrąglenia), a rabat w BL (ujemna
+      // pozycja K1) i orders.promo_discount używają NASZEJ kwoty z
+      // validatePromoCode — jedna kwota wszędzie eliminuje rozjazd o grosz
+      // między kwotą pobraną a sumą pozycji w BL.
+      // amount_off=0 jest błędem w Stripe (np. 1% z 0,49 zł zaokrągla się
+      // do 0 gr) — wtedy po prostu nie tworzymy kuponu.
+      const amountOffGr = Math.round(promoDiscount * 100);
+      if (amountOffGr > 0) {
+        const coupon = await stripe.coupons.create({
+          amount_off: amountOffGr,
+          currency: "pln",
+          duration: "once",
+          name: promoResult.promo.code,
+        });
+        stripeCouponId = coupon.id;
+      } else {
+        promoDiscount = 0;
+      }
     }
 
     // Koszt dostawy NIE jest doliczany do Stripe — meble różnią się wagą
@@ -211,13 +247,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url: session.url });
   } catch (err) {
+    // Szczegóły tylko do logów serwera — surowe err.message wyciekało
+    // wewnętrzne detale (Stripe/Supabase) do klienta.
     console.error("Checkout error:", err);
-    const message =
-      err instanceof Error
-        ? err.message
-        : typeof err === "object" && err !== null && "message" in err
-          ? String((err as { message: unknown }).message)
-          : "Nieznany błąd";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Nie udało się rozpocząć płatności. Spróbuj ponownie za chwilę." },
+      { status: 500 }
+    );
   }
 }

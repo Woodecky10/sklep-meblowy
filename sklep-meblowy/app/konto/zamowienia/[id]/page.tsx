@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { createClient } from "@/app/_lib/supabase/server";
+import { createClient, createAdminClient } from "@/app/_lib/supabase/server";
 import type { Order, OrderItem } from "@/app/_lib/types";
 import ReorderButton from "@/app/_components/ui/ReorderButton";
 import CancelOrderButton from "../CancelOrderButton";
@@ -27,12 +27,18 @@ export default async function OrderDetailPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user) notFound();
 
-  const { data, error } = await supabase
+  // Zapytanie przez admin client: RLS na products (is_active=true) ukrywałby
+  // kupione produkty, które później zostały ukryte (znikły z BL / admin),
+  // a promo_codes nie ma polityki odczytu dla klienta — embed kodu kuponu
+  // zawsze zwracał null. Ownership wymusza .eq("user_id", user.id) z sesji.
+  const adminSupabase = await createAdminClient();
+  const { data, error } = await adminSupabase
     .from("orders")
     .select(`*, items:order_items(*, product:products(*)), promo_code:promo_codes(code)`)
     .eq("id", id)
-    .eq("user_id", user!.id)
+    .eq("user_id", user.id)
     .single();
 
   if (error || !data) notFound();

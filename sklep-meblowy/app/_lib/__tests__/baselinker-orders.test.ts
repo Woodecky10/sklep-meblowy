@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { buildBlOrderProducts } from "@/app/_lib/baselinker-orders";
+import {
+  buildBlOrderProducts,
+  hasCompletedBlPush,
+  toCountryCode,
+} from "@/app/_lib/baselinker-orders";
 
 // Minimalny element pozycji zamówienia (tyle, ile czyta buildBlOrderProducts).
 const item = (over: Record<string, unknown> = {}) => ({
@@ -62,5 +66,36 @@ describe("buildBlOrderProducts (K1 — rabat do BaseLinkera)", () => {
     expect(r[0].name).toContain("Sofa");
     expect(r[0].name).toContain("—"); // wariant doklejony do nazwy
     expect(r[0].attributes).toContain("Uwagi: bez nóżek");
+  });
+});
+
+describe("toCountryCode — kraj z formularza → ISO-3166 alpha-2 dla BL", () => {
+  it("gotowy kod 2-literowy przechodzi (uppercase)", () => {
+    expect(toCountryCode("PL")).toBe("PL");
+    expect(toCountryCode("de")).toBe("DE");
+    expect(toCountryCode(" cz ")).toBe("CZ");
+  });
+  it("wolny tekst (Polska, Poland, cokolwiek) → PL", () => {
+    expect(toCountryCode("Polska")).toBe("PL");
+    expect(toCountryCode("Poland")).toBe("PL");
+    expect(toCountryCode("Rzeczpospolita")).toBe("PL");
+  });
+  it("brak wartości → PL", () => {
+    expect(toCountryCode(null)).toBe("PL");
+    expect(toCountryCode(undefined)).toBe("PL");
+    expect(toCountryCode("")).toBe("PL");
+  });
+});
+
+describe("hasCompletedBlPush — odróżnia prawdziwe BL id od sentinela claimu", () => {
+  it("null/undefined → false (push jeszcze nie wykonany)", () => {
+    expect(hasCompletedBlPush(null)).toBe(false);
+    expect(hasCompletedBlPush(undefined)).toBe(false);
+  });
+  it("sentinel pending:<ts> → false (push w toku / osierocony)", () => {
+    expect(hasCompletedBlPush("pending:1718000000000")).toBe(false);
+  });
+  it("prawdziwe ID z BL → true", () => {
+    expect(hasCompletedBlPush("123456")).toBe(true);
   });
 });

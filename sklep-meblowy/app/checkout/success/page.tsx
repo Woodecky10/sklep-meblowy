@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { stripe } from "@/app/_lib/stripe";
+import { getStripe } from "@/app/_lib/stripe";
 import { getOrderById } from "@/app/_lib/orders";
 import ClearCart from "./ClearCart";
 
@@ -16,7 +16,7 @@ export default async function SuccessPage({
 
   if (session_id) {
     try {
-      const session = await stripe.checkout.sessions.retrieve(session_id);
+      const session = await getStripe().checkout.sessions.retrieve(session_id);
       orderId = session.metadata?.order_id ?? null;
       email = session.customer_details?.email ?? session.customer_email ?? null;
       if (orderId) {

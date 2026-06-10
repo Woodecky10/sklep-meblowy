@@ -25,6 +25,8 @@ Ta instrukcja pokazuje, jak dodać nową kategorię produktów (np. „Komoda", 
 
 > 💡 **Tip:** możesz też pobrać listę wszystkich ID przez specjalny adres:
 > `https://mollien.pl/api/baselinker/test`
+> **Najpierw zaloguj się jako admin na mollien.pl** (adres działa tylko dla
+> admina — bez zalogowania zobaczysz „Brak uprawnień").
 > Otworzy się JSON — w sekcji `categories` zobaczysz wszystkie kategorie z BL razem z ich `category_id`.
 
 ---

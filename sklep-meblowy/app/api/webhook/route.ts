@@ -1,9 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
-import { stripe } from "@/app/_lib/stripe";
-import { markOrderPaid, getOrderById } from "@/app/_lib/orders";
+import { getStripe } from "@/app/_lib/stripe";
+import { markOrderPaid } from "@/app/_lib/orders";
 import { incrementPromoUsage } from "@/app/_lib/promo";
 import { pushOrderToBaseLinker } from "@/app/_lib/baselinker-orders";
+import { hasCompletedBlPush } from "@/app/_lib/baselinker-orders";
+import { createAdminClient } from "@/app/_lib/supabase/server";
+import type { OrderStatus } from "@/app/_lib/types";
 
 // Meble robione na zamówienie — nie dekrementujemy stock przy opłacie.
 // Pole `stock` w produktach zostaje w bazie na wypadek przyszłych towarów
@@ -18,7 +21,7 @@ export async function POST(request: NextRequest) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(
+    event = getStripe().webhooks.constructEvent(
       body,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
@@ -41,26 +44,89 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    try {
-      await markOrderPaid(orderId, paymentIntent ?? session.id);
-    } catch (err) {
-      console.error("Błąd przetwarzania webhooka:", err);
+    // Guard statusu = deduplikacja eventów Stripe. Duplikat
+    // checkout.session.completed nie może podwójnie inkrementować promo,
+    // ponownie push'ować do BL ani cofać statusu zamówienia (np. po tym
+    // jak admin przestawił na processing/shipped).
+    const supabase = await createAdminClient();
+    const { data: orderRow, error: orderErr } = await supabase
+      .from("orders")
+      .select("id, status, promo_code_id, baselinker_order_id")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    if (orderErr) {
+      console.error("Błąd odczytu zamówienia w webhooku:", orderErr.message);
+      // 500 → Stripe ponowi event (przejściowa awaria DB).
       return NextResponse.json(
-        { error: "Błąd aktualizacji zamówienia" },
+        { error: "Błąd odczytu zamówienia" },
         { status: 500 }
       );
     }
+    if (!orderRow) {
+      console.error(`Webhook: zamówienie ${orderId} nie istnieje`);
+      return NextResponse.json({ received: true });
+    }
 
-    // Increment used_count dla kodu rabatowego, jeśli zamówienie go używało.
-    // Best-effort — nieudany increment nie blokuje webhooka.
-    try {
-      const order = await getOrderById(orderId);
-      const promoId = (order as unknown as { promo_code_id: string | null }).promo_code_id;
-      if (promoId) {
-        await incrementPromoUsage(promoId);
+    const ord = orderRow as unknown as {
+      status: OrderStatus;
+      promo_code_id: string | null;
+      baselinker_order_id: string | null;
+    };
+
+    if (ord.status === "cancelled") {
+      // Klient anulował, a płatność i tak doszła — wymaga ręcznej obsługi
+      // (zwrot albo przywrócenie zamówienia). Zostawiamy trwały ślad +
+      // payment_intent, bez którego nie da się łatwo zrobić zwrotu w Stripe.
+      console.error(
+        `Webhook: płatność za ANULOWANE zamówienie ${orderId} — wymaga ręcznej obsługi (zwrot/przywrócenie)`
+      );
+      await supabase
+        .from("orders")
+        .update({
+          stripe_payment_intent: paymentIntent ?? session.id,
+          baselinker_push_error:
+            "płatność Stripe doszła po anulowaniu zamówienia — wymaga ręcznej obsługi",
+        } as never)
+        .eq("id", orderId);
+      return NextResponse.json({ received: true });
+    }
+
+    // Dedup vs odzyskiwanie: status != pending znaczy "markOrderPaid już
+    // przeszedł", ale Stripe retry'uje też po crashu W TRAKCIE handlera
+    // (markOrderPaid OK → crash przed pushem do BL). Taki retry MUSI dokończyć
+    // push — inaczej opłacone zamówienie nigdy nie trafi do BL. Pomijamy
+    // wyłącznie to, co faktycznie się już wydarzyło.
+    const isFirstProcessing = ord.status === "pending";
+    if (!isFirstProcessing && hasCompletedBlPush(ord.baselinker_order_id)) {
+      // W pełni przetworzone (duplikat eventu) — idempotentny skip.
+      return NextResponse.json({ received: true });
+    }
+
+    if (isFirstProcessing) {
+      try {
+        await markOrderPaid(orderId, paymentIntent ?? session.id);
+      } catch (err) {
+        console.error("Błąd przetwarzania webhooka:", err);
+        return NextResponse.json(
+          { error: "Błąd aktualizacji zamówienia" },
+          { status: 500 }
+        );
       }
-    } catch (err) {
-      console.error("[promo] increment used_count nieudany:", err);
+
+      // Increment used_count dla kodu rabatowego, jeśli zamówienie go używało.
+      // Best-effort — nieudany increment nie blokuje webhooka. Tylko przy
+      // pierwszym przetworzeniu (retry po częściowym crashu nie może
+      // inkrementować drugi raz; ewentualna strata inkrementu przy crashu
+      // dokładnie między markOrderPaid a tym wywołaniem jest akceptowalna —
+      // used_count to statystyka limitu, nie księgowość).
+      try {
+        if (ord.promo_code_id) {
+          await incrementPromoUsage(ord.promo_code_id);
+        }
+      } catch (err) {
+        console.error("[promo] increment used_count nieudany:", err);
+      }
     }
 
     // Push do BaseLinker — best-effort, nie blokuje webhooka jeśli zawiedzie.

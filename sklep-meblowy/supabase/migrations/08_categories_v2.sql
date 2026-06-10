@@ -36,18 +36,7 @@ update public.products
 set category = 'sofa-3-osobowa'
 where category = 'sofy';
 
--- 3. Nowy check constraint
-alter table public.products
-  add constraint products_category_check
-  check (category in (
-    'sofa-2-osobowa',
-    'sofa-3-osobowa',
-    'naroznik-l',
-    'naroznik-u',
-    'fotele',
-    'pufy',
-    'zestawy',
-    'lozko-kontynentalne',
-    'lozko-tapicerowane',
-    'materace'
-  ));
+-- 3. (historycznie) nowy check constraint — USUNIĘTY z pliku, jak w
+-- migracji 04: przejściowy (09 zamienia na FK do categories), a jego
+-- obecność wywalała świeży setup z schema.sql. Stan końcowy łańcucha
+-- migracji bez zmian.

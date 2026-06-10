@@ -109,14 +109,19 @@ export async function blRequest<T = unknown>(
 // Typy odpowiedzi (tylko najczęstsze pola — BL ma ich więcej)
 // ============================================================
 
+// Kształt wg oficjalnej dokumentacji getInventories — BL zwraca
+// price_groups (lista ID grup cenowych) + default_price_group (ID domyślnej),
+// NIE pojedyncze price_group_id (takie pole nie istnieje w odpowiedzi API).
 export type BLInventory = {
   inventory_id: number;
   name: string;
   description: string;
   languages: string[];
   default_language: string;
-  price_group_id: number;
+  price_groups: number[];
+  default_price_group: number;
   warehouses: string[];
+  default_warehouse: string;
   reservations: boolean;
   is_default: boolean;
 };
@@ -135,9 +140,10 @@ export type BLCategoriesResponse = {
   categories: BLCategory[];
 };
 
+// Pełne dane produktu z getInventoryProductsData. Mapowane pola — BL zwraca
+// dużo więcej, podajemy te które używamy. ID produktu NIE jest polem
+// odpowiedzi — to klucz w Record<string, BLInventoryProduct>.
 export type BLInventoryProduct = {
-  // Mapowane pola — BL zwraca dużo więcej, podajemy te które używamy
-  id: string; // BL product id
   ean?: string;
   sku?: string;
   text_fields?: {
@@ -176,8 +182,25 @@ export type BLVariant = {
   prices?: Record<string, number>; // {price_group_id: price}
 };
 
+// Wiersz z getInventoryProductsList — okrojony względem pełnych danych:
+// tylko id/ean/sku/name/prices/stock (name na TOP-LEVEL, nie w text_fields;
+// id jest LICZBĄ). Pełne text_fields/images/variants/features daje dopiero
+// getInventoryProductsData.
+export type BLProductListItem = {
+  id: number;
+  ean?: string;
+  sku?: string;
+  name?: string;
+  prices?: Record<string, number>; // {price_group_id: price}
+  stock?: Record<string, number>; // {warehouse_id: qty}
+};
+
 export type BLInventoryProductsListResponse = {
-  products: Record<string, BLInventoryProduct>; // klucz = id
+  products: Record<string, BLProductListItem>; // klucz = id produktu
+};
+
+export type BLInventoryProductsDataResponse = {
+  products: Record<string, BLInventoryProduct>; // klucz = id produktu
 };
 
 // ============================================================
@@ -216,8 +239,8 @@ export async function getInventoryProductsData(
   inventoryId: number,
   productIds: string[],
   retry?: BlRetryOptions
-): Promise<BLInventoryProductsListResponse> {
-  return blRequest<BLInventoryProductsListResponse>(
+): Promise<BLInventoryProductsDataResponse> {
+  return blRequest<BLInventoryProductsDataResponse>(
     "getInventoryProductsData",
     { inventory_id: inventoryId, products: productIds },
     retry

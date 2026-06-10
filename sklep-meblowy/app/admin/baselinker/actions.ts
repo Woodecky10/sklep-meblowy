@@ -15,7 +15,9 @@ export type SyncActionResult =
       duration_ms: number;
       outcome: Extract<SyncOutcome, { ok: true }>;
     }
-  | { ok: false; error: string; durationMs: number };
+  // duration_ms spójnie z gałęzią sukcesu i kolumną DB (wcześniej camelCase
+  // durationMs tylko w gałęzi błędu — rozjazd nazw UI↔API).
+  | { ok: false; error: string; duration_ms: number };
 
 // ============================================================
 // Wywoływane z admin panelu — przycisk "Synchronizuj teraz"
@@ -45,7 +47,7 @@ export async function syncProductsAction(): Promise<SyncActionResult> {
   revalidatePath("/");
 
   if (!outcome.ok) {
-    return { ok: false, error: outcome.error, durationMs };
+    return { ok: false, error: outcome.error, duration_ms: durationMs };
   }
 
   return { ok: true, duration_ms: durationMs, outcome };
@@ -75,11 +77,17 @@ export async function getSyncLog(limit = 20): Promise<SyncLogRow[]> {
   await requireAdmin();
   const supabase = await createAdminClient();
 
-  const { data: logs } = await supabase
+  const { data: logs, error } = await supabase
     .from("baselinker_sync_log")
     .select("*")
     .order("triggered_at", { ascending: false })
     .limit(limit);
+
+  // Awaria odczytu nie może wyglądać jak pusta historia — zostaw ślad w logu
+  // serwera (UI i tak pokaże pustkę, ale przyczyna jest diagnozowalna).
+  if (error) {
+    console.error("[BL] odczyt baselinker_sync_log nieudany:", error.message);
+  }
 
   const rows = (logs ?? []) as Array<Omit<SyncLogRow, "triggered_by_email">>;
   if (rows.length === 0) return [];

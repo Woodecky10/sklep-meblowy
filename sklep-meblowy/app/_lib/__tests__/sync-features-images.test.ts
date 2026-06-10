@@ -1,28 +1,27 @@
-import { describe, it, expect } from "vitest";
+﻿import { describe, it, expect } from "vitest";
 import { resolveBlFeatures, pickFirstImage } from "@/app/_lib/baselinker-sync";
 
 describe("resolveBlFeatures — tolerancja źródła", () => {
   it("czyta text_fields.features gdy obecne", () => {
     expect(
-      resolveBlFeatures({ id: "1", text_fields: { features: { Kolor: "Beż" } } })
+      resolveBlFeatures({ text_fields: { features: { Kolor: "Beż" } } })
     ).toEqual({ Kolor: "Beż" });
   });
   it("fallback do top-level features", () => {
-    expect(resolveBlFeatures({ id: "1", features: { Kolor: "Szary" } })).toEqual({
+    expect(resolveBlFeatures({ features: { Kolor: "Szary" } })).toEqual({
       Kolor: "Szary",
     });
   });
   it("preferuje text_fields.features nad top-level", () => {
     expect(
       resolveBlFeatures({
-        id: "1",
         text_fields: { features: { Kolor: "Beż" } },
         features: { Kolor: "Szary" },
       })
     ).toEqual({ Kolor: "Beż" });
   });
   it("brak cech → undefined", () => {
-    expect(resolveBlFeatures({ id: "1" })).toBeUndefined();
+    expect(resolveBlFeatures({})).toBeUndefined();
   });
 });
 

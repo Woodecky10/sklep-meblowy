@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/app/_lib/supabase/server";
+import { isAdmin } from "@/app/_lib/admin";
 import {
   getInventories,
   getInventoryCategories,
@@ -8,7 +10,7 @@ import {
   BaseLinkerError,
 } from "@/app/_lib/baselinker";
 
-// Endpoint testowy — sprawdza:
+// Endpoint diagnostyczny — sprawdza:
 // 1. Czy token API działa (getInventories)
 // 2. Czy są jakieś magazyny (Inventory) i jakie ID
 // 3. Pobiera kategorie z pierwszego magazynu
@@ -16,9 +18,18 @@ import {
 // 5. Pobiera pełne dane pierwszych ~3 produktów (żeby zobaczyć strukturę)
 //
 // Zwraca surowy JSON — żebyśmy zobaczyli, jak BL zwraca dane.
-// Po teście usuniemy ten endpoint lub zabezpieczymy auth-em.
+// TYLKO dla admina — bez auth wyciekał pełne dane magazynowe i statusy
+// zamówień każdemu, kto znał URL.
 
 export async function GET() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!isAdmin(user)) {
+    return NextResponse.json({ error: "Brak uprawnień" }, { status: 403 });
+  }
+
   try {
     const inventories = await getInventories();
 
