@@ -8,6 +8,17 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
   const [lightbox, setLightbox] = useState(false);
   const list = images.length > 0 ? images : ["/placeholder.jpg"];
 
+  // Zmiana zestawu zdjęć (np. wybór wariantu z własną galerią) → wróć do
+  // pierwszego zdjęcia. Bez tego `active` mógł wskazywać poza nową, krótszą
+  // listę (list[active] === undefined → crash next/image). Porównanie po
+  // zawartości (nie referencji) — odporne na świeże tablice z helpera.
+  const imagesKey = images.join("|");
+  const [prevImagesKey, setPrevImagesKey] = useState(imagesKey);
+  if (prevImagesKey !== imagesKey) {
+    setPrevImagesKey(imagesKey);
+    setActive(0);
+  }
+
   // Stan zoomu w lightboxie:
   // - zoomed: czy 2x czy 1x
   // - origin: transform-origin (gdzie w obrazku jest "centrum" zoomu)
