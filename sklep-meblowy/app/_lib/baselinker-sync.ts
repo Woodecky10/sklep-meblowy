@@ -184,8 +184,8 @@ function getFeature(
 
 // Blacklist cech specyficznych dla Allegro (które admin musi wypełnić w BL
 // dla aukcji ale nie mają sensu w sklepie). Filtrowane case-insensitive.
-// Powód: koleżanka prowadzi sprzedaż na Allegro przez BL, więc te cechy
-// regularnie pojawiają się w BL features i bez filtra leciałyby na Mollien.pl.
+// Powód: sprzedaż na Allegro idzie przez BL, więc te cechy regularnie
+// pojawiają się w BL features i bez filtra leciałyby na Mollien.pl.
 const ALLEGRO_JUNK_KEYS = new Set(
   [
     "stan",
@@ -209,8 +209,8 @@ function isAllegroJunkKey(key: string): boolean {
 
 // Zbiera WSZYSTKIE cechy z BL jako array {key, value} — zachowuje kolejność
 // którą admin ustawił w BL. Filtruje puste wartości + allegro-junk (Stan,
-// Faktura VAT, Numer aukcji, etc. — te które koleżanka wypełnia dla
-// publikacji na Allegro a nie mają sensu w sklepie).
+// Faktura VAT, Numer aukcji, etc. — wypełniane na potrzeby publikacji
+// na Allegro, bez sensu w sklepie).
 function extractAllFeatures(
   features: BLInventoryProduct["features"]
 ): { key: string; value: string }[] {

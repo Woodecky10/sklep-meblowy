@@ -32,8 +32,8 @@ const ALLOWED_ATTRS_PER_TAG: Record<string, Set<string>> = {
   a: new Set(["href", "target", "rel"]),
 };
 
-// Domeny które wycinamy z linków w opisie BL — koleżanka prowadzi sprzedaż
-// na Allegro, więc w opisach z BL regularnie pojawiają się linki "Zobacz
+// Domeny które wycinamy z linków w opisie BL — sprzedaż na Allegro idzie
+// przez BL, więc w opisach z BL regularnie pojawiają się linki "Zobacz
 // inne aukcje" i podobne CTA niespójne ze sklepem Mollien.
 // Strategia: zachowaj tekst linku, usuń sam tag <a>.
 const BLOCKED_LINK_DOMAINS = [

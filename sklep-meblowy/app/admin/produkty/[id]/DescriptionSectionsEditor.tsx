@@ -124,8 +124,8 @@ export default function DescriptionSectionsEditor({
         <p className="text-sm text-[var(--muted)] mt-1 max-w-2xl leading-relaxed">
           Sekcje <strong>z BaseLinkera</strong> (Opis / Wymiary i materiały /
           Informacje dla klienta) przychodzą z sync — domyślnie BL je nadpisuje.
-          Możesz <strong>nadpisać per produkt</strong> (przycisk „Edytuj override”)
-          gdy koleżanka pomyliła pola w BL.
+          Możesz <strong>nadpisać per produkt</strong> (przycisk „Edytuj override”),
+          np. gdy w BaseLinkerze treść trafiła w złe pole.
           <br />
           Możesz też dodać <strong>własne sekcje</strong> (przycisk „+ Dodaj
           sekcję” → Tekst lub Zdjęcie) — przeżywają kolejne sync z BL.

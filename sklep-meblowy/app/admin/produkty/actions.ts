@@ -274,7 +274,7 @@ export async function updateProductVariants(
 // — nie nasze, nie nasz problem. Czyścimy też zdjęcia variantów.
 //
 // UWAGA: nie usuwa produktu z BaseLinkera. BL to osobne źródło prawdy —
-// koleżanka usuwa produkt w panelu BL niezależnie. Tu czyścimy tylko
+// produkt usuwa się tam niezależnie, w panelu BL. Tu czyścimy tylko
 // kopię w naszej bazie.
 export async function deleteProduct(formData: FormData): Promise<ActionResult> {
   await requireAdmin();

@@ -2,7 +2,7 @@
 -- Migracja 14: polecane produkty na stronie głównej w DB
 -- ============================================================
 -- Po tej migracji sekcję "Polecane produkty" na home zarządzamy w admin
--- panelu (/admin/polecane): koleżanka wybiera produkty, ustawia kolejność
+-- panelu (/admin/polecane): admin wybiera produkty, ustawia kolejność
 -- i opcjonalny badge ("Bestseller", "Nowość" itp.). Bez wybranych
 -- featured strona główna pokazuje 4 najnowsze produkty jako fallback.
 --

@@ -4,7 +4,7 @@
 -- Karta produktu pokazuje opis jako akordeony IKEA-style: O materiale,
 -- Pielęgnacja, Wymiary szczegółowe, FAQ. 5 pól BL (description +
 -- description_extra1-4) automatycznie mapuje się na 5 nazwanych sekcji
--- z konwencją hardcoded — koleżanka uczy się raz: "wpisz w Opis 2
+-- z konwencją hardcoded — wystarczy raz zapamiętać: "wpisz w Opis 2
 -- informacje o materiale" i tak działa dla każdego produktu.
 --
 -- Każda sekcja: { title: string, body: string, kind: 'text' }
