@@ -30,18 +30,9 @@ export default function ProductActions({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Dynamiczna cena (gdy modyfikator zmienia bazową) */}
-      {showVariants && complete && price !== product.price && (
-        <div className="flex items-baseline gap-3">
-          <p className="font-sans text-2xl font-bold text-[var(--color-gold)]">
-            {price.toLocaleString("pl-PL")} zł
-          </p>
-          <p className="text-sm text-[var(--muted)] line-through">
-            {product.price.toLocaleString("pl-PL")} zł
-          </p>
-        </div>
-      )}
-
+      {/* Cenę (jedną, aktualną dla wybranego wariantu) wyświetla parent
+          (ProductMainSection) — bez przekreślania bazowej: wzrost ceny
+          wariantu wyglądał jak odwrócona promocja. */}
       {showVariants && (
         <VariantSelector
           product={product}

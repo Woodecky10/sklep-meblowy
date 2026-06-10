@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Product, ProductRating } from "@/app/_lib/types";
-import { getVariantImages } from "@/app/_lib/variants";
+import { getVariantImages, getVariantPrice } from "@/app/_lib/variants";
 import ImageGallery from "./ImageGallery";
 import ProductActions from "./ProductActions";
 import StarRating from "./StarRating";
@@ -31,6 +31,9 @@ export default function ProductMainSection({
 }) {
   const [selected, setSelected] = useState<Record<string, string>>({});
   const images = getVariantImages(product, selected);
+  // Jedna, aktualna cena: bazowa przed wyborem wariantu, z modyfikatorem po
+  // wyborze. Bez przekreśleń — zmiana ceny wariantu to nie promocja.
+  const currentPrice = getVariantPrice(product, selected);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-16">
@@ -87,7 +90,7 @@ export default function ProductMainSection({
           )}
 
           <p className="font-sans text-3xl font-bold text-[var(--fg)]">
-            {product.price.toLocaleString("pl-PL")} zł
+            {currentPrice.toLocaleString("pl-PL")} zł
           </p>
         </div>
 
