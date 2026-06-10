@@ -1,7 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/app/_lib/supabase/server";
-import { pushOrderToBaseLinker } from "@/app/_lib/baselinker-orders";
+import { pushOrderToBaseLinker, hasCompletedBlPush } from "@/app/_lib/baselinker-orders";
 import { reconcileOrders } from "@/app/_lib/baselinker-reconcile";
+import { getOrders } from "@/app/_lib/baselinker";
+import { applyBlStatus } from "@/app/_lib/orders";
+import {
+  parseStatusIdConfig,
+  isStatusConfigEmpty,
+  reconcileOrderStatuses,
+  type InflightOrder,
+} from "@/app/_lib/baselinker-status-sync";
 
 // ============================================================
 // GET /api/cron/reconcile-bl
@@ -17,6 +25,9 @@ import { reconcileOrders } from "@/app/_lib/baselinker-reconcile";
 
 const BATCH_LIMIT = 50;
 const RECONCILE_STATUSES = ["paid", "processing", "shipped", "delivered"];
+const STATUS_BATCH_LIMIT = 100;
+const INFLIGHT_STATUSES = ["paid", "processing", "shipped"];
+const BL_READ_RETRY = { attempts: 3, baseDelayMs: 500 };
 
 function isAuthorized(
   request: NextRequest,
@@ -88,10 +99,54 @@ export async function GET(request: NextRequest) {
   const summary = await reconcileOrders(orderIds, pushOrderToBaseLinker);
 
   console.log(
-    `[reconcile-bl] scanned=${summary.scanned} pushed=${summary.pushed} ` +
+    `[reconcile-bl] push scanned=${summary.scanned} pushed=${summary.pushed} ` +
       `in_progress=${summary.in_progress} skipped=${summary.skipped} ` +
       `failed=${summary.failed} backlog=${backlog}`
   );
 
-  return NextResponse.json({ ...summary, backlog });
+  // --- Pull statusów z BL (po push-sierot) ---
+  const cfg = parseStatusIdConfig({
+    BL_STATUS_PROCESSING_IDS: process.env.BL_STATUS_PROCESSING_IDS,
+    BL_STATUS_SHIPPED_IDS: process.env.BL_STATUS_SHIPPED_IDS,
+    BL_STATUS_DELIVERED_IDS: process.env.BL_STATUS_DELIVERED_IDS,
+    BL_STATUS_CANCELLED_IDS: process.env.BL_STATUS_CANCELLED_IDS,
+  });
+
+  let statusSync: Record<string, unknown> = { configured: false };
+  if (!isStatusConfigEmpty(cfg)) {
+    const { data: inflightRows, error: inflightErr } = await supabase
+      .from("orders")
+      .select("id, status, baselinker_order_id")
+      .in("status", INFLIGHT_STATUSES)
+      .not("baselinker_order_id", "is", null)
+      .order("created_at", { ascending: true })
+      .limit(STATUS_BATCH_LIMIT + 1);
+
+    if (inflightErr) {
+      console.error("[reconcile-bl] zapytanie in-flight nieudane:", inflightErr.message);
+      statusSync = { configured: true, error: "Błąd zapytania in-flight" };
+    } else {
+      // Tylko prawdziwe BL id (nie sentinel pending:%).
+      const inflight = ((inflightRows ?? []) as InflightOrder[]).filter((r) =>
+        hasCompletedBlPush(r.baselinker_order_id)
+      );
+      const statusBacklog = inflight.length > STATUS_BATCH_LIMIT;
+      const batch = inflight.slice(0, STATUS_BATCH_LIMIT);
+
+      const fetchStatus = async (blOrderId: string): Promise<number | null> => {
+        const orders = await getOrders(
+          { orderId: Number(blOrderId), getUnconfirmed: true },
+          BL_READ_RETRY
+        );
+        return orders[0]?.status_id ?? null;
+      };
+
+      const sync = await reconcileOrderStatuses(batch, cfg, fetchStatus, applyBlStatus);
+      statusSync = { configured: true, backlog: statusBacklog, ...sync };
+    }
+  }
+
+  console.log(`[reconcile-bl] status-sync ${JSON.stringify(statusSync)}`);
+
+  return NextResponse.json({ push: { ...summary, backlog }, statusSync });
 }
