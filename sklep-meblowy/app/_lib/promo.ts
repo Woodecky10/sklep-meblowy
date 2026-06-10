@@ -94,9 +94,13 @@ export async function validatePromoCode(
 // ============================================================
 export async function incrementPromoUsage(promoId: string): Promise<void> {
   const supabase = await createAdminClient();
-  // Atomowy UPDATE ... SET used_count = used_count + 1 po stronie DB
-  // (RPC z migracji 25). Wcześniejsze read-then-update gubiło inkrementy
-  // przy równoległych webhookach i pozwalało przekroczyć max_uses.
+  // Atomowy UPDATE ... SET used_count = used_count + 1 po stronie DB (RPC z
+  // migracji 25) — eliminuje gubienie inkrementów przy read-then-update.
+  // UWAGA: to NIE jest twardy limit. max_uses sprawdzany jest tylko przy
+  // walidacji (przed płatnością), a rabat nalicza się przy płatności, więc dwa
+  // równoległe checkouty tego samego kodu mogą oba go użyć. used_count to
+  // miękka statystyka limitu; podwójne liczenie z duplikatów webhooka blokuje
+  // CAS w markOrderPaid (increment leci tylko dla zwycięzcy claimu pending→paid).
   const { error } = await supabase.rpc("increment_promo_usage", {
     p_promo_id: promoId,
   });

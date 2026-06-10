@@ -108,16 +108,20 @@ export async function POST(request: NextRequest) {
     // przeszedł", ale Stripe retry'uje też po crashu W TRAKCIE handlera
     // (markOrderPaid OK → crash przed pushem do BL). Taki retry MUSI dokończyć
     // push — inaczej opłacone zamówienie nigdy nie trafi do BL. Pomijamy
-    // wyłącznie to, co faktycznie się już wydarzyło.
-    const isFirstProcessing = ord.status === "pending";
-    if (!isFirstProcessing && hasCompletedBlPush(ord.baselinker_order_id)) {
+    // wyłącznie to, co faktycznie się już w pełni wydarzyło.
+    if (ord.status !== "pending" && hasCompletedBlPush(ord.baselinker_order_id)) {
       // W pełni przetworzone (duplikat eventu) — idempotentny skip.
       return NextResponse.json({ received: true });
     }
 
-    if (isFirstProcessing) {
+    // Atomowy claim przejścia pending→paid. Przy równoległych duplikatach
+    // webhooka TYLKO JEDNO wywołanie dostaje claimedFirst=true (CAS po
+    // status='pending'); reszta zaktualizuje 0 wierszy. Dzięki temu increment
+    // used_count leci dokładnie raz na zamówienie.
+    let claimedFirst = false;
+    if (ord.status === "pending") {
       try {
-        await markOrderPaid(orderId, paymentIntent ?? session.id);
+        claimedFirst = await markOrderPaid(orderId, paymentIntent ?? session.id);
       } catch (err) {
         console.error("Błąd przetwarzania webhooka:", err);
         return NextResponse.json(
@@ -125,17 +129,17 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         );
       }
+    }
 
-      // Increment used_count dla kodu rabatowego, jeśli zamówienie go używało.
-      // Best-effort — nieudany increment nie blokuje webhooka. Tylko przy
-      // pierwszym przetworzeniu (retry po częściowym crashu nie może
-      // inkrementować drugi raz; ewentualna strata inkrementu przy crashu
-      // dokładnie między markOrderPaid a tym wywołaniem jest akceptowalna —
-      // used_count to statystyka limitu, nie księgowość).
+    // Increment used_count tylko dla zwycięzcy claimu (best-effort — nieudany
+    // increment nie blokuje webhooka). CAS w markOrderPaid eliminuje podwójne
+    // liczenie z duplikatów webhooka. UWAGA: to nadal NIE jest twardy limit —
+    // rabat nalicza się przy płatności, a licznik po niej, więc dwa równoległe
+    // checkouty tego samego kodu mogą oba go użyć. used_count = miękka
+    // statystyka limitu (twardy limit wymagałby rezerwacji przy checkoucie).
+    if (claimedFirst && ord.promo_code_id) {
       try {
-        if (ord.promo_code_id) {
-          await incrementPromoUsage(ord.promo_code_id);
-        }
+        await incrementPromoUsage(ord.promo_code_id);
       } catch (err) {
         console.error("[promo] increment used_count nieudany:", err);
       }

@@ -76,14 +76,21 @@ export async function getUserOrders(userId: string) {
 export async function markOrderPaid(
   orderId: string,
   paymentIntentId: string
-) {
+): Promise<boolean> {
   const supabase = await createAdminClient();
-  const { error } = await supabase
+  // CAS: aktualizuj TYLKO przy przejściu pending→paid. Zwraca true, jeśli TO
+  // wywołanie faktycznie przestawiło status — czyli wygrało wyścig równoległych
+  // duplikatów webhooka Stripe. Caller używa tego do JEDNOKROTNEGO incrementu
+  // used_count (bez tego dwa duplikaty liczyłyby ten sam kod podwójnie).
+  const { data, error } = await supabase
     .from("orders")
     .update({ stripe_payment_intent: paymentIntentId, status: "paid" } as never)
-    .eq("id", orderId);
+    .eq("id", orderId)
+    .eq("status", "pending")
+    .select("id");
 
   if (error) throw error;
+  return (data?.length ?? 0) > 0;
 }
 
 export async function getOrderById(orderId: string) {

@@ -7,8 +7,10 @@
 --      Dodajemy orders.baselinker_push_error — trwały zapis błędu/powodu
 --      pominięcia; admin może ponowić przez /api/baselinker/push-order.
 --   2. incrementPromoUsage robił read-then-update — równoległe webhooki
---      gubiły inkrementy i pozwalały przekroczyć max_uses. RPC z atomowym
---      UPDATE ... SET used_count = used_count + 1.
+--      gubiły inkrementy. RPC z atomowym UPDATE ... SET used_count =
+--      used_count + 1 to naprawia. UWAGA: to NIE jest twardy limit max_uses
+--      (rabat nalicza się przy płatności, licznik po niej) — szczegóły w
+--      komentarzu promo.ts/incrementPromoUsage.
 --   3. Polityki write na products z baseline'u schema.sql sprawdzały
 --      top-level claim 'role' (w Supabase zawsze anon/authenticated/
 --      service_role) zamiast app_metadata.role — nigdy nie przepuszczały.
