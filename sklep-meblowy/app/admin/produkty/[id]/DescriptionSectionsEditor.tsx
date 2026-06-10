@@ -122,13 +122,13 @@ export default function DescriptionSectionsEditor({
           Sekcje opisu produktu
         </h2>
         <p className="text-sm text-[var(--muted)] mt-1 max-w-2xl leading-relaxed">
-          Sekcje <strong>z BaseLinkera</strong> (Opis / Wymiary i materiały /
-          Informacje dla klienta) przychodzą z sync — domyślnie BL je nadpisuje.
-          Możesz <strong>nadpisać per produkt</strong> (przycisk „Edytuj override”),
-          np. gdy w BaseLinkerze treść trafiła w złe pole.
+          Wszystkie sekcje opisu są zarządzane <strong>tutaj</strong> — sync
+          z BaseLinkerem ich nie zmienia ani nie nadpisuje.
+          Sekcje zaimportowane kiedyś z BL możesz <strong>nadpisać</strong>
+          (przycisk „Edytuj override”) albo ukryć.
           <br />
-          Możesz też dodać <strong>własne sekcje</strong> (przycisk „+ Dodaj
-          sekcję” → Tekst lub Zdjęcie) — przeżywają kolejne sync z BL.
+          Nowe treści dodajesz przyciskami „+ Własna sekcja” (tekst) i
+          „+ Zdjęcie” — wszystkie przeżywają kolejne sync z BL.
         </p>
       </div>
 
@@ -197,8 +197,9 @@ export default function DescriptionSectionsEditor({
 
         {sections.length === 0 && (
           <p className="text-sm text-[var(--muted)] italic py-6 text-center">
-            Brak sekcji opisu. Wypełnij pola Opis / Opis 1-4 w BaseLinkerze i odpal sync,
-            albo dodaj zdjęcie przyciskiem powyżej.
+            Brak sekcji opisu. Dodaj własną sekcję tekstową lub zdjęcie
+            przyciskiem powyżej — opisy są zarządzane tutaj, sync z BL ich
+            nie tworzy.
           </p>
         )}
       </div>
@@ -331,7 +332,7 @@ function TextSectionRow({
           </p>
           <div className="flex items-center gap-3 mt-2 flex-wrap">
             <p className="text-[10px] font-sans uppercase tracking-widest text-[var(--muted)]">
-              {hasOverride ? "Nadpisana przez admina" : "Z BaseLinkera — edytuj w BL panelu"}
+              {hasOverride ? "Nadpisana przez admina" : "Z BaseLinkera (import) — edytuj przez override"}
             </p>
             <button
               type="button"
