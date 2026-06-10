@@ -263,6 +263,30 @@ export async function getOrderStatusList(): Promise<BLOrderStatus[]> {
   return res.statuses ?? [];
 }
 
+// Zamówienie z getOrders — tylko pola których używamy (BL zwraca więcej).
+export type BLOrder = {
+  order_id: number;
+  status_id: number;
+  date_add?: number;
+  date_confirmed?: number;
+  email?: string;
+};
+
+// getOrders — z order_id zwraca to jedno zamówienie z aktualnym status_id.
+// (Bez order_id zwraca do 100 od date_confirmed_from — nieużywane tutaj.)
+export async function getOrders(
+  params: { orderId?: number; dateConfirmedFrom?: number; getUnconfirmed?: boolean },
+  retry?: BlRetryOptions
+): Promise<BLOrder[]> {
+  const blParams: Record<string, unknown> = {};
+  if (params.orderId != null) blParams.order_id = params.orderId;
+  if (params.dateConfirmedFrom != null)
+    blParams.date_confirmed_from = params.dateConfirmedFrom;
+  if (params.getUnconfirmed) blParams.get_unconfirmed_orders = true;
+  const res = await blRequest<{ orders: BLOrder[] }>("getOrders", blParams, retry);
+  return res.orders ?? [];
+}
+
 // Pojedyncza pozycja w zamówieniu BL
 export type BLOrderProduct = {
   storage?: string; // "db" lub "bl_xxx" (id magazynu BL)
