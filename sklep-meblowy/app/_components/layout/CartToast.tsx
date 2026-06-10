@@ -11,12 +11,23 @@ export default function CartToast() {
   const { notification, dismissNotification } = useCart();
   const [visible, setVisible] = useState(false);
 
+  // Nowa notyfikacja → start od ukrytego (fade-in robi timer w efekcie).
+  // Wzorzec "adjusting state during render" zamiast setState w ciele efektu.
+  const [prevNotification, setPrevNotification] = useState(notification);
+  if (notification !== prevNotification) {
+    setPrevNotification(notification);
+    if (notification) setVisible(false);
+  }
+
   useEffect(() => {
     if (!notification) return;
-    setVisible(true);
+    // Pokazujemy po pierwszym paint (transition robi fade-in), potem auto-hide
+    // i zdjęcie notyfikacji 300ms po zakończeniu fade-out.
+    const showTimer = setTimeout(() => setVisible(true), 20);
     const hideTimer = setTimeout(() => setVisible(false), VISIBLE_MS);
     const removeTimer = setTimeout(() => dismissNotification(), VISIBLE_MS + 300);
     return () => {
+      clearTimeout(showTimer);
       clearTimeout(hideTimer);
       clearTimeout(removeTimer);
     };

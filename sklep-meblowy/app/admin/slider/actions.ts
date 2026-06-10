@@ -33,15 +33,6 @@ function parseDateTimeLocal(input: unknown): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-function parseInteger(input: unknown, fallback = 0): number {
-  if (typeof input === "string" && input.trim() !== "") {
-    const n = Number(input);
-    return Number.isFinite(n) ? Math.trunc(n) : fallback;
-  }
-  if (typeof input === "number" && Number.isFinite(input)) return Math.trunc(input);
-  return fallback;
-}
-
 // ============================================================
 // Upload zdjęcia do Supabase Storage
 // ============================================================

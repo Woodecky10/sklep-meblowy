@@ -23,39 +23,19 @@ export default function KoszykPage() {
     clearPromo,
   } = useCart();
 
-  if (items.length === 0) {
-    return (
-      <div className="max-w-7xl mx-auto px-6 py-32 text-center">
-        <p className="font-display text-5xl mb-4">🛒</p>
-        <h1 className="font-display text-3xl font-bold text-[var(--fg)] mb-4">
-          Koszyk jest pusty
-        </h1>
-        <p className="text-[var(--muted)] mb-10">
-          Dodaj produkty do koszyka, aby kontynuować zakupy.
-        </p>
-        <Link
-          href="/sklep"
-          className="inline-flex px-8 py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
-        >
-          Przejdź do sklepu
-        </Link>
-      </div>
-    );
-  }
-
   // Koszt dostawy ustalany indywidualnie per zamówienie po kontakcie z klientem
   // — meble różnią się wagą i gabarytami. Stripe pobiera tylko cenę produktów.
   const discount = appliedPromo?.discount ?? 0;
   const grandTotal = Math.max(0, total - discount);
 
-  // Cross-sell — "Może Cię zainteresować"
+  // Cross-sell — "Może Cię zainteresować".
+  // UWAGA: wszystkie hooki muszą być PRZED wczesnym returnem pustego koszyka —
+  // inaczej React rzuca "Rendered fewer hooks" gdy koszyk się opróżni.
   const [crossSell, setCrossSell] = useState<Product[]>([]);
   useEffect(() => {
+    // Pusty koszyk → strona renderuje pusty stan, cross-sell i tak niewidoczny.
+    if (items.length === 0) return;
     let cancelled = false;
-    if (items.length === 0) {
-      setCrossSell([]);
-      return;
-    }
     getCartCrossSellAction(
       items.map((i) => ({ id: i.id, category: i.category }))
     ).then((products) => {
@@ -95,6 +75,26 @@ export default function KoszykPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [total]);
+
+  if (items.length === 0) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-32 text-center">
+        <p className="font-display text-5xl mb-4">🛒</p>
+        <h1 className="font-display text-3xl font-bold text-[var(--fg)] mb-4">
+          Koszyk jest pusty
+        </h1>
+        <p className="text-[var(--muted)] mb-10">
+          Dodaj produkty do koszyka, aby kontynuować zakupy.
+        </p>
+        <Link
+          href="/sklep"
+          className="inline-flex px-8 py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
+        >
+          Przejdź do sklepu
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">

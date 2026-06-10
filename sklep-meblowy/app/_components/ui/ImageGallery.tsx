@@ -54,12 +54,16 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
     };
   }
 
-  // Reset zoom przy zmianie zdjęcia / zamknięciu lightbox
-  useEffect(() => {
+  // Reset zoom przy zmianie zdjęcia / zamknięciu lightbox — wzorzec
+  // "adjusting state during render" (React docs) zamiast setState w efekcie:
+  // bez dodatkowego przebiegu renderu i bez mignięcia starym zoomem.
+  const [prevReset, setPrevReset] = useState({ active, lightbox });
+  if (prevReset.active !== active || prevReset.lightbox !== lightbox) {
+    setPrevReset({ active, lightbox });
     setZoomed(false);
     setPan({ x: 0, y: 0 });
     setOrigin({ x: 50, y: 50 });
-  }, [active, lightbox]);
+  }
 
   // Esc zamyka lightbox; strzałki przełączają zdjęcia
   useEffect(() => {

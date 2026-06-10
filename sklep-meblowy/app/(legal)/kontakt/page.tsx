@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { COMPANY, formatFullAddress, isFilled } from "@/app/_lib/company";
 
 export const metadata: Metadata = {
@@ -145,13 +146,13 @@ export default function KontaktPage() {
       <ul>
         <li>
           Status zamówienia – sprawdzisz również w zakładce{" "}
-          <a href="/konto/zamowienia">Moje zamówienia</a> po zalogowaniu.
+          <Link href="/konto/zamowienia">Moje zamówienia</Link> po zalogowaniu.
         </li>
         <li>
-          Zwrot produktu – szczegóły w <a href="/zwroty">Zwroty i reklamacje</a>.
+          Zwrot produktu – szczegóły w <Link href="/zwroty">Zwroty i reklamacje</Link>.
         </li>
         <li>
-          Reklamacja – w zakładce <a href="/zwroty">Zwroty i reklamacje</a>.
+          Reklamacja – w zakładce <Link href="/zwroty">Zwroty i reklamacje</Link>.
         </li>
         <li>
           Doradztwo przy wyborze produktu – napisz do nas, chętnie pomożemy.

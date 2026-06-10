@@ -124,11 +124,11 @@ export default function DescriptionSectionsEditor({
         <p className="text-sm text-[var(--muted)] mt-1 max-w-2xl leading-relaxed">
           Sekcje <strong>z BaseLinkera</strong> (Opis / Wymiary i materiały /
           Informacje dla klienta) przychodzą z sync — domyślnie BL je nadpisuje.
-          Możesz <strong>nadpisać per produkt</strong> (przycisk „Edytuj override")
+          Możesz <strong>nadpisać per produkt</strong> (przycisk „Edytuj override”)
           gdy koleżanka pomyliła pola w BL.
           <br />
           Możesz też dodać <strong>własne sekcje</strong> (przycisk „+ Dodaj
-          sekcję" → Tekst lub Zdjęcie) — przeżywają kolejne sync z BL.
+          sekcję” → Tekst lub Zdjęcie) — przeżywają kolejne sync z BL.
         </p>
       </div>
 
@@ -250,6 +250,21 @@ function TextSectionRow({
   onMoveUp?: () => void;
   onMoveDown?: () => void;
 }) {
+  // Override = admin coś realnie ustawił. Pomijamy whitespace-only stringi
+  // (puste / same spacje nie są realnym override). hidden=true liczy się jako
+  // "admin tknął" — patrz onToggleHidden i merge logic w baselinker-sync.ts.
+  const hasTitleOverride = (section.admin_title?.trim().length ?? 0) > 0;
+  const hasBodyOverride = (section.admin_body?.trim().length ?? 0) > 0;
+  const hasOverride = hasTitleOverride || hasBodyOverride || section.hidden === true;
+
+  // Expand kontroli override gdy admin już coś nadpisał — wtedy widzi
+  // wszystkie pola od razu. Inaczej trzeba kliknąć "Edytuj override".
+  // UWAGA: hook musi być PRZED wczesnym returnem admin_custom — sekcje są
+  // renderowane z key={idx}, więc ta sama instancja komponentu może przejść
+  // z BL-sekcji na custom (np. po wstawieniu sekcji wyżej) i odwrotnie;
+  // hook za returnem = "Rendered fewer/more hooks" crash.
+  const [expanded, setExpanded] = useState(hasOverride);
+
   // Admin custom sekcja — render zupełnie inny (inline editable inputs)
   if (section.admin_custom) {
     return (
@@ -263,24 +278,6 @@ function TextSectionRow({
       />
     );
   }
-  // Override = admin coś realnie ustawił. Pomijamy whitespace-only stringi
-  // (puste / same spacje nie są realnym override). hidden true LUB false
-  // liczy się jako "admin tknął" — patrz onToggleHidden i merge logic.
-  const hasTitleOverride = (section.admin_title?.trim().length ?? 0) > 0;
-  const hasBodyOverride = (section.admin_body?.trim().length ?? 0) > 0;
-  const hasHiddenOverride = section.hidden !== undefined;
-  const hasOverride = hasTitleOverride || hasBodyOverride || section.hidden === true;
-
-  // Expand kontroli override gdy admin już coś nadpisał — wtedy widzi
-  // wszystkie pola od razu. Inaczej trzeba kliknąć "Edytuj override".
-  const [expanded, setExpanded] = useState(hasOverride);
-
-  // Krótki preview body (strip HTML + 120 znaków)
-  const preview = section.body
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 120);
 
   const effectiveTitle = section.admin_title?.trim() || section.title;
   const effectiveBody = hasBodyOverride

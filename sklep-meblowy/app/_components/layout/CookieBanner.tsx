@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 
 // Kategorie cookies zgodne z dobrą praktyką RODO:
@@ -44,33 +44,39 @@ function saveConsent(analytics: boolean, marketing: boolean) {
   window.dispatchEvent(new CustomEvent("cookie-consent", { detail: consent }));
 }
 
+// Subskrypcja na decyzję cookie — saveConsent dispatchuje event
+// "cookie-consent", więc baner zamyka się sam po zapisie zgody.
+function subscribeConsent(callback: () => void): () => void {
+  window.addEventListener("cookie-consent", callback);
+  return () => window.removeEventListener("cookie-consent", callback);
+}
+
 export default function CookieBanner() {
-  const [open, setOpen] = useState(false);
+  // useSyncExternalStore zamiast setState-w-efekcie: na serwerze "zgoda
+  // rozstrzygnięta" (baner niewidoczny), po hydracji czytamy localStorage.
+  const consentDecided = useSyncExternalStore(
+    subscribeConsent,
+    () => getConsent() !== null,
+    () => true
+  );
   const [showDetails, setShowDetails] = useState(false);
   const [analytics, setAnalytics] = useState(false);
   const [marketing, setMarketing] = useState(false);
 
-  useEffect(() => {
-    const existing = getConsent();
-    if (!existing) setOpen(true);
-  }, []);
-
+  // saveConsent emituje "cookie-consent" → consentDecided=true → baner znika.
   function acceptAll() {
     saveConsent(true, true);
-    setOpen(false);
   }
 
   function rejectAll() {
     saveConsent(false, false);
-    setOpen(false);
   }
 
   function saveCustom() {
     saveConsent(analytics, marketing);
-    setOpen(false);
   }
 
-  if (!open) return null;
+  if (consentDecided) return null;
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 px-4 pb-4 pointer-events-none">

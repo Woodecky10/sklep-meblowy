@@ -24,27 +24,39 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (pathname === "/sklep") {
-      setValue(searchParams.get("q") ?? "");
-    }
-  }, [pathname, searchParams]);
+  // Sync wartości z URL na /sklep — wzorzec "adjusting state during render"
+  // zamiast setState w efekcie. Klucz = pełne searchParams (nie samo q):
+  // każda nawigacja w /sklep (paginacja, filtry) ma przywracać do inputa
+  // aktualne q z URL, tak jak robił to dawny efekt z deps [pathname,
+  // searchParams] — np. po ręcznym wyczyszczeniu pola i zmianie strony.
+  const urlKey = pathname === "/sklep" ? searchParams.toString() : null;
+  const [prevUrlKey, setPrevUrlKey] = useState(urlKey);
+  if (urlKey !== prevUrlKey) {
+    setPrevUrlKey(urlKey);
+    if (urlKey !== null) setValue(searchParams.get("q") ?? "");
+  }
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
 
-  // Debounce 200ms + fetch sugestii
+  // Debounce 200ms + fetch sugestii. Puste value czyści sugestie po tym
+  // samym debounce (asynchronicznie — bez setState w ciele efektu); bez
+  // czyszczenia stare podpowiedzi migały przy ponownym wpisywaniu, a
+  // loading potrafił utknąć na true.
   useEffect(() => {
     const trimmed = value.trim();
     if (trimmed.length < 1) {
-      setSuggestions([]);
-      setLoading(false);
-      return;
+      const handle = setTimeout(() => {
+        setSuggestions([]);
+        setLoading(false);
+        setHighlighted(-1);
+      }, 200);
+      return () => clearTimeout(handle);
     }
-    setLoading(true);
+    let cancelled = false;
     const handle = setTimeout(() => {
-      let cancelled = false;
+      setLoading(true);
       fetch(`/api/search/suggest?q=${encodeURIComponent(trimmed)}`)
         .then((r) => (r.ok ? r.json() : []))
         .then((data: SearchSuggestion[]) => {
@@ -58,11 +70,13 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
         .finally(() => {
           if (!cancelled) setLoading(false);
         });
-      return () => {
-        cancelled = true;
-      };
     }, 200);
-    return () => clearTimeout(handle);
+    // cancelled na poziomie efektu — wcześniej flaga żyła w closure setTimeout
+    // i jej cleanup był wyrzucany, więc anulowanie fetcha nigdy nie działało.
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
   }, [value]);
 
   // Click outside zamyka dropdown (tylko dla inline)

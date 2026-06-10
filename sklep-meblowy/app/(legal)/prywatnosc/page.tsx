@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { COMPANY, formatFullAddress } from "@/app/_lib/company";
 
 export const metadata: Metadata = {
@@ -15,7 +15,7 @@ export default function PrywatnoscPage() {
       <h2>§ 1. Administrator danych osobowych</h2>
       <p>
         Administratorem Twoich danych osobowych jest <strong>{COMPANY.legalName}</strong> z
-        siedzibą pod adresem {formatFullAddress()}, NIP: {COMPANY.nip} (dalej: „Administrator").
+        siedzibą pod adresem {formatFullAddress()}, NIP: {COMPANY.nip} (dalej: „Administrator”).
         Kontakt w sprawach ochrony danych: <strong>{COMPANY.email}</strong>.
       </p>
 
@@ -142,7 +142,7 @@ export default function PrywatnoscPage() {
       <ul>
         <li>dostępu do treści swoich danych,</li>
         <li>sprostowania (poprawienia) danych,</li>
-        <li>usunięcia danych („prawo do bycia zapomnianym"),</li>
+        <li>usunięcia danych („prawo do bycia zapomnianym”),</li>
         <li>ograniczenia przetwarzania,</li>
         <li>przenoszenia danych,</li>
         <li>

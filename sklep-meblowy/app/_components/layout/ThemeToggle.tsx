@@ -1,12 +1,23 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
+
+// Hydration gate bez setState-w-efekcie: serwer widzi false, klient po
+// hydracji true. useSyncExternalStore z pustą subskrypcją to zalecany
+// zamiennik dla wzorca `useEffect(() => setMounted(true), [])`.
+const emptySubscribe = () => () => {};
+function useMounted(): boolean {
+  return useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
+}
 
 export default function ThemeToggle() {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useMounted();
   if (!mounted) return <div className="w-9 h-9" />;
 
   return (

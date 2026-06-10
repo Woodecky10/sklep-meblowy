@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 // Statyczny wyświetlacz ocen — ma wsparcie dla „pół gwiazdki" (dla średnich np. 4.3).
 // size: rozmiar pojedynczej gwiazdki w px.
 export default function StarRating({
@@ -28,7 +30,9 @@ export default function StarRating({
 
 function Star({ size, filled, half }: { size: number; filled: boolean; half: boolean }) {
   const color = filled || half ? "var(--color-gold)" : "var(--border)";
-  const id = `half-${Math.random().toString(36).slice(2, 9)}`;
+  // useId zamiast Math.random — stabilne między renderami i zgodne z SSR
+  // (random ID powodował hydration mismatch przy pół-gwiazdce).
+  const id = `half-${useId()}`;
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
       {half && (

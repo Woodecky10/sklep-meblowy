@@ -21,14 +21,14 @@ export default function RegulaminPage() {
       <ol>
         <li>
           Niniejszy regulamin określa zasady korzystania ze sklepu internetowego dostępnego pod
-          adresem <strong>{COMPANY.domain}</strong> (dalej: „Sklep").
+          adresem <strong>{COMPANY.domain}</strong> (dalej: „Sklep”).
         </li>
         <li>
           Właścicielem Sklepu jest <strong>{COMPANY.legalName}</strong> z siedzibą pod adresem{" "}
           {formatFullAddress()}, NIP: {COMPANY.nip}
           {isFilled(COMPANY.regon) && <>, REGON: {COMPANY.regon}</>}
           {COMPANY.krs && <>, KRS: {COMPANY.krs}</>}
-          {" "}(dalej: „Sprzedawca").
+          {" "}(dalej: „Sprzedawca”).
         </li>
         <li>
           Kontakt ze Sprzedawcą: e-mail <strong>{COMPANY.email}</strong>

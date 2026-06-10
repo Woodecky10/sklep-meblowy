@@ -35,7 +35,13 @@ export type CartNotification = {
   ts: number;
 };
 
-type CartState = { items: CartItem[] };
+// hydrated=true dopiero po odczycie z localStorage (akcja HYDRATE), żeby nie
+// nadpisać zapisanego stanu pustym przy pierwszym renderze.
+type CartState = {
+  items: CartItem[];
+  appliedPromo: AppliedPromo | null;
+  hydrated: boolean;
+};
 
 type CartAction =
   | { type: "ADD"; item: CartItem }
@@ -53,7 +59,18 @@ type CartAction =
       notes: string;
     }
   | { type: "CLEAR" }
-  | { type: "HYDRATE"; items: CartItem[] };
+  | { type: "HYDRATE"; items: CartItem[]; appliedPromo: AppliedPromo | null }
+  | { type: "APPLY_PROMO"; promo: AppliedPromo }
+  | { type: "CLEAR_PROMO" };
+
+// Maksymalna ilość jednej pozycji — spójna z walidacją w /api/checkout
+// (route odrzuca quantity > 99, więc UI nie może pozwolić jej zbudować).
+export const MAX_CART_QTY = 99;
+
+function clampQty(q: number): number {
+  if (!Number.isFinite(q)) return 1;
+  return Math.min(MAX_CART_QTY, Math.max(1, Math.trunc(q)));
+}
 
 // Stabilny klucz wariantu — sortuje po nazwie opcji żeby kolejność wyboru
 // (np. najpierw Kolor, potem Strona) nie tworzyła osobnych pozycji w koszyku.
@@ -78,27 +95,36 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       );
       if (existing) {
         return {
+          ...state,
           items: state.items.map((i) =>
             itemKey(i.id, i.variantValues) === key
-              ? { ...i, quantity: i.quantity + action.item.quantity }
+              ? { ...i, quantity: clampQty(i.quantity + action.item.quantity) }
               : i
           ),
         };
       }
-      return { items: [...state.items, action.item] };
+      return {
+        ...state,
+        items: [
+          ...state.items,
+          { ...action.item, quantity: clampQty(action.item.quantity) },
+        ],
+      };
     }
     case "REMOVE": {
       const key = itemKey(action.id, action.variantValues);
       return {
+        ...state,
         items: state.items.filter((i) => itemKey(i.id, i.variantValues) !== key),
       };
     }
     case "UPDATE_QTY": {
       const key = itemKey(action.id, action.variantValues);
       return {
+        ...state,
         items: state.items.map((i) =>
           itemKey(i.id, i.variantValues) === key
-            ? { ...i, quantity: action.quantity }
+            ? { ...i, quantity: clampQty(action.quantity) }
             : i
         ),
       };
@@ -106,6 +132,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     case "UPDATE_NOTES": {
       const key = itemKey(action.id, action.variantValues);
       return {
+        ...state,
         items: state.items.map((i) =>
           itemKey(i.id, i.variantValues) === key
             ? { ...i, notes: action.notes }
@@ -114,9 +141,17 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       };
     }
     case "CLEAR":
-      return state.items.length === 0 ? state : { items: [] };
+      // Czyści też promo — rabat bez koszyka nie ma sensu (wcześniej robił
+      // to osobny setAppliedPromo(null) w callbacku clear()).
+      return state.items.length === 0 && state.appliedPromo === null
+        ? state
+        : { ...state, items: [], appliedPromo: null };
     case "HYDRATE":
-      return { items: action.items };
+      return { items: action.items, appliedPromo: action.appliedPromo, hydrated: true };
+    case "APPLY_PROMO":
+      return { ...state, appliedPromo: action.promo };
+    case "CLEAR_PROMO":
+      return state.appliedPromo === null ? state : { ...state, appliedPromo: null };
     default:
       return state;
   }
@@ -158,32 +193,37 @@ type CartContextValue = {
 const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(cartReducer, { items: [] });
+  const [state, dispatch] = useReducer(cartReducer, {
+    items: [],
+    appliedPromo: null,
+    hydrated: false,
+  });
   const [notification, setNotification] = useState<CartNotification | null>(null);
-  const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
-  // hydrated=true dopiero po odczycie z localStorage, żeby nie nadpisać
-  // zapisanego stanu pustym przy pierwszym renderze.
-  const [hydrated, setHydrated] = useState(false);
+  const appliedPromo = state.appliedPromo;
+  const hydrated = state.hydrated;
 
-  // Hydrate z localStorage na mount (client-only).
+  // Hydrate z localStorage na mount (client-only). Items + promo + flaga
+  // hydrated wchodzą jednym dispatch'em HYDRATE — bez setState w ciele efektu.
   useEffect(() => {
+    let items: CartItem[] = [];
+    let promo: AppliedPromo | null = null;
     try {
       const rawItems = localStorage.getItem(LS_ITEMS);
       if (rawItems) {
-        const items = JSON.parse(rawItems) as CartItem[];
-        if (Array.isArray(items)) dispatch({ type: "HYDRATE", items });
+        const parsed = JSON.parse(rawItems) as CartItem[];
+        if (Array.isArray(parsed)) items = parsed;
       }
       const rawPromo = localStorage.getItem(LS_PROMO);
       if (rawPromo) {
-        const promo = JSON.parse(rawPromo) as AppliedPromo;
-        if (promo && typeof promo === "object" && promo.code) {
-          setAppliedPromo(promo);
+        const parsed = JSON.parse(rawPromo) as AppliedPromo;
+        if (parsed && typeof parsed === "object" && parsed.code) {
+          promo = parsed;
         }
       }
     } catch {
       // Uszkodzony JSON — ignorujemy.
     }
-    setHydrated(true);
+    dispatch({ type: "HYDRATE", items, appliedPromo: promo });
   }, []);
 
   // Persist items
@@ -223,8 +263,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     []
   );
   const clear = useCallback(() => {
+    // CLEAR w reducerze zeruje też appliedPromo.
     dispatch({ type: "CLEAR" });
-    setAppliedPromo(null);
     // Defensywnie czyścimy też localStorage natychmiastowo, niezależnie od
     // efektu persist — race z hydrate'em mógłby zapisać tu coś z powrotem.
     try {
@@ -233,8 +273,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, []);
   const dismissNotification = useCallback(() => setNotification(null), []);
-  const applyPromo = useCallback((promo: AppliedPromo) => setAppliedPromo(promo), []);
-  const clearPromo = useCallback(() => setAppliedPromo(null), []);
+  const applyPromo = useCallback(
+    (promo: AppliedPromo) => dispatch({ type: "APPLY_PROMO", promo }),
+    []
+  );
+  const clearPromo = useCallback(() => dispatch({ type: "CLEAR_PROMO" }), []);
 
   const value = useMemo<CartContextValue>(() => {
     const total = state.items.reduce((s, i) => s + i.price * i.quantity, 0);
