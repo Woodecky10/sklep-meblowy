@@ -18,13 +18,24 @@ Anulowane", nie tylko „Opłacone". Wyświetlanie już działa (badge mapuje ws
 Cienki dodatek reużywający cron `reconcile-bl` i wzorce projektu.
 
 - `app/_lib/baselinker.ts` — nowa `getOrders` (przez `blRequest`, wzorzec jak
-  `getOrderStatusList`/`addOrder`) + typy `BLOrder`, `BLOrdersResponse`.
+  `getOrderStatusList`/`addOrder`) + typ `BLOrder`. Użycie: fetch po `order_id`.
 - `app/_lib/baselinker-status-sync.ts` (nowy) — czyste, testowalne jednostki:
   `parseStatusIdConfig`, `mapBlStatusToShop`, `decideStatusUpdate` (forward-only),
-  `fetchBlStatusMap` (paginacja getOrders, z wstrzykniętym fetcherem),
-  `reconcileOrderStatuses` (orchestrator z wstrzykniętym `applyUpdate`).
+  `reconcileOrderStatuses` (orchestrator z wstrzykniętym fetcherem statusu i
+  `applyUpdate`).
 - `app/api/cron/reconcile-bl/route.ts` — rozszerzenie: po push-sierot uruchom
   pull-statusów. Zwraca `{ push: {...}, statusSync: {...} }`.
+
+## Pobieranie statusu — per zamówienie (nie paginacja okna)
+
+Mamy `baselinker_order_id` każdego zamówienia, więc pytamy BL wprost o konkretne
+zamówienie: `getOrders({ order_id })` → zwraca to jedno z aktualnym `status_id`.
+Sekwencyjnie, N małych wywołań (N = liczba in-flight, mała), w granicach limitu
+BL (100/min), z retry na błędy przejściowe. Świadomie zamiast paginacji po
+`date_confirmed_from` — ta ma niejasne zachowanie dla zamówień
+potwierdzonych/niepotwierdzonych i mogłaby cicho pominąć zamówienie. Per-order
+jest trywialnie poprawne. Limit `STATUS_BATCH_LIMIT` na przebieg + flaga backlog
+(jak w push-sierot).
 
 ## Mapowanie (env, ustawiane raz)
 
@@ -57,14 +68,14 @@ nasz stan dozwolone):
 1. Jeśli env mapowania puste → `statusSync = { configured: false }`, koniec
    (push-sierot działał niezależnie).
 2. Pobierz z DB in-flight (status in paid/processing/shipped, `baselinker_order_id`
-   not null), odfiltruj `hasCompletedBlPush`. Brak → `{ scanned: 0 }`.
-3. `fetchBlStatusMap`: `getOrders` po `date_confirmed_from` = (najstarszy in-flight
-   `created_at`, max okno ~90 dni wstecz), paginacja (max 100/stronę, advance
-   `date_confirmed_from`) → `Map<string blOrderId, status_id>`.
-4. Dla każdego in-flight: `blStatusId = map.get(order.baselinker_order_id)`;
-   brak → `notFoundInBl++` (zaloguj); jest → `next = decideStatusUpdate(order.status,
-   mapBlStatusToShop(blStatusId, cfg))`; jeśli `next` → guarded update, tally.
-5. `statusSync = { scanned, updated, notFoundInBl, breakdown: {shipped, delivered, cancelled, processing} }`.
+   not null), odfiltruj `hasCompletedBlPush`, utnij do `STATUS_BATCH_LIMIT`
+   (reszta → backlog). Brak → `{ scanned: 0 }`.
+3. Dla każdego in-flight sekwencyjnie: `statusId = getBlOrderStatus(order.baselinker_order_id)`
+   (`getOrders({ order_id })`); brak → `notFoundInBl++` (zaloguj). Błąd wywołania
+   łapany per-zamówienie (nie przerywa pętli).
+4. `target = mapBlStatusToShop(statusId, cfg)`; `next = decideStatusUpdate(order.status, target)`;
+   jeśli `next` → guarded update, tally wg stanu docelowego.
+5. `statusSync = { scanned, updated, notFoundInBl, failed, backlog, breakdown: {processing, shipped, delivered, cancelled} }`.
 
 ## Maile
 
@@ -74,13 +85,13 @@ akcje). Sklep tylko odzwierciedla status.
 ## Testy (TDD)
 
 `app/_lib/__tests__/baselinker-status-sync.test.ts` (vitest):
-- `parseStatusIdConfig` — CSV → zbiory, puste/śmieci.
+- `parseStatusIdConfig` — CSV → zbiory; puste/śmieci/spacje.
 - `mapBlStatusToShop` — trafienie w każdy stan + brak mapowania → null.
 - `decideStatusUpdate` — forward (paid→shipped OK), backward (shipped→processing
-  blok), `cancelled` z dowolnego in-flight, brak mapowania.
-- `fetchBlStatusMap` — paginacja z wstrzykniętym getOrders (2 strony → scalona mapa).
-- `reconcileOrderStatuses` — kategoryzacja (updated/notFound/skip) z wstrzykniętym
-  applyUpdate.
+  blok → null), `cancelled` z dowolnego in-flight, brak mapowania → null,
+  ten sam stan → null.
+- `reconcileOrderStatuses` — kategoryzacja (updated/notFound/skip/failed) z
+  wstrzykniętym fetcherem statusu i `applyUpdate`; błąd fetchera nie przerywa pętli.
 Route + `getOrders` bez unit-testu (spójnie z repo).
 
 ## Env do ustawienia (Vercel + .env.local)
@@ -90,7 +101,7 @@ Route + `getOrders` bez unit-testu (spójnie z repo).
 
 ## Pliki
 
-- `app/_lib/baselinker.ts` (+`getOrders`, typy)
+- `app/_lib/baselinker.ts` (+`getOrders`, typ `BLOrder`)
 - `app/_lib/baselinker-status-sync.ts` (nowy)
 - `app/_lib/__tests__/baselinker-status-sync.test.ts` (nowy)
 - `app/api/cron/reconcile-bl/route.ts` (rozszerzenie)
