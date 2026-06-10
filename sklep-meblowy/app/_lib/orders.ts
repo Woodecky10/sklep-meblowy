@@ -1,5 +1,5 @@
 import { createAdminClient } from "./supabase/server";
-import type { Address, Order, OrderItem } from "./types";
+import type { Address, Order, OrderItem, OrderStatus } from "./types";
 
 type CreateOrderInput = {
   userId: string | null;
@@ -103,4 +103,23 @@ export async function getOrderById(orderId: string) {
 
   if (error) throw error;
   return data as unknown as Order & { items: OrderItem[] };
+}
+
+// Przepnij status z BL (sync statusów). CAS na odczytanym statusie — nie
+// nadpisujemy równoległej zmiany (np. webhook pending→paid). Zwraca true gdy
+// faktycznie zmienił.
+export async function applyBlStatus(
+  orderId: string,
+  fromStatus: OrderStatus,
+  toStatus: OrderStatus
+): Promise<boolean> {
+  const supabase = await createAdminClient();
+  const { data, error } = await supabase
+    .from("orders")
+    .update({ status: toStatus } as never)
+    .eq("id", orderId)
+    .eq("status", fromStatus)
+    .select("id");
+  if (error) throw error;
+  return (data?.length ?? 0) > 0;
 }
