@@ -2,6 +2,24 @@ import { createClient } from "./supabase/server";
 import { getCategories } from "./categories";
 import type { Category, Product } from "./types";
 
+// Górny limit rozmiaru strony — broni przed ?limit=999999 (kosztowny request).
+export const PRODUCTS_PAGE_LIMIT_MAX = 100;
+
+// Bezpieczna normalizacja paginacji. URL-owe ?strona=abc dawało Number()=NaN,
+// a destrukturyzacja `page = 1` łapie tylko undefined (nie NaN/0/ujemne) →
+// from=(NaN-1)*limit=NaN → query.range(NaN,NaN) → błąd PostgREST → 500 na /sklep.
+export function clampPage(value: number | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 1) return 1;
+  return Math.floor(value);
+}
+
+export function clampLimit(value: number | undefined, fallback = 12): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 1) {
+    return fallback;
+  }
+  return Math.min(Math.floor(value), PRODUCTS_PAGE_LIMIT_MAX);
+}
+
 export type ProductFilters = {
   category?: Category;
   // Sort:
@@ -45,6 +63,10 @@ export async function getProducts(filters: ProductFilters = {}) {
     collectionSlug,
     sectionSlug,
   } = filters;
+
+  // Normalizacja paginacji — chroni przed NaN/0/ujemnymi (patrz clampPage).
+  const safePage = clampPage(page);
+  const safeLimit = clampLimit(limit);
 
   let query = supabase.from("products").select("*", { count: "exact" });
 
@@ -112,8 +134,8 @@ export async function getProducts(filters: ProductFilters = {}) {
       .order("created_at", { ascending: false });
   }
 
-  const from = (page - 1) * limit;
-  query = query.range(from, from + limit - 1);
+  const from = (safePage - 1) * safeLimit;
+  query = query.range(from, from + safeLimit - 1);
 
   const { data, error, count } = await query;
   if (error) throw error;
@@ -121,7 +143,7 @@ export async function getProducts(filters: ProductFilters = {}) {
   return {
     products: (data ?? []) as Product[],
     total: count ?? 0,
-    pages: Math.ceil((count ?? 0) / limit),
+    pages: Math.ceil((count ?? 0) / safeLimit),
   };
 }
 
