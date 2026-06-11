@@ -16,6 +16,7 @@ import {
 } from "@/app/_lib/reviews";
 import ProductMainSection from "@/app/_components/ui/ProductMainSection";
 import ProductCard from "@/app/_components/ui/ProductCard";
+import RecentlyViewed from "@/app/_components/ui/RecentlyViewed";
 import StarRating from "@/app/_components/ui/StarRating";
 import ReviewList from "@/app/_components/ui/ReviewList";
 import ReviewForm from "@/app/_components/ui/ReviewForm";
@@ -389,6 +390,16 @@ export default async function ProduktPage({ params }: Props) {
           </div>
         </section>
       )}
+
+      <RecentlyViewed
+        current={{
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          image: product.images?.[0] ?? "",
+          category: categoryLabels.get(product.category) ?? product.category,
+        }}
+      />
     </div>
   );
 }
