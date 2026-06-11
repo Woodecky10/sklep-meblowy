@@ -151,6 +151,22 @@ export function pickFirstImage(images: BLInventoryProduct["images"]): string[] {
   return ordered.filter((v): v is string => typeof v === "string" && v.length > 0);
 }
 
+// Chudy sync zdjęć: NOWY produkt dostaje `images` z BL jako seed startowy;
+// ISTNIEJĄCY zachowuje ręczną galerię i kolejność ustawioną przez admina w
+// panelu — `images` odpięte z payloadu, więc upsert (ON CONFLICT DO UPDATE)
+// nie dotyka kolumny (preserve). Spójne z `variants`/`description`, które już
+// są wykluczone z synca. Bez tego każdy przebieg synca nadpisywał ułożenie
+// zdjęć z BL, kasując ręczną pracę w galerii (regres chudego synca).
+export function buildProductSyncPayload<T extends { images: unknown }>(
+  product: T,
+  isNew: boolean
+): T | Omit<T, "images"> {
+  if (isNew) return product;
+  const rest: Partial<T> = { ...product };
+  delete rest.images;
+  return rest as Omit<T, "images">;
+}
+
 // Tolerancja źródła cech: audyt pokazał, że cechy realnie siedzą pod
 // text_fields.features (a kod czytał top-level bl.features). Chroni Kolor/
 // Materiał/Konstrukcję/Specyfikację przed cichym wyzerowaniem.
@@ -311,11 +327,14 @@ async function mapBlToProduct(
 
   const blFeatures = resolveBlFeatures(bl);
 
-  // Sync ustawia tylko pola „twarde" z BL (nazwa, cena, kategoria, zdjęcia,
-  // cechy). description/description_sections/variants są pominięte celowo —
-  // zarządza nimi admin ręcznie w panelu. Pominięcie ich w upsert sprawia, że
-  // UPDATE nie nadpisuje istniejących wartości (preserve), a INSERT dostaje
-  // default DB (description '', description_sections '[]', variants null).
+  // Sync ustawia pola „twarde" z BL (nazwa, cena, kategoria, cechy).
+  // description/description_sections/variants są pominięte całkowicie — zarządza
+  // nimi admin ręcznie w panelu. Pominięcie ich w upsert sprawia, że UPDATE nie
+  // nadpisuje istniejących wartości (preserve), a INSERT dostaje default DB
+  // (description '', description_sections '[]', variants null).
+  // `images` to przypadek pośredni: poniżej wyliczamy je z BL, ale do upsertu
+  // trafiają TYLKO dla nowego produktu (seed) — przy istniejącym buildProduct-
+  // SyncPayload odpina je, żeby zachować ręczną galerię/kolejność admina.
   const product: SyncProductFields = {
     name: name.trim(),
     price,
@@ -480,6 +499,10 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
         const existingRow = existing as
           | { is_active: boolean | null; deactivation_source: "auto" | "manual" | null }
           | null;
+        // Wiersz istniał przed upsertem (odczyt existing wyżej) = update.
+        // Liczone TU (nie po upsercie), bo determinuje też politykę zdjęć:
+        // images seedujemy tylko przy nowym produkcie.
+        const isNew = existingRow === null;
         // manual → zostaje ukryty (respektujemy admina); auto/aktywny/nowy → aktywny.
         const wasManuallyHidden = existingRow?.deactivation_source === "manual";
         mapped.product.is_active = !wasManuallyHidden;
@@ -487,9 +510,13 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
         const wasAutoHidden =
           existingRow?.is_active === false && existingRow?.deactivation_source === "auto";
 
+        // Chudy sync zdjęć: nowy → seed images z BL; istniejący → ręczna
+        // galeria admina nietknięta (images odpięte z payloadu, upsert ich
+        // nie nadpisuje).
+        const payload = buildProductSyncPayload(mapped.product, isNew);
         const { error } = await supabase
           .from("products")
-          .upsert(mapped.product as never, { onConflict: "baselinker_id" })
+          .upsert(payload as never, { onConflict: "baselinker_id" })
           .select("id")
           .single();
 
@@ -507,10 +534,9 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
           reactivated.push({ id: blId, name: mapped.product.name });
         }
 
-        // insert vs update: wiersz istniał przed upsertem (odczyt existing
-        // wyżej) = update. Bez heurystyki porównywania created_at z zegarem
-        // aplikacji (rozjazd zegarów DB/app fałszował klasyfikację).
-        const isNew = existingRow === null;
+        // Klasyfikacja inserted/updated wg isNew policzonego przed upsertem
+        // (bez heurystyki porównywania created_at z zegarem — rozjazd zegarów
+        // DB/app fałszował klasyfikację).
         const synced: SyncedProduct = { id: blId, name: mapped.product.name };
         if (isNew) {
           result.inserted += 1;

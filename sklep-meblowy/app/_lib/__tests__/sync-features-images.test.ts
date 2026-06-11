@@ -1,5 +1,9 @@
 ﻿import { describe, it, expect } from "vitest";
-import { resolveBlFeatures, pickFirstImage } from "@/app/_lib/baselinker-sync";
+import {
+  resolveBlFeatures,
+  pickFirstImage,
+  buildProductSyncPayload,
+} from "@/app/_lib/baselinker-sync";
 
 describe("resolveBlFeatures — tolerancja źródła", () => {
   it("czyta text_fields.features gdy obecne", () => {
@@ -38,5 +42,33 @@ describe("pickFirstImage — sort kluczy numerycznych", () => {
   });
   it("filtruje puste", () => {
     expect(pickFirstImage(["a.jpg", ""])).toEqual(["a.jpg"]);
+  });
+});
+
+describe("buildProductSyncPayload — chudy sync zdjęć (seed przy nowym, ręczne potem)", () => {
+  it("nowy produkt: payload zawiera images (seed z BL)", () => {
+    const payload = buildProductSyncPayload(
+      { name: "Sofa", price: 1999, images: ["a.jpg", "b.jpg"] },
+      true
+    );
+    expect(payload).toHaveProperty("images", ["a.jpg", "b.jpg"]);
+    expect(payload).toHaveProperty("name", "Sofa");
+  });
+
+  it("istniejący produkt: payload NIE zawiera images (preserve ręcznej galerii admina)", () => {
+    const payload = buildProductSyncPayload(
+      { name: "Sofa", price: 1999, images: ["a.jpg", "b.jpg"] },
+      false
+    );
+    expect(payload).not.toHaveProperty("images");
+    // pozostałe „twarde" pola (nazwa, cena) nadal lecą do upsertu
+    expect(payload).toHaveProperty("name", "Sofa");
+    expect(payload).toHaveProperty("price", 1999);
+  });
+
+  it("nie mutuje wejścia przy odpinaniu images", () => {
+    const input = { name: "Sofa", price: 1999, images: ["a.jpg"] };
+    buildProductSyncPayload(input, false);
+    expect(input).toHaveProperty("images", ["a.jpg"]);
   });
 });
