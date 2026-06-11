@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/app/_lib/supabase/server";
+import { createClient, createAdminClient } from "@/app/_lib/supabase/server";
 
 export type CancelOrderResult =
   | { ok: true; message: string }
@@ -22,9 +22,13 @@ export async function cancelOrder(orderId: string): Promise<CancelOrderResult> {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Musisz być zalogowany" };
 
-  // RLS sam blokuje dostęp do cudzych zamówień, ale dla pewnego komunikatu
-  // o błędzie weryfikujemy ownership + status zanim zaktualizujemy.
-  const { data: order, error: loadErr } = await supabase
+  // Service-role: po utwardzeniu RLS (migracja 26) klient nie ma prawa UPDATE
+  // na orders — mutacja idzie service-rolem, a ownership i dozwolone przejście
+  // wymuszamy TU. Ładujemy WŁASNE zamówienie (filtr user_id z sesji), a sama
+  // zmiana to CAS pending→cancelled scoped po user_id (atomowo blokuje wyścig
+  // z webhookiem pending→paid i cudze zamówienia).
+  const admin = await createAdminClient();
+  const { data: order, error: loadErr } = await admin
     .from("orders")
     .select("id, user_id, status")
     .eq("id", orderId)
@@ -42,14 +46,24 @@ export async function cancelOrder(orderId: string): Promise<CancelOrderResult> {
     };
   }
 
-  const { error: updateErr } = await supabase
+  const { data: updated, error: updateErr } = await admin
     .from("orders")
     .update({ status: "cancelled" } as never)
     .eq("id", orderId)
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .eq("status", "pending")
+    .select("id");
 
   if (updateErr) {
     return { ok: false, error: updateErr.message };
+  }
+  if (!updated || updated.length === 0) {
+    // Status zmienił się między odczytem a CAS (np. webhook pending→paid).
+    return {
+      ok: false,
+      error:
+        "Tego zamówienia nie można już anulować z poziomu konta. Skontaktuj się z nami.",
+    };
   }
 
   revalidatePath(`/konto/zamowienia/${orderId}`);

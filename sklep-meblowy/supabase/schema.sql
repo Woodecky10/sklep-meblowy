@@ -137,14 +137,11 @@ create policy "orders: własny odczyt"
   on public.orders for select
   using (auth.uid() = user_id);
 
-create policy "orders: własne tworzenie"
-  on public.orders for insert
-  to authenticated
-  with check (auth.uid() = user_id);
-
-create policy "orders: własna aktualizacja"
-  on public.orders for update
-  using (auth.uid() = user_id);
+-- Brak klienckich polityk INSERT/UPDATE/DELETE na orders: całe tworzenie i
+-- mutacje idą przez service role (createOrder/markOrderPaid/applyBlStatus/
+-- cancelOrder). Patrz migracja 26 (utwardzenie RLS po audycie 2026-06-11) —
+-- otwarte polityki write pozwalały klientowi fałszować status/total/promo
+-- i fabrykować zamówienia 'paid'.
 
 -- Order items: przez zamówienie
 create policy "order_items: odczyt przez zamówienie"
@@ -157,16 +154,8 @@ create policy "order_items: odczyt przez zamówienie"
     )
   );
 
-create policy "order_items: tworzenie przez zamówienie"
-  on public.order_items for insert
-  to authenticated
-  with check (
-    exists (
-      select 1 from public.orders
-      where orders.id = order_items.order_id
-        and orders.user_id = auth.uid()
-    )
-  );
+-- Brak klienckiej polityki INSERT na order_items: pozycje dodaje wyłącznie
+-- service role (createOrder). Patrz migracja 26.
 
 -- ============================================================
 -- DANE PRZYKŁADOWE (opcjonalne — usuń w produkcji)
