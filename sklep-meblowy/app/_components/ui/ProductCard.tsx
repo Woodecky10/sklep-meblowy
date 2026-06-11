@@ -14,8 +14,9 @@ export default function ProductCard({
 }: {
   product: Product;
   rating?: ProductRating;
-  // Opcjonalny badge zastępujący domyślne "Na zamówienie"
-  // (używane w sekcji "Polecane" na home: "Bestseller", "Nowość" etc.).
+  // Opcjonalna plakietka — renderowana TYLKO gdy podana (używane w sekcji
+  // "Polecane" na home: "Bestseller", "Nowość" etc.). Bez niej karta nie ma
+  // plakietki (wcześniej domyślnie pokazywała "Na zamówienie").
   badge?: string | null;
   // Etykieta kategorii. Bez niej wyświetlamy surowy slug — używane
   // w client components (np. cross-sell w /koszyk) które nie mogą
@@ -44,9 +45,11 @@ export default function ProductCard({
               Brak zdjęcia
             </div>
           )}
-          <span className="absolute top-4 left-4 px-3 py-1 bg-[var(--color-gold)] text-[var(--color-navy)] text-[10px] font-sans font-semibold uppercase tracking-widest rounded-full">
-            {badge || "Na zamówienie"}
-          </span>
+          {badge && (
+            <span className="absolute top-4 left-4 px-3 py-1 bg-[var(--color-gold)] text-[var(--color-navy)] text-[10px] font-sans font-semibold uppercase tracking-widest rounded-full">
+              {badge}
+            </span>
+          )}
         </Link>
         <WishlistButton
           productId={product.id}

@@ -94,18 +94,6 @@ export default function ProductMainSection({
           </p>
         </div>
 
-        <div className="inline-flex items-center gap-2 text-sm text-[var(--muted)]">
-          <span className="w-2 h-2 rounded-full bg-[var(--color-gold)]" />
-          <span>
-            Produkt wykonywany na zamówienie
-            {product.delivery_time && (
-              <>
-                {" "}• Realizacja: <strong className="text-[var(--fg)]">{product.delivery_time}</strong>
-              </>
-            )}
-          </span>
-        </div>
-
         <ProductActions product={product} selected={selected} onChange={setSelected} />
 
         <InquiryModal productId={product.id} productName={product.name} />
