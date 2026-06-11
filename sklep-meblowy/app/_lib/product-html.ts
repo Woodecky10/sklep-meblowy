@@ -51,6 +51,24 @@ function isBlockedHref(href: string): boolean {
   );
 }
 
+// Schematy URL dozwolone w href/src. Whitelist (nie blocklist) — odrzuca z
+// definicji wszystko nieznane (javascript:, vbscript:, data:, file: itd.).
+const SAFE_URL_SCHEMES = new Set(["http", "https", "mailto", "tel"]);
+
+// Czy URL ma bezpieczny schemat? Normalizacja odporna na obejścia: przeglądarka
+// IGNORUJE znaki sterujące i białe wewnątrz schematu URL, więc href="java\nscript:…"
+// jest interpretowane jako javascript:. Dlatego usuwamy je PRZED sprawdzeniem
+// schematu (samo .trim() łapało tylko skrajne znaki). URL bez schematu
+// (relatywny, #kotwica, ?query) jest dozwolony.
+function hasSafeUrlScheme(value: string): boolean {
+  const normalized = value
+    .replace(/[\u0000-\u0020\u00A0\u2028\u2029\uFEFF]/g, "")
+    .toLowerCase();
+  const schemeMatch = normalized.match(/^([a-z][a-z0-9+.-]*):/);
+  if (!schemeMatch) return true; // brak schematu -> relatywny / kotwica
+  return SAFE_URL_SCHEMES.has(schemeMatch[1]);
+}
+
 // Tagi w całości wycinane wraz z zawartością — niezaufana treść skryptowa.
 const DANGEROUS_BLOCK_TAGS = [
   "script",
@@ -118,16 +136,13 @@ export function sanitizeProductHtml(html: string | null | undefined): string {
         const attrValue = m[2] ?? m[3] ?? "";
         if (!allowedAttrs.has(attrName)) continue;
 
-        // Block javascript:, data:, vbscript: URLs w href/src
-        if (attrName === "href" || attrName === "src") {
-          const lower = attrValue.toLowerCase().trim();
-          if (
-            lower.startsWith("javascript:") ||
-            lower.startsWith("vbscript:") ||
-            lower.startsWith("data:")
-          ) {
-            continue;
-          }
+        // Whitelist bezpiecznych schematów URL w href/src — odporna na obejścia
+        // ze znakami sterującymi (java\nscript:). Niebezpieczny → drop atrybutu.
+        if (
+          (attrName === "href" || attrName === "src") &&
+          !hasSafeUrlScheme(attrValue)
+        ) {
+          continue;
         }
 
         cleanAttrs.push(`${attrName}="${escapeHtmlAttr(attrValue)}"`);
