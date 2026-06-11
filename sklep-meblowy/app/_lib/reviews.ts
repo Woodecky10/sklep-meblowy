@@ -1,9 +1,7 @@
-import { createClient } from "./supabase/server";
+import { createClient, createAdminClient } from "./supabase/server";
 import type { ProductRating, ProductReview } from "./types";
 
 // Pobiera recenzje dla produktu (najnowsze pierwsze) razem z imieniem autora.
-// Zwykłe join przez Supabase — RLS na profiles ogranicza select, ale full_name
-// możemy pokazać (to dane, które klient sam podał przy rejestracji/zamówieniu).
 export async function getReviewsForProduct(
   productId: string,
   limit = 50
@@ -18,11 +16,15 @@ export async function getReviewsForProduct(
 
   if (error || !data) return [];
 
-  // Dociągnij imiona z profili
+  // Dociągnij imiona z profili. Service-role (admin) celowo — profiles ma RLS
+  // using(auth.uid()=id), więc zwykły klient widziałby TYLKO profil aktualnego
+  // usera i każda CUDZA opinia gubiła imię (fallback "Klient"). Eksponujemy
+  // WYŁĄCZNIE full_name (autor zgadza się pokazać je jako podpis pod opinią).
   const userIds = Array.from(new Set((data as ProductReview[]).map((r) => r.user_id)));
   if (userIds.length === 0) return data as ProductReview[];
 
-  const { data: profiles } = await supabase
+  const admin = await createAdminClient();
+  const { data: profiles } = await admin
     .from("profiles")
     .select("id, full_name")
     .in("id", userIds);
