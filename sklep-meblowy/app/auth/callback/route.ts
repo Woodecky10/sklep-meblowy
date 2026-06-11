@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/app/_lib/supabase/server";
 import { linkGuestOrders } from "@/app/_lib/link-guest-orders";
 import { isAdmin } from "@/app/_lib/admin";
+import { safeNextPath } from "@/app/_lib/safe-redirect";
 
 // OAuth callback (Google itp.) — wymienia `code` na sesję i linkuje zamówienia gościa.
 // Admin po zalogowaniu trafia do /admin, zwykły user do /konto (chyba że
@@ -31,6 +32,7 @@ export async function GET(request: NextRequest) {
     await linkGuestOrders(user.id, user.email);
   }
 
-  const next = explicitNext ?? (isAdmin(user) ? "/admin" : "/konto");
+  const next =
+    safeNextPath(explicitNext) ?? (isAdmin(user) ? "/admin" : "/konto");
   return NextResponse.redirect(`${origin}${next}`);
 }

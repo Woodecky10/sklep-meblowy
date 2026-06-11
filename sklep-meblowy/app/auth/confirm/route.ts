@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/app/_lib/supabase/server";
 import { linkGuestOrders } from "@/app/_lib/link-guest-orders";
+import { safeNextPath } from "@/app/_lib/safe-redirect";
 
 // Weryfikacja linku z emaila (signup, magic link, recovery).
 // Po sukcesie: sesja utworzona + linkujemy zamówienia gościa.
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const token_hash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type") as EmailOtpType | null;
-  const next = url.searchParams.get("next") ?? "/konto";
+  const next = safeNextPath(url.searchParams.get("next")) ?? "/konto";
   const origin = url.origin;
 
   if (!token_hash || !type) {
