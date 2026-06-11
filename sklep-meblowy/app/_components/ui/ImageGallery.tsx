@@ -156,7 +156,7 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
           type="button"
           onClick={() => setLightbox(true)}
           aria-label="Powiększ zdjęcie"
-          className="relative aspect-[4/3] bg-stone-100 dark:bg-stone-800 rounded-3xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-[var(--color-gold)]/40 transition-all"
+          className="relative aspect-[3/4] bg-stone-100 dark:bg-stone-800 rounded-3xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-[var(--color-gold)]/40 transition-all"
         >
           <Image
             src={list[active]}
