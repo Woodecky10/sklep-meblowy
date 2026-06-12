@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Card, EmptyState, Field, ToastView, inputCls } from "@/app/admin/_shared";
 import {
   createPromoCode,
@@ -15,9 +16,16 @@ type Toast = { type: "success" | "error"; message: string } | null;
 
 export default function PromoEditor({ initialCodes }: { initialCodes: PromoCode[] }) {
   const [codes, setCodes] = useState<PromoCode[]>(initialCodes);
+  // Sync stanu z propów po router.refresh() (patrz SliderEditor).
+  const [prevInitial, setPrevInitial] = useState(initialCodes);
+  if (initialCodes !== prevInitial) {
+    setPrevInitial(initialCodes);
+    setCodes(initialCodes);
+  }
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
+  const router = useRouter();
 
   function showToast(t: Toast) {
     setToast(t);
@@ -69,7 +77,7 @@ export default function PromoEditor({ initialCodes }: { initialCodes: PromoCode[
               const res = await createPromoCode(fd);
               handleResult(res, () => {
                 setCreating(false);
-                window.location.reload();
+                router.refresh();
               });
             }}
           />
@@ -90,7 +98,7 @@ export default function PromoEditor({ initialCodes }: { initialCodes: PromoCode[
                 const res = await updatePromoCode(fd);
                 handleResult(res, () => {
                   setEditingId(null);
-                  window.location.reload();
+                  router.refresh();
                 });
               }}
               onDelete={async () => {

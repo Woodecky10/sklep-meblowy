@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Card, EmptyState, Field, ToastView, inputCls } from "@/app/admin/_shared";
 import Image from "next/image";
 import {
@@ -38,10 +39,17 @@ export default function TilesEditor({
   initialTiles: TileRow[];
 }) {
   const [tiles, setTiles] = useState<TileRow[]>(initialTiles);
+  // Sync stanu z propów po router.refresh() (patrz SliderEditor).
+  const [prevInitial, setPrevInitial] = useState(initialTiles);
+  if (initialTiles !== prevInitial) {
+    setPrevInitial(initialTiles);
+    setTiles(initialTiles);
+  }
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
   const [, startTransition] = useTransition();
+  const router = useRouter();
 
   function showToast(t: Toast) {
     setToast(t);
@@ -126,7 +134,7 @@ export default function TilesEditor({
               const res = await createTile(fd);
               handleResult(res, () => {
                 setCreating(false);
-                window.location.reload();
+                router.refresh();
               });
             }}
           />
@@ -149,7 +157,7 @@ export default function TilesEditor({
                     const res = await updateTile(fd);
                     handleResult(res, () => {
                       setEditingId(null);
-                      window.location.reload();
+                      router.refresh();
                     });
                   }}
                   onDelete={async () => {

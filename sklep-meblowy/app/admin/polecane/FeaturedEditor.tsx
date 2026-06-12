@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { EmptyState, ToastView, inputCls } from "@/app/admin/_shared";
 import Image from "next/image";
 import {
@@ -40,8 +41,15 @@ export default function FeaturedEditor({
   availableProducts: Product[];
 }) {
   const [items, setItems] = useState<FeaturedItem[]>(initialFeatured);
+  // Sync stanu z propów po router.refresh() (patrz SliderEditor).
+  const [prevInitial, setPrevInitial] = useState(initialFeatured);
+  if (initialFeatured !== prevInitial) {
+    setPrevInitial(initialFeatured);
+    setItems(initialFeatured);
+  }
   const [toast, setToast] = useState<Toast>(null);
   const [, startTransition] = useTransition();
+  const router = useRouter();
 
   function showToast(t: Toast) {
     setToast(t);
@@ -109,7 +117,7 @@ export default function FeaturedEditor({
         availableProducts={availableProducts}
         onAdd={async (fd) => {
           const res = await addFeatured(fd);
-          handleResult(res, () => window.location.reload());
+          handleResult(res, () => router.refresh());
         }}
       />
 

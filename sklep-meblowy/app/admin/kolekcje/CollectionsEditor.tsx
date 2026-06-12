@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Card, EmptyState, Field, ToastView, inputCls } from "@/app/admin/_shared";
 import Image from "next/image";
 import {
@@ -24,9 +25,16 @@ export default function CollectionsEditor({
   productCounts: Record<string, number>;
 }) {
   const [collections, setCollections] = useState<Collection[]>(initialCollections);
+  // Sync stanu z propów po router.refresh() (patrz SliderEditor).
+  const [prevInitial, setPrevInitial] = useState(initialCollections);
+  if (initialCollections !== prevInitial) {
+    setPrevInitial(initialCollections);
+    setCollections(initialCollections);
+  }
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
+  const router = useRouter();
 
   function showToast(t: Toast) {
     setToast(t);
@@ -92,7 +100,7 @@ export default function CollectionsEditor({
               }
               showToast({ type: "success", message: res.message ?? "Zapisano" });
               setCreating(false);
-              window.location.reload();
+              router.refresh();
             }}
           />
         </Card>
@@ -119,7 +127,7 @@ export default function CollectionsEditor({
                 }
                 showToast({ type: "success", message: "Kolekcja zapisana" });
                 setEditingId(null);
-                window.location.reload();
+                router.refresh();
               }}
               onDelete={async () => {
                 const fd = new FormData();

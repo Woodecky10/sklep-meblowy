@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Card, EmptyState, Field, ToastView, inputCls } from "@/app/admin/_shared";
 import Image from "next/image";
 import {
@@ -38,10 +39,19 @@ export default function SliderEditor({
   initialSlides: SlideRow[];
 }) {
   const [slides, setSlides] = useState<SlideRow[]>(initialSlides);
+  // Sync stanu z propów po router.refresh(): server re-renderuje stronę ze
+  // świeżymi danymi (np. po create), nowy initialSlides resetuje listę.
+  // Wzorzec „adjusting state during render" (jak ImageGallery/SearchBox).
+  const [prevInitial, setPrevInitial] = useState(initialSlides);
+  if (initialSlides !== prevInitial) {
+    setPrevInitial(initialSlides);
+    setSlides(initialSlides);
+  }
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
   const [, startTransition] = useTransition();
+  const router = useRouter();
 
   function showToast(t: Toast) {
     setToast(t);
@@ -130,9 +140,10 @@ export default function SliderEditor({
               const res = await createSlide(fd);
               handleResult(res, () => {
                 setCreating(false);
-                // Strona zostanie zrevalidate przez server action,
-                // ale szybciej zobaczymy efekt z fresh page reload
-                window.location.reload();
+                // Server action revaliduje stronę; router.refresh() pociąga
+                // świeże dane (prop-sync wyżej wstawi nowy slajd) bez pełnego
+                // reloadu — toast nie znika.
+                router.refresh();
               });
             }}
           />
@@ -158,7 +169,7 @@ export default function SliderEditor({
                     const res = await updateSlide(fd);
                     handleResult(res, () => {
                       setEditingId(null);
-                      window.location.reload();
+                      router.refresh();
                     });
                   }}
                   onDelete={async () => {
