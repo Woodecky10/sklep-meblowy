@@ -256,16 +256,12 @@ export async function reorderSlides(
 
   const supabase = await createAdminClient();
 
-  // Sequential update — w Supabase nie ma czystego batch'a per-row UPDATE.
-  // Liczba slajdów typowo ~5-10, więc OK.
-  for (const { id, sort_order } of order) {
-    if (!id) continue;
-    const { error } = await supabase
-      .from("home_slides")
-      .update({ sort_order } as never)
-      .eq("id", id);
-    if (error) return { ok: false, error: `Reorder zawiódł: ${error.message}` };
-  }
+  // Atomowy reorder w jednej transakcji (RPC) — koniec częściowej niespójności
+  // przy padzie w połowie pętli (audyt LOW #17).
+  const { error } = await supabase.rpc("reorder_home_slides", {
+    p_ids: order.map((o) => o.id).filter(Boolean),
+  });
+  if (error) return { ok: false, error: `Reorder zawiódł: ${error.message}` };
 
   invalidateSlidesCache();
   revalidatePath("/admin/slider");

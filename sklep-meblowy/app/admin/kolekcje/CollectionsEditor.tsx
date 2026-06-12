@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Image from "next/image";
 import {
   createCollection,
-  updateCollection,
+  saveCollection,
   deleteCollection,
   setCollectionProducts,
   type ActionResult,
@@ -110,14 +110,10 @@ export default function CollectionsEditor({
               expanded={editingId === c.id}
               onToggleExpand={() => setEditingId(editingId === c.id ? null : c.id)}
               onUpdate={async (fd, productIds) => {
-                const res = await updateCollection(fd);
+                // Metadane + przypisania w jednej atomowej akcji (audyt LOW #14).
+                const res = await saveCollection(fd, productIds);
                 if (!res.ok) {
                   showToast({ type: "error", message: res.error });
-                  return;
-                }
-                const r2 = await setCollectionProducts(c.id, productIds);
-                if (!r2.ok) {
-                  showToast({ type: "error", message: r2.error });
                   return;
                 }
                 showToast({ type: "success", message: "Kolekcja zapisana" });

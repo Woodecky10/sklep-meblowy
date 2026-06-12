@@ -125,28 +125,51 @@ export async function setCollectionProducts(
 
   const supabase = await createAdminClient();
 
-  // Krok 1: assign wszystkie nowe
-  if (productIds.length > 0) {
-    const { error: e1 } = await supabase
-      .from("products")
-      .update({ collection_id: collectionId } as never)
-      .in("id", productIds);
-    if (e1) return { ok: false, error: `Przypisywanie: ${e1.message}` };
-  }
-
-  // Krok 2: unassign te które NIE są w nowej liście, ale obecnie są w tej kolekcji
-  let unassignQuery = supabase
-    .from("products")
-    .update({ collection_id: null } as never)
-    .eq("collection_id", collectionId);
-  if (productIds.length > 0) {
-    unassignQuery = unassignQuery.not("id", "in", `(${productIds.join(",")})`);
-  }
-  const { error: e2 } = await unassignQuery;
-  if (e2) return { ok: false, error: `Odpinanie: ${e2.message}` };
+  // Assign + unassign w JEDNEJ transakcji (RPC) — koniec częściowego stanu
+  // przy padzie między krokami (audyt LOW #15). Pusta lista = odpina wszystko.
+  const { error } = await supabase.rpc("set_collection_products", {
+    p_collection_id: collectionId,
+    p_product_ids: productIds,
+  });
+  if (error) return { ok: false, error: `Zapis przypisań: ${error.message}` };
 
   invalidateCollectionsCache();
   revalidatePath("/admin/kolekcje");
   revalidatePath("/sklep");
   return { ok: true, message: `Przypisano ${productIds.length} produktów` };
+}
+
+// ============================================================
+// saveCollection — metadane + przypisania w JEDNEJ transakcji (#14)
+// ============================================================
+// Edytor zapisywał kolekcję dwoma osobnymi server actions (updateCollection +
+// setCollectionProducts) — pad między nimi zostawiał metadane zapisane, a
+// przypisania nie. RPC save_collection robi oba UPDATE atomowo.
+export async function saveCollection(
+  formData: FormData,
+  productIds: string[]
+): Promise<ActionResult> {
+  await requireAdmin();
+
+  const id = sanitize(formData.get("id"));
+  if (!id) return { ok: false, error: "Brak id" };
+
+  const label = sanitize(formData.get("label"), 200);
+  if (!label) return { ok: false, error: "Nazwa kolekcji jest wymagana" };
+
+  const description = emptyToNull(sanitize(formData.get("description"), 1000));
+
+  const supabase = await createAdminClient();
+  const { error } = await supabase.rpc("save_collection", {
+    p_id: id,
+    p_label: label,
+    p_description: description,
+    p_product_ids: productIds,
+  });
+  if (error) return { ok: false, error: error.message };
+
+  invalidateCollectionsCache();
+  revalidatePath("/admin/kolekcje");
+  revalidatePath("/sklep");
+  return { ok: true, message: "Kolekcja zapisana" };
 }
