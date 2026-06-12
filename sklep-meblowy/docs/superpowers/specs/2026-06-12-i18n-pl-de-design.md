@@ -42,9 +42,12 @@ wg locale, SEO (hreflang/sitemap/meta), override w panelu.
 
 ### 1. Routing i rozpoznanie locale
 
-- **Nowy root `middleware.ts`**: dla `/de` i `/de/:path*` → `NextResponse.rewrite`
-  na ścieżkę bez prefiksu (`/de/sklep` → `/sklep`), wstrzykując nagłówek
-  `x-locale: de` do request headers. URL w przeglądarce zostaje `/de/...`.
+- **Nowy root `proxy.ts`** (Next 16 zmienił `middleware.ts` → `proxy.ts`, ten sam
+  mechanizm): dla `/de` i `/de/:path*` → `NextResponse.rewrite` na ścieżkę bez
+  prefiksu (`/de/sklep` → `/sklep`), wstrzykując nagłówek `x-locale: de` przez
+  `NextResponse.rewrite(url, { request: { headers } })`. URL w przeglądarce zostaje
+  `/de/...`. (Świadomie NIE używamy segmentu `app/[lang]` z guide'a Next — to
+  przesunęłoby wszystkie pliki; rewrite+nagłówek zachowuje URL-e PL bez ruszania struktury.)
   Pozostałe ścieżki → locale `pl` (domyślne), bez rewrite. Istniejące URL-e PL
   nietknięte (zero redirectów, SEO PL bez zmian).
 - **`app/_lib/i18n.ts`**: `LOCALES = ['pl','de'] as const`, `DEFAULT_LOCALE = 'pl'`,
@@ -54,13 +57,14 @@ wg locale, SEO (hreflang/sitemap/meta), override w panelu.
   prefiksem `/de`, zachowując query string.
 - **`<html lang>`** w root layout — dynamiczne wg `getLocale()`.
 - **Integracja Supabase**: istnieje helper `app/_lib/supabase/middleware.ts`, ale
-  brak aktywnego root-middleware. Nowy `middleware.ts` zhostuje rewrite locale i —
+  brak aktywnego root-proxy/middleware. Nowy `proxy.ts` zhostuje rewrite locale i —
   jeśli wymagane — wywoła odświeżanie sesji Supabase.
 
-> **Ryzyko/weryfikacja:** dokładne API middleware/rewrite w tym (mocno
-> zmodyfikowanym) Next 16 — sprawdzić wobec `node_modules/next/dist/docs/` PRZED
-> kodem (zgodnie z `AGENTS.md`). To jedyny punkt, który może wymusić korektę
-> mechanizmu routingu.
+> **Zweryfikowane wobec `node_modules/next/dist/docs/` (Next 16):** mechanizm to
+> `proxy.ts` (d. middleware), `export function proxy(request)` + `config.matcher`,
+> `NextResponse.rewrite(url, { request: { headers } })` do przekazania `x-locale`
+> server-side (czytane przez `headers()`). Oficjalny i18n-guide używa `app/[lang]` +
+> redirect; my robimy wariant rewrite+nagłówek (zachowuje URL-e PL, zero przesuwania plików).
 
 ### 2. Przechowywanie tłumaczeń (model danych)
 
