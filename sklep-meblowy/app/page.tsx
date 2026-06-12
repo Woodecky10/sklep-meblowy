@@ -199,25 +199,6 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Banner promocyjny */}
-      <section className="max-w-7xl mx-auto px-6 py-24">
-        <div className="rounded-3xl bg-[var(--color-navy)] px-6 sm:px-12 py-16 flex flex-col md:flex-row items-center justify-between gap-8">
-          <div>
-            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-3">
-              Oferta limitowana
-            </p>
-            <h3 className="font-display text-3xl md:text-4xl font-bold text-white max-w-md">
-              Do 30% taniej na wybrane modele
-            </h3>
-          </div>
-          <Link
-            href="/sklep?wyprzedaz=true"
-            className="shrink-0 px-8 py-4 bg-[var(--color-gold)] text-[var(--color-navy)] font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold-light)] transition-colors"
-          >
-            Skorzystaj z oferty
-          </Link>
-        </div>
-      </section>
     </>
   );
 }

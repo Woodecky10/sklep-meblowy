@@ -35,6 +35,9 @@ export default function KoszykPage() {
   const [crossSellWishlist, setCrossSellWishlist] = useState<Set<string>>(
     new Set()
   );
+  const [crossSellLabels, setCrossSellLabels] = useState<
+    Record<string, string>
+  >({});
   useEffect(() => {
     // Pusty koszyk → strona renderuje pusty stan, cross-sell i tak niewidoczny.
     if (items.length === 0) return;
@@ -45,6 +48,7 @@ export default function KoszykPage() {
       if (!cancelled) {
         setCrossSell(res.products);
         setCrossSellWishlist(new Set(res.wishlistIds));
+        setCrossSellLabels(res.categoryLabels);
       }
     });
     return () => {
@@ -297,6 +301,7 @@ export default function KoszykPage() {
                 key={p.id}
                 product={p}
                 isInWishlist={crossSellWishlist.has(p.id)}
+                categoryLabel={crossSellLabels[p.category]}
               />
             ))}
           </div>

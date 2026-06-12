@@ -6,6 +6,22 @@ type Props = {
   searchParams: Record<string, string>;
 };
 
+// Okienkowanie: zawsze 1 i ostatnia + bieżąca ±2, reszta jako "…".
+// Bez tego przy dużym katalogu renderowały się WSZYSTKIE strony, rozbijając
+// layout (audyt 2026-06-11 LOW).
+function pageWindow(page: number, pages: number): (number | "ellipsis")[] {
+  const delta = 2;
+  const items: (number | "ellipsis")[] = [];
+  for (let p = 1; p <= pages; p++) {
+    if (p === 1 || p === pages || (p >= page - delta && p <= page + delta)) {
+      items.push(p);
+    } else if (items[items.length - 1] !== "ellipsis") {
+      items.push("ellipsis");
+    }
+  }
+  return items;
+}
+
 export default function Pagination({ page, pages, searchParams }: Props) {
   if (pages <= 1) return null;
 
@@ -19,27 +35,41 @@ export default function Pagination({ page, pages, searchParams }: Props) {
       {page > 1 && (
         <Link
           href={pageHref(page - 1)}
+          aria-label="Poprzednia strona"
           className="w-10 h-10 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
         >
           ←
         </Link>
       )}
-      {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
-        <Link
-          key={p}
-          href={pageHref(p)}
-          className={`w-10 h-10 flex items-center justify-center rounded-full text-sm font-sans transition-colors ${
-            p === page
-              ? "bg-[var(--color-navy)] text-white"
-              : "border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)]"
-          }`}
-        >
-          {p}
-        </Link>
-      ))}
+      {pageWindow(page, pages).map((item, i) =>
+        item === "ellipsis" ? (
+          <span
+            key={`e${i}`}
+            className="w-10 h-10 flex items-center justify-center text-sm text-[var(--muted)]"
+            aria-hidden="true"
+          >
+            …
+          </span>
+        ) : (
+          <Link
+            key={item}
+            href={pageHref(item)}
+            aria-label={`Strona ${item}`}
+            aria-current={item === page ? "page" : undefined}
+            className={`w-10 h-10 flex items-center justify-center rounded-full text-sm font-sans transition-colors ${
+              item === page
+                ? "bg-[var(--color-navy)] text-white"
+                : "border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)]"
+            }`}
+          >
+            {item}
+          </Link>
+        )
+      )}
       {page < pages && (
         <Link
           href={pageHref(page + 1)}
+          aria-label="Następna strona"
           className="w-10 h-10 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
         >
           →

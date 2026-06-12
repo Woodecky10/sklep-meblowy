@@ -3,6 +3,7 @@
 import { validatePromoCode } from "@/app/_lib/promo";
 import { getCrossSellProducts } from "@/app/_lib/products";
 import { getUserWishlistIds } from "@/app/_lib/wishlist";
+import { getCategories } from "@/app/_lib/categories";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import type { Product } from "@/app/_lib/types";
 
@@ -48,12 +49,17 @@ export async function applyPromoCodeAction(
 export type CartCrossSellResult = {
   products: Product[];
   wishlistIds: string[];
+  // Mapa slug→label dla kategorii poleconych produktów. Koszyk to client
+  // component i nie zrobi async lookupu w renderze — bez tego karta pokazuje
+  // surowy slug "lozko-tapicerowane" zamiast "Łóżka tapicerowane" (audyt LOW).
+  categoryLabels: Record<string, string>;
 };
 
 export async function getCartCrossSellAction(
   items: { id: string; category?: string }[]
 ): Promise<CartCrossSellResult> {
-  if (items.length === 0) return { products: [], wishlistIds: [] };
+  if (items.length === 0)
+    return { products: [], wishlistIds: [], categoryLabels: {} };
 
   // Uzupełnij brakujące category z DB
   const missing = items.filter((i) => !i.category).map((i) => i.id);
@@ -87,5 +93,15 @@ export async function getCartCrossSellAction(
     .filter((p) => userWishlist.has(p.id))
     .map((p) => p.id);
 
-  return { products, wishlistIds };
+  // Etykiety kategorii poleconych produktów (getCategories jest cache'owane).
+  const labelBySlug = new Map(
+    (await getCategories()).map((c) => [c.slug, c.label])
+  );
+  const categoryLabels: Record<string, string> = {};
+  for (const p of products) {
+    const label = labelBySlug.get(p.category);
+    if (label) categoryLabels[p.category] = label;
+  }
+
+  return { products, wishlistIds, categoryLabels };
 }
