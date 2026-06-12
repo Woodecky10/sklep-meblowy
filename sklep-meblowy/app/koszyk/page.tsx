@@ -32,14 +32,20 @@ export default function KoszykPage() {
   // UWAGA: wszystkie hooki muszą być PRZED wczesnym returnem pustego koszyka —
   // inaczej React rzuca "Rendered fewer hooks" gdy koszyk się opróżni.
   const [crossSell, setCrossSell] = useState<Product[]>([]);
+  const [crossSellWishlist, setCrossSellWishlist] = useState<Set<string>>(
+    new Set()
+  );
   useEffect(() => {
     // Pusty koszyk → strona renderuje pusty stan, cross-sell i tak niewidoczny.
     if (items.length === 0) return;
     let cancelled = false;
     getCartCrossSellAction(
       items.map((i) => ({ id: i.id, category: i.category }))
-    ).then((products) => {
-      if (!cancelled) setCrossSell(products);
+    ).then((res) => {
+      if (!cancelled) {
+        setCrossSell(res.products);
+        setCrossSellWishlist(new Set(res.wishlistIds));
+      }
     });
     return () => {
       cancelled = true;
@@ -287,7 +293,11 @@ export default function KoszykPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {crossSell.map((p) => (
-              <ProductCard key={p.id} product={p} />
+              <ProductCard
+                key={p.id}
+                product={p}
+                isInWishlist={crossSellWishlist.has(p.id)}
+              />
             ))}
           </div>
         </section>

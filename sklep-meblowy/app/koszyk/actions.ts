@@ -2,6 +2,7 @@
 
 import { validatePromoCode } from "@/app/_lib/promo";
 import { getCrossSellProducts } from "@/app/_lib/products";
+import { getUserWishlistIds } from "@/app/_lib/wishlist";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import type { Product } from "@/app/_lib/types";
 
@@ -40,11 +41,19 @@ export async function applyPromoCodeAction(
 // ============================================================
 // Klient wysyła listę {id, category}. Dla items bez category (stare
 // localStorage entry sprzed dodania pola) próbujemy uzupełnić z DB.
-// Zwraca do 4 produktów z kategorii cross-sell.
+// Zwraca do 4 produktów z kategorii cross-sell + ids tych, które są
+// w ulubionych zalogowanego usera (koszyk to client component i nie może
+// sam pobrać wishlisty server-side — audyt 2026-06-11 MEDIUM: bez tego
+// karta pokazywała puste serce, a klik USUWAŁ produkt z ulubionych).
+export type CartCrossSellResult = {
+  products: Product[];
+  wishlistIds: string[];
+};
+
 export async function getCartCrossSellAction(
   items: { id: string; category?: string }[]
-): Promise<Product[]> {
-  if (items.length === 0) return [];
+): Promise<CartCrossSellResult> {
+  if (items.length === 0) return { products: [], wishlistIds: [] };
 
   // Uzupełnij brakujące category z DB
   const missing = items.filter((i) => !i.category).map((i) => i.id);
@@ -69,5 +78,14 @@ export async function getCartCrossSellAction(
   );
   const cartProductIds = items.map((i) => i.id);
 
-  return getCrossSellProducts(cartCategories, cartProductIds, 4);
+  const products = await getCrossSellProducts(cartCategories, cartProductIds, 4);
+
+  // Które z poleconych produktów są już w ulubionych usera. getUserWishlistIds
+  // zwraca pusty Set dla niezalogowanego — wtedy wishlistIds = [].
+  const userWishlist = await getUserWishlistIds();
+  const wishlistIds = products
+    .filter((p) => userWishlist.has(p.id))
+    .map((p) => p.id);
+
+  return { products, wishlistIds };
 }
