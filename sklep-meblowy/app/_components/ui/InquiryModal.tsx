@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { submitInquiry } from "@/app/produkt/actions";
+import { useModal } from "@/app/_lib/useModal";
 
 // Modal "Zapytaj o inne kolory / własny wariant" — otwarty przyciskiem
 // na karcie produktu. Wysyła zapytanie do tabeli product_inquiries,
@@ -18,6 +19,7 @@ export default function InquiryModal({
   const [result, setResult] = useState<
     { ok: true; message: string } | { ok: false; error: string } | null
   >(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   function close() {
     setOpen(false);
@@ -25,6 +27,9 @@ export default function InquiryModal({
     // przerwana zmianą zawartości.
     setTimeout(() => setResult(null), 200);
   }
+
+  // a11y: scroll-lock tła, Escape zamyka, focus-trap w obrębie modala.
+  useModal(open, { onClose: close, containerRef: dialogRef, trapFocus: true });
 
   return (
     <>
@@ -38,6 +43,7 @@ export default function InquiryModal({
 
       {open && (
         <div
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
           aria-label="Zapytanie o niestandardowy wariant"

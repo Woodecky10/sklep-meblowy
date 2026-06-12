@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useModal } from "@/app/_lib/useModal";
 import type { SearchSuggestion } from "@/app/api/search/suggest/route";
 
 type Variant = "icon" | "inline";
@@ -39,6 +40,10 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
+
+  // a11y: blokada scrolla tła gdy otwarty modal wyszukiwarki (wariant icon).
+  // Bez Escape/focus-trapu — SearchBox ma własną obsługę klawiatury i focusu.
+  useModal(open, {});
 
   // Debounce 200ms + fetch sugestii. Puste value czyści sugestie po tym
   // samym debounce (asynchronicznie — bez setState w ciele efektu); bez

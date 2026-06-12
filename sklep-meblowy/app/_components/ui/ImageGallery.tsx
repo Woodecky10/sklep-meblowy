@@ -2,10 +2,12 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { useModal } from "@/app/_lib/useModal";
 
 export default function ImageGallery({ images, name }: { images: string[]; name: string }) {
   const [active, setActive] = useState(0);
   const [lightbox, setLightbox] = useState(false);
+  const lightboxRef = useRef<HTMLDivElement>(null);
   const list = images.length > 0 ? images : ["/placeholder.jpg"];
 
   // Zmiana zestawu zdjęć (np. wybór wariantu z własną galerią) → wróć do
@@ -76,11 +78,17 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
     setOrigin({ x: 50, y: 50 });
   }
 
-  // Esc zamyka lightbox; strzałki przełączają zdjęcia
+  // a11y: scroll-lock tła, Escape zamyka, focus-trap (Escape obsługuje useModal).
+  useModal(lightbox, {
+    onClose: () => setLightbox(false),
+    containerRef: lightboxRef,
+    trapFocus: true,
+  });
+
+  // Strzałki przełączają zdjęcia w otwartym lightboxie
   useEffect(() => {
     if (!lightbox) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setLightbox(false);
       if (e.key === "ArrowRight") setActive((i) => (i + 1) % list.length);
       if (e.key === "ArrowLeft") setActive((i) => (i - 1 + list.length) % list.length);
     }
@@ -174,6 +182,7 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
                 key={i}
                 onClick={() => setActive(i)}
                 aria-label={`Pokaż zdjęcie ${i + 1}`}
+                aria-current={i === active}
                 className={`relative w-20 aspect-square rounded-xl overflow-hidden border-2 transition-colors cursor-pointer ${
                   i === active ? "border-[var(--color-gold)]" : "border-transparent hover:border-[var(--color-gold)]/50"
                 }`}
@@ -187,6 +196,7 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
 
       {lightbox && (
         <div
+          ref={lightboxRef}
           role="dialog"
           aria-modal="true"
           aria-label={`Zdjęcie produktu ${name}`}
