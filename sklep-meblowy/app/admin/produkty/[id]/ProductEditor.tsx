@@ -24,6 +24,10 @@ export default function ProductEditor({
   categories: CategoryDef[];
 }) {
   const [images, setImages] = useState<string[]>(product.images ?? []);
+  // Baseline ostatnio zapisanej galerii — resetowany na zapisany payload po
+  // sukcesie. Bez tego imagesDirty liczone względem propa product.images
+  // (niezmiennego bez reloadu) wisiało jako true po zapisie (audyt LOW).
+  const [savedImages, setSavedImages] = useState<string[]>(product.images ?? []);
   const [toast, setToast] = useState<Toast>(null);
   const [savingBasics, startBasicsTransition] = useTransition();
   const [savingImages, startImagesTransition] = useTransition();
@@ -90,13 +94,15 @@ export default function ProductEditor({
   function saveImages() {
     startImagesTransition(async () => {
       const res = await updateProductImages(product.id, images);
+      // Reset baseline na zapisany payload → imagesDirty wraca do false.
+      if (res.ok) setSavedImages(images);
       handleResult(res);
     });
   }
 
   const imagesDirty =
-    images.length !== (product.images?.length ?? 0) ||
-    images.some((u, i) => u !== product.images?.[i]);
+    images.length !== savedImages.length ||
+    images.some((u, i) => u !== savedImages[i]);
 
   // ============================================================
   // Render

@@ -72,13 +72,16 @@ export default function FeaturedEditor({
       ...it,
       sort_order: i,
     }));
+    // Stan sprzed próby — rollback nie może cofać do initialFeatured (gubiłby
+    // wcześniejsze udane reordery), tylko do ostatniego dobrego stanu (audyt LOW).
+    const prev = items;
     setItems(reordered);
     startTransition(async () => {
       const res = await reorderFeatured(
         reordered.map((it) => ({ id: it.id, sort_order: it.sort_order }))
       );
       if (!res.ok) {
-        setItems(initialFeatured);
+        setItems(prev);
         showToast({ type: "error", message: res.error });
       }
     });

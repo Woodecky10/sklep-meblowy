@@ -74,13 +74,16 @@ export default function TilesEditor({
       sort_order: i,
     }));
 
+    // Stan sprzed próby — rollback nie może cofać do initialTiles (gubiłby
+    // wcześniejsze udane reordery), tylko do ostatniego dobrego stanu (audyt LOW).
+    const prev = tiles;
     setTiles(reordered);
     startTransition(async () => {
       const res = await reorderTiles(
         reordered.map((t) => ({ id: t.id, sort_order: t.sort_order }))
       );
       if (!res.ok) {
-        setTiles(initialTiles);
+        setTiles(prev);
         showToast({ type: "error", message: res.error });
       }
     });

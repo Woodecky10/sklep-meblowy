@@ -75,15 +75,18 @@ export default function SliderEditor({
       sort_order: i,
     }));
 
-    // Optimistic update — pokazujemy nową kolejność od razu, server w tle
+    // Optimistic update — pokazujemy nową kolejność od razu, server w tle.
+    // Zapamiętujemy stan SPRZED tej próby, żeby rollback nie cofał do
+    // initialSlides (gubiąc wcześniejsze udane reordery) — audyt LOW.
+    const prev = slides;
     setSlides(reordered);
     startTransition(async () => {
       const res = await reorderSlides(
         reordered.map((s) => ({ id: s.id, sort_order: s.sort_order }))
       );
       if (!res.ok) {
-        // Wycofaj jeśli się sypnęło
-        setSlides(initialSlides);
+        // Wycofaj do stanu sprzed tej próby
+        setSlides(prev);
         showToast({ type: "error", message: res.error });
       }
     });
