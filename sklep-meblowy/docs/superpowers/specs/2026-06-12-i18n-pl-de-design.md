@@ -76,10 +76,14 @@ wg locale, SEO (hreflang/sitemap/meta), override w panelu.
 **Odczyt**: `localized(row, locale, field)` → zwraca `row[field+'_de']` gdy `de`
 i niepuste, inaczej `row[field]` (PL). Jedno miejsce reguły fallbacku.
 
-**Świeżość (app-level, bez triggerów DB)**: ścieżki zapisu zmieniające pola PL
-ustawiają `needs_translation=true`; tłumacz (inline/sweep) zapisuje `_de`,
-`translated_at=now()`, `needs_translation=false`. Ręczna korekta DE w panelu też
-ustawia `needs_translation=false` i NIE jest nadpisywana przez sweep.
+**Świeżość (app-level, bez triggerów DB)** — reguła `needs_translation`:
+- `=true` przy: insercie, **zmianie pól źródłowych PL**, lub ręcznym „Przetłumacz ponownie".
+- `=false` przy: udanym auto-tłumaczeniu (zapis `_de` + `translated_at=now()`) **lub**
+  ręcznym zapisie DE w panelu.
+- Sweep przetwarza **tylko** wiersze `needs_translation=true`.
+- Konsekwencja: ręczne DE jest zachowane, dopóki nie zmieni się źródło PL ani admin
+  nie wymusi retłumaczenia. Przy zmianie PL manualne DE może zostać nadpisane przez
+  sweep — świadomy trade-off (stare DE i tak nieaktualne wobec nowego źródła).
 
 ### 3. Pipeline tłumaczeń (DeepL + triggery)
 
@@ -133,11 +137,12 @@ ustawia `needs_translation=false` i NIE jest nadpisywana przez sweep.
 - **hreflang**: każda publiczna strona wystawia `alternates.languages`
   (`pl`, `de`, `x-default`→PL) w `generateMetadata`. Strona/produkt **bez DE**
   (`needs_translation=true` / brak `_de`) → **pomijamy alternate `de`**.
-- **Sitemap** (`app/sitemap.ts`): wpisy PL (jak dziś) **+** `/de/...`; produkty DE
-  **tylko gdy `needs_translation=false`**. Statyczne strony lokalizowane słownikiem
-  (home, sklep, o-nas, kontakt, dostawa, zwroty) wchodzą do DE od razu; strony legal
-  DE dopiero w etapie ③. Wpisy niosą `alternates.languages`. Filtr DE wydzielony do
-  pure-helpera (testowalny).
+- **Sitemap** (`app/sitemap.ts`): wpisy PL (jak dziś) **+** `/de/...`. Do DE wchodzą:
+  strony zakupowe sterowane słownikiem UI (home, sklep) oraz produkty/kategorie/kolekcje
+  DE **tylko gdy `needs_translation=false`**. Strony informacyjne/prawne z prozą
+  (o-nas, dostawa, zwroty, regulamin, prywatność, kontakt) **NIE** wchodzą do DE w tym
+  etapie — ich niemiecka treść powstaje w etapie ③ (razem z wymogami prawnymi DE).
+  Wpisy niosą `alternates.languages`. Filtr DE wydzielony do pure-helpera (testowalny).
 - **`<html lang>`** per locale; **og:locale** `pl_PL`/`de_DE`.
 - **Canonical**: self-referencing per locale (PL→PL, DE→DE). Canonical PL bez zmian.
 - **robots.ts**: bez zmian (admin/konto/checkout/koszyk/ulubione już wykluczone;
