@@ -23,12 +23,18 @@ export default function DescriptionSectionsEditor({
   onToast: (t: Toast) => void;
 }) {
   const [sections, setSections] = useState<ProductDescriptionSection[]>(initial);
+  // Baseline ostatnio zapisanego stanu — trzymany w state (nie z propa
+  // initial), bo po udanym zapisie ustawiamy go na DOKŁADNIE wysłany payload.
+  // Inaczej dirty zostaje true na zawsze: kolumna JSONB normalizuje kolejność
+  // kluczy, więc round-trip nigdy nie wraca do równości z initial → banner
+  // „niezapisane zmiany" i przycisk wiszą po zapisie (audyt 2026-06-11 MED).
+  const [baseline, setBaseline] = useState<ProductDescriptionSection[]>(initial);
   const [saving, startSaveTransition] = useTransition();
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
 
   const dirty = useMemo(
-    () => JSON.stringify(sections) !== JSON.stringify(initial),
-    [sections, initial]
+    () => JSON.stringify(sections) !== JSON.stringify(baseline),
+    [sections, baseline]
   );
 
   function patchSection(idx: number, patch: Partial<ProductDescriptionSection>) {
@@ -108,6 +114,9 @@ export default function DescriptionSectionsEditor({
     startSaveTransition(async () => {
       const res = await updateProductDescriptionSections(productId, sections);
       if (res.ok) {
+        // Reset baseline na wysłany payload → dirty wraca do false
+        // (banner „niezapisane zmiany" i przycisk „Zapisz sekcje" znikają).
+        setBaseline(sections);
         onToast({ type: "success", message: res.message ?? "Zapisano sekcje" });
       } else {
         onToast({ type: "error", message: res.error });
