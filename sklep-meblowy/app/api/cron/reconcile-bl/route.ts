@@ -4,6 +4,7 @@ import { pushOrderToBaseLinker, hasCompletedBlPush } from "@/app/_lib/baselinker
 import { reconcileOrders } from "@/app/_lib/baselinker-reconcile";
 import { getOrders } from "@/app/_lib/baselinker";
 import { applyBlStatus } from "@/app/_lib/orders";
+import { safeCompareSecret } from "@/app/_lib/secure-compare";
 import {
   parseStatusIdConfig,
   isStatusConfigEmpty,
@@ -35,11 +36,14 @@ function isAuthorized(
   syncSecret?: string
 ): boolean {
   // Vercel Cron: Authorization: Bearer $CRON_SECRET.
-  if (cronSecret && request.headers.get("authorization") === `Bearer ${cronSecret}`) {
+  if (
+    cronSecret &&
+    safeCompareSecret(request.headers.get("authorization"), `Bearer ${cronSecret}`)
+  ) {
     return true;
   }
   // Ręczny curl — spójnie z /api/baselinker/push-order.
-  if (syncSecret && request.headers.get("x-sync-secret") === syncSecret) {
+  if (syncSecret && safeCompareSecret(request.headers.get("x-sync-secret"), syncSecret)) {
     return true;
   }
   return false;

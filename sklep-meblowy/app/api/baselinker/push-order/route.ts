@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { pushOrderToBaseLinker } from "@/app/_lib/baselinker-orders";
 import { BaseLinkerError } from "@/app/_lib/baselinker";
+import { safeCompareSecret } from "@/app/_lib/secure-compare";
 
 // ============================================================
 // POST /api/baselinker/push-order?key={SECRET}&orderId={uuid}
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-  if (key !== expected) {
+  if (!safeCompareSecret(key, expected)) {
     return NextResponse.json({ error: "Nieprawidłowy klucz" }, { status: 401 });
   }
   if (!orderId) {

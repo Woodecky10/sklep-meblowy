@@ -3,6 +3,7 @@ import {
   syncProductsFromBaseLinker,
   logSyncOutcome,
 } from "@/app/_lib/baselinker-sync";
+import { safeCompareSecret } from "@/app/_lib/secure-compare";
 
 // ============================================================
 // POST /api/baselinker/sync-products
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-  if (key !== expected) {
+  if (!safeCompareSecret(key, expected)) {
     return NextResponse.json({ error: "Nieprawidłowy klucz" }, { status: 401 });
   }
 

@@ -48,6 +48,18 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    // Walidacja formatu/długości emaila — bez tego śmieciowy guest_email
+    // tworzył osierocone pending-zamówienia w DB (audyt 2026-06-11 LOW).
+    const emailTrimmed = body.email.trim();
+    if (
+      emailTrimmed.length > 254 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)
+    ) {
+      return NextResponse.json(
+        { error: "Nieprawidłowy adres e-mail" },
+        { status: 400 }
+      );
+    }
     // Adres dostawy wymagany w całości — bez tego zamówienie w BL powstaje
     // bez adresu i kurier nie ma gdzie jechać. Formularz to waliduje, ale
     // route musi być odporny na bezpośrednie wywołania.

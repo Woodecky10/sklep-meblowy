@@ -8,12 +8,25 @@ type Body = {
   comment?: string;
 };
 
+// Walidacja productId jako UUID — bez tego błędny id leciał do PostgREST,
+// który zwracał error.message ujawniający schemat DB klientowi (audyt LOW).
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(request: NextRequest) {
-  const body = (await request.json()) as Body;
+  let body: Body;
+  try {
+    body = (await request.json()) as Body;
+  } catch {
+    return NextResponse.json({ error: "Nieprawidłowy JSON" }, { status: 400 });
+  }
   const { productId, rating, comment } = body;
 
   if (!productId || typeof rating !== "number") {
     return NextResponse.json({ error: "Brak wymaganych pól" }, { status: 400 });
+  }
+  if (!UUID_RE.test(productId)) {
+    return NextResponse.json({ error: "Nieprawidłowy productId" }, { status: 400 });
   }
   const ratingInt = Math.round(rating);
   if (ratingInt < 1 || ratingInt > 5) {
@@ -48,9 +61,11 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (error) {
-    // Typowy błąd: 403 z RLS gdy user nie ma zamówienia tego produktu
+    // Typowy błąd: 403 z RLS gdy user nie ma zamówienia tego produktu.
+    // error.message NIE trafia do klienta (wyciekał schemat DB) — log na serwerze.
+    console.error("review upsert error:", error);
     return NextResponse.json(
-      { error: "Nie możesz dodać opinii — weryfikujemy zakupy klientów. " + error.message },
+      { error: "Nie możesz dodać opinii — weryfikujemy zakupy klientów." },
       { status: 403 }
     );
   }
@@ -65,8 +80,8 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const productId = searchParams.get("productId");
-  if (!productId) {
-    return NextResponse.json({ error: "Brak productId" }, { status: 400 });
+  if (!productId || !UUID_RE.test(productId)) {
+    return NextResponse.json({ error: "Nieprawidłowy productId" }, { status: 400 });
   }
 
   const supabase = await createClient();
@@ -84,7 +99,12 @@ export async function DELETE(request: NextRequest) {
     .eq("user_id", user.id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // error.message nie trafia do klienta (wyciek schematu DB) — log serwerowy.
+    console.error("review delete error:", error);
+    return NextResponse.json(
+      { error: "Nie udało się usunąć opinii" },
+      { status: 500 }
+    );
   }
 
   revalidatePath(`/produkt/${productId}`);

@@ -181,11 +181,15 @@ export default async function ProduktPage({ params }: Props) {
     };
   }
 
+  // Escape `<` → <: bez tego product.name/description z BL zawierające
+  // </script> wybiłyby się z bloku JSON-LD i wstrzyknęły skrypt (audyt LOW).
+  const jsonLdHtml = JSON.stringify(jsonLd).replace(/</g, "\\u003c");
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdHtml }}
       />
 
       {/* Breadcrumb */}
