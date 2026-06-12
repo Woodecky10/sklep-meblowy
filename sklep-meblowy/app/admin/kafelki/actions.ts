@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
+import { validateImageUpload } from "@/app/_lib/image-upload";
 import { invalidateTilesCache } from "@/app/_lib/home-tiles";
 
 const STORAGE_BUCKET = "home-tiles";
@@ -34,21 +35,17 @@ async function uploadImageIfPresent(
   if (!(file instanceof File) || file.size === 0) {
     return { ok: true, url: null };
   }
-  if (!file.type.startsWith("image/")) {
-    return { ok: false, error: "Plik musi być obrazem (jpg, png, webp itp.)" };
-  }
-  if (file.size > 8 * 1024 * 1024) {
-    return { ok: false, error: "Zdjęcie jest za duże (max 8 MB)" };
-  }
+  // Allowlist formatów (raster) — SVG/inne odrzucone (stored XSS).
+  const valid = validateImageUpload(file);
+  if (!valid.ok) return { ok: false, error: valid.error };
 
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "bin";
-  const path = `${Date.now()}-${randomUUID()}.${ext}`;
+  const path = `${Date.now()}-${randomUUID()}.${valid.ext}`;
 
   const supabase = await createAdminClient();
   const { error: uploadErr } = await supabase.storage
     .from(STORAGE_BUCKET)
-    .upload(path, file, {
-      contentType: file.type,
+    .upload(path, valid.file, {
+      contentType: valid.contentType,
       cacheControl: "3600",
       upsert: false,
     });

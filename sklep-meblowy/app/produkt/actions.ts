@@ -15,7 +15,9 @@ function isEmail(s: string): boolean {
 }
 
 // Public server action — klient niezalogowany może wysłać zapytanie.
-// RLS na tabeli pozwala anon INSERT (migracja 17).
+// Insert idzie SERVICE ROLEM (createAdminClient), więc nie zależy od polityk
+// RLS na tabeli. Migracja 27 odebrała anon/authenticated prawo INSERT (był to
+// wektor bypassu walidacji przez bezpośredni REST).
 export async function submitInquiry(
   formData: FormData
 ): Promise<SubmitInquiryResult> {
