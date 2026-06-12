@@ -8,6 +8,7 @@ import Footer from "./_components/layout/Footer";
 import CookieBanner from "./_components/layout/CookieBanner";
 import CartToast from "./_components/layout/CartToast";
 import { CartProvider } from "./_context/CartContext";
+import { ToastProvider } from "./_context/ToastContext";
 import { COMPANY } from "./_lib/company";
 
 const inter = Inter({
@@ -65,12 +66,14 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col antialiased">
         <ThemeProvider>
           <CartProvider>
-            <TopBar />
-            <Navbar />
-            <main className="flex-1">{children}</main>
-            <Footer />
-            <CookieBanner />
-            <CartToast />
+            <ToastProvider>
+              <TopBar />
+              <Navbar />
+              <main className="flex-1">{children}</main>
+              <Footer />
+              <CookieBanner />
+              <CartToast />
+            </ToastProvider>
           </CartProvider>
         </ThemeProvider>
       </body>

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toggleWishlist } from "@/app/_lib/wishlist-actions";
+import { useToast } from "@/app/_context/ToastContext";
 
 // Serce do dodawania/usuwania produktu z ulubionych.
 // Optymistyczna aktualizacja UI — natychmiast pokazujemy nowy stan,
@@ -23,6 +24,7 @@ export default function WishlistButton({
   const [isInWishlist, setIsInWishlist] = useState(initialIsInWishlist);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+  const showToast = useToast();
 
   function handleClick(e: React.MouseEvent) {
     e.preventDefault();
@@ -34,16 +36,22 @@ export default function WishlistButton({
 
     startTransition(async () => {
       const res = await toggleWishlist(productId);
-      if (!res.ok) {
-        // Rollback
-        setIsInWishlist(!nextState);
-        if (res.error === "unauthenticated") {
-          router.push("/logowanie");
-        } else {
-          alert(res.message);
-        }
+      if (res.ok) {
+        // Sukces — revalidatePath w server action odświeży licznik w navbar.
+        showToast(
+          nextState ? "Dodano do ulubionych" : "Usunięto z ulubionych",
+          "success"
+        );
+        return;
       }
-      // Sukces — revalidatePath w server action już odświeży licznik w navbar.
+      // Rollback
+      setIsInWishlist(!nextState);
+      if (res.error === "unauthenticated") {
+        router.push("/logowanie");
+      } else {
+        // Spójny toast zamiast blokującego alert() (audyt LOW #11).
+        showToast(res.message, "error");
+      }
     });
   }
 
