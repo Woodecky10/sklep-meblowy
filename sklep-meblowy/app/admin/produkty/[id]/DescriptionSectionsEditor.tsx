@@ -1,10 +1,14 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { updateProductDescriptionSections, uploadProductImage } from "../actions";
 import type { ProductDescriptionSection } from "@/app/_lib/types";
 import { compressIfNeeded, IconBtn, inputClass, type Toast } from "./_shared";
+
+// Sekcja + stabilne lokalne id (klucz Reacta). Id NIE jest częścią danych
+// zapisywanych do DB — służy tylko do identyfikacji wiersza w UI.
+type SectionRow = { id: string; data: ProductDescriptionSection };
 
 // Edytor sekcji opisu produktu:
 // - Sekcje text (z BL) są read-only — admin widzi pierwsze 80 znaków preview
@@ -22,31 +26,47 @@ export default function DescriptionSectionsEditor({
   initial: ProductDescriptionSection[];
   onToast: (t: Toast) => void;
 }) {
-  const [sections, setSections] = useState<ProductDescriptionSection[]>(initial);
-  // Baseline ostatnio zapisanego stanu — trzymany w state (nie z propa
-  // initial), bo po udanym zapisie ustawiamy go na DOKŁADNIE wysłany payload.
-  // Inaczej dirty zostaje true na zawsze: kolumna JSONB normalizuje kolejność
-  // kluczy, więc round-trip nigdy nie wraca do równości z initial → banner
-  // „niezapisane zmiany" i przycisk wiszą po zapisie (audyt 2026-06-11 MED).
+  // Sekcje jako {id, data} — id to STABILNY klucz Reacta (audyt LOW #18).
+  // Z key={idx} stan `expanded` w wierszu przyklejał się do POZYCJI: po
+  // reorderze/insercie rozwinięcie wędrowało na inną sekcję. Id wędruje razem
+  // z danymi, więc UI-stan podąża za treścią. Id NIE trafia do payloadu zapisu.
+  const [rows, setRows] = useState<SectionRow[]>(() =>
+    initial.map((data, i) => ({ id: `init-${i}`, data }))
+  );
+  const nextIdRef = useRef(0);
+  function newId() {
+    nextIdRef.current += 1;
+    return `new-${nextIdRef.current}`;
+  }
+
+  // Baseline ostatnio zapisanego stanu — resetowany na DOKŁADNIE wysłany
+  // payload po sukcesie. Inaczej dirty zostaje true na zawsze: kolumna JSONB
+  // normalizuje kolejność kluczy → round-trip nie wraca do równości z initial
+  // (audyt 2026-06-11 MED).
   const [baseline, setBaseline] = useState<ProductDescriptionSection[]>(initial);
   const [saving, startSaveTransition] = useTransition();
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
 
+  const sections = rows.map((r) => r.data);
   const dirty = useMemo(
-    () => JSON.stringify(sections) !== JSON.stringify(baseline),
-    [sections, baseline]
+    () => JSON.stringify(rows.map((r) => r.data)) !== JSON.stringify(baseline),
+    [rows, baseline]
   );
 
   function patchSection(idx: number, patch: Partial<ProductDescriptionSection>) {
-    setSections((prev) =>
-      prev.map((s, i) => (i === idx ? ({ ...s, ...patch } as ProductDescriptionSection) : s))
+    setRows((prev) =>
+      prev.map((r, i) =>
+        i === idx
+          ? { ...r, data: { ...r.data, ...patch } as ProductDescriptionSection }
+          : r
+      )
     );
   }
 
   function moveSection(idx: number, dir: -1 | 1) {
     const target = idx + dir;
-    if (target < 0 || target >= sections.length) return;
-    setSections((prev) => {
+    if (target < 0 || target >= rows.length) return;
+    setRows((prev) => {
       const next = prev.slice();
       [next[idx], next[target]] = [next[target], next[idx]];
       return next;
@@ -55,7 +75,7 @@ export default function DescriptionSectionsEditor({
 
   function removeSection(idx: number) {
     if (!window.confirm("Usunąć tę sekcję?")) return;
-    setSections((prev) => prev.filter((_, i) => i !== idx));
+    setRows((prev) => prev.filter((_, i) => i !== idx));
   }
 
   // Wstawia nową pustą custom text sekcję (admin może edytować inline).
@@ -68,9 +88,9 @@ export default function DescriptionSectionsEditor({
       body: "",
       admin_custom: true,
     };
-    setSections((prev) => {
+    setRows((prev) => {
       const next = prev.slice();
-      next.splice(insertIdx, 0, newText);
+      next.splice(insertIdx, 0, { id: newId(), data: newText });
       return next;
     });
   }
@@ -96,9 +116,9 @@ export default function DescriptionSectionsEditor({
         image_url: url,
         image_alt: "",
       };
-      setSections((prev) => {
+      setRows((prev) => {
         const next = prev.slice();
-        next.splice(insertIdx, 0, newImage);
+        next.splice(insertIdx, 0, { id: newId(), data: newImage });
         return next;
       });
       onToast({
@@ -111,12 +131,13 @@ export default function DescriptionSectionsEditor({
   }
 
   function save() {
+    const payload = rows.map((r) => r.data);
     startSaveTransition(async () => {
-      const res = await updateProductDescriptionSections(productId, sections);
+      const res = await updateProductDescriptionSections(productId, payload);
       if (res.ok) {
         // Reset baseline na wysłany payload → dirty wraca do false
         // (banner „niezapisane zmiany" i przycisk „Zapisz sekcje" znikają).
-        setBaseline(sections);
+        setBaseline(payload);
         onToast({ type: "success", message: res.message ?? "Zapisano sekcje" });
       } else {
         onToast({ type: "error", message: res.error });
@@ -149,8 +170,10 @@ export default function DescriptionSectionsEditor({
           onAddCustomText={() => insertCustomTextAt(0)}
         />
 
-        {sections.map((s, idx) => (
-          <div key={idx}>
+        {rows.map((row, idx) => {
+          const s = row.data;
+          return (
+          <div key={row.id}>
             {s.kind === "text" ? (
               <TextSectionRow
                 section={s}
@@ -202,7 +225,8 @@ export default function DescriptionSectionsEditor({
               onAddCustomText={() => insertCustomTextAt(idx + 1)}
             />
           </div>
-        ))}
+          );
+        })}
 
         {sections.length === 0 && (
           <p className="text-sm text-[var(--muted)] italic py-6 text-center">

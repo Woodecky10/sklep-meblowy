@@ -24,6 +24,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
 
   // Sync wartości z URL na /sklep — wzorzec "adjusting state during render"
   // zamiast setState w efekcie. Klucz = pełne searchParams (nie samo q):
@@ -41,9 +42,10 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
     if (open) inputRef.current?.focus();
   }, [open]);
 
-  // a11y: blokada scrolla tła gdy otwarty modal wyszukiwarki (wariant icon).
-  // Bez Escape/focus-trapu — SearchBox ma własną obsługę klawiatury i focusu.
-  useModal(open, {});
+  // a11y: scroll-lock tła + focus-trap gdy otwarty modal wyszukiwarki (icon).
+  // Escape obsługuje useModal (działa też gdy focus jest na przycisku, nie
+  // tylko na inpucie). Własna keyboard-nav sugestii (onKeyDown) zostaje.
+  useModal(open, { containerRef: modalRef, trapFocus: true, onClose: close });
 
   // Debounce 200ms + fetch sugestii. Puste value czyści sugestie po tym
   // samym debounce (asynchronicznie — bez setState w ciele efektu); bez
@@ -214,6 +216,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
 
       {open && (
         <div
+          ref={modalRef}
           className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-start justify-center pt-24 px-6"
           onClick={close}
         >
