@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/app/_lib/supabase/server";
+import { buildSearchOrFilter } from "@/app/_lib/search-filter";
 
 export type SearchSuggestion = {
   id: string;
@@ -17,14 +18,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json<SearchSuggestion[]>([]);
   }
 
-  const supabase = await createClient();
-  // Escape ILIKE wildcards w user input.
-  const term = q.replace(/[%_\\]/g, "\\$&");
+  // Sanityzacja + budowa filtra .or() (escape składni .or() i wildcardów
+  // ILIKE) w search-filter.ts. null = sama interpunkcja → brak podpowiedzi.
+  const orFilter = buildSearchOrFilter(q);
+  if (!orFilter) {
+    return NextResponse.json<SearchSuggestion[]>([]);
+  }
 
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("products")
     .select("id, name, price, images, category")
-    .or(`name.ilike.%${term}%,description.ilike.%${term}%`)
+    .or(orFilter)
     .order("created_at", { ascending: false })
     .limit(6);
 

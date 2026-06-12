@@ -1,0 +1,32 @@
+// Czyste helpery do bezpiecznego budowania filtrów PostgREST / ILIKE z user
+// inputu. Wydzielone z products.ts, żeby były testowalne bez mockowania
+// supabase (jak safe-redirect).
+
+// Escape znaków specjalnych ILIKE (% _ \) w wartości dopasowania — bez tego
+// user mógłby użyć wildcardów. Zachowuje dosłowną treść (np. email z "_").
+export function escapeIlike(value: string): string {
+  return value.replace(/[%_\\]/g, "\\$&");
+}
+
+// Sanityzacja frazy wyszukiwania przed wstrzyknięciem w PostgREST .or().
+// Audyt 2026-06-11 (MEDIUM): escapowaliśmy tylko wildcardy ILIKE (% _ \), ale
+// NIE składni .or() (`, . ( )`). `q=x,price.gt.0` wstrzykiwało dodatkowy
+// warunek OR (blind-boolean enumeracja po kolumnach products), a `(`/`)`
+// rozbijał filtr → 500 na /sklep. Allowlist: litery (dowolny alfabet, w tym
+// polskie znaki), cyfry, spacja, myślnik. Usuwa WSZYSTKIE znaki znaczące dla
+// .or() ORAZ wildcardy ILIKE — fraza trafia do zapytania jako czysty literał.
+export function sanitizeSearchTerm(raw: string): string {
+  return raw
+    .replace(/[^\p{L}\p{N}\s-]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Buduje filtr .or() (name/description ILIKE) z odsanityzowanej frazy.
+// Zwraca null gdy po sanityzacji nic nie zostaje (pusta/sama-interpunkcja
+// fraza = nie zawężaj wyników).
+export function buildSearchOrFilter(raw: string): string | null {
+  const term = sanitizeSearchTerm(raw);
+  if (!term) return null;
+  return `name.ilike.%${term}%,description.ilike.%${term}%`;
+}

@@ -1,5 +1,6 @@
 import { createClient } from "./supabase/server";
 import { getCategories } from "./categories";
+import { buildSearchOrFilter } from "./search-filter";
 import type { Category, Product } from "./types";
 
 // Górny limit rozmiaru strony — broni przed ?limit=999999 (kosztowny request).
@@ -104,8 +105,10 @@ export async function getProducts(filters: ProductFilters = {}) {
   }
 
   if (search && search.trim()) {
-    const term = search.trim().replace(/[%_]/g, "\\$&");
-    query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%`);
+    // Sanityzacja + budowa filtra .or() w search-filter.ts (escape składni
+    // .or() i wildcardów ILIKE). null = po sanityzacji nic nie zostało.
+    const orFilter = buildSearchOrFilter(search);
+    if (orFilter) query = query.or(orFilter);
   }
 
   if (typeof priceMin === "number") query = query.gte("price", priceMin);
