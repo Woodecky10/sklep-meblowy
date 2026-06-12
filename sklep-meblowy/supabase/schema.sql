@@ -117,20 +117,24 @@ create policy "products: publiczny odczyt"
   to anon, authenticated
   using (true);
 
+-- Rola admina żyje w app_metadata (raw_app_meta_data.role) — top-level claim
+-- 'role' w JWT Supabase to zawsze anon/authenticated/service_role, więc
+-- `->> 'role'` NIGDY nie zmatchowałoby 'admin' (martwa polityka). Konwencja
+-- spójna z migracjami 09/23/25 i isAdmin() w app/_lib/admin.ts.
 create policy "products: admin insert"
   on public.products for insert
   to authenticated
-  with check (auth.jwt() ->> 'role' = 'admin');
+  with check (auth.jwt() -> 'app_metadata' ->> 'role' = 'admin');
 
 create policy "products: admin update"
   on public.products for update
   to authenticated
-  using (auth.jwt() ->> 'role' = 'admin');
+  using (auth.jwt() -> 'app_metadata' ->> 'role' = 'admin');
 
 create policy "products: admin delete"
   on public.products for delete
   to authenticated
-  using (auth.jwt() ->> 'role' = 'admin');
+  using (auth.jwt() -> 'app_metadata' ->> 'role' = 'admin');
 
 -- Orders: własne zamówienia
 create policy "orders: własny odczyt"
