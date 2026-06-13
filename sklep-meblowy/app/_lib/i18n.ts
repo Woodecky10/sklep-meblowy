@@ -1,3 +1,5 @@
+import { headers } from "next/headers";
+
 export const LOCALES = ["pl", "de"] as const;
 export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = "pl";
@@ -28,4 +30,12 @@ export function pickLocalized(
 ): string {
   if (locale === "de" && de && de.trim().length > 0) return de;
   return pl;
+}
+
+// Server-only: czyta locale z nagłówka `x-locale` ustawionego przez proxy.
+// Fallback do DEFAULT_LOCALE gdy brak/niepoprawny.
+export async function getLocale(): Promise<Locale> {
+  const h = await headers();
+  const v = h.get("x-locale");
+  return v && isLocale(v) ? v : DEFAULT_LOCALE;
 }
