@@ -1,4 +1,4 @@
-import Link from "next/link";
+import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/app/_lib/supabase/server";
@@ -56,12 +56,12 @@ export default async function WishlistPage() {
             Klikaj serce na karcie produktu, żeby zachować swoje typy na
             później. Wrócisz do nich w każdej chwili tutaj.
           </p>
-          <Link
+          <LocalizedLink
             href="/sklep"
             className="inline-flex px-8 py-3.5 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
           >
             Przeglądaj sklep
-          </Link>
+          </LocalizedLink>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
