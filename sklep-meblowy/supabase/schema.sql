@@ -53,13 +53,24 @@ create table if not exists public.products (
   images      text[] not null default '{}',
   stock       integer not null default 0 check (stock >= 0),
   variants    jsonb,
-  created_at  timestamptz not null default now()
+  created_at  timestamptz not null default now(),
+  -- i18n DE (migracja 29)
+  name_de                    text,
+  description_de             text,
+  description_sections_de    jsonb,
+  color_de                   text,
+  material_de                text,
+  needs_translation          boolean not null default true,
+  translated_at              timestamptz
 );
 
 -- Indeksy dla filtrowania i sortowania
 create index if not exists idx_products_category on public.products (category);
 create index if not exists idx_products_price    on public.products (price);
 create index if not exists idx_products_created  on public.products (created_at desc);
+-- i18n DE — indeksy częściowe (migracja 29)
+create index if not exists idx_products_needs_translation
+  on public.products (needs_translation) where needs_translation = true;
 
 -- ============================================================
 -- TABELA: orders
