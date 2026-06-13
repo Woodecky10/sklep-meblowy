@@ -27,9 +27,9 @@ export default async function HomePage() {
   const [dbSlides, dbTiles, featured, allCategories, collectionsForHome, wishlistIds] = await Promise.all([
     getActiveSlides(),
     getActiveTiles(),
-    getFeaturedOrFallback(),
+    getFeaturedOrFallback(locale),
     getCategories(locale),
-    getCollectionsForHome(),
+    getCollectionsForHome(locale),
     getUserWishlistIds(),
   ]);
   const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));

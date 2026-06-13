@@ -1,7 +1,7 @@
 import { createClient } from "./supabase/server";
 import { getCategories } from "./categories";
 import { buildSearchOrFilter } from "./search-filter";
-import { localizeProduct } from "./localize";
+import { localizeProduct, buildLocalizedFacets } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Category, Product } from "./types";
 
@@ -266,18 +266,12 @@ export async function getRelatedProducts(
 export async function getFilterFacets(locale: Locale = DEFAULT_LOCALE) {
   const supabase = await createClient();
 
-  // DE: agregujemy wartość _de z fallbackiem do PL gdy _de puste (produkt
-  // jeszcze nieprzetłumaczony pokaże PL etykietę koloru/materiału). Selektujemy
-  // obie kolumny i składamy etykietę w JS (postgrest nie ma COALESCE w
-  // select-listcie tutaj).
-  //
-  // ⚠️ UWAGA (Task 9, świadome ograniczenie): aktywny FILTR po kolorze/materiale
-  // w getProducts nadal porównuje kolumnę PL (`color`/`material`). Gdy produkt
-  // MA tłumaczenie color_de, jego facet pokazuje wartość DE, a kliknięcie wyśle
-  // ją jako ?kolor=... i `.in("color", ["beige"])` nie znajdzie nic (PL color =
-  // "beż"). Filtrowanie po zlokalizowanych facetach wymaga zmiany predykatu
-  // (mieszany namespace PL/DE + escaping wartości w .or()) — poza zakresem
-  // tego taska. Wyszukiwarka tekstowa i wyświetlanie treści DE działają.
+  // Każdy facet niesie KANONICZNĄ wartość PL (`value`) + zlokalizowany `label`.
+  // Dedupe robimy po PL value, więc kliknięcie zawsze wysyła ?kolor=<PL> i
+  // pasuje do `.in("color", ...)` w getProducts (predykat dalej PL — patrz
+  // niżej). DE produkty pokażą niemiecką etykietę (label), ale filtrują po PL.
+  // Selektujemy obie kolumny i składamy { value, label } w JS przez
+  // buildLocalizedFacets (czysty, testowalny helper).
   const [
     { data: colorsData },
     { data: materialsData },
@@ -292,38 +286,22 @@ export async function getFilterFacets(locale: Locale = DEFAULT_LOCALE) {
       .not("material", "is", null),
   ]);
 
-  const pickFacet = (
-    pl: string | null,
-    de: string | null | undefined
-  ): string => {
-    if (locale === "de" && de && de.trim().length > 0) return de.trim();
-    return pl?.trim() ?? "";
-  };
+  const colors = buildLocalizedFacets(
+    ((colorsData ?? []) as { color: string | null; color_de: string | null }[]).map(
+      (r) => ({ value: r.color, value_de: r.color_de })
+    ),
+    locale
+  );
 
-  const colors = Array.from(
-    new Set(
-      (colorsData ?? [])
-        .map((r) => {
-          const row = r as { color: string | null; color_de: string | null };
-          return pickFacet(row.color, row.color_de);
-        })
-        .filter((c) => c.length > 0)
-    )
-  ).sort((a, b) => a.localeCompare(b, "pl"));
-
-  const materials = Array.from(
-    new Set(
-      (materialsData ?? [])
-        .map((r) => {
-          const row = r as {
-            material: string | null;
-            material_de: string | null;
-          };
-          return pickFacet(row.material, row.material_de);
-        })
-        .filter((m) => m.length > 0)
-    )
-  ).sort((a, b) => a.localeCompare(b, "pl"));
+  const materials = buildLocalizedFacets(
+    (
+      (materialsData ?? []) as {
+        material: string | null;
+        material_de: string | null;
+      }[]
+    ).map((r) => ({ value: r.material, value_de: r.material_de })),
+    locale
+  );
 
   return { colors, materials };
 }

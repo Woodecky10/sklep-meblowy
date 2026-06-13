@@ -21,9 +21,16 @@ export type FilterBarCollection = {
   label: string;
 };
 
+// Facet kolor/materiał: `value` = kanoniczna wartość PL (niesie ?kolor= i filtr
+// DB), `label` = zlokalizowana etykieta do wyświetlenia (DE gdy dostępna).
+export type FilterBarFacet = {
+  value: string;
+  label: string;
+};
+
 type Props = {
-  colors: string[];
-  materials: string[];
+  colors: FilterBarFacet[];
+  materials: FilterBarFacet[];
   sections?: FilterBarSection[];
   collections?: FilterBarCollection[];
 };
@@ -131,6 +138,14 @@ export default function FilterBar({
     .find((c) => c.slug === category);
 
   const activeCollection = collections.find((c) => c.slug === collection);
+
+  // Lookup value(PL) → label(zlokalizowany) dla chipów aktywnych filtrów.
+  // Fallback do surowej wartości gdy zaznaczony value nie istnieje w bieżącym
+  // zestawie facetów (np. stary link z wartością, która zniknęła z katalogu).
+  const colorLabel = (value: string) =>
+    colors.find((c) => c.value === value)?.label ?? value;
+  const materialLabel = (value: string) =>
+    materials.find((m) => m.value === value)?.label ?? value;
 
   const priceActive = priceMin !== "" || priceMax !== "";
   const categoryCount = category ? 1 : 0;
@@ -320,18 +335,18 @@ export default function FilterBar({
         <DropdownPanel align="left">
           <div className="flex flex-wrap gap-1.5">
             {colors.map((c) => {
-              const active = selectedColors.includes(c);
+              const active = selectedColors.includes(c.value);
               return (
                 <button
-                  key={c}
-                  onClick={() => toggleMulti("kolor", selectedColors, c)}
+                  key={c.value}
+                  onClick={() => toggleMulti("kolor", selectedColors, c.value)}
                   className={`px-3 py-1.5 rounded-full text-xs font-sans capitalize transition-colors ${
                     active
                       ? "bg-[var(--color-gold)] text-white"
                       : "border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
                   }`}
                 >
-                  {c}
+                  {c.label}
                 </button>
               );
             })}
@@ -343,18 +358,18 @@ export default function FilterBar({
         <DropdownPanel align="left">
           <div className="flex flex-wrap gap-1.5">
             {materials.map((m) => {
-              const active = selectedMaterials.includes(m);
+              const active = selectedMaterials.includes(m.value);
               return (
                 <button
-                  key={m}
-                  onClick={() => toggleMulti("material", selectedMaterials, m)}
+                  key={m.value}
+                  onClick={() => toggleMulti("material", selectedMaterials, m.value)}
                   className={`px-3 py-1.5 rounded-full text-xs font-sans capitalize transition-colors ${
                     active
                       ? "bg-[var(--color-gold)] text-white"
                       : "border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
                   }`}
                 >
-                  {m}
+                  {m.label}
                 </button>
               );
             })}
@@ -441,14 +456,14 @@ export default function FilterBar({
           {selectedColors.map((c) => (
             <ActiveChip
               key={`color-${c}`}
-              label={`Kolor: ${c}`}
+              label={`Kolor: ${colorLabel(c)}`}
               onRemove={() => toggleMulti("kolor", selectedColors, c)}
             />
           ))}
           {selectedMaterials.map((m) => (
             <ActiveChip
               key={`material-${m}`}
-              label={`Materiał: ${m}`}
+              label={`Materiał: ${materialLabel(m)}`}
               onRemove={() => toggleMulti("material", selectedMaterials, m)}
             />
           ))}

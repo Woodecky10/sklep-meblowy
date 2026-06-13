@@ -4,6 +4,7 @@ import {
   localizeCategory,
   localizeCategoryGroup,
   localizeReview,
+  buildLocalizedFacets,
 } from "@/app/_lib/localize";
 import type { ProductDescriptionSection } from "@/app/_lib/types";
 
@@ -113,6 +114,73 @@ describe("localizeCategory / localizeCategoryGroup", () => {
     expect(localizeCategory({ slug: "sofy", label: "Sofy", label_de: "Sofas" }, "pl").label).toBe(
       "Sofy"
     );
+  });
+});
+
+describe("buildLocalizedFacets", () => {
+  it("PL: value === label, dedupe po PL, sort po label", () => {
+    const out = buildLocalizedFacets(
+      [
+        { value: "welur", value_de: "Velours" },
+        { value: "beż", value_de: "beige" },
+        { value: "welur", value_de: "Velours" }, // duplikat → jeden wpis
+      ],
+      "pl"
+    );
+    expect(out).toEqual([
+      { value: "beż", label: "beż" },
+      { value: "welur", label: "welur" },
+    ]);
+  });
+
+  it("DE: value = PL kanoniczne, label = DE; sort po niemieckim labelu", () => {
+    const out = buildLocalizedFacets(
+      [
+        { value: "welur", value_de: "Velours" },
+        { value: "beż", value_de: "Beige" },
+      ],
+      "de"
+    );
+    // value zostaje PL (filtr DB), label niemiecki
+    expect(out).toContainEqual({ value: "welur", label: "Velours" });
+    expect(out).toContainEqual({ value: "beż", label: "Beige" });
+    // posortowane po labelu: Beige < Velours
+    expect(out.map((f) => f.label)).toEqual(["Beige", "Velours"]);
+  });
+
+  it("DE bez tłumaczenia → label = PL value (fallback)", () => {
+    const out = buildLocalizedFacets(
+      [
+        { value: "dąb", value_de: null },
+        { value: "orzech", value_de: "" },
+      ],
+      "de"
+    );
+    expect(out).toContainEqual({ value: "dąb", label: "dąb" });
+    expect(out).toContainEqual({ value: "orzech", label: "orzech" });
+  });
+
+  it("DE: przetłumaczony wiersz wygrywa label nad nieprzetłumaczonym przy tym samym PL value", () => {
+    const out = buildLocalizedFacets(
+      [
+        { value: "beż", value_de: null }, // najpierw bez tłumaczenia
+        { value: "beż", value_de: "Beige" }, // potem z tłumaczeniem
+      ],
+      "de"
+    );
+    expect(out).toEqual([{ value: "beż", label: "Beige" }]);
+  });
+
+  it("pomija puste/whitespace wartości i trimuje", () => {
+    const out = buildLocalizedFacets(
+      [
+        { value: null, value_de: "X" },
+        { value: "   ", value_de: "Y" },
+        { value: "  szary  ", value_de: "  Grau  " },
+      ],
+      "de"
+    );
+    expect(out).toEqual([{ value: "szary", label: "Grau" }]);
   });
 });
 

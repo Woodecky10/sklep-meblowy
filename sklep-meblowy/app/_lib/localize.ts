@@ -70,6 +70,41 @@ export function localizeCategory<T extends LabelLocalizable>(
 // Grupy kategorii mają identyczny kształt (label/label_de) — alias dla czytelności.
 export const localizeCategoryGroup = localizeCategory;
 
+// Facet (kolor/materiał) na /sklep: dedupe po KANONICZNEJ wartości PL (używanej
+// do query + filtra DB), z localized labelem do wyświetlenia. Czysty helper —
+// testowalny bez mockowania supabase (getFilterFacets tylko dostarcza wiersze).
+//
+// value = PL canonical (np. "beż") — niesie ?kolor= i .in("color", ...).
+// label = DE gdy _de niepuste, inaczej PL — to co widzi user.
+// Gdy ten sam PL value ma kilka wierszy, pierwszy niepusty _de wygrywa jako label.
+// Sortowanie po label wg podanego locale (PL collation gdy locale=pl).
+export type LocalizedFacet = { value: string; label: string };
+
+export function buildLocalizedFacets(
+  rows: Array<{ value: string | null; value_de: string | null | undefined }>,
+  locale: Locale
+): LocalizedFacet[] {
+  const byValue = new Map<string, string>();
+  for (const r of rows) {
+    const value = r.value?.trim() ?? "";
+    if (value.length === 0) continue;
+    const de = r.value_de?.trim() ?? "";
+    const label = locale === "de" && de.length > 0 ? de : value;
+    // Pierwszy wpis ustala label; kolejne nadpisują tylko gdy obecny label ==
+    // value (PL fallback) a nowy ma sensowny DE — żeby przetłumaczony wiersz
+    // wygrał nad nieprzetłumaczonym przy tym samym PL value.
+    const existing = byValue.get(value);
+    if (existing === undefined) {
+      byValue.set(value, label);
+    } else if (existing === value && label !== value) {
+      byValue.set(value, label);
+    }
+  }
+  return Array.from(byValue.entries())
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, locale));
+}
+
 type ReviewLocalizable = {
   comment: string | null;
   comment_de?: string | null;

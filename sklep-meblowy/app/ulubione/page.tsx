@@ -20,7 +20,7 @@ export default async function WishlistPage() {
 
   const locale = await getLocale();
   const [products, wishlistIds, categories] = await Promise.all([
-    getWishlistProducts(),
+    getWishlistProducts(locale),
     getUserWishlistIds(),
     getCategories(locale),
   ]);

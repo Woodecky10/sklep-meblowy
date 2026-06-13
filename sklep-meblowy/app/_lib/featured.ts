@@ -4,6 +4,8 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
+import { localizeProduct } from "./localize";
+import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Product } from "./types";
 
 export const FEATURED_CACHE_TAG = "featured-products";
@@ -123,12 +125,18 @@ export async function getAvailableProductsForFeatured(): Promise<Product[]> {
 // Dla home: featured z DB, fallback do 4 najnowszych gdy puste
 // ============================================================
 // Zwraca jednolity kształt { product, badge } dla home page.
-export async function getFeaturedOrFallback(): Promise<
-  Array<{ product: Product; badge: string | null }>
-> {
+// Lokalizujemy nazwy/treść produktów PO odczycie z cache (getFeaturedItems
+// trzymane jako PL, locale-agnostyczne — patrz unstable_cache wyżej), więc
+// jeden cache obsługuje oba języki bez rozdmuchania kluczy.
+export async function getFeaturedOrFallback(
+  locale: Locale = DEFAULT_LOCALE
+): Promise<Array<{ product: Product; badge: string | null }>> {
   const items = await getFeaturedItems();
   if (items.length > 0) {
-    return items.map((it) => ({ product: it.product, badge: it.badge }));
+    return items.map((it) => ({
+      product: localizeProduct(it.product, locale),
+      badge: it.badge,
+    }));
   }
 
   // Fallback: 4 najnowsze produkty bez badge
@@ -139,7 +147,10 @@ export async function getFeaturedOrFallback(): Promise<
     .order("created_at", { ascending: false })
     .limit(4);
 
-  return ((data ?? []) as Product[]).map((product) => ({ product, badge: null }));
+  return ((data ?? []) as Product[]).map((product) => ({
+    product: localizeProduct(product, locale),
+    badge: null,
+  }));
 }
 
 // ============================================================

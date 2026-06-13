@@ -97,7 +97,7 @@ export default async function ProduktPage({ params }: Props) {
   const [collection, collectionSiblings] = product.collection_id
     ? await Promise.all([
         getCollection(product.collection_id),
-        getCollectionSiblings(product.collection_id, product.id, 8),
+        getCollectionSiblings(product.collection_id, product.id, 8, locale),
       ])
     : [null, []];
 
