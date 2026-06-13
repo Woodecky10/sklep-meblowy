@@ -15,13 +15,16 @@ import { hasVariants } from "@/app/_lib/variants";
 import { Field, IconBtn, compressIfNeeded, inputClass, type Toast } from "./_shared";
 import VariantsEditor from "./VariantsEditor";
 import DescriptionSectionsEditor from "./DescriptionSectionsEditor";
+import TranslationEditor, { type ProductDeFields } from "./TranslationEditor";
 
 export default function ProductEditor({
   product,
   categories,
+  de,
 }: {
   product: Product;
   categories: CategoryDef[];
+  de: ProductDeFields;
 }) {
   const [images, setImages] = useState<string[]>(product.images ?? []);
   // Baseline ostatnio zapisanej galerii — resetowany na zapisany payload po
@@ -393,6 +396,11 @@ export default function ProductEditor({
         initial={product.description_sections ?? []}
         onToast={showToast}
       />
+
+      {/* ============================================================
+          Sekcja: Tłumaczenie niemieckie (DE) — override + status
+          ============================================================ */}
+      <TranslationEditor productId={product.id} initial={de} onToast={showToast} />
 
       {/* ============================================================
           Sekcja: Surowe dane z BaseLinker (debug / diagnostyka)

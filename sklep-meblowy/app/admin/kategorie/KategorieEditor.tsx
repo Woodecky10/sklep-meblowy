@@ -409,6 +409,18 @@ function CategoryForm({
           />
         </Field>
 
+        <Field
+          label="Nazwa po niemiecku (DE)"
+          hint="Pokazywana w niemieckiej wersji sklepu. Zostaw puste = polska nazwa."
+        >
+          <input
+            name="label_de"
+            defaultValue={initial?.label_de ?? ""}
+            placeholder="np. 3-Sitzer-Sofa"
+            className="w-full px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
+          />
+        </Field>
+
         <Field label="Grupa" required>
           <select
             name="group_id"

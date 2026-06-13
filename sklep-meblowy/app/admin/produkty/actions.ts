@@ -493,3 +493,108 @@ export async function updateProductDescriptionSections(
   revalidatePath(`/produkt/${productId}`);
   return { ok: true, message: "Zapisano sekcje opisu" };
 }
+
+// ============================================================
+// retranslateProduct — wymuszone ponowne tłumaczenie DE (DeepL)
+// ============================================================
+// Jawna akcja admina: bierze ŚWIEŻE pola PL z DB, woła DeepL i nadpisuje
+// kolumny _de (+ needs_translation=false, translated_at=now). W odróżnieniu
+// od inline best-effort przy zapisie PL — TU błąd DeepL jest surfaced do
+// admina (return error), bo admin świadomie kliknął "Przetłumacz ponownie".
+export async function retranslateProduct(id: string): Promise<ActionResult> {
+  await requireAdmin();
+  if (!id) return { ok: false, error: "Brak id produktu" };
+
+  const supabase = await createAdminClient();
+  const { data: fresh, error: fetchErr } = await supabase
+    .from("products")
+    .select("id, name, description, color, material, description_sections")
+    .eq("id", id)
+    .single();
+
+  if (fetchErr) return { ok: false, error: fetchErr.message };
+  if (!fresh) return { ok: false, error: "Produkt nie istnieje" };
+
+  try {
+    const { translateProductRow } = await import("@/app/_lib/translation-service");
+    await translateProductRow(fresh as never, supabase);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Nieznany błąd tłumaczenia";
+    // Brak klucza DeepL → translateTexts rzuca "DEEPL_API_KEY nie jest ustawiony".
+    return { ok: false, error: `Tłumaczenie nieudane: ${msg}` };
+  }
+
+  revalidatePath(`/admin/produkty/${id}`);
+  revalidatePath(`/produkt/${id}`);
+  return { ok: true, message: "Przetłumaczono ponownie (DE)" };
+}
+
+// ============================================================
+// saveProductDe — ręczna korekta tłumaczenia DE produktu
+// ============================================================
+// Admin nadpisuje pola _de wpisane ręcznie (po korekcie auto-tłumaczenia).
+// Zapis czyści needs_translation (admin ma kontrolę) i stempluje translated_at.
+// Sekcje opisu DE (description_sections_de) zostają zarządzane przez
+// auto-tłumaczenie — pole opcjonalne, zapisywane tylko gdy przekazane.
+export async function saveProductDe(
+  id: string,
+  fields: {
+    name_de: string;
+    description_de: string;
+    color_de: string | null;
+    material_de: string | null;
+    description_sections_de?: unknown;
+  }
+): Promise<ActionResult> {
+  await requireAdmin();
+  if (!id) return { ok: false, error: "Brak id produktu" };
+
+  const updates: Record<string, unknown> = {
+    name_de: sanitize(fields.name_de, 300),
+    description_de: sanitize(fields.description_de, 20000),
+    color_de: emptyToNull(sanitize(fields.color_de ?? "", 100)),
+    material_de: emptyToNull(sanitize(fields.material_de ?? "", 100)),
+    needs_translation: false,
+    translated_at: new Date().toISOString(),
+  };
+  // Sekcje DE — zapisujemy tylko gdy explicit przekazane (inaczej nie ruszamy).
+  if (fields.description_sections_de !== undefined) {
+    updates.description_sections_de = fields.description_sections_de;
+  }
+
+  const supabase = await createAdminClient();
+  const { error } = await supabase
+    .from("products")
+    .update(updates as never)
+    .eq("id", id);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/admin/produkty/${id}`);
+  revalidatePath(`/produkt/${id}`);
+  return { ok: true, message: "Zapisano tłumaczenie DE" };
+}
+
+// ============================================================
+// translatePendingBatch — przetłumacz zaległe produkty (DE) hurtem
+// ============================================================
+// Wołane z panelu BaseLinker. Bierze produkty z needs_translation=true
+// i tłumaczy je przez DeepL (limit per-run w translation-service).
+// Brak DEEPL_API_KEY → translateTexts rzuca → łapiemy i surfacujemy.
+export async function translatePendingBatch(): Promise<ActionResult> {
+  await requireAdmin();
+
+  try {
+    const { translatePendingProducts } = await import(
+      "@/app/_lib/translation-service"
+    );
+    const summary = await translatePendingProducts();
+    return { ok: true, message: "Tłumaczenie zaległych zakończone", data: summary };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Nieznany błąd";
+    if (msg.includes("DEEPL_API_KEY")) {
+      return { ok: false, error: "Brak DEEPL_API_KEY — ustaw klucz w środowisku (Vercel)." };
+    }
+    return { ok: false, error: `Tłumaczenie zaległych nieudane: ${msg}` };
+  }
+}

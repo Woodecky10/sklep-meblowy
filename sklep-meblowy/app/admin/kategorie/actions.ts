@@ -33,6 +33,12 @@ function sanitizeLabel(input: unknown): string {
   return typeof input === "string" ? input.trim().slice(0, 200) : "";
 }
 
+// Opcjonalna etykieta DE: pusty string → null (fallback do PL przy odczycie).
+function sanitizeOptionalLabel(input: unknown): string | null {
+  const s = sanitizeLabel(input);
+  return s === "" ? null : s;
+}
+
 function parseInteger(input: unknown, fallback = 0): number {
   if (typeof input === "string" && input.trim() !== "") {
     const n = Number(input);
@@ -152,6 +158,7 @@ export async function createCategory(formData: FormData): Promise<ActionResult> 
   const slug = slugInput ? toSlug(slugInput) : toSlug(label);
   if (!slug) return { ok: false, error: "Nie udało się wygenerować sluga" };
 
+  const labelDe = sanitizeOptionalLabel(formData.get("label_de"));
   const baselinkerCategoryId = parseOptionalBigInt(formData.get("baselinker_category_id"));
   const sortOrder = parseInteger(formData.get("sort_order"));
   const crossSellCategories = formData
@@ -165,6 +172,7 @@ export async function createCategory(formData: FormData): Promise<ActionResult> 
     .insert({
       slug,
       label,
+      label_de: labelDe,
       group_id: groupId,
       baselinker_category_id: baselinkerCategoryId,
       cross_sell_categories: crossSellCategories,
@@ -192,6 +200,7 @@ export async function updateCategory(formData: FormData): Promise<ActionResult> 
   const groupId = String(formData.get("group_id") ?? "");
   if (!groupId) return { ok: false, error: "Wybierz grupę" };
 
+  const labelDe = sanitizeOptionalLabel(formData.get("label_de"));
   const baselinkerCategoryId = parseOptionalBigInt(formData.get("baselinker_category_id"));
   const sortOrder = parseInteger(formData.get("sort_order"));
   const active = formData.get("active") === "1";
@@ -205,6 +214,7 @@ export async function updateCategory(formData: FormData): Promise<ActionResult> 
     .from("categories")
     .update({
       label,
+      label_de: labelDe,
       group_id: groupId,
       baselinker_category_id: baselinkerCategoryId,
       cross_sell_categories: crossSellCategories,

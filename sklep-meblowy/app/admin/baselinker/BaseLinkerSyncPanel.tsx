@@ -7,6 +7,7 @@ import {
   type SyncActionResult,
   type SyncLogRow,
 } from "./actions";
+import { translatePendingBatch } from "@/app/admin/produkty/actions";
 import type {
   SyncInventoryResult,
   SyncSkippedProduct,
@@ -17,8 +18,10 @@ type Toast = { type: "success" | "error" | "warning"; message: string } | null;
 
 export default function BaseLinkerSyncPanel({
   initialLogs,
+  pendingTranslations,
 }: {
   initialLogs: SyncLogRow[];
+  pendingTranslations: number;
 }) {
   // Logi przychodzą z serwera przez prop — router.refresh() po sync
   // (sukces I błąd) odświeża server component i lista aktualizuje się
@@ -26,6 +29,7 @@ export default function BaseLinkerSyncPanel({
   const logs = initialLogs;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [translating, startTranslateTransition] = useTransition();
   const [lastResult, setLastResult] = useState<SyncActionResult | null>(null);
   const [toast, setToast] = useState<Toast>(null);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
@@ -33,6 +37,30 @@ export default function BaseLinkerSyncPanel({
   function showToast(t: Toast) {
     setToast(t);
     if (t) setTimeout(() => setToast(null), 5000);
+  }
+
+  function handleTranslatePending() {
+    startTranslateTransition(async () => {
+      const res = await translatePendingBatch();
+      if (!res.ok) {
+        showToast({ type: "error", message: res.error });
+        return;
+      }
+      const s = res.data as
+        | { scanned: number; translated: number; failed: number; backlog: boolean }
+        | undefined;
+      const msg = s
+        ? `Przetłumaczono ${s.translated} z ${s.scanned}${
+            s.failed > 0 ? `, ${s.failed} z błędem` : ""
+          }${s.backlog ? " · zostały kolejne — odpal ponownie" : ""}`
+        : "Tłumaczenie zaległych zakończone";
+      showToast({
+        type: s && s.failed > 0 ? "warning" : "success",
+        message: msg,
+      });
+      // Odśwież licznik zaległych (server component przeliczy needs_translation).
+      router.refresh();
+    });
   }
 
   function handleSync() {
@@ -123,6 +151,49 @@ export default function BaseLinkerSyncPanel({
           <ResultSummary result={lastResult} />
         </Card>
       )}
+
+      {/* Tłumaczenia DE — licznik zaległych + przycisk hurtowego tłumaczenia */}
+      <Card>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="font-display text-lg font-semibold text-[var(--fg)] mb-1">
+              Tłumaczenia niemieckie (DE)
+            </h2>
+            <p className="text-sm text-[var(--muted)] leading-relaxed max-w-xl">
+              Nowe i zmienione produkty trafiają do kolejki tłumaczeń. Kliknij
+              poniżej żeby przetłumaczyć je hurtowo (DeepL). Tłumaczenie idzie
+              partiami — jeśli zostaną kolejne, odpal jeszcze raz.
+            </p>
+            <p className="text-sm text-[var(--fg)] mt-3">
+              Czeka na tłumaczenie:{" "}
+              <strong
+                className={
+                  pendingTranslations > 0
+                    ? "text-amber-700 dark:text-amber-300"
+                    : "text-emerald-700 dark:text-emerald-300"
+                }
+              >
+                {pendingTranslations}{" "}
+                {pendingTranslations === 1 ? "produkt" : "produktów"}
+              </strong>
+            </p>
+          </div>
+          <button
+            onClick={handleTranslatePending}
+            disabled={translating || pendingTranslations === 0}
+            className="shrink-0 px-5 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {translating ? (
+              <span className="flex items-center gap-2">
+                <Spinner />
+                Tłumaczę...
+              </span>
+            ) : (
+              "Przetłumacz zaległe (DE)"
+            )}
+          </button>
+        </div>
+      </Card>
 
       {/* Historia synchronizacji */}
       <div>
