@@ -162,6 +162,21 @@ export async function updateProductBasics(
 
   if (error) return { ok: false, error: error.message };
 
+  // best-effort inline DE (pojedynczy produkt z panelu) — błąd nie blokuje zapisu PL
+  try {
+    const { createAdminClient } = await import("@/app/_lib/supabase/server");
+    const { translateProductRow } = await import("@/app/_lib/translation-service");
+    const sb = await createAdminClient();
+    const { data: fresh } = await sb
+      .from("products")
+      .select("id, name, description, color, material, description_sections")
+      .eq("id", id)
+      .single();
+    if (fresh) await translateProductRow(fresh as never, sb);
+  } catch (e) {
+    console.warn("inline DE translate skipped:", e);
+  }
+
   revalidatePath(`/admin/produkty/${id}`);
   revalidatePath(`/produkt/${id}`);
   revalidatePath("/sklep");
@@ -458,6 +473,21 @@ export async function updateProductDescriptionSections(
     .eq("id", productId);
 
   if (error) return { ok: false, error: error.message };
+
+  // best-effort inline DE (pojedynczy produkt z panelu) — błąd nie blokuje zapisu PL
+  try {
+    const { createAdminClient } = await import("@/app/_lib/supabase/server");
+    const { translateProductRow } = await import("@/app/_lib/translation-service");
+    const sb = await createAdminClient();
+    const { data: fresh } = await sb
+      .from("products")
+      .select("id, name, description, color, material, description_sections")
+      .eq("id", productId)
+      .single();
+    if (fresh) await translateProductRow(fresh as never, sb);
+  } catch (e) {
+    console.warn("inline DE translate skipped:", e);
+  }
 
   revalidatePath(`/admin/produkty/${productId}`);
   revalidatePath(`/produkt/${productId}`);

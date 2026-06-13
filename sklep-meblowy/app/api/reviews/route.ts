@@ -70,6 +70,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // best-effort inline DE komentarza — błąd nie blokuje zapisu opinii
+  if (trimmedComment && data) {
+    try {
+      const { translateComment } = await import("@/app/_lib/translate-entities");
+      const { translateTexts } = await import("@/app/_lib/translate");
+      const { createAdminClient } = await import("@/app/_lib/supabase/server");
+      const comment_de = await translateComment(trimmedComment, (texts, opts) =>
+        translateTexts(texts, { html: opts?.html })
+      );
+      const admin = await createAdminClient();
+      await admin
+        .from("product_reviews")
+        .update({ comment_de, needs_translation: false } as never)
+        .eq("id", (data as { id: string }).id);
+    } catch (e) {
+      console.warn("inline DE review translate skipped:", e);
+    }
+  }
+
   // Odśwież stronę produktu i sklep (nowe oceny wpływają na średnią)
   revalidatePath(`/produkt/${productId}`);
   revalidatePath("/sklep");

@@ -481,7 +481,7 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
 
         const { data: existing, error: existingErr } = await supabase
           .from("products")
-          .select("is_active, deactivation_source")
+          .select("is_active, deactivation_source, name, color, material")
           .eq("baselinker_id", blId)
           .maybeSingle();
         if (existingErr) {
@@ -497,12 +497,36 @@ export async function syncProductsFromBaseLinker(): Promise<SyncOutcome> {
           continue;
         }
         const existingRow = existing as
-          | { is_active: boolean | null; deactivation_source: "auto" | "manual" | null }
+          | {
+              is_active: boolean | null;
+              deactivation_source: "auto" | "manual" | null;
+              name: string | null;
+              color: string | null;
+              material: string | null;
+            }
           | null;
         // Wiersz istniał przed upsertem (odczyt existing wyżej) = update.
         // Liczone TU (nie po upsercie), bo determinuje też politykę zdjęć:
         // images seedujemy tylko przy nowym produkcie.
         const isNew = existingRow === null;
+
+        // i18n: flaguj needs_translation TYLKO gdy PL faktycznie się zmieniło
+        // (lub produkt jest nowy) — inaczej każdy sync kasowałby ręczne/poprzednie
+        // tłumaczenia DE. Porównujemy WYŁĄCZNIE pola PL realnie zapisywane dla
+        // istniejącego produktu: name/color/material. description/description_sections
+        // NIE są synchronizowane (mapBlToProduct ich nie ustawia), więc ich nie
+        // porównujemy — inaczej fałszywie flagowalibyśmy przy każdym przebiegu.
+        // Gdy plChanged === false, NIE dopisujemy pola (upsert zostawia kolumnę
+        // nietkniętą = preserve istniejącego DE).
+        const plChanged =
+          isNew ||
+          (existingRow != null &&
+            (mapped.product.name !== existingRow.name ||
+              (mapped.product.color ?? null) !== (existingRow.color ?? null) ||
+              (mapped.product.material ?? null) !== (existingRow.material ?? null)));
+        if (plChanged) {
+          (mapped.product as { needs_translation?: boolean }).needs_translation = true;
+        }
         // manual → zostaje ukryty (respektujemy admina); auto/aktywny/nowy → aktywny.
         const wasManuallyHidden = existingRow?.deactivation_source === "manual";
         mapped.product.is_active = !wasManuallyHidden;
