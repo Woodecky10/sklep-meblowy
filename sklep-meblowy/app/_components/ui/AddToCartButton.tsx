@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import LocalizedLink from "./LocalizedLink";
 import { useCart } from "@/app/_context/CartContext";
 import type { Product } from "@/app/_lib/types";
 
@@ -58,7 +58,7 @@ export default function AddToCartButton({
     // wariantem). Bez wariantów → quick-add jak dotychczas.
     if (productHasVariants) {
       return (
-        <Link
+        <LocalizedLink
           href={`/produkt/${product.id}`}
           className="w-9 h-9 flex items-center justify-center rounded-full border border-[var(--color-navy)] text-[var(--color-navy)] dark:border-[var(--color-gold)] dark:text-[var(--color-gold)] hover:bg-[var(--color-navy)] hover:text-white dark:hover:bg-[var(--color-gold)] dark:hover:text-[var(--color-navy)] transition-colors"
           aria-label="Wybierz wariant"
@@ -67,7 +67,7 @@ export default function AddToCartButton({
           <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
             <path d="M5 12h14M12 5l7 7-7 7" />
           </svg>
-        </Link>
+        </LocalizedLink>
       );
     }
     return (

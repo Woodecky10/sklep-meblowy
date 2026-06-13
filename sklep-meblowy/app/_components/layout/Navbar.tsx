@@ -12,7 +12,7 @@ import { isAdmin } from "@/app/_lib/admin";
 import { getSections, getCategories } from "@/app/_lib/categories";
 import { getWishlistCount } from "@/app/_lib/wishlist";
 import { COMPANY } from "@/app/_lib/company";
-import { getLocale } from "@/app/_lib/i18n";
+import { getLocale } from "@/app/_lib/i18n-server";
 
 export default async function Navbar() {
   const supabase = await createClient();

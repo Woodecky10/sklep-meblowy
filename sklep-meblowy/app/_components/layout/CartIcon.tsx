@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
+import LocalizedLink from "../ui/LocalizedLink";
 import { useCart } from "@/app/_context/CartContext";
 
 export default function CartIcon() {
   const { count } = useCart();
   return (
-    <Link
+    <LocalizedLink
       href="/koszyk"
       className="relative w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] transition-colors"
       aria-label="Koszyk"
@@ -21,6 +21,6 @@ export default function CartIcon() {
           {count > 9 ? "9+" : count}
         </span>
       )}
-    </Link>
+    </LocalizedLink>
   );
 }

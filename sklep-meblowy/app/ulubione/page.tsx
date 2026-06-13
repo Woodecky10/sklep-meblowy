@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/app/_lib/supabase/server";
 import { getWishlistProducts, getUserWishlistIds } from "@/app/_lib/wishlist";
 import { getCategories } from "@/app/_lib/categories";
-import { getLocale } from "@/app/_lib/i18n";
+import { getLocale } from "@/app/_lib/i18n-server";
 import ProductCard from "@/app/_components/ui/ProductCard";
 
 export const metadata: Metadata = {

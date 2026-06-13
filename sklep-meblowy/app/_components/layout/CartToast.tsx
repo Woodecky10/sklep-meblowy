@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import LocalizedLink from "../ui/LocalizedLink";
 import Image from "next/image";
 import { useCart } from "@/app/_context/CartContext";
 
@@ -64,13 +64,13 @@ export default function CartToast() {
           <p className="font-display text-sm font-semibold text-[var(--fg)] truncate">
             {item.name}
           </p>
-          <Link
+          <LocalizedLink
             href="/koszyk"
             onClick={() => dismissNotification()}
             className="inline-block mt-2 text-xs font-sans uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors"
           >
             Zobacz koszyk →
-          </Link>
+          </LocalizedLink>
         </div>
         <button
           onClick={() => {

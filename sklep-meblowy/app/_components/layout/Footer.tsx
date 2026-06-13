@@ -2,7 +2,7 @@ import LocalizedLink from "../ui/LocalizedLink";
 import Image from "next/image";
 import { getSections, getCategories } from "@/app/_lib/categories";
 import { COMPANY, isFilled } from "@/app/_lib/company";
-import { getLocale } from "@/app/_lib/i18n";
+import { getLocale } from "@/app/_lib/i18n-server";
 import { getDictionary } from "@/app/_lib/dictionaries";
 
 export default async function Footer() {

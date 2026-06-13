@@ -10,7 +10,7 @@ import CartToast from "./_components/layout/CartToast";
 import { CartProvider } from "./_context/CartContext";
 import { ToastProvider } from "./_context/ToastContext";
 import { COMPANY } from "./_lib/company";
-import { getLocale } from "./_lib/i18n";
+import { getLocale } from "./_lib/i18n-server";
 
 const inter = Inter({
   subsets: ["latin", "latin-ext"],

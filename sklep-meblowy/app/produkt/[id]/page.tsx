@@ -23,7 +23,7 @@ import ReviewForm from "@/app/_components/ui/ReviewForm";
 import { sanitizeProductHtml } from "@/app/_lib/product-html";
 import ProductDescriptionSections from "@/app/_components/ui/ProductDescriptionSections";
 import { COMPANY } from "@/app/_lib/company";
-import { getLocale } from "@/app/_lib/i18n";
+import { getLocale } from "@/app/_lib/i18n-server";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import type { Product } from "@/app/_lib/types";
 

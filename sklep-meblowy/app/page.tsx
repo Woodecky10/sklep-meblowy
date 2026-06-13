@@ -8,7 +8,7 @@ import { getFeaturedOrFallback } from "./_lib/featured";
 import { getCategories } from "./_lib/categories";
 import { getCollectionsForHome } from "./_lib/collections";
 import { getUserWishlistIds } from "./_lib/wishlist";
-import { getLocale } from "./_lib/i18n";
+import { getLocale } from "./_lib/i18n-server";
 import ProductCard from "./_components/ui/ProductCard";
 
 export const metadata: Metadata = {

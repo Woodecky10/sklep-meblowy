@@ -9,7 +9,7 @@ import {
 } from "@/app/_lib/categories";
 import { getCollection, getAllCollections } from "@/app/_lib/collections";
 import { getUserWishlistIds } from "@/app/_lib/wishlist";
-import { getLocale } from "@/app/_lib/i18n";
+import { getLocale } from "@/app/_lib/i18n-server";
 import ProductCard from "@/app/_components/ui/ProductCard";
 import FilterBar from "@/app/_components/ui/FilterBar";
 import Pagination from "@/app/_components/ui/Pagination";

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getSections, getCategories } from "@/app/_lib/categories";
-import { getLocale } from "@/app/_lib/i18n";
+import { getLocale } from "@/app/_lib/i18n-server";
 
 // Globalny 404 — renderowany gdy URL nie pasuje do żadnej trasy
 // albo gdy w page.tsx wywołamy notFound() (np. produkt usunięty, zamówienie

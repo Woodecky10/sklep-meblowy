@@ -5,7 +5,7 @@ import { getCrossSellProducts } from "@/app/_lib/products";
 import { getUserWishlistIds } from "@/app/_lib/wishlist";
 import { getCategories } from "@/app/_lib/categories";
 import { createAdminClient } from "@/app/_lib/supabase/server";
-import { getLocale } from "@/app/_lib/i18n";
+import { getLocale } from "@/app/_lib/i18n-server";
 import type { Product } from "@/app/_lib/types";
 
 export type PromoApplyResult =
