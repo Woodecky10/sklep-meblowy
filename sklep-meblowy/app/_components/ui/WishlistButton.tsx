@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toggleWishlist } from "@/app/_lib/wishlist-actions";
 import { useToast } from "@/app/_context/ToastContext";
+import { localizeHref } from "@/app/_lib/i18n";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
 
 // Serce do dodawania/usuwania produktu z ulubionych.
 // Optymistyczna aktualizacja UI — natychmiast pokazujemy nowy stan,
@@ -24,6 +26,7 @@ export default function WishlistButton({
   const [isInWishlist, setIsInWishlist] = useState(initialIsInWishlist);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+  const locale = useClientLocale();
   const showToast = useToast();
 
   function handleClick(e: React.MouseEvent) {
@@ -47,7 +50,7 @@ export default function WishlistButton({
       // Rollback
       setIsInWishlist(!nextState);
       if (res.error === "unauthenticated") {
-        router.push("/logowanie");
+        router.push(localizeHref("/logowanie", locale));
       } else {
         // Spójny toast zamiast blokującego alert() (audyt LOW #11).
         showToast(res.message, "error");

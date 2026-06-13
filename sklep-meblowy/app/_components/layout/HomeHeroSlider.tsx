@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import LocalizedLink from "../ui/LocalizedLink";
 import Image from "next/image";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
@@ -126,20 +126,20 @@ export default function HomeHeroSlider({ slides }: { slides: HeroSlide[] }) {
                   )}
                   <div className="flex flex-wrap gap-4">
                     {slide.ctaPrimary?.href && slide.ctaPrimary.label && (
-                      <Link
+                      <LocalizedLink
                         href={slide.ctaPrimary.href}
                         className="inline-flex items-center gap-2 px-8 py-4 bg-[var(--color-gold)] text-[var(--color-navy)] font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold-light)] transition-colors"
                       >
                         {slide.ctaPrimary.label}
-                      </Link>
+                      </LocalizedLink>
                     )}
                     {slide.ctaSecondary?.href && slide.ctaSecondary.label && (
-                      <Link
+                      <LocalizedLink
                         href={slide.ctaSecondary.href}
                         className="inline-flex items-center gap-2 px-8 py-4 border border-white/30 text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
                       >
                         {slide.ctaSecondary.label}
-                      </Link>
+                      </LocalizedLink>
                     )}
                   </div>
                 </div>

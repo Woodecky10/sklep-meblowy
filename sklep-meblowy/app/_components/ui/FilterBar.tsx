@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { localizeHref } from "@/app/_lib/i18n";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
 
 const SORTS = [
   { value: "alphabetic", label: "Alfabetycznie A-Z" },
@@ -52,6 +54,7 @@ export default function FilterBar({
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const locale = useClientLocale();
 
   const category = searchParams.get("kategoria") ?? "";
   const collection = searchParams.get("kolekcja") ?? "";
@@ -107,19 +110,19 @@ export default function FilterBar({
       if (priceMin === currentMin && priceMax === currentMax) return;
 
       params.delete("strona");
-      router.push(`/sklep?${params.toString()}`);
+      router.push(localizeHref(`/sklep?${params.toString()}`, locale));
     }, 500);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [priceMin, priceMax, router, searchParams]);
+  }, [priceMin, priceMax, router, searchParams, locale]);
 
   function update(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
     if (value) params.set(key, value);
     else params.delete(key);
     params.delete("strona");
-    router.push(`/sklep?${params.toString()}`);
+    router.push(localizeHref(`/sklep?${params.toString()}`, locale));
   }
 
   function toggleMulti(key: string, current: string[], value: string) {
@@ -171,7 +174,7 @@ export default function FilterBar({
     setPriceMin("");
     setPriceMax("");
     setOpenDropdown(null);
-    router.push(`/sklep?${params.toString()}`);
+    router.push(localizeHref(`/sklep?${params.toString()}`, locale));
   }
 
   return (

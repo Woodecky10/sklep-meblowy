@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/app/_context/CartContext";
+import { localizeHref } from "@/app/_lib/i18n";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
 import type { OrderItem } from "@/app/_lib/types";
 
 // Dodaje wszystkie pozycje z historycznego zamówienia do bieżącego koszyka.
@@ -14,6 +16,7 @@ import type { OrderItem } from "@/app/_lib/types";
 export default function ReorderButton({ items }: { items: OrderItem[] }) {
   const { add } = useCart();
   const router = useRouter();
+  const locale = useClientLocale();
   const [pending, startTransition] = useTransition();
   const [skipped, setSkipped] = useState(0);
 
@@ -51,7 +54,7 @@ export default function ReorderButton({ items }: { items: OrderItem[] }) {
     }
     setSkipped(skippedCount);
     if (added > 0) {
-      startTransition(() => router.push("/koszyk"));
+      startTransition(() => router.push(localizeHref("/koszyk", locale)));
     }
   }
 

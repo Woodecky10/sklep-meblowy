@@ -1,4 +1,4 @@
-import Link from "next/link";
+import LocalizedLink from "../ui/LocalizedLink";
 import Image from "next/image";
 import { getSections, getCategories } from "@/app/_lib/categories";
 import { COMPANY, isFilled } from "@/app/_lib/company";
@@ -64,12 +64,12 @@ export default async function Footer() {
                 .filter((c) => c.group_slug === section.slug)
                 .map((c) => (
                   <li key={c.slug}>
-                    <Link
+                    <LocalizedLink
                       href={`/sklep?kategoria=${c.slug}`}
                       className="hover:text-[var(--color-gold)] transition-colors"
                     >
                       {c.label}
-                    </Link>
+                    </LocalizedLink>
                   </li>
                 ))}
             </ul>
@@ -83,9 +83,9 @@ export default async function Footer() {
           <ul className="space-y-3 text-sm text-white/70">
             {infoLinks.map(([label, href]) => (
               <li key={href}>
-                <Link href={href} className="hover:text-[var(--color-gold)] transition-colors">
+                <LocalizedLink href={href} className="hover:text-[var(--color-gold)] transition-colors">
                   {label}
-                </Link>
+                </LocalizedLink>
               </li>
             ))}
           </ul>

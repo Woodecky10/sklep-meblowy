@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useModal } from "@/app/_lib/useModal";
+import { localizeHref, stripLocale } from "@/app/_lib/i18n";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
 import type { SearchSuggestion } from "@/app/api/search/suggest/route";
 
 type Variant = "icon" | "inline";
@@ -14,6 +16,10 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const locale = useClientLocale();
+  // Pod '/de' usePathname() zwraca '/de/sklep'. Porównujemy ścieżkę BEZ prefiksu
+  // locale, inaczej cała logika "jesteśmy na /sklep" gubiła się pod DE.
+  const isOnSklep = stripLocale(pathname ?? "/").pathname === "/sklep";
 
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(searchParams.get("q") ?? "");
@@ -31,7 +37,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
   // każda nawigacja w /sklep (paginacja, filtry) ma przywracać do inputa
   // aktualne q z URL, tak jak robił to dawny efekt z deps [pathname,
   // searchParams] — np. po ręcznym wyczyszczeniu pola i zmianie strony.
-  const urlKey = pathname === "/sklep" ? searchParams.toString() : null;
+  const urlKey = isOnSklep ? searchParams.toString() : null;
   const [prevUrlKey, setPrevUrlKey] = useState(urlKey);
   if (urlKey !== prevUrlKey) {
     setPrevUrlKey(urlKey);
@@ -107,18 +113,18 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
     }
     const q = value.trim();
     const params = new URLSearchParams(
-      pathname === "/sklep" ? searchParams.toString() : ""
+      isOnSklep ? searchParams.toString() : ""
     );
     if (q) params.set("q", q);
     else params.delete("q");
     params.delete("strona");
-    router.push(`/sklep?${params.toString()}`);
+    router.push(localizeHref(`/sklep?${params.toString()}`, locale));
     setOpen(false);
     setSuggestionsOpen(false);
   }
 
   function goToProduct(id: string) {
-    router.push(`/produkt/${id}`);
+    router.push(localizeHref(`/produkt/${id}`, locale));
     setOpen(false);
     setSuggestionsOpen(false);
   }

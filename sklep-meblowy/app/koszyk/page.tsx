@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import Link from "next/link";
+import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import Image from "next/image";
 import { useCart, cartItemKey } from "@/app/_context/CartContext";
 import { formatVariantLabel } from "@/app/_lib/variants";
@@ -101,12 +101,12 @@ export default function KoszykPage() {
         <p className="text-[var(--muted)] mb-10">
           {t.cart.emptyHint}
         </p>
-        <Link
+        <LocalizedLink
           href="/sklep"
           className="inline-flex px-8 py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
         >
           {t.cart.goToShop}
-        </Link>
+        </LocalizedLink>
       </div>
     );
   }
@@ -141,7 +141,7 @@ export default function KoszykPage() {
                 className="flex gap-6 p-6 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl"
               >
                 {/* Zdjęcie */}
-                <Link href={`/produkt/${item.id}`} className="shrink-0">
+                <LocalizedLink href={`/produkt/${item.id}`} className="shrink-0">
                   <div className="relative w-24 h-24 rounded-xl overflow-hidden bg-stone-100 dark:bg-stone-800">
                     {item.image ? (
                       <Image
@@ -157,15 +157,15 @@ export default function KoszykPage() {
                       </div>
                     )}
                   </div>
-                </Link>
+                </LocalizedLink>
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <Link href={`/produkt/${item.id}`}>
+                  <LocalizedLink href={`/produkt/${item.id}`}>
                     <p className="font-display text-lg font-semibold text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors leading-snug mb-1">
                       {item.name}
                     </p>
-                  </Link>
+                  </LocalizedLink>
                   {item.variantValues && (
                     <p className="text-xs text-[var(--muted)] mb-3">
                       {formatVariantLabel(item.variantValues)}
@@ -266,19 +266,19 @@ export default function KoszykPage() {
               </div>
             </div>
 
-            <Link
+            <LocalizedLink
               href="/checkout"
               className="w-full py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors text-center"
             >
               {t.cart.checkout} →
-            </Link>
+            </LocalizedLink>
 
-            <Link
+            <LocalizedLink
               href="/sklep"
               className="text-center text-xs font-sans text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors uppercase tracking-widest"
             >
               ← {t.cart.continueShopping}
-            </Link>
+            </LocalizedLink>
 
             <div className="border-t border-[var(--border)] pt-4 text-xs text-[var(--muted)] space-y-1">
               <p>✓ Bezpieczna płatność Stripe</p>

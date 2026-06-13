@@ -1,4 +1,4 @@
-import Link from "next/link";
+import LocalizedLink from "./_components/ui/LocalizedLink";
 import Image from "next/image";
 import type { Metadata } from "next";
 import HomeHeroSlider from "./_components/layout/HomeHeroSlider";
@@ -54,7 +54,7 @@ export default async function HomePage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {tiles.map((tile) => (
-            <Link
+            <LocalizedLink
               key={tile.id}
               href={tile.href}
               className="group relative aspect-[4/3] sm:aspect-square rounded-2xl overflow-hidden bg-[var(--color-navy)] hover:ring-2 hover:ring-[var(--color-gold)] transition-all"
@@ -91,7 +91,7 @@ export default async function HomePage() {
                   </svg>
                 </span>
               </div>
-            </Link>
+            </LocalizedLink>
           ))}
         </div>
       </section>
@@ -105,12 +105,12 @@ export default async function HomePage() {
                 Polecane produkty
               </h2>
             </div>
-            <Link
+            <LocalizedLink
               href="/sklep"
               className="hidden md:inline-flex text-sm font-sans uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors"
             >
               Wszystkie →
-            </Link>
+            </LocalizedLink>
           </div>
 
           {featured.length === 0 ? (
@@ -147,7 +147,7 @@ export default async function HomePage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {collectionsForHome.map(({ collection, sampleProducts }) => (
-              <Link
+              <LocalizedLink
                 key={collection.id}
                 href={`/sklep?kolekcja=${collection.slug}`}
                 className="group flex flex-col bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl overflow-hidden hover:border-[var(--color-gold)] transition-colors"
@@ -196,7 +196,7 @@ export default async function HomePage() {
                     </svg>
                   </span>
                 </div>
-              </Link>
+              </LocalizedLink>
             ))}
           </div>
         </section>

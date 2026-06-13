@@ -1,4 +1,4 @@
-import Link from "next/link";
+import LocalizedLink from "./LocalizedLink";
 import Image from "next/image";
 import type { Product, ProductRating } from "@/app/_lib/types";
 import { DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
@@ -37,7 +37,7 @@ export default function ProductCard({
   return (
     <div className="group flex flex-col">
       <div className="relative aspect-[4/3] bg-stone-100 dark:bg-stone-800 rounded-2xl overflow-hidden mb-4">
-        <Link href={`/produkt/${product.id}`} className="block absolute inset-0">
+        <LocalizedLink href={`/produkt/${product.id}`} className="block absolute inset-0">
           {image ? (
             <Image
               src={image}
@@ -56,7 +56,7 @@ export default function ProductCard({
               {badge}
             </span>
           )}
-        </Link>
+        </LocalizedLink>
         <WishlistButton
           productId={product.id}
           initialIsInWishlist={isInWishlist}
@@ -67,11 +67,11 @@ export default function ProductCard({
       <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-1">
         {categoryLabel ?? product.category}
       </p>
-      <Link href={`/produkt/${product.id}`}>
+      <LocalizedLink href={`/produkt/${product.id}`}>
         <p className="font-display text-lg font-semibold text-[var(--fg)] group-hover:text-[var(--color-gold)] transition-colors mb-2 leading-snug">
           {product.name}
         </p>
-      </Link>
+      </LocalizedLink>
       {rating && rating.count > 0 && (
         <div className="flex items-center gap-2 mb-2">
           <StarRating value={rating.average} size={12} />

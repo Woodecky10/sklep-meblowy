@@ -22,6 +22,18 @@ export function localizePath(pathname: string, locale: Locale): string {
   return pathname === "/" ? "/de" : `/de${pathname}`;
 }
 
+// Lokalizuje href wewnętrzny (zaczynający się od '/'): wyłuskuje ewentualny
+// istniejący prefiks '/de', dokleja prefiks dla `locale`, zachowując query/hash.
+// External/hash/mailto/itp. (nie zaczynające się od '/') przepuszcza bez zmian.
+export function localizeHref(href: string, locale: Locale): string {
+  if (!href.startsWith("/")) return href;
+  const sepMatch = href.search(/[?#]/);
+  const path = sepMatch === -1 ? href : href.slice(0, sepMatch);
+  const suffix = sepMatch === -1 ? "" : href.slice(sepMatch);
+  const { pathname } = stripLocale(path);
+  return localizePath(pathname, locale) + suffix;
+}
+
 // Wybiera wartość DE (z fallbackiem do PL gdy pusta) albo PL.
 export function pickLocalized(
   pl: string,

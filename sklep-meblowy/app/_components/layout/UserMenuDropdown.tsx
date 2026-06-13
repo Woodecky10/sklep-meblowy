@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import LocalizedLink from "../ui/LocalizedLink";
 import { signOut } from "@/app/_lib/auth-actions";
 
 export default function UserMenuDropdown({
@@ -48,7 +48,7 @@ export default function UserMenuDropdown({
           </div>
           <nav className="flex flex-col py-1">
             {isAdminUser && (
-              <Link
+              <LocalizedLink
                 href="/admin"
                 onClick={() => setOpen(false)}
                 className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-[var(--color-gold)] hover:bg-[var(--border)] transition-colors border-b border-[var(--border)]"
@@ -60,22 +60,22 @@ export default function UserMenuDropdown({
                   <rect x="14" y="14" width="7" height="7" rx="1" />
                 </svg>
                 Panel admina
-              </Link>
+              </LocalizedLink>
             )}
-            <Link
+            <LocalizedLink
               href="/konto"
               onClick={() => setOpen(false)}
               className="px-4 py-2.5 text-sm text-[var(--fg)] hover:bg-[var(--border)] transition-colors"
             >
               Profil
-            </Link>
-            <Link
+            </LocalizedLink>
+            <LocalizedLink
               href="/konto/zamowienia"
               onClick={() => setOpen(false)}
               className="px-4 py-2.5 text-sm text-[var(--fg)] hover:bg-[var(--border)] transition-colors"
             >
               Zamówienia
-            </Link>
+            </LocalizedLink>
             <form action={signOut} className="border-t border-[var(--border)]">
               <button
                 type="submit"

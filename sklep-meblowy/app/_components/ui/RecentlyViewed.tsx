@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useReducer } from "react";
-import Link from "next/link";
+import LocalizedLink from "./LocalizedLink";
 import Image from "next/image";
 import {
   addRecentlyViewed,
@@ -68,7 +68,7 @@ export default function RecentlyViewed({
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
         {items.map((p) => (
-          <Link key={p.id} href={`/produkt/${p.id}`} className="group flex flex-col">
+          <LocalizedLink key={p.id} href={`/produkt/${p.id}`} className="group flex flex-col">
             <div className="relative aspect-[4/3] bg-stone-100 dark:bg-stone-800 rounded-2xl overflow-hidden mb-4">
               {p.image ? (
                 <Image
@@ -93,7 +93,7 @@ export default function RecentlyViewed({
             <p className="font-sans font-bold text-[var(--fg)] mt-auto">
               {formatPrice(p.price, locale)}
             </p>
-          </Link>
+          </LocalizedLink>
         ))}
       </div>
     </section>

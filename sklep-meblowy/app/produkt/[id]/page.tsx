@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import type { Metadata } from "next";
 import {
   getProduct,
@@ -199,16 +199,16 @@ export default async function ProduktPage({ params }: Props) {
 
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-xs font-sans text-[var(--muted)] mb-12 uppercase tracking-widest">
-        <Link href="/" className="hover:text-[var(--color-gold)] transition-colors">Dom</Link>
+        <LocalizedLink href="/" className="hover:text-[var(--color-gold)] transition-colors">Dom</LocalizedLink>
         <span>/</span>
-        <Link href="/sklep" className="hover:text-[var(--color-gold)] transition-colors">Sklep</Link>
+        <LocalizedLink href="/sklep" className="hover:text-[var(--color-gold)] transition-colors">Sklep</LocalizedLink>
         <span>/</span>
-        <Link
+        <LocalizedLink
           href={`/sklep?kategoria=${product.category}`}
           className="hover:text-[var(--color-gold)] transition-colors"
         >
           {categoryLabel ?? product.category}
-        </Link>
+        </LocalizedLink>
         <span>/</span>
         <span className="text-[var(--fg)] normal-case tracking-normal">{product.name}</span>
       </nav>

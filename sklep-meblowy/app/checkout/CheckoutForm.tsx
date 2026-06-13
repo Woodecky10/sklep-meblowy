@@ -6,6 +6,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { useCart, cartItemKey } from "@/app/_context/CartContext";
 import { formatVariantLabel } from "@/app/_lib/variants";
+import { localizeHref } from "@/app/_lib/i18n";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
 import type { Address } from "@/app/_lib/types";
 
 export default function CheckoutForm({
@@ -20,6 +22,7 @@ export default function CheckoutForm({
   isLoggedIn: boolean;
 }) {
   const router = useRouter();
+  const locale = useClientLocale();
   const { items, total, count, appliedPromo } = useCart();
 
   const [fullName, setFullName] = useState(defaultFullName);
@@ -36,9 +39,9 @@ export default function CheckoutForm({
 
   useEffect(() => {
     if (items.length === 0) {
-      router.replace("/koszyk");
+      router.replace(localizeHref("/koszyk", locale));
     }
-  }, [items.length, router]);
+  }, [items.length, router, locale]);
 
   // Koszt dostawy ustalany indywidualnie po zamówieniu — meble różnią się
   // wagą, gabarytami i miejscem dostawy, ten sam ryczałtowy koszt dla

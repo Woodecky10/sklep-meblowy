@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import LocalizedLink from "../ui/LocalizedLink";
 import { signOut } from "@/app/_lib/auth-actions";
 import LanguageSwitcher from "./LanguageSwitcher";
 
@@ -70,22 +70,22 @@ export default function MobileMenu({
                   {isOpen && (
                     <div className="flex flex-col gap-2 mt-2 pl-4 border-l border-[var(--border)]">
                       {/* Skrót do całej sekcji bez wybierania sub-kategorii. */}
-                      <Link
+                      <LocalizedLink
                         href={`/sklep?sekcja=${section.slug}`}
                         onClick={() => setOpen(false)}
                         className="text-sm text-[var(--color-gold)] hover:underline transition-colors font-medium"
                       >
                         Wszystkie {section.label.toLowerCase()}
-                      </Link>
+                      </LocalizedLink>
                       {cats.map((c) => (
-                        <Link
+                        <LocalizedLink
                           key={c.slug}
                           href={`/sklep?kategoria=${c.slug}`}
                           onClick={() => setOpen(false)}
                           className="text-sm text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors"
                         >
                           {c.label}
-                        </Link>
+                        </LocalizedLink>
                       ))}
                     </div>
                   )}
@@ -96,7 +96,7 @@ export default function MobileMenu({
               {isLoggedIn ? (
                 <>
                   {isAdmin && (
-                    <Link
+                    <LocalizedLink
                       href="/admin"
                       onClick={() => setOpen(false)}
                       className="font-sans text-sm uppercase tracking-widest text-[var(--color-gold)] font-semibold flex items-center gap-2"
@@ -108,22 +108,22 @@ export default function MobileMenu({
                         <rect x="14" y="14" width="7" height="7" rx="1" />
                       </svg>
                       Panel admina
-                    </Link>
+                    </LocalizedLink>
                   )}
-                  <Link
+                  <LocalizedLink
                     href="/konto"
                     onClick={() => setOpen(false)}
                     className="font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors"
                   >
                     Moje konto
-                  </Link>
-                  <Link
+                  </LocalizedLink>
+                  <LocalizedLink
                     href="/konto/zamowienia"
                     onClick={() => setOpen(false)}
                     className="font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors"
                   >
                     Zamówienia
-                  </Link>
+                  </LocalizedLink>
                   <form action={signOut}>
                     <button
                       type="submit"
@@ -135,20 +135,20 @@ export default function MobileMenu({
                 </>
               ) : (
                 <>
-                  <Link
+                  <LocalizedLink
                     href="/logowanie"
                     onClick={() => setOpen(false)}
                     className="font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors"
                   >
                     Zaloguj się
-                  </Link>
-                  <Link
+                  </LocalizedLink>
+                  <LocalizedLink
                     href="/rejestracja"
                     onClick={() => setOpen(false)}
                     className="font-sans text-sm uppercase tracking-widest text-[var(--color-gold)] font-semibold transition-colors"
                   >
                     Zarejestruj się
-                  </Link>
+                  </LocalizedLink>
                 </>
               )}
               <div className="border-t border-[var(--border)] pt-4 mt-2">

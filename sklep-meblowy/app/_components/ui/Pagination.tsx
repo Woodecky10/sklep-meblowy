@@ -1,4 +1,4 @@
-import Link from "next/link";
+import LocalizedLink from "./LocalizedLink";
 
 type Props = {
   page: number;
@@ -33,13 +33,13 @@ export default function Pagination({ page, pages, searchParams }: Props) {
   return (
     <div className="flex items-center justify-center gap-2 mt-16">
       {page > 1 && (
-        <Link
+        <LocalizedLink
           href={pageHref(page - 1)}
           aria-label="Poprzednia strona"
           className="w-10 h-10 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
         >
           ←
-        </Link>
+        </LocalizedLink>
       )}
       {pageWindow(page, pages).map((item, i) =>
         item === "ellipsis" ? (
@@ -51,7 +51,7 @@ export default function Pagination({ page, pages, searchParams }: Props) {
             …
           </span>
         ) : (
-          <Link
+          <LocalizedLink
             key={item}
             href={pageHref(item)}
             aria-label={`Strona ${item}`}
@@ -63,17 +63,17 @@ export default function Pagination({ page, pages, searchParams }: Props) {
             }`}
           >
             {item}
-          </Link>
+          </LocalizedLink>
         )
       )}
       {page < pages && (
-        <Link
+        <LocalizedLink
           href={pageHref(page + 1)}
           aria-label="Następna strona"
           className="w-10 h-10 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
         >
           →
-        </Link>
+        </LocalizedLink>
       )}
     </div>
   );
