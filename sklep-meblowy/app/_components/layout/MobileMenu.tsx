@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { signOut } from "@/app/_lib/auth-actions";
+import LanguageSwitcher from "./LanguageSwitcher";
 
 export type MobileMenuSection = {
   slug: string;
@@ -150,6 +151,9 @@ export default function MobileMenu({
                   </Link>
                 </>
               )}
+              <div className="border-t border-[var(--border)] pt-4 mt-2">
+                <LanguageSwitcher />
+              </div>
             </div>
           </nav>
         </div>

@@ -10,6 +10,11 @@ type Props = {
   selectedValues?: Record<string, string>;
   currentPrice?: number;
   needsVariant?: boolean;
+  // Zlokalizowane etykiety pełnego przycisku (z ProductActions). Bez nich
+  // fallback do PL — bezpieczny default dla wariantu compact (karty), który
+  // i tak ich nie używa (renderuje ikonę).
+  addToCartLabel?: string;
+  selectVariantLabel?: string;
 };
 
 // Meble robione na zamówienie — brak limitów sztuk. Walidujemy tylko
@@ -20,6 +25,8 @@ export default function AddToCartButton({
   selectedValues,
   currentPrice,
   needsVariant,
+  addToCartLabel = "Dodaj do koszyka",
+  selectVariantLabel = "Wybierz wariant",
 }: Props) {
   const { add } = useCart();
 
@@ -76,7 +83,7 @@ export default function AddToCartButton({
     );
   }
 
-  const label = needsVariant ? "Wybierz wariant" : "Dodaj do koszyka";
+  const label = needsVariant ? selectVariantLabel : addToCartLabel;
 
   return (
     <button

@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { COMPANY } from "@/app/_lib/company";
+import LanguageSwitcher from "./LanguageSwitcher";
 
 // Cienki pasek nad headerem z kontaktem i krótką informacją o dostawie.
 // Ciemne tło (navy) + jasny tekst — identyczny wygląd w light i dark mode.
@@ -51,10 +53,15 @@ export default function TopBar() {
           )}
         </div>
 
-        {/* Slogan po prawej */}
-        <span className="hidden md:inline text-white/70 tracking-wide">
-          Polski producent mebli tapicerowanych
-        </span>
+        {/* Slogan + przełącznik języka po prawej */}
+        <div className="flex items-center gap-5">
+          <span className="hidden md:inline text-white/70 tracking-wide">
+            Polski producent mebli tapicerowanych
+          </span>
+          <Suspense fallback={<div className="w-12 h-4" />}>
+            <LanguageSwitcher className="text-white/80" />
+          </Suspense>
+        </div>
       </div>
     </div>
   );

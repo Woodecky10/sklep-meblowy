@@ -1,6 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { Product, ProductRating } from "@/app/_lib/types";
+import { DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
+import { formatPrice } from "@/app/_lib/format";
 import AddToCartButton from "./AddToCartButton";
 import StarRating from "./StarRating";
 import WishlistButton from "./WishlistButton";
@@ -11,6 +13,7 @@ export default function ProductCard({
   badge,
   categoryLabel,
   isInWishlist = false,
+  locale = DEFAULT_LOCALE,
 }: {
   product: Product;
   rating?: ProductRating;
@@ -25,6 +28,9 @@ export default function ProductCard({
   // Czy produkt jest na liście ulubionych zalogowanego usera.
   // Default false — niezalogowani widzą puste serce.
   isInWishlist?: boolean;
+  // Locale dla formatowania ceny (PL/DE). Default PL — bezpieczny fallback
+  // dla call-site'ów które jeszcze go nie przekazują.
+  locale?: Locale;
 }) {
   const image = product.images?.[0];
 
@@ -74,7 +80,7 @@ export default function ProductCard({
       )}
       <div className="flex items-center justify-between mt-auto">
         <p className="font-sans font-bold text-[var(--fg)]">
-          {product.price.toLocaleString("pl-PL")} zł
+          {formatPrice(product.price, locale)}
         </p>
         <AddToCartButton product={product} compact />
       </div>

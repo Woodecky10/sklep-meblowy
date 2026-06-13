@@ -8,12 +8,20 @@ import {
   RECENTLY_VIEWED_LS_KEY,
   type RecentlyViewedItem,
 } from "@/app/_lib/recently-viewed";
+import { DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
+import { formatPrice } from "@/app/_lib/format";
 
 // Sekcja „Ostatnio oglądane" na stronie produktu. Czyta snapshoty z
 // localStorage (wzorzec jak CartContext), dopisuje bieżący produkt na mount
 // i pokazuje to, co oglądane WCZEŚNIEJ (bez bieżącego). Gdy nic wcześniej nie
 // oglądano — nie renderuje nic. `current.category` to gotowy label (nie slug).
-export default function RecentlyViewed({ current }: { current: RecentlyViewedItem }) {
+export default function RecentlyViewed({
+  current,
+  locale = DEFAULT_LOCALE,
+}: {
+  current: RecentlyViewedItem;
+  locale?: Locale;
+}) {
   // useReducer (nie useState) — synchroniczny setState w efekcie łamie regułę
   // react-hooks/set-state-in-effect; dispatch jej nie łamie (wzorzec hydracji
   // z localStorage jak w CartContext). Reducer tylko podstawia świeżą listę.
@@ -83,7 +91,7 @@ export default function RecentlyViewed({ current }: { current: RecentlyViewedIte
               {p.name}
             </p>
             <p className="font-sans font-bold text-[var(--fg)] mt-auto">
-              {p.price.toLocaleString("pl-PL")} zł
+              {formatPrice(p.price, locale)}
             </p>
           </Link>
         ))}

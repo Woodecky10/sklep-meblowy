@@ -171,6 +171,7 @@ export default async function SklepPage({
               rating={ratings.get(product.id)}
               categoryLabel={categoryLabels.get(product.category)}
               isInWishlist={wishlistIds.has(product.id)}
+              locale={locale}
             />
           ))}
         </div>

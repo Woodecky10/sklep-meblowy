@@ -7,9 +7,14 @@ import { useCart, cartItemKey } from "@/app/_context/CartContext";
 import { formatVariantLabel } from "@/app/_lib/variants";
 import { applyPromoCodeAction, getCartCrossSellAction } from "./actions";
 import ProductCard from "@/app/_components/ui/ProductCard";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
+import { getDictionary } from "@/app/_lib/dictionaries";
+import { formatPrice } from "@/app/_lib/format";
 import type { Product } from "@/app/_lib/types";
 
 export default function KoszykPage() {
+  const locale = useClientLocale();
+  const t = getDictionary(locale);
   const {
     items,
     total,
@@ -91,16 +96,16 @@ export default function KoszykPage() {
       <div className="max-w-7xl mx-auto px-6 py-32 text-center">
         <p className="font-display text-5xl mb-4">🛒</p>
         <h1 className="font-display text-3xl font-bold text-[var(--fg)] mb-4">
-          Koszyk jest pusty
+          {t.cart.empty}
         </h1>
         <p className="text-[var(--muted)] mb-10">
-          Dodaj produkty do koszyka, aby kontynuować zakupy.
+          {t.cart.emptyHint}
         </p>
         <Link
           href="/sklep"
           className="inline-flex px-8 py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
         >
-          Przejdź do sklepu
+          {t.cart.goToShop}
         </Link>
       </div>
     );
@@ -195,7 +200,7 @@ export default function KoszykPage() {
 
                     <div className="flex items-center gap-6">
                       <p className="font-sans font-bold text-[var(--fg)]">
-                        {(item.price * item.quantity).toLocaleString("pl-PL")} zł
+                        {formatPrice(item.price * item.quantity, locale)}
                       </p>
                       <button
                         onClick={() => remove(item.id, item.variantValues)}
@@ -224,7 +229,7 @@ export default function KoszykPage() {
         <div className="lg:col-span-1">
           <div className="sticky top-24 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8 flex flex-col gap-6">
             <h2 className="font-display text-2xl font-bold text-[var(--fg)]">
-              Podsumowanie
+              {t.cart.summary}
             </h2>
 
             <PromoInput
@@ -237,12 +242,12 @@ export default function KoszykPage() {
             <div className="flex flex-col gap-3 text-sm font-sans">
               <div className="flex justify-between text-[var(--muted)]">
                 <span>Produkty ({count} szt.)</span>
-                <span>{total.toLocaleString("pl-PL")} zł</span>
+                <span>{formatPrice(total, locale)}</span>
               </div>
               {appliedPromo && discount > 0 && (
                 <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
                   <span>Zniżka ({appliedPromo.code})</span>
-                  <span>−{discount.toLocaleString("pl-PL")} zł</span>
+                  <span>−{formatPrice(discount, locale)}</span>
                 </div>
               )}
               <div className="flex justify-between items-start text-[var(--muted)] gap-3">
@@ -256,8 +261,8 @@ export default function KoszykPage() {
                 </span>
               </div>
               <div className="border-t border-[var(--border)] pt-3 flex justify-between font-bold text-base text-[var(--fg)]">
-                <span>Razem</span>
-                <span>{grandTotal.toLocaleString("pl-PL")} zł</span>
+                <span>{t.cart.total}</span>
+                <span>{formatPrice(grandTotal, locale)}</span>
               </div>
             </div>
 
@@ -265,14 +270,14 @@ export default function KoszykPage() {
               href="/checkout"
               className="w-full py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors text-center"
             >
-              Przejdź do kasy →
+              {t.cart.checkout} →
             </Link>
 
             <Link
               href="/sklep"
               className="text-center text-xs font-sans text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors uppercase tracking-widest"
             >
-              ← Kontynuuj zakupy
+              ← {t.cart.continueShopping}
             </Link>
 
             <div className="border-t border-[var(--border)] pt-4 text-xs text-[var(--muted)] space-y-1">
@@ -302,6 +307,7 @@ export default function KoszykPage() {
                 product={p}
                 isInWishlist={crossSellWishlist.has(p.id)}
                 categoryLabel={crossSellLabels[p.category]}
+                locale={locale}
               />
             ))}
           </div>

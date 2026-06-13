@@ -71,6 +71,7 @@ export default async function WishlistPage() {
               product={product}
               categoryLabel={categoryLabels.get(product.category)}
               isInWishlist={wishlistIds.has(product.id)}
+              locale={locale}
             />
           ))}
         </div>

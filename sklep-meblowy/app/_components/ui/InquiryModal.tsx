@@ -10,9 +10,14 @@ import { useModal } from "@/app/_lib/useModal";
 export default function InquiryModal({
   productId,
   productName,
+  triggerLabel = "Zapytaj o inne kolory",
 }: {
   productId: string;
   productName: string;
+  // Etykieta przycisku otwierającego modal — zlokalizowana, przekazana z
+  // ProductMainSection (client). Reszta modala (formularz) zostaje PL — to
+  // mniej widoczny tekst, do osobnego przejścia.
+  triggerLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -38,7 +43,7 @@ export default function InquiryModal({
         onClick={() => setOpen(true)}
         className="w-full py-3 border border-[var(--color-gold)] text-[var(--color-gold)] font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
       >
-        Zapytaj o inne kolory
+        {triggerLabel}
       </button>
 
       {open && (

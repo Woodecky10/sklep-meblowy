@@ -24,6 +24,7 @@ import { sanitizeProductHtml } from "@/app/_lib/product-html";
 import ProductDescriptionSections from "@/app/_components/ui/ProductDescriptionSections";
 import { COMPANY } from "@/app/_lib/company";
 import { getLocale } from "@/app/_lib/i18n";
+import { getDictionary } from "@/app/_lib/dictionaries";
 import type { Product } from "@/app/_lib/types";
 
 type Props = { params: Promise<{ id: string }> };
@@ -68,6 +69,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ProduktPage({ params }: Props) {
   const { id } = await params;
   const locale = await getLocale();
+  const t = getDictionary(locale);
   const product = await getProduct(id, locale);
   if (!product) notFound();
 
@@ -292,7 +294,7 @@ export default async function ProduktPage({ params }: Props) {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {crossSell.map((p) => (
-              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} />
+              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} locale={locale} />
             ))}
           </div>
         </section>
@@ -316,7 +318,7 @@ export default async function ProduktPage({ params }: Props) {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {collectionSiblings.map((p) => (
-              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} />
+              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} locale={locale} />
             ))}
           </div>
         </section>
@@ -327,10 +329,10 @@ export default async function ProduktPage({ params }: Props) {
         <div className="mb-8 flex items-end justify-between flex-wrap gap-4">
           <div>
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-              Opinie
+              {t.product.reviews}
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
-              Co mówią klienci
+              {t.product.reviewsHeading}
             </h2>
           </div>
           {rating.count > 0 && (
@@ -384,21 +386,22 @@ export default async function ProduktPage({ params }: Props) {
         <section>
           <div className="mb-10">
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-              Zobacz też
+              {t.product.relatedProducts}
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
-              Podobne produkty
+              {t.product.relatedProductsHeading}
             </h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {related.map((p) => (
-              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} />
+              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} locale={locale} />
             ))}
           </div>
         </section>
       )}
 
       <RecentlyViewed
+        locale={locale}
         current={{
           id: product.id,
           name: product.name,

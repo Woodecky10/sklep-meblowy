@@ -126,6 +126,7 @@ export default async function HomePage() {
                   badge={badge}
                   categoryLabel={categoryLabels.get(product.category)}
                   isInWishlist={wishlistIds.has(product.id)}
+                  locale={locale}
                 />
               ))}
             </div>
