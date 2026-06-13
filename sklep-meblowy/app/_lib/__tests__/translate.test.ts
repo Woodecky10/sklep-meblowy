@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { translateTexts } from "@/app/_lib/translate";
 
 function fakeFetch(translations: string[]) {
-  return vi.fn(async (_url: string | URL | Request, _init?: RequestInit) =>
+  return vi.fn<(url: string | URL | Request, init?: RequestInit) => Promise<Response>>(async () =>
     new Response(JSON.stringify({ translations: translations.map((t) => ({ text: t })) }), {
       status: 200,
       headers: { "content-type": "application/json" },
