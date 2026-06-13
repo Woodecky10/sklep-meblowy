@@ -24,6 +24,8 @@ import { sanitizeProductHtml } from "@/app/_lib/product-html";
 import ProductDescriptionSections from "@/app/_components/ui/ProductDescriptionSections";
 import { COMPANY } from "@/app/_lib/company";
 import { getLocale } from "@/app/_lib/i18n-server";
+import { localizePath } from "@/app/_lib/i18n";
+import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import type { Product } from "@/app/_lib/types";
 
@@ -56,11 +58,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const locale = await getLocale();
   const product = await getProduct(id, locale);
   if (!product) return { title: "Produkt nie znaleziony" };
+  // DE w SEO tylko gdy produkt przetłumaczony. `needs_translation` NIE jest w
+  // typie Product (data layer zwraca je przez select("*")) — dostęp przez cast.
+  const hasDe =
+    (product as { needs_translation?: boolean }).needs_translation === false;
+  const plPath = `/produkt/${id}`;
   return {
     title: product.name,
     // Meta description = plain text (bez HTML, max 160 znaków)
     description: stripHtml(productPlainDescription(product)).slice(0, 160),
+    alternates: {
+      // canonical = self dla bieżącego locale (relatywne, rozwiązane przez
+      // metadataBase z app/layout.tsx). Na PL → /produkt/X, na DE → /de/produkt/X.
+      canonical: localizePath(plPath, locale),
+      languages: alternatesFor(plPath, { hasDe }).languages,
+    },
     openGraph: {
+      locale: locale === "de" ? "de_DE" : "pl_PL",
       images: product.images?.[0] ? [{ url: product.images[0] }] : [],
     },
   };

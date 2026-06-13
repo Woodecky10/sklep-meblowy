@@ -9,11 +9,26 @@ import { getCategories } from "./_lib/categories";
 import { getCollectionsForHome } from "./_lib/collections";
 import { getUserWishlistIds } from "./_lib/wishlist";
 import { getLocale } from "./_lib/i18n-server";
+import { localizePath } from "./_lib/i18n";
+import { alternatesFor } from "./_lib/sitemap-i18n";
 import ProductCard from "./_components/ui/ProductCard";
 
-export const metadata: Metadata = {
-  title: "Meble Premium | Eleganckie Meble do Twojego Domu",
-};
+// Home jest w pełni przetłumaczone przez słownik UI → DE zawsze (hasDe: true).
+// generateMetadata na poziomie strony nadpisuje statyczne metadata z layoutu
+// dla "/". canonical = self per locale, og:locale dopasowany.
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return {
+    title: "Meble Premium | Eleganckie Meble do Twojego Domu",
+    alternates: {
+      canonical: localizePath("/", locale),
+      languages: alternatesFor("/", { hasDe: true }).languages,
+    },
+    openGraph: {
+      locale: locale === "de" ? "de_DE" : "pl_PL",
+    },
+  };
+}
 
 // Polski poprawnik typograficzny: ostatnia pojedyncza litera (np. "L", "U")
 // nigdy nie powinna zawijać się na nową linię ("sierota"). Zamieniamy ostatnią

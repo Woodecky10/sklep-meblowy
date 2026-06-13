@@ -10,11 +10,28 @@ import {
 import { getCollection, getAllCollections } from "@/app/_lib/collections";
 import { getUserWishlistIds } from "@/app/_lib/wishlist";
 import { getLocale } from "@/app/_lib/i18n-server";
+import { localizePath } from "@/app/_lib/i18n";
+import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import ProductCard from "@/app/_components/ui/ProductCard";
 import FilterBar from "@/app/_components/ui/FilterBar";
 import Pagination from "@/app/_components/ui/Pagination";
 
-export const metadata: Metadata = { title: "Sklep" };
+// /sklep jest w pełni przetłumaczone przez słownik UI → DE zawsze (hasDe: true).
+// canonical = self per locale, og:locale dopasowany. Relatywne URL-e rozwiązuje
+// metadataBase z app/layout.tsx.
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return {
+    title: "Sklep",
+    alternates: {
+      canonical: localizePath("/sklep", locale),
+      languages: alternatesFor("/sklep", { hasDe: true }).languages,
+    },
+    openGraph: {
+      locale: locale === "de" ? "de_DE" : "pl_PL",
+    },
+  };
+}
 
 type SearchParams = Promise<{
   kategoria?: string;
