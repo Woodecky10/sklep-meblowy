@@ -61,7 +61,7 @@ export default function RecentlyViewed({ current }: { current: RecentlyViewedIte
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
         {items.map((p) => (
           <Link key={p.id} href={`/produkt/${p.id}`} className="group flex flex-col">
-            <div className="relative aspect-[3/4] bg-stone-100 dark:bg-stone-800 rounded-2xl overflow-hidden mb-4">
+            <div className="relative aspect-[4/3] bg-stone-100 dark:bg-stone-800 rounded-2xl overflow-hidden mb-4">
               {p.image ? (
                 <Image
                   src={p.image}

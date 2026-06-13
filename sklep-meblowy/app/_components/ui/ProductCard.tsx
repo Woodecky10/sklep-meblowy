@@ -30,7 +30,7 @@ export default function ProductCard({
 
   return (
     <div className="group flex flex-col">
-      <div className="relative aspect-[3/4] bg-stone-100 dark:bg-stone-800 rounded-2xl overflow-hidden mb-4">
+      <div className="relative aspect-[4/3] bg-stone-100 dark:bg-stone-800 rounded-2xl overflow-hidden mb-4">
         <Link href={`/produkt/${product.id}`} className="block absolute inset-0">
           {image ? (
             <Image
