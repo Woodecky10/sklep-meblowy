@@ -162,21 +162,6 @@ export async function updateProductBasics(
 
   if (error) return { ok: false, error: error.message };
 
-  // best-effort inline DE (pojedynczy produkt z panelu) — błąd nie blokuje zapisu PL
-  try {
-    const { createAdminClient } = await import("@/app/_lib/supabase/server");
-    const { translateProductRow } = await import("@/app/_lib/translation-service");
-    const sb = await createAdminClient();
-    const { data: fresh } = await sb
-      .from("products")
-      .select("id, name, description, color, material, description_sections")
-      .eq("id", id)
-      .single();
-    if (fresh) await translateProductRow(fresh as never, sb);
-  } catch (e) {
-    console.warn("inline DE translate skipped:", e);
-  }
-
   revalidatePath(`/admin/produkty/${id}`);
   revalidatePath(`/produkt/${id}`);
   revalidatePath("/sklep");
@@ -474,68 +459,17 @@ export async function updateProductDescriptionSections(
 
   if (error) return { ok: false, error: error.message };
 
-  // best-effort inline DE (pojedynczy produkt z panelu) — błąd nie blokuje zapisu PL
-  try {
-    const { createAdminClient } = await import("@/app/_lib/supabase/server");
-    const { translateProductRow } = await import("@/app/_lib/translation-service");
-    const sb = await createAdminClient();
-    const { data: fresh } = await sb
-      .from("products")
-      .select("id, name, description, color, material, description_sections")
-      .eq("id", productId)
-      .single();
-    if (fresh) await translateProductRow(fresh as never, sb);
-  } catch (e) {
-    console.warn("inline DE translate skipped:", e);
-  }
-
   revalidatePath(`/admin/produkty/${productId}`);
   revalidatePath(`/produkt/${productId}`);
   return { ok: true, message: "Zapisano sekcje opisu" };
 }
 
 // ============================================================
-// retranslateProduct — wymuszone ponowne tłumaczenie DE (DeepL)
+// saveProductDe — ręczny zapis tłumaczenia DE produktu
 // ============================================================
-// Jawna akcja admina: bierze ŚWIEŻE pola PL z DB, woła DeepL i nadpisuje
-// kolumny _de (+ needs_translation=false, translated_at=now). W odróżnieniu
-// od inline best-effort przy zapisie PL — TU błąd DeepL jest surfaced do
-// admina (return error), bo admin świadomie kliknął "Przetłumacz ponownie".
-export async function retranslateProduct(id: string): Promise<ActionResult> {
-  await requireAdmin();
-  if (!id) return { ok: false, error: "Brak id produktu" };
-
-  const supabase = await createAdminClient();
-  const { data: fresh, error: fetchErr } = await supabase
-    .from("products")
-    .select("id, name, description, color, material, description_sections")
-    .eq("id", id)
-    .single();
-
-  if (fetchErr) return { ok: false, error: fetchErr.message };
-  if (!fresh) return { ok: false, error: "Produkt nie istnieje" };
-
-  try {
-    const { translateProductRow } = await import("@/app/_lib/translation-service");
-    await translateProductRow(fresh as never, supabase);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Nieznany błąd tłumaczenia";
-    // Brak klucza DeepL → translateTexts rzuca "DEEPL_API_KEY nie jest ustawiony".
-    return { ok: false, error: `Tłumaczenie nieudane: ${msg}` };
-  }
-
-  revalidatePath(`/admin/produkty/${id}`);
-  revalidatePath(`/produkt/${id}`);
-  return { ok: true, message: "Przetłumaczono ponownie (DE)" };
-}
-
-// ============================================================
-// saveProductDe — ręczna korekta tłumaczenia DE produktu
-// ============================================================
-// Admin nadpisuje pola _de wpisane ręcznie (po korekcie auto-tłumaczenia).
+// Admin wpisuje ręcznie pola _de (nazwa/opis/kolor/materiał/sekcje).
 // Zapis czyści needs_translation (admin ma kontrolę) i stempluje translated_at.
-// Sekcje opisu DE (description_sections_de) zostają zarządzane przez
-// auto-tłumaczenie — pole opcjonalne, zapisywane tylko gdy przekazane.
+// Sekcje opisu DE (description_sections_de) zapisywane tylko gdy przekazane.
 export async function saveProductDe(
   id: string,
   fields: {
@@ -573,28 +507,4 @@ export async function saveProductDe(
   revalidatePath(`/admin/produkty/${id}`);
   revalidatePath(`/produkt/${id}`);
   return { ok: true, message: "Zapisano tłumaczenie DE" };
-}
-
-// ============================================================
-// translatePendingBatch — przetłumacz zaległe produkty (DE) hurtem
-// ============================================================
-// Wołane z panelu BaseLinker. Bierze produkty z needs_translation=true
-// i tłumaczy je przez DeepL (limit per-run w translation-service).
-// Brak DEEPL_API_KEY → translateTexts rzuca → łapiemy i surfacujemy.
-export async function translatePendingBatch(): Promise<ActionResult> {
-  await requireAdmin();
-
-  try {
-    const { translatePendingProducts } = await import(
-      "@/app/_lib/translation-service"
-    );
-    const summary = await translatePendingProducts();
-    return { ok: true, message: "Tłumaczenie zaległych zakończone", data: summary };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Nieznany błąd";
-    if (msg.includes("DEEPL_API_KEY")) {
-      return { ok: false, error: "Brak DEEPL_API_KEY — ustaw klucz w środowisku (Vercel)." };
-    }
-    return { ok: false, error: `Tłumaczenie zaległych nieudane: ${msg}` };
-  }
 }

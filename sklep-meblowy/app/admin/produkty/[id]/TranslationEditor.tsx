@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { retranslateProduct, saveProductDe } from "../actions";
+import { saveProductDe } from "../actions";
 import { Field, inputClass, type Toast } from "./_shared";
 
 // Surowe pola tłumaczenia DE produktu (niezlokalizowane — patrz page.tsx).
@@ -38,7 +38,6 @@ export default function TranslationEditor({
   const [materialDe, setMaterialDe] = useState(initial.material_de ?? "");
 
   const [saving, startSaveTransition] = useTransition();
-  const [retranslating, startRetranslateTransition] = useTransition();
 
   // Dirty względem wartości initial (po router.refresh() props się odświeżą,
   // a komponent zremountuje się — baseline wraca do świeżego DB).
@@ -76,20 +75,6 @@ export default function TranslationEditor({
     });
   }
 
-  function retranslate() {
-    startRetranslateTransition(async () => {
-      const res = await retranslateProduct(productId);
-      if (res.ok) {
-        onToast({ type: "success", message: res.message ?? "Przetłumaczono ponownie" });
-        // router.refresh() (konwencja admina #19) — bez full reloadu, podciąga
-        // nowe _de z DB i remountuje editor z aktualnymi wartościami.
-        router.refresh();
-      } else {
-        onToast({ type: "error", message: res.error });
-      }
-    });
-  }
-
   return (
     <section className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col gap-5">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -98,10 +83,8 @@ export default function TranslationEditor({
             Tłumaczenie niemieckie (DE)
           </h2>
           <p className="text-sm text-[var(--muted)] mt-1 max-w-2xl leading-relaxed">
-            Treść pokazywana klientom w wersji niemieckiej sklepu. Tłumaczenie
-            powstaje automatycznie (DeepL) — tutaj możesz je <strong>poprawić ręcznie</strong>.
-            Sekcje opisu DE odświeża przycisk „Przetłumacz ponownie”.
-            Puste pole = fallback do polskiej treści.
+            Treść pokazywana klientom w niemieckiej wersji sklepu. Wpisz ją
+            <strong> ręcznie</strong>. Puste pole = fallback do polskiej treści.
           </p>
         </div>
         {/* Status badge */}
@@ -165,19 +148,11 @@ export default function TranslationEditor({
         </Field>
       </div>
 
-      <div className="flex items-center justify-between gap-4 pt-2 border-t border-[var(--border)] flex-wrap">
-        <button
-          type="button"
-          onClick={retranslate}
-          disabled={retranslating || saving}
-          className="px-5 py-3 border border-[var(--border)] text-[var(--fg)] font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors disabled:opacity-50"
-        >
-          {retranslating ? "Tłumaczę..." : "Przetłumacz ponownie (DeepL)"}
-        </button>
+      <div className="flex items-center justify-end gap-4 pt-2 border-t border-[var(--border)] flex-wrap">
         <button
           type="button"
           onClick={save}
-          disabled={saving || retranslating || !dirty}
+          disabled={saving || !dirty}
           className="px-6 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
         >
           {saving ? "Zapisuję..." : "Zapisz tłumaczenie DE"}
