@@ -3,10 +3,6 @@
     {
       "path": "/api/cron/reconcile-bl",
       "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/cron/translate",
-      "schedule": "0 4 * * *"
     }
   ]
 }
