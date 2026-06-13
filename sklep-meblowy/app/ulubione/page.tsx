@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/app/_lib/supabase/server";
 import { getWishlistProducts, getUserWishlistIds } from "@/app/_lib/wishlist";
 import { getCategories } from "@/app/_lib/categories";
+import { getLocale } from "@/app/_lib/i18n";
 import ProductCard from "@/app/_components/ui/ProductCard";
 
 export const metadata: Metadata = {
@@ -17,10 +18,11 @@ export default async function WishlistPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/logowanie?next=/ulubione");
 
+  const locale = await getLocale();
   const [products, wishlistIds, categories] = await Promise.all([
     getWishlistProducts(),
     getUserWishlistIds(),
-    getCategories(),
+    getCategories(locale),
   ]);
   const categoryLabels = new Map(categories.map((c) => [c.slug, c.label]));
 

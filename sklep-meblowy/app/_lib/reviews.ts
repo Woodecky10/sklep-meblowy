@@ -1,10 +1,15 @@
 import { createClient, createAdminClient } from "./supabase/server";
+import { localizeReview } from "./localize";
+import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { ProductRating, ProductReview } from "./types";
 
 // Pobiera recenzje dla produktu (najnowsze pierwsze) razem z imieniem autora.
+// locale==='de' → treść (comment) z comment_de z fallbackiem PL. Imię autora
+// nie jest tłumaczone.
 export async function getReviewsForProduct(
   productId: string,
-  limit = 50
+  limit = 50,
+  locale: Locale = DEFAULT_LOCALE
 ): Promise<ProductReview[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -21,7 +26,9 @@ export async function getReviewsForProduct(
   // usera i każda CUDZA opinia gubiła imię (fallback "Klient"). Eksponujemy
   // WYŁĄCZNIE full_name (autor zgadza się pokazać je jako podpis pod opinią).
   const userIds = Array.from(new Set((data as ProductReview[]).map((r) => r.user_id)));
-  if (userIds.length === 0) return data as ProductReview[];
+  if (userIds.length === 0) {
+    return (data as ProductReview[]).map((r) => localizeReview(r, locale));
+  }
 
   const admin = await createAdminClient();
   const { data: profiles } = await admin
@@ -37,7 +44,7 @@ export async function getReviewsForProduct(
   );
 
   return (data as ProductReview[]).map((r) => ({
-    ...r,
+    ...localizeReview(r, locale),
     author_name: nameMap.get(r.user_id) ?? null,
   }));
 }

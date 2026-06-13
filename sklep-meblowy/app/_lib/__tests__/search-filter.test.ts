@@ -55,6 +55,18 @@ describe("buildSearchOrFilter", () => {
     expect(filter).toBe("name.ilike.%xpricegt0%,description.ilike.%xpricegt0%");
     expect(filter?.split(",").length).toBe(2);
   });
+
+  it("locale de → kolumny _de", () => {
+    expect(buildSearchOrFilter("sofa", "de")).toBe(
+      "name_de.ilike.%sofa%,description_de.ilike.%sofa%"
+    );
+  });
+
+  it("locale pl (domyślnie) → kolumny PL", () => {
+    expect(buildSearchOrFilter("sofa")).toBe(
+      "name.ilike.%sofa%,description.ilike.%sofa%"
+    );
+  });
 });
 
 describe("escapeIlike — escape wildcardów (linkGuestOrders, audyt MED)", () => {

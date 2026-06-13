@@ -5,6 +5,7 @@ import { getCrossSellProducts } from "@/app/_lib/products";
 import { getUserWishlistIds } from "@/app/_lib/wishlist";
 import { getCategories } from "@/app/_lib/categories";
 import { createAdminClient } from "@/app/_lib/supabase/server";
+import { getLocale } from "@/app/_lib/i18n";
 import type { Product } from "@/app/_lib/types";
 
 export type PromoApplyResult =
@@ -84,7 +85,13 @@ export async function getCartCrossSellAction(
   );
   const cartProductIds = items.map((i) => i.id);
 
-  const products = await getCrossSellProducts(cartCategories, cartProductIds, 4);
+  const locale = await getLocale();
+  const products = await getCrossSellProducts(
+    cartCategories,
+    cartProductIds,
+    4,
+    locale
+  );
 
   // Które z poleconych produktów są już w ulubionych usera. getUserWishlistIds
   // zwraca pusty Set dla niezalogowanego — wtedy wishlistIds = [].
@@ -95,7 +102,7 @@ export async function getCartCrossSellAction(
 
   // Etykiety kategorii poleconych produktów (getCategories jest cache'owane).
   const labelBySlug = new Map(
-    (await getCategories()).map((c) => [c.slug, c.label])
+    (await getCategories(locale)).map((c) => [c.slug, c.label])
   );
   const categoryLabels: Record<string, string> = {};
   for (const p of products) {

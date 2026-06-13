@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { getSections, getCategories } from "@/app/_lib/categories";
 import { COMPANY, isFilled } from "@/app/_lib/company";
+import { getLocale } from "@/app/_lib/i18n";
 
 const INFO_LINKS: [string, string][] = [
   ["O nas", "/o-nas"],
@@ -15,9 +16,10 @@ const INFO_LINKS: [string, string][] = [
 ];
 
 export default async function Footer() {
+  const locale = await getLocale();
   const [sections, categories] = await Promise.all([
-    getSections(),
-    getCategories(),
+    getSections(locale),
+    getCategories(locale),
   ]);
 
   return (

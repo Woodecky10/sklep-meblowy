@@ -12,9 +12,11 @@ import { isAdmin } from "@/app/_lib/admin";
 import { getSections, getCategories } from "@/app/_lib/categories";
 import { getWishlistCount } from "@/app/_lib/wishlist";
 import { COMPANY } from "@/app/_lib/company";
+import { getLocale } from "@/app/_lib/i18n";
 
 export default async function Navbar() {
   const supabase = await createClient();
+  const locale = await getLocale();
   const [
     {
       data: { user },
@@ -24,8 +26,8 @@ export default async function Navbar() {
     wishlistCount,
   ] = await Promise.all([
     supabase.auth.getUser(),
-    getSections(),
-    getCategories(),
+    getSections(locale),
+    getCategories(locale),
     getWishlistCount(),
   ]);
 

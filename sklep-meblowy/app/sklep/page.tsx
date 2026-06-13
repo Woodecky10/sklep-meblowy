@@ -9,6 +9,7 @@ import {
 } from "@/app/_lib/categories";
 import { getCollection, getAllCollections } from "@/app/_lib/collections";
 import { getUserWishlistIds } from "@/app/_lib/wishlist";
+import { getLocale } from "@/app/_lib/i18n";
 import ProductCard from "@/app/_components/ui/ProductCard";
 import FilterBar from "@/app/_components/ui/FilterBar";
 import Pagination from "@/app/_components/ui/Pagination";
@@ -41,6 +42,7 @@ export default async function SklepPage({
   searchParams: SearchParams;
 }) {
   const sp = await searchParams;
+  const locale = await getLocale();
   const category = sp.kategoria || undefined;
   // sekcja działa tylko jeśli kategoria nie jest ustawiona — kategoria
   // bardziej szczegółowa wygrywa (user kliknął sub-kategorię z dropdown).
@@ -78,12 +80,13 @@ export default async function SklepPage({
       materials,
       collectionSlug,
       sectionSlug,
+      locale,
     }),
-    getFilterFacets(),
-    getSections(),
-    getCategories(),
+    getFilterFacets(locale),
+    getSections(locale),
+    getCategories(locale),
     getAllCollections(),
-    getCategoryLabel(category),
+    getCategoryLabel(category, locale),
     collectionSlug ? getCollection(collectionSlug) : Promise.resolve(null),
   ]);
 

@@ -1,0 +1,140 @@
+import { describe, it, expect } from "vitest";
+import {
+  localizeProduct,
+  localizeCategory,
+  localizeCategoryGroup,
+  localizeReview,
+} from "@/app/_lib/localize";
+import type { ProductDescriptionSection } from "@/app/_lib/types";
+
+const sectionsPl: ProductDescriptionSection[] = [
+  { kind: "text", title: "Materiał", body: "<b>Miękki</b>" },
+];
+const sectionsDe: ProductDescriptionSection[] = [
+  { kind: "text", title: "Material", body: "<b>Weich</b>" },
+];
+
+function baseProduct() {
+  return {
+    id: "p1",
+    name: "Sofa",
+    description: "<p>Wygodna</p>",
+    color: "beż",
+    material: "welur",
+    description_sections: sectionsPl,
+    name_de: "Couch",
+    description_de: "<p>Bequem</p>",
+    color_de: "beige",
+    material_de: "Velours",
+    description_sections_de: sectionsDe,
+    price: 100,
+  };
+}
+
+describe("localizeProduct", () => {
+  it("DE z pełnym tłumaczeniem → zamienia pola na _de", () => {
+    const out = localizeProduct(baseProduct(), "de");
+    expect(out.name).toBe("Couch");
+    expect(out.description).toBe("<p>Bequem</p>");
+    expect(out.color).toBe("beige");
+    expect(out.material).toBe("Velours");
+    expect(out.description_sections).toEqual(sectionsDe);
+    // pola źródłowe _de zostają (nie są usuwane)
+    expect(out.price).toBe(100);
+  });
+
+  it("DE bez tłumaczenia → fallback do PL", () => {
+    const row = {
+      ...baseProduct(),
+      name_de: null,
+      description_de: "",
+      color_de: null,
+      material_de: "",
+      description_sections_de: null,
+    };
+    const out = localizeProduct(row, "de");
+    expect(out.name).toBe("Sofa");
+    expect(out.description).toBe("<p>Wygodna</p>");
+    expect(out.color).toBe("beż");
+    expect(out.material).toBe("welur");
+    expect(out.description_sections).toEqual(sectionsPl);
+  });
+
+  it("DE: pusta tablica sekcji _de → fallback do PL sekcji", () => {
+    const row = { ...baseProduct(), description_sections_de: [] };
+    const out = localizeProduct(row, "de");
+    expect(out.description_sections).toEqual(sectionsPl);
+  });
+
+  it("DE: PRESERVE null dla color/material gdy PL = null i _de puste", () => {
+    const row = {
+      ...baseProduct(),
+      color: null,
+      material: null,
+      color_de: null,
+      material_de: null,
+    };
+    const out = localizeProduct(row, "de");
+    expect(out.color).toBeNull();
+    expect(out.material).toBeNull();
+  });
+
+  it("PL → passthrough bez zmian", () => {
+    const row = baseProduct();
+    const out = localizeProduct(row, "pl");
+    expect(out.name).toBe("Sofa");
+    expect(out.description).toBe("<p>Wygodna</p>");
+    expect(out.color).toBe("beż");
+    expect(out.material).toBe("welur");
+    expect(out.description_sections).toEqual(sectionsPl);
+  });
+});
+
+describe("localizeCategory / localizeCategoryGroup", () => {
+  it("DE z label_de → zamienia label", () => {
+    expect(localizeCategory({ slug: "sofy", label: "Sofy", label_de: "Sofas" }, "de").label).toBe(
+      "Sofas"
+    );
+    expect(
+      localizeCategoryGroup({ slug: "salon", label: "Salon", label_de: "Wohnzimmer" }, "de").label
+    ).toBe("Wohnzimmer");
+  });
+
+  it("DE bez label_de → fallback PL", () => {
+    expect(localizeCategory({ slug: "sofy", label: "Sofy", label_de: null }, "de").label).toBe(
+      "Sofy"
+    );
+    expect(localizeCategory({ slug: "sofy", label: "Sofy", label_de: "" }, "de").label).toBe(
+      "Sofy"
+    );
+  });
+
+  it("PL → passthrough", () => {
+    expect(localizeCategory({ slug: "sofy", label: "Sofy", label_de: "Sofas" }, "pl").label).toBe(
+      "Sofy"
+    );
+  });
+});
+
+describe("localizeReview", () => {
+  it("DE z comment_de → zamienia comment", () => {
+    expect(
+      localizeReview({ id: "r1", comment: "Świetna", comment_de: "Toll" }, "de").comment
+    ).toBe("Toll");
+  });
+  it("DE bez comment_de → fallback PL", () => {
+    expect(
+      localizeReview({ id: "r1", comment: "Świetna", comment_de: null }, "de").comment
+    ).toBe("Świetna");
+  });
+  it("DE: comment PL null zostaje null", () => {
+    expect(
+      localizeReview({ id: "r1", comment: null, comment_de: null }, "de").comment
+    ).toBeNull();
+  });
+  it("PL → passthrough", () => {
+    expect(
+      localizeReview({ id: "r1", comment: "Świetna", comment_de: "Toll" }, "pl").comment
+    ).toBe("Świetna");
+  });
+});

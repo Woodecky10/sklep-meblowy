@@ -8,6 +8,8 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
+import { localizeCategory, localizeCategoryGroup } from "./localize";
+import { DEFAULT_LOCALE, type Locale } from "./i18n";
 
 // Tag używany przez `unstable_cache` i `revalidateTag` po mutacjach z admina.
 export const CATEGORIES_CACHE_TAG = "categories";
@@ -20,6 +22,9 @@ export type Section = {
   id: string;
   slug: string;
   label: string;
+  // Tłumaczenie DE etykiety (null = brak → fallback do PL przy odczycie DE).
+  // Surowe pole z DB; publiczne API podmienia `label` na nie wg locale.
+  label_de: string | null;
   sort_order: number;
   active: boolean;
 };
@@ -28,6 +33,7 @@ export type CategoryDef = {
   id: string;
   slug: string;
   label: string;
+  label_de: string | null;
   group_id: string;
   group_slug: string;
   baselinkerCategoryId: number | null;
@@ -78,13 +84,22 @@ const fetchCategoriesData = unstable_cache(
         id: string;
         slug: string;
         label: string;
+        label_de: string | null;
         sort_order: number;
         active: boolean;
-      }>),
+      }>).map((g) => ({
+        id: g.id,
+        slug: g.slug,
+        label: g.label,
+        label_de: g.label_de ?? null,
+        sort_order: g.sort_order,
+        active: g.active,
+      })),
       categories: ((categories ?? []) as Array<{
         id: string;
         slug: string;
         label: string;
+        label_de: string | null;
         group_id: string;
         baselinker_category_id: number | null;
         cross_sell_categories: string[] | null;
@@ -95,6 +110,7 @@ const fetchCategoriesData = unstable_cache(
         id: c.id,
         slug: c.slug,
         label: c.label,
+        label_de: c.label_de ?? null,
         group_id: c.group_id,
         group_slug: c.group?.slug ?? "",
         baselinkerCategoryId: c.baselinker_category_id,
@@ -116,56 +132,80 @@ const getData = cache(fetchCategoriesData);
 // Public API (async)
 // ============================================================
 
-export async function getSections(): Promise<Section[]> {
+// UWAGA architektura cache: `getData()` (unstable_cache) trzyma SUROWE wiersze
+// PL+_de — locale NIE wchodzi do klucza cache (jeden cache dla obu języków).
+// Lokalizacja (`localizeCategory`/`localizeCategoryGroup`) dzieje się tu, w
+// publicznym API, które dostaje `locale` jako parametr od strony/RSC. Dzięki
+// temu nie wołamy `getLocale()`/`headers()` wewnątrz cached funkcji (zakazane
+// w Next 16) i nie dublujemy cache PL/DE.
+export async function getSections(
+  locale: Locale = DEFAULT_LOCALE
+): Promise<Section[]> {
   const data = await getData();
-  return data.groups.filter((g) => g.active);
+  return data.groups
+    .filter((g) => g.active)
+    .map((g) => localizeCategoryGroup(g, locale));
 }
 
-export async function getCategories(): Promise<CategoryDef[]> {
+export async function getCategories(
+  locale: Locale = DEFAULT_LOCALE
+): Promise<CategoryDef[]> {
   const data = await getData();
-  return data.categories.filter((c) => c.active);
+  return data.categories
+    .filter((c) => c.active)
+    .map((c) => localizeCategory(c, locale));
 }
 
-export async function getAllCategories(): Promise<CategoryDef[]> {
-  // Bez filtra `active` — używane w admin UI.
+export async function getAllCategories(
+  locale: Locale = DEFAULT_LOCALE
+): Promise<CategoryDef[]> {
+  // Bez filtra `active` — używane w admin UI (domyślnie PL).
   const data = await getData();
-  return data.categories;
+  return data.categories.map((c) => localizeCategory(c, locale));
 }
 
-export async function getAllSections(): Promise<Section[]> {
+export async function getAllSections(
+  locale: Locale = DEFAULT_LOCALE
+): Promise<Section[]> {
   const data = await getData();
-  return data.groups;
+  return data.groups.map((g) => localizeCategoryGroup(g, locale));
 }
 
 export async function getCategory(
-  slug: string | undefined | null
+  slug: string | undefined | null,
+  locale: Locale = DEFAULT_LOCALE
 ): Promise<CategoryDef | undefined> {
   if (!slug) return undefined;
   const data = await getData();
-  return data.categories.find((c) => c.slug === slug);
+  const found = data.categories.find((c) => c.slug === slug);
+  return found ? localizeCategory(found, locale) : undefined;
 }
 
 export async function getCategoryLabel(
-  slug: string | undefined | null
+  slug: string | undefined | null,
+  locale: Locale = DEFAULT_LOCALE
 ): Promise<string | undefined> {
-  return (await getCategory(slug))?.label;
+  return (await getCategory(slug, locale))?.label;
 }
 
 export async function getSection(
-  slug: string | undefined | null
+  slug: string | undefined | null,
+  locale: Locale = DEFAULT_LOCALE
 ): Promise<Section | undefined> {
   if (!slug) return undefined;
   const data = await getData();
-  return data.groups.find((g) => g.slug === slug);
+  const found = data.groups.find((g) => g.slug === slug);
+  return found ? localizeCategoryGroup(found, locale) : undefined;
 }
 
 export async function getCategoriesBySection(
-  sectionSlug: string
+  sectionSlug: string,
+  locale: Locale = DEFAULT_LOCALE
 ): Promise<CategoryDef[]> {
   const data = await getData();
-  return data.categories.filter(
-    (c) => c.active && c.group_slug === sectionSlug
-  );
+  return data.categories
+    .filter((c) => c.active && c.group_slug === sectionSlug)
+    .map((c) => localizeCategory(c, locale));
 }
 
 export async function getCategoryByBaselinkerId(

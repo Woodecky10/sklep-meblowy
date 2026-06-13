@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSections, getCategories } from "@/app/_lib/categories";
+import { getLocale } from "@/app/_lib/i18n";
 
 // Globalny 404 — renderowany gdy URL nie pasuje do żadnej trasy
 // albo gdy w page.tsx wywołamy notFound() (np. produkt usunięty, zamówienie
@@ -8,9 +9,10 @@ import { getSections, getCategories } from "@/app/_lib/categories";
 // Async bo pobieramy aktywne kategorie z DB żeby pokazać "top sekcje".
 // Klient który trafi na zepsuty link od razu widzi gdzie może iść.
 export default async function NotFound() {
+  const locale = await getLocale();
   const [sections, categories] = await Promise.all([
-    getSections(),
-    getCategories(),
+    getSections(locale),
+    getCategories(locale),
   ]);
 
   // Bierzemy do 4 kategorii z pierwszej sekcji (zazwyczaj "Salon" / "Sypialnia")

@@ -23,6 +23,7 @@ import ReviewForm from "@/app/_components/ui/ReviewForm";
 import { sanitizeProductHtml } from "@/app/_lib/product-html";
 import ProductDescriptionSections from "@/app/_components/ui/ProductDescriptionSections";
 import { COMPANY } from "@/app/_lib/company";
+import { getLocale } from "@/app/_lib/i18n";
 import type { Product } from "@/app/_lib/types";
 
 type Props = { params: Promise<{ id: string }> };
@@ -51,7 +52,8 @@ function productPlainDescription(product: Product): string {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const product = await getProduct(id);
+  const locale = await getLocale();
+  const product = await getProduct(id, locale);
   if (!product) return { title: "Produkt nie znaleziony" };
   return {
     title: product.name,
@@ -65,18 +67,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProduktPage({ params }: Props) {
   const { id } = await params;
-  const product = await getProduct(id);
+  const locale = await getLocale();
+  const product = await getProduct(id, locale);
   if (!product) notFound();
 
   const [related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell, wishlistIds] =
     await Promise.all([
-      getRelatedProducts(product.id, product.category),
+      getRelatedProducts(product.id, product.category, 4, locale),
       getProductRating(product.id),
-      getReviewsForProduct(product.id),
+      getReviewsForProduct(product.id, 50, locale),
       getReviewStatus(product.id),
-      getCategoryLabel(product.category),
-      getAllCategories(),
-      getCrossSellProducts([product.category], [product.id], 4),
+      getCategoryLabel(product.category, locale),
+      getAllCategories(locale),
+      getCrossSellProducts([product.category], [product.id], 4, locale),
       getUserWishlistIds(),
     ]);
 
