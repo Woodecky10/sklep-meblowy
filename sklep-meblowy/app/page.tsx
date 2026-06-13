@@ -11,6 +11,7 @@ import { getUserWishlistIds } from "./_lib/wishlist";
 import { getLocale } from "./_lib/i18n-server";
 import { localizePath } from "./_lib/i18n";
 import { alternatesFor } from "./_lib/sitemap-i18n";
+import { getDictionary } from "./_lib/dictionaries";
 import ProductCard from "./_components/ui/ProductCard";
 
 // Home jest w pełni przetłumaczone przez słownik UI → DE zawsze (hasDe: true).
@@ -39,6 +40,7 @@ function protectOrphans(text: string): string {
 
 export default async function HomePage() {
   const locale = await getLocale();
+  const t = getDictionary(locale);
   const [dbSlides, dbTiles, featured, allCategories, collectionsForHome, wishlistIds] = await Promise.all([
     getActiveSlides(),
     getActiveTiles(),
@@ -61,10 +63,10 @@ export default async function HomePage() {
       <section className="max-w-7xl mx-auto px-6 py-24">
         <div className="text-center mb-16">
           <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-3">
-            Kolekcje
+            {t.home.collectionsEyebrow}
           </p>
           <h2 className="font-display text-4xl font-bold text-[var(--fg)]">
-            Znajdź swój styl
+            {t.home.collectionsHeading}
           </h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -100,7 +102,7 @@ export default async function HomePage() {
                   </span>
                 )}
                 <span className="mt-1 text-[10px] sm:text-xs font-sans uppercase tracking-widest text-[var(--color-gold)] flex items-center gap-1">
-                  Odkryj
+                  {t.home.tileDiscover}
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M5 12h14M12 5l7 7-7 7" />
                   </svg>
@@ -117,14 +119,14 @@ export default async function HomePage() {
           <div className="flex items-end justify-between mb-16">
             <div>
               <h2 className="font-display text-4xl font-bold text-[var(--fg)]">
-                Polecane produkty
+                {t.home.featuredHeading}
               </h2>
             </div>
             <LocalizedLink
               href="/sklep"
               className="hidden md:inline-flex text-sm font-sans uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors"
             >
-              Wszystkie →
+              {t.home.seeAll}
             </LocalizedLink>
           </div>
 
@@ -154,10 +156,10 @@ export default async function HomePage() {
         <section className="max-w-7xl mx-auto px-6 py-24">
           <div className="text-center mb-16">
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-3">
-              Serie mebli
+              {t.home.seriesEyebrow}
             </p>
             <h2 className="font-display text-4xl font-bold text-[var(--fg)]">
-              Nasze kolekcje
+              {t.home.seriesHeading}
             </h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -204,8 +206,12 @@ export default async function HomePage() {
                     </p>
                   )}
                   <span className="mt-2 text-xs font-sans uppercase tracking-widest text-[var(--color-gold)] flex items-center gap-1">
-                    Zobacz kolekcję ({sampleProducts.length}
-                    {sampleProducts.length === 1 ? " produkt" : sampleProducts.length < 5 ? " produkty" : " produktów"})
+                    {t.home.seeCollection} ({sampleProducts.length}{" "}
+                    {sampleProducts.length === 1
+                      ? t.home.productOne
+                      : sampleProducts.length < 5
+                        ? t.home.productFew
+                        : t.home.productMany})
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M5 12h14M12 5l7 7-7 7" />
                     </svg>

@@ -121,27 +121,27 @@ export default async function ProduktPage({ params }: Props) {
   if (product.dimensions) {
     const { width, depth, height } = product.dimensions;
     details.push({
-      label: "Wymiary",
-      value: `${width} × ${depth} × ${height} cm (szer. × gł. × wys.)`,
+      label: t.product.specWidth,
+      value: `${width} × ${depth} × ${height} cm (${t.product.dimensionsHint})`,
     });
   }
   if (product.weight !== null && product.weight !== undefined) {
-    details.push({ label: "Waga", value: `${product.weight} kg` });
+    details.push({ label: t.product.specWeight, value: `${product.weight} kg` });
   }
   if (product.material) {
-    details.push({ label: "Materiał", value: product.material });
+    details.push({ label: t.product.specMaterial, value: product.material });
   }
   if (product.color) {
-    details.push({ label: "Kolor bazowy", value: product.color });
+    details.push({ label: t.product.specBaseColor, value: product.color });
   }
   if (product.construction) {
-    details.push({ label: "Konstrukcja", value: product.construction });
+    details.push({ label: t.product.specConstruction, value: product.construction });
   }
   if (product.delivery_time) {
-    details.push({ label: "Czas realizacji", value: product.delivery_time });
+    details.push({ label: t.product.specDeliveryTime, value: product.delivery_time });
   }
   if (product.warranty) {
-    details.push({ label: "Gwarancja", value: product.warranty });
+    details.push({ label: t.product.specWarranty, value: product.warranty });
   }
 
   // Dodatkowe cechy z BL (features) — Allegro template parametry. Pomijamy
@@ -213,9 +213,9 @@ export default async function ProduktPage({ params }: Props) {
 
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-xs font-sans text-[var(--muted)] mb-12 uppercase tracking-widest">
-        <LocalizedLink href="/" className="hover:text-[var(--color-gold)] transition-colors">Dom</LocalizedLink>
+        <LocalizedLink href="/" className="hover:text-[var(--color-gold)] transition-colors">{t.product.breadcrumbHome}</LocalizedLink>
         <span>/</span>
-        <LocalizedLink href="/sklep" className="hover:text-[var(--color-gold)] transition-colors">Sklep</LocalizedLink>
+        <LocalizedLink href="/sklep" className="hover:text-[var(--color-gold)] transition-colors">{t.product.breadcrumbShop}</LocalizedLink>
         <span>/</span>
         <LocalizedLink
           href={`/sklep?kategoria=${product.category}`}
@@ -266,10 +266,10 @@ export default async function ProduktPage({ params }: Props) {
           <section className="mb-24">
             <div className="mb-8">
               <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-                Opis produktu
+                {t.product.descriptionEyebrow}
               </p>
               <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
-                Wszystko, co musisz wiedzieć
+                {t.product.descriptionHeading}
               </h2>
             </div>
             <ProductDescriptionSections sections={visibleSections} />
@@ -282,10 +282,10 @@ export default async function ProduktPage({ params }: Props) {
         <section className="mb-24">
           <div className="mb-8">
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-              Pełny opis
+              {t.product.fullDescriptionEyebrow}
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
-              Opis produktu
+              {t.product.fullDescriptionHeading}
             </h2>
           </div>
           <div
@@ -300,10 +300,12 @@ export default async function ProduktPage({ params }: Props) {
         <section className="mb-24">
           <div className="mb-8">
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-              Dopełnienie
+              {t.product.crossSellEyebrow}
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
-              {crossSellLabel ? `Polecane ${crossSellLabel.toLowerCase()}` : "Może Cię zainteresować"}
+              {crossSellLabel
+                ? `${t.product.crossSellRecommendedPrefix} ${crossSellLabel.toLowerCase()}`
+                : t.product.crossSellFallbackHeading}
             </h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -319,7 +321,7 @@ export default async function ProduktPage({ params }: Props) {
         <section className="mb-24">
           <div className="mb-8">
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-              Pełna kolekcja
+              {t.product.fullCollectionEyebrow}
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
               {collection.label}
@@ -375,19 +377,14 @@ export default async function ProduktPage({ params }: Props) {
               <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 text-sm text-[var(--muted)] leading-relaxed">
                 {reviewStatus.reason === "not_logged_in" ? (
                   <>
-                    Opinie mogą dodawać tylko osoby, które kupiły produkt.{" "}
+                    {t.product.reviewGuardLoggedOut}{" "}
                     <a href="/logowanie" className="text-[var(--color-gold)] underline">
-                      Zaloguj się
+                      {t.product.reviewGuardLogin}
                     </a>
-                    , a jeśli ten produkt jest w Twoich zamówieniach, zobaczysz tu
-                    formularz.
+                    {t.product.reviewGuardLoggedOutSuffix}
                   </>
                 ) : (
-                  <>
-                    Opinię możesz dodać po dokonaniu zakupu tego produktu.
-                    Weryfikujemy autentyczność opinii na podstawie historii
-                    zamówień.
-                  </>
+                  <>{t.product.reviewGuardNotPurchased}</>
                 )}
               </div>
             )}

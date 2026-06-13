@@ -48,10 +48,10 @@ export default function ProductMainSection({
         {specifications.length > 0 && (
           <div>
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-              Specyfikacja
+              {t.product.specificationEyebrow}
             </p>
             <h2 className="font-display text-2xl font-bold text-[var(--fg)] mb-5">
-              Szczegóły produktu
+              {t.product.specificationHeading}
             </h2>
             <dl className="flex flex-col">
               {specifications.map((s) => (
@@ -89,7 +89,11 @@ export default function ProductMainSection({
               <StarRating value={rating.average} size={16} />
               <span>
                 {rating.average.toFixed(1)} ({rating.count}{" "}
-                {rating.count === 1 ? "opinia" : rating.count < 5 ? "opinie" : "opinii"})
+                {rating.count === 1
+                  ? t.product.reviewOne
+                  : rating.count < 5
+                    ? t.product.reviewFew
+                    : t.product.reviewMany})
               </span>
             </a>
           )}
@@ -114,12 +118,12 @@ export default function ProductMainSection({
         />
 
         <div className="border-t border-[var(--border)] pt-6 text-sm text-[var(--muted)] space-y-2">
-          <p>✓ Zwrot do 30 dni</p>
-          <p>✓ Gwarancja 2 lata</p>
+          <p>✓ {t.product.returns}</p>
+          <p>✓ {t.product.warranty}</p>
           <p>
-            ✓ Czas dostawy:{" "}
+            ✓ {t.product.deliveryTimeLabel}{" "}
             <strong className="text-[var(--fg)]">
-              {product.delivery_time || "14–21 dni roboczych"}
+              {product.delivery_time || t.product.deliveryTimeDefault}
             </strong>
           </p>
         </div>

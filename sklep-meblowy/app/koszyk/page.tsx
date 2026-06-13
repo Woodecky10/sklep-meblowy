@@ -116,17 +116,17 @@ export default function KoszykPage() {
       <div className="mb-10 flex items-end justify-between">
         <div>
           <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-            Koszyk
+            {t.cart.eyebrow}
           </p>
           <h1 className="font-display text-4xl font-bold text-[var(--fg)]">
-            Twoje produkty ({count})
+            {t.cart.yourProducts} ({count})
           </h1>
         </div>
         <button
           onClick={clear}
           className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] hover:text-red-500 transition-colors"
         >
-          Wyczyść koszyk
+          {t.cart.clearCart}
         </button>
       </div>
 
@@ -153,7 +153,7 @@ export default function KoszykPage() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-[var(--muted)] text-xs">
-                        Brak
+                        {t.cart.noImage}
                       </div>
                     )}
                   </div>
@@ -205,7 +205,7 @@ export default function KoszykPage() {
                       <button
                         onClick={() => remove(item.id, item.variantValues)}
                         className="text-[var(--muted)] hover:text-red-500 transition-colors"
-                        aria-label="Usuń"
+                        aria-label={t.cart.remove}
                       >
                         <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                           <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
@@ -218,6 +218,14 @@ export default function KoszykPage() {
                   <ItemNotes
                     initial={item.notes ?? ""}
                     onSave={(notes) => updateNotes(item.id, notes, item.variantValues)}
+                    labels={{
+                      add: t.cart.addNotes,
+                      label: t.cart.notesLabel,
+                      placeholder: t.cart.notesPlaceholder,
+                      charsSuffix: t.cart.notesCharsSuffix,
+                      unsaved: t.cart.notesUnsaved,
+                      remove: t.cart.removeNotes,
+                    }}
                   />
                 </div>
               </div>
@@ -237,26 +245,34 @@ export default function KoszykPage() {
               appliedPromo={appliedPromo}
               onApply={applyPromo}
               onClear={clearPromo}
+              labels={{
+                label: t.cart.promoLabel,
+                placeholder: t.cart.promoPlaceholder,
+                apply: t.cart.promoApply,
+                discountPercent: t.cart.promoDiscountPercent,
+                discountAmount: t.cart.promoDiscountAmount,
+                remove: t.cart.promoRemove,
+              }}
             />
 
             <div className="flex flex-col gap-3 text-sm font-sans">
               <div className="flex justify-between text-[var(--muted)]">
-                <span>Produkty ({count} szt.)</span>
+                <span>{t.cart.productsCount} ({count} {t.cart.pieces})</span>
                 <span>{formatPrice(total, locale)}</span>
               </div>
               {appliedPromo && discount > 0 && (
                 <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
-                  <span>Zniżka ({appliedPromo.code})</span>
+                  <span>{t.cart.discount} ({appliedPromo.code})</span>
                   <span>−{formatPrice(discount, locale)}</span>
                 </div>
               )}
               <div className="flex justify-between items-start text-[var(--muted)] gap-3">
-                <span className="shrink-0">Dostawa</span>
+                <span className="shrink-0">{t.cart.delivery}</span>
                 <span className="text-right text-xs leading-snug">
-                  od&nbsp;99&nbsp;zł
+                  {t.cart.deliveryFrom}
                   <br />
                   <span className="text-[var(--muted)]">
-                    dokładną wycenę podajemy telefonicznie lub mailowo po&nbsp;zamówieniu
+                    {t.cart.deliveryHint}
                   </span>
                 </span>
               </div>
@@ -281,9 +297,9 @@ export default function KoszykPage() {
             </LocalizedLink>
 
             <div className="border-t border-[var(--border)] pt-4 text-xs text-[var(--muted)] space-y-1">
-              <p>✓ Bezpieczna płatność Stripe</p>
-              <p>✓ Zwrot do 30 dni</p>
-              <p>✓ Gwarancja 2 lata</p>
+              <p>✓ {t.cart.trustPayment}</p>
+              <p>✓ {t.cart.trustReturns}</p>
+              <p>✓ {t.cart.trustWarranty}</p>
             </div>
           </div>
         </div>
@@ -294,10 +310,10 @@ export default function KoszykPage() {
         <section className="mt-20 pt-16 border-t border-[var(--border)]">
           <div className="mb-10">
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-              Polecane do koszyka
+              {t.cart.crossSellEyebrow}
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
-              Może Cię zainteresować
+              {t.cart.crossSellHeading}
             </h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -324,9 +340,18 @@ export default function KoszykPage() {
 function ItemNotes({
   initial,
   onSave,
+  labels,
 }: {
   initial: string;
   onSave: (notes: string) => void;
+  labels: {
+    add: string;
+    label: string;
+    placeholder: string;
+    charsSuffix: string;
+    unsaved: string;
+    remove: string;
+  };
 }) {
   const [open, setOpen] = useState(initial.length > 0);
   const [value, setValue] = useState(initial);
@@ -339,7 +364,7 @@ function ItemNotes({
         onClick={() => setOpen(true)}
         className="self-start mt-3 text-xs font-sans uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors"
       >
-        + Dodaj uwagi do tego produktu
+        {labels.add}
       </button>
     );
   }
@@ -347,7 +372,7 @@ function ItemNotes({
   return (
     <div className="mt-3 flex flex-col gap-2">
       <label className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
-        Uwagi do tego produktu
+        {labels.label}
       </label>
       <textarea
         value={value}
@@ -357,12 +382,12 @@ function ItemNotes({
         }}
         rows={2}
         maxLength={500}
-        placeholder="np. róż jak na zdjęciu 2, proszę o telefon przed dostawą"
+        placeholder={labels.placeholder}
         className="w-full px-3 py-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)] resize-y"
       />
       <div className="flex items-center justify-between gap-2">
         <span className="text-[10px] text-[var(--muted)]">
-          {value.length}/500 znaków{dirty ? " · niezapisane" : ""}
+          {value.length}/500 {labels.charsSuffix}{dirty ? labels.unsaved : ""}
         </span>
         {value.length > 0 && (
           <button
@@ -374,7 +399,7 @@ function ItemNotes({
             }}
             className="text-[10px] font-sans uppercase tracking-widest text-[var(--muted)] hover:text-red-500"
           >
-            Usuń uwagi
+            {labels.remove}
           </button>
         )}
       </div>
@@ -391,11 +416,20 @@ function PromoInput({
   appliedPromo,
   onApply,
   onClear,
+  labels,
 }: {
   cartTotal: number;
   appliedPromo: ReturnType<typeof useCart>["appliedPromo"];
   onApply: ReturnType<typeof useCart>["applyPromo"];
   onClear: ReturnType<typeof useCart>["clearPromo"];
+  labels: {
+    label: string;
+    placeholder: string;
+    apply: string;
+    discountPercent: string;
+    discountAmount: string;
+    remove: string;
+  };
 }) {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -434,8 +468,8 @@ function PromoInput({
           </p>
           <p className="text-xs text-emerald-700 dark:text-emerald-400">
             {appliedPromo.discountType === "percent"
-              ? `Zniżka ${appliedPromo.discountValue}%`
-              : `Zniżka ${appliedPromo.discountValue.toFixed(2)} zł`}
+              ? `${labels.discountPercent} ${appliedPromo.discountValue}%`
+              : `${labels.discountAmount} ${appliedPromo.discountValue.toFixed(2)} zł`}
           </p>
         </div>
         <button
@@ -443,7 +477,7 @@ function PromoInput({
           onClick={onClear}
           className="text-xs font-sans uppercase tracking-widest text-emerald-700 dark:text-emerald-400 hover:underline"
         >
-          Usuń
+          {labels.remove}
         </button>
       </div>
     );
@@ -452,13 +486,13 @@ function PromoInput({
   return (
     <form onSubmit={submit} className="flex flex-col gap-2">
       <label className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
-        Kod rabatowy
+        {labels.label}
       </label>
       <div className="flex gap-2">
         <input
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
-          placeholder="np. MOLLIEN10"
+          placeholder={labels.placeholder}
           maxLength={50}
           className="flex-1 px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-sm text-[var(--fg)] font-mono uppercase focus:outline-none focus:border-[var(--color-gold)]"
         />
@@ -467,7 +501,7 @@ function PromoInput({
           disabled={pending || !code.trim()}
           className="px-4 py-2 border border-[var(--color-gold)] text-[var(--color-gold)] font-sans text-xs uppercase tracking-widest rounded-lg hover:bg-[var(--color-gold)] hover:text-[var(--color-navy)] transition-colors disabled:opacity-50"
         >
-          {pending ? "..." : "Zastosuj"}
+          {pending ? "..." : labels.apply}
         </button>
       </div>
       {error && (

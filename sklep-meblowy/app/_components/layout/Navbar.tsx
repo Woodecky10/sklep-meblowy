@@ -13,10 +13,12 @@ import { getSections, getCategories } from "@/app/_lib/categories";
 import { getWishlistCount } from "@/app/_lib/wishlist";
 import { COMPANY } from "@/app/_lib/company";
 import { getLocale } from "@/app/_lib/i18n-server";
+import { getDictionary } from "@/app/_lib/dictionaries";
 
 export default async function Navbar() {
   const supabase = await createClient();
   const locale = await getLocale();
+  const t = getDictionary(locale);
   const [
     {
       data: { user },
@@ -56,7 +58,7 @@ export default async function Navbar() {
         <LocalizedLink
           href="/"
           className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0"
-          aria-label={`${COMPANY.brandName} — strona główna`}
+          aria-label={`${COMPANY.brandName} — ${t.nav.homeAria}`}
         >
           <Image
             src="/logo-mark.svg"
@@ -109,7 +111,7 @@ export default async function Navbar() {
                       href={`/sklep?sekcja=${section.slug}`}
                       className="block px-5 py-2.5 text-sm text-[var(--color-gold)] hover:bg-[var(--bg)] transition-colors border-b border-[var(--border)] mb-1 font-medium"
                     >
-                      Wszystkie {section.label.toLowerCase()}
+                      {t.nav.allInSection} {section.label.toLowerCase()}
                     </LocalizedLink>
                     {cats.map((c) => (
                       <LocalizedLink
@@ -147,6 +149,16 @@ export default async function Navbar() {
             isLoggedIn={!!user}
             isAdmin={isAdmin(user)}
             sections={mobileSections}
+            labels={{
+              menu: t.nav.menu,
+              allInSection: t.nav.allInSection,
+              adminPanel: t.nav.adminPanel,
+              myAccount: t.nav.myAccount,
+              orders: t.nav.orders,
+              logout: t.nav.logout,
+              login: t.nav.login,
+              register: t.nav.register,
+            }}
           />
         </div>
       </div>

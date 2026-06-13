@@ -11,14 +11,27 @@ export type MobileMenuSection = {
   categories: { slug: string; label: string }[];
 };
 
+export type MobileMenuLabels = {
+  menu: string;
+  allInSection: string;
+  adminPanel: string;
+  myAccount: string;
+  orders: string;
+  logout: string;
+  login: string;
+  register: string;
+};
+
 export default function MobileMenu({
   isLoggedIn = false,
   isAdmin = false,
   sections = [],
+  labels,
 }: {
   isLoggedIn?: boolean;
   isAdmin?: boolean;
   sections?: MobileMenuSection[];
+  labels: MobileMenuLabels;
 }) {
   const [open, setOpen] = useState(false);
   const [openSection, setOpenSection] = useState<string | null>(null);
@@ -28,7 +41,7 @@ export default function MobileMenu({
       <button
         onClick={() => setOpen(!open)}
         className="lg:hidden w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--fg)]"
-        aria-label="Menu"
+        aria-label={labels.menu}
       >
         {open ? (
           <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -75,7 +88,7 @@ export default function MobileMenu({
                         onClick={() => setOpen(false)}
                         className="text-sm text-[var(--color-gold)] hover:underline transition-colors font-medium"
                       >
-                        Wszystkie {section.label.toLowerCase()}
+                        {labels.allInSection} {section.label.toLowerCase()}
                       </LocalizedLink>
                       {cats.map((c) => (
                         <LocalizedLink
@@ -107,7 +120,7 @@ export default function MobileMenu({
                         <rect x="3" y="14" width="7" height="7" rx="1" />
                         <rect x="14" y="14" width="7" height="7" rx="1" />
                       </svg>
-                      Panel admina
+                      {labels.adminPanel}
                     </LocalizedLink>
                   )}
                   <LocalizedLink
@@ -115,21 +128,21 @@ export default function MobileMenu({
                     onClick={() => setOpen(false)}
                     className="font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors"
                   >
-                    Moje konto
+                    {labels.myAccount}
                   </LocalizedLink>
                   <LocalizedLink
                     href="/konto/zamowienia"
                     onClick={() => setOpen(false)}
                     className="font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors"
                   >
-                    Zamówienia
+                    {labels.orders}
                   </LocalizedLink>
                   <form action={signOut}>
                     <button
                       type="submit"
                       className="font-sans text-sm uppercase tracking-widest text-red-600 hover:text-red-700 transition-colors text-left"
                     >
-                      Wyloguj
+                      {labels.logout}
                     </button>
                   </form>
                 </>
@@ -140,14 +153,14 @@ export default function MobileMenu({
                     onClick={() => setOpen(false)}
                     className="font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors"
                   >
-                    Zaloguj się
+                    {labels.login}
                   </LocalizedLink>
                   <LocalizedLink
                     href="/rejestracja"
                     onClick={() => setOpen(false)}
                     className="font-sans text-sm uppercase tracking-widest text-[var(--color-gold)] font-semibold transition-colors"
                   >
-                    Zarejestruj się
+                    {labels.register}
                   </LocalizedLink>
                 </>
               )}
