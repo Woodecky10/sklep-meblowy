@@ -3,6 +3,8 @@
 import { useRef, useState, useTransition } from "react";
 import { submitInquiry } from "@/app/produkt/actions";
 import { useModal } from "@/app/_lib/useModal";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
+import { getDictionary } from "@/app/_lib/dictionaries";
 
 // Modal "Zapytaj o inne kolory / własny wariant" — otwarty przyciskiem
 // na karcie produktu. Wysyła zapytanie do tabeli product_inquiries,
@@ -10,10 +12,18 @@ import { useModal } from "@/app/_lib/useModal";
 export default function InquiryModal({
   productId,
   productName,
+  triggerLabel,
 }: {
   productId: string;
   productName: string;
+  // Etykieta przycisku otwierającego modal — zlokalizowana, przekazana z
+  // ProductMainSection (client). Bez niej bierzemy ją (i resztę chrome modala)
+  // ze słownika po locale klienta. Dynamiczne komunikaty z server action
+  // (result.message / result.error) pozostają PL.
+  triggerLabel?: string;
 }) {
+  const t = getDictionary(useClientLocale());
+  const label = triggerLabel ?? t.product.inquireColors;
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<
@@ -38,7 +48,7 @@ export default function InquiryModal({
         onClick={() => setOpen(true)}
         className="w-full py-3 border border-[var(--color-gold)] text-[var(--color-gold)] font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
       >
-        Zapytaj o inne kolory
+        {label}
       </button>
 
       {open && (
@@ -46,7 +56,7 @@ export default function InquiryModal({
           ref={dialogRef}
           role="dialog"
           aria-modal="true"
-          aria-label="Zapytanie o niestandardowy wariant"
+          aria-label={t.inquiry.dialogAria}
           onClick={close}
           className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
         >
@@ -57,18 +67,18 @@ export default function InquiryModal({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-1">
-                  Pytanie
+                  {t.inquiry.eyebrow}
                 </p>
                 <h2 className="font-display text-2xl font-bold text-[var(--fg)] leading-tight">
-                  Inny kolor, własny wariant?
+                  {t.inquiry.heading}
                 </h2>
                 <p className="text-sm text-[var(--muted)] mt-2">
-                  Produkt: <strong className="text-[var(--fg)]">{productName}</strong>
+                  {t.inquiry.productLabel}: <strong className="text-[var(--fg)]">{productName}</strong>
                 </p>
               </div>
               <button
                 onClick={close}
-                aria-label="Zamknij"
+                aria-label={t.common.close}
                 className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
               >
                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -80,7 +90,7 @@ export default function InquiryModal({
             {result?.ok ? (
               <div className="p-5 bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 rounded-xl">
                 <p className="text-sm text-emerald-800 dark:text-emerald-200 font-semibold mb-1">
-                  Wiadomość wysłana ✓
+                  {t.inquiry.sentTitle}
                 </p>
                 <p className="text-sm text-emerald-700 dark:text-emerald-300">
                   {result.message}
@@ -89,7 +99,7 @@ export default function InquiryModal({
                   onClick={close}
                   className="mt-4 px-5 py-2 text-xs font-sans uppercase tracking-widest border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors"
                 >
-                  Zamknij
+                  {t.common.close}
                 </button>
               </div>
             ) : (
@@ -105,7 +115,7 @@ export default function InquiryModal({
                 <input type="hidden" name="product_id" value={productId} />
                 <input type="hidden" name="product_name" value={productName} />
 
-                <Field label="Twoje imię i nazwisko">
+                <Field label={t.inquiry.nameLabel}>
                   <input
                     name="customer_name"
                     maxLength={200}
@@ -114,7 +124,7 @@ export default function InquiryModal({
                   />
                 </Field>
 
-                <Field label="Email" required>
+                <Field label={t.inquiry.emailLabel} required>
                   <input
                     type="email"
                     name="customer_email"
@@ -125,7 +135,7 @@ export default function InquiryModal({
                   />
                 </Field>
 
-                <Field label="Telefon (opcjonalny)" hint="Jeśli wolisz kontakt telefoniczny.">
+                <Field label={t.inquiry.phoneLabel} hint={t.inquiry.phoneHint}>
                   <input
                     type="tel"
                     name="customer_phone"
@@ -135,14 +145,14 @@ export default function InquiryModal({
                   />
                 </Field>
 
-                <Field label="Wiadomość" required hint="Napisz jakiego koloru / wariantu szukasz.">
+                <Field label={t.inquiry.messageLabel} required hint={t.inquiry.messageHint}>
                   <textarea
                     name="message"
                     required
                     minLength={5}
                     maxLength={2000}
                     rows={4}
-                    placeholder="Szukam wersji w kolorze butelkowej zieleni. Czy macie tkaninę Velvet w tym odcieniu?"
+                    placeholder={t.inquiry.messagePlaceholder}
                     className={`${inputCls} resize-y`}
                   />
                 </Field>
@@ -159,7 +169,7 @@ export default function InquiryModal({
                     disabled={pending}
                     className="flex-1 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
                   >
-                    {pending ? "Wysyłam..." : "Wyślij zapytanie"}
+                    {pending ? t.inquiry.submitting : t.inquiry.submit}
                   </button>
                   <button
                     type="button"
@@ -167,12 +177,12 @@ export default function InquiryModal({
                     disabled={pending}
                     className="px-5 py-3 border border-[var(--border)] text-[var(--fg)] font-sans text-sm uppercase tracking-widest rounded-full hover:border-[var(--color-gold)] transition-colors"
                   >
-                    Anuluj
+                    {t.inquiry.cancel}
                   </button>
                 </div>
 
                 <p className="text-xs text-[var(--muted)] leading-snug">
-                  Twoje dane będą wykorzystane wyłącznie do odpowiedzi na to zapytanie.
+                  {t.inquiry.privacyNote}
                 </p>
               </form>
             )}

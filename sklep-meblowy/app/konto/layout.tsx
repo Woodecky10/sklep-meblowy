@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/app/_lib/supabase/server";
 import { signOut } from "@/app/_lib/auth-actions";
+import { getLocale } from "@/app/_lib/i18n-server";
 
 export default async function AccountLayout({
   children,
@@ -15,28 +16,46 @@ export default async function AccountLayout({
 
   if (!user) redirect("/logowanie");
 
+  const locale = await getLocale();
+  const de = locale === "de";
+  const c = de
+    ? {
+        account: "Mein Konto",
+        greeting: "Willkommen",
+        profile: "Profil",
+        orders: "Bestellungen",
+        signOut: "Abmelden",
+      }
+    : {
+        account: "Twoje konto",
+        greeting: "Witaj",
+        profile: "Profil",
+        orders: "Zamówienia",
+        signOut: "Wyloguj",
+      };
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
       <div className="mb-10">
         <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-          Twoje konto
+          {c.account}
         </p>
         <h1 className="font-display text-4xl font-bold text-[var(--fg)]">
-          Witaj{user.user_metadata?.full_name ? `, ${user.user_metadata.full_name}` : ""}
+          {c.greeting}{user.user_metadata?.full_name ? `, ${user.user_metadata.full_name}` : ""}
         </h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
         <aside className="lg:col-span-1">
           <nav className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible">
-            <SideLink href="/konto">Profil</SideLink>
-            <SideLink href="/konto/zamowienia">Zamówienia</SideLink>
+            <SideLink href="/konto">{c.profile}</SideLink>
+            <SideLink href="/konto/zamowienia">{c.orders}</SideLink>
             <form action={signOut} className="lg:mt-4">
               <button
                 type="submit"
                 className="w-full text-left px-4 py-3 rounded-xl font-sans text-sm uppercase tracking-widest text-[var(--muted)] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors whitespace-nowrap"
               >
-                Wyloguj
+                {c.signOut}
               </button>
             </form>
           </nav>

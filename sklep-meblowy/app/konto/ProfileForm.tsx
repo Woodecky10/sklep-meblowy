@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { updateProfile, type ProfileState } from "./actions";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
 import type { Profile } from "@/app/_lib/types";
 
 export default function ProfileForm({
@@ -11,6 +12,35 @@ export default function ProfileForm({
   profile: Profile | null;
   email: string;
 }) {
+  const de = useClientLocale() === "de";
+  const c = de
+    ? {
+        email: "Email",
+        fullName: "Vor- und Nachname",
+        defaultAddress: "Standard-Lieferadresse",
+        street: "Straße und Hausnummer",
+        postalCode: "Postleitzahl",
+        city: "Stadt",
+        country: "Land",
+        defaultCountry: "Polen",
+        saved: "Änderungen gespeichert.",
+        saving: "Wird gespeichert...",
+        save: "Änderungen speichern",
+      }
+    : {
+        email: "Email",
+        fullName: "Imię i nazwisko",
+        defaultAddress: "Domyślny adres dostawy",
+        street: "Ulica i numer",
+        postalCode: "Kod pocztowy",
+        city: "Miasto",
+        country: "Kraj",
+        defaultCountry: "Polska",
+        saved: "Zapisano zmiany.",
+        saving: "Zapisuję...",
+        save: "Zapisz zmiany",
+      };
+
   const [state, action, pending] = useActionState<ProfileState, FormData>(
     updateProfile,
     null
@@ -18,40 +48,40 @@ export default function ProfileForm({
 
   return (
     <form action={action} className="flex flex-col gap-5">
-      <Field label="Email" name="email" value={email} disabled />
+      <Field label={c.email} name="email" value={email} disabled />
       <Field
-        label="Imię i nazwisko"
+        label={c.fullName}
         name="full_name"
         defaultValue={profile?.full_name ?? ""}
         required
       />
 
       <h3 className="font-display text-lg font-bold text-[var(--fg)] pt-4">
-        Domyślny adres dostawy
+        {c.defaultAddress}
       </h3>
 
       <Field
-        label="Ulica i numer"
+        label={c.street}
         name="street"
         defaultValue={profile?.address?.street ?? ""}
       />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Field
-          label="Kod pocztowy"
+          label={c.postalCode}
           name="postal_code"
           placeholder="00-000"
           defaultValue={profile?.address?.postal_code ?? ""}
         />
         <Field
-          label="Miasto"
+          label={c.city}
           name="city"
           defaultValue={profile?.address?.city ?? ""}
         />
       </div>
       <Field
-        label="Kraj"
+        label={c.country}
         name="country"
-        defaultValue={profile?.address?.country ?? "Polska"}
+        defaultValue={profile?.address?.country ?? c.defaultCountry}
       />
 
       {state?.error && (
@@ -61,7 +91,7 @@ export default function ProfileForm({
       )}
       {state?.success && (
         <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-900 text-green-700 dark:text-green-300 rounded-xl px-4 py-3 text-sm">
-          Zapisano zmiany.
+          {c.saved}
         </div>
       )}
 
@@ -70,7 +100,7 @@ export default function ProfileForm({
         disabled={pending}
         className="self-start px-8 py-3.5 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
       >
-        {pending ? "Zapisuję..." : "Zapisz zmiany"}
+        {pending ? c.saving : c.save}
       </button>
     </form>
   );

@@ -55,17 +55,19 @@ export function isFilled(v: string | null | undefined): boolean {
   return !s.startsWith("DO UZUPEŁNIENIA");
 }
 
-// Sformatowany pełny adres – używany w regulaminie i polityce prywatności
-export function formatFullAddress(): string {
+// Sformatowany pełny adres – używany w regulaminie i polityce prywatności.
+// Na DE nazwa kraju tłumaczona (Polska → Polen); reszta adresu bez zmian.
+export function formatFullAddress(locale: "pl" | "de" = "pl"): string {
   const a = COMPANY.address;
-  return `${a.street}, ${a.postalCode} ${a.city}, ${a.country}`;
+  const country = locale === "de" ? "Polen" : a.country;
+  return `${a.street}, ${a.postalCode} ${a.city}, ${country}`;
 }
 
 // Sformatowane dane rejestrowe – stopka dokumentów
-export function formatCompanyHeader(): string {
+export function formatCompanyHeader(locale: "pl" | "de" = "pl"): string {
   const parts = [
     COMPANY.legalName,
-    formatFullAddress(),
+    formatFullAddress(locale),
     `NIP: ${COMPANY.nip}`,
   ];
   if (isFilled(COMPANY.regon)) parts.push(`REGON: ${COMPANY.regon}`);

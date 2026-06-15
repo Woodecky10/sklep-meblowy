@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/app/_lib/supabase/server";
+import { getLocale } from "@/app/_lib/i18n-server";
 
 export type SubmitInquiryResult =
   | { ok: true; message: string }
@@ -21,6 +22,8 @@ function isEmail(s: string): boolean {
 export async function submitInquiry(
   formData: FormData
 ): Promise<SubmitInquiryResult> {
+  const de = (await getLocale()) === "de";
+  const tr = (pl: string, deTxt: string) => (de ? deTxt : pl);
   const productId = sanitize(formData.get("product_id"), 64) || null;
   const productName = sanitize(formData.get("product_name"), 300);
   const customerName = sanitize(formData.get("customer_name"), 200);
@@ -29,10 +32,10 @@ export async function submitInquiry(
   const message = sanitize(formData.get("message"), 2000);
 
   if (!customerEmail || !isEmail(customerEmail)) {
-    return { ok: false, error: "Podaj poprawny adres email" };
+    return { ok: false, error: tr("Podaj poprawny adres email", "Bitte geben Sie eine gültige E-Mail-Adresse an") };
   }
   if (message.length < 5) {
-    return { ok: false, error: "Wiadomość jest za krótka (min 5 znaków)" };
+    return { ok: false, error: tr("Wiadomość jest za krótka (min 5 znaków)", "Die Nachricht ist zu kurz (mind. 5 Zeichen)") };
   }
 
   const supabase = await createAdminClient();
@@ -46,11 +49,14 @@ export async function submitInquiry(
   } as never);
 
   if (error) {
-    return { ok: false, error: "Nie udało się wysłać zapytania — spróbuj później" };
+    return { ok: false, error: tr("Nie udało się wysłać zapytania — spróbuj później", "Die Anfrage konnte nicht gesendet werden — bitte versuchen Sie es später erneut") };
   }
 
   return {
     ok: true,
-    message: "Dziękujemy! Odezwiemy się na podany email w ciągu 24 godzin.",
+    message: tr(
+      "Dziękujemy! Odezwiemy się na podany email w ciągu 24 godzin.",
+      "Vielen Dank! Wir melden uns innerhalb von 24 Stunden unter der angegebenen E-Mail-Adresse."
+    ),
   };
 }

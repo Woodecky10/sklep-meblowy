@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { createClient } from "./supabase/server";
 import { linkGuestOrders } from "./link-guest-orders";
 import { isAdmin } from "./admin";
+import { getLocale } from "@/app/_lib/i18n-server";
 
 export type AuthState = { error?: string; info?: string } | null;
 
@@ -23,20 +24,22 @@ function validateEmail(email: string) {
 }
 
 export async function signIn(_state: AuthState, formData: FormData): Promise<AuthState> {
+  const de = (await getLocale()) === "de";
+  const tr = (pl: string, deTxt: string) => (de ? deTxt : pl);
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
-  if (!validateEmail(email)) return { error: "Nieprawidłowy email" };
-  if (password.length < 6) return { error: "Hasło musi mieć min. 6 znaków" };
+  if (!validateEmail(email)) return { error: tr("Nieprawidłowy email", "Ungültige E-Mail") };
+  if (password.length < 6) return { error: tr("Hasło musi mieć min. 6 znaków", "Das Passwort muss mindestens 6 Zeichen haben") };
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
     if (error.message.toLowerCase().includes("email not confirmed")) {
-      return { error: "Email niezweryfikowany — sprawdź skrzynkę" };
+      return { error: tr("Email niezweryfikowany — sprawdź skrzynkę", "E-Mail nicht bestätigt — bitte prüfen Sie Ihr Postfach") };
     }
-    return { error: "Nieprawidłowy email lub hasło" };
+    return { error: tr("Nieprawidłowy email lub hasło", "Ungültige E-Mail oder Passwort") };
   }
 
   // Po zalogowaniu — podepnij ewentualne nowe zamówienia gościa o tym samym emailu
@@ -52,13 +55,15 @@ export async function signIn(_state: AuthState, formData: FormData): Promise<Aut
 }
 
 export async function signUp(_state: AuthState, formData: FormData): Promise<AuthState> {
+  const de = (await getLocale()) === "de";
+  const tr = (pl: string, deTxt: string) => (de ? deTxt : pl);
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const fullName = String(formData.get("full_name") ?? "").trim();
 
-  if (!validateEmail(email)) return { error: "Nieprawidłowy email" };
-  if (password.length < 6) return { error: "Hasło musi mieć min. 6 znaków" };
-  if (fullName.length < 2) return { error: "Podaj imię i nazwisko" };
+  if (!validateEmail(email)) return { error: tr("Nieprawidłowy email", "Ungültige E-Mail") };
+  if (password.length < 6) return { error: tr("Hasło musi mieć min. 6 znaków", "Das Passwort muss mindestens 6 Zeichen haben") };
+  if (fullName.length < 2) return { error: tr("Podaj imię i nazwisko", "Bitte geben Sie Vor- und Nachname an") };
 
   const headerList = await headers();
   const origin = getOrigin(headerList);
@@ -75,12 +80,12 @@ export async function signUp(_state: AuthState, formData: FormData): Promise<Aut
 
   if (error) {
     if (error.message.toLowerCase().includes("already") || error.message.toLowerCase().includes("registered")) {
-      return { error: "Ten email jest już zarejestrowany" };
+      return { error: tr("Ten email jest już zarejestrowany", "Diese E-Mail ist bereits registriert") };
     }
     return { error: error.message };
   }
 
-  return { info: "Sprawdź skrzynkę — wysłaliśmy link potwierdzający rejestrację." };
+  return { info: tr("Sprawdź skrzynkę — wysłaliśmy link potwierdzający rejestrację.", "Bitte prüfen Sie Ihr Postfach — wir haben Ihnen einen Bestätigungslink gesendet.") };
 }
 
 export async function signInWithGoogle() {
@@ -120,8 +125,10 @@ export async function requestPasswordReset(
   _state: AuthState,
   formData: FormData
 ): Promise<AuthState> {
+  const de = (await getLocale()) === "de";
+  const tr = (pl: string, deTxt: string) => (de ? deTxt : pl);
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  if (!validateEmail(email)) return { error: "Nieprawidłowy email" };
+  if (!validateEmail(email)) return { error: tr("Nieprawidłowy email", "Ungültige E-Mail") };
 
   const headerList = await headers();
   const origin = getOrigin(headerList);
@@ -134,7 +141,10 @@ export async function requestPasswordReset(
   });
 
   return {
-    info: "Jeśli ten email jest zarejestrowany, wysłaliśmy na niego link do resetu hasła. Sprawdź skrzynkę.",
+    info: tr(
+      "Jeśli ten email jest zarejestrowany, wysłaliśmy na niego link do resetu hasła. Sprawdź skrzynkę.",
+      "Falls diese E-Mail registriert ist, haben wir einen Link zum Zurücksetzen des Passworts gesendet. Bitte prüfen Sie Ihr Postfach."
+    ),
   };
 }
 
@@ -142,11 +152,13 @@ export async function updatePassword(
   _state: AuthState,
   formData: FormData
 ): Promise<AuthState> {
+  const de = (await getLocale()) === "de";
+  const tr = (pl: string, deTxt: string) => (de ? deTxt : pl);
   const password = String(formData.get("password") ?? "");
   const confirm = String(formData.get("confirm") ?? "");
 
-  if (password.length < 6) return { error: "Hasło musi mieć min. 6 znaków" };
-  if (password !== confirm) return { error: "Hasła nie są identyczne" };
+  if (password.length < 6) return { error: tr("Hasło musi mieć min. 6 znaków", "Das Passwort muss mindestens 6 Zeichen haben") };
+  if (password !== confirm) return { error: tr("Hasła nie są identyczne", "Die Passwörter stimmen nicht überein") };
 
   const supabase = await createClient();
   const {
@@ -157,8 +169,10 @@ export async function updatePassword(
   // (auth/confirm ją tworzy). Bez sesji updateUser zawiedzie.
   if (!user) {
     return {
-      error:
+      error: tr(
         "Sesja resetu wygasła lub jest nieprawidłowa. Wyślij sobie nowy link z /zapomnialem-hasla.",
+        "Die Reset-Sitzung ist abgelaufen oder ungültig. Bitte fordern Sie unter /zapomnialem-hasla einen neuen Link an."
+      ),
     };
   }
 

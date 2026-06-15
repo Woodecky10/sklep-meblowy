@@ -33,6 +33,12 @@ function sanitizeLabel(input: unknown): string {
   return typeof input === "string" ? input.trim().slice(0, 200) : "";
 }
 
+// Opcjonalna etykieta DE: pusty string → null (fallback do PL przy odczycie).
+function sanitizeOptionalLabel(input: unknown): string | null {
+  const s = sanitizeLabel(input);
+  return s === "" ? null : s;
+}
+
 function parseInteger(input: unknown, fallback = 0): number {
   if (typeof input === "string" && input.trim() !== "") {
     const n = Number(input);
@@ -67,12 +73,13 @@ export async function createGroup(formData: FormData): Promise<ActionResult> {
   const slug = slugInput ? toSlug(slugInput) : toSlug(label);
   if (!slug) return { ok: false, error: "Nie udało się wygenerować sluga z nazwy" };
 
+  const labelDe = sanitizeOptionalLabel(formData.get("label_de"));
   const sortOrder = parseInteger(formData.get("sort_order"));
 
   const supabase = await createAdminClient();
   const { error } = await supabase
     .from("category_groups")
-    .insert({ slug, label, sort_order: sortOrder } as never);
+    .insert({ slug, label, label_de: labelDe, sort_order: sortOrder } as never);
 
   if (error) {
     if (error.code === "23505") return { ok: false, error: `Grupa o slug "${slug}" już istnieje` };
@@ -92,13 +99,14 @@ export async function updateGroup(formData: FormData): Promise<ActionResult> {
   const label = sanitizeLabel(formData.get("label"));
   if (label.length < 2) return { ok: false, error: "Nazwa grupy jest za krótka" };
 
+  const labelDe = sanitizeOptionalLabel(formData.get("label_de"));
   const sortOrder = parseInteger(formData.get("sort_order"));
   const active = formData.get("active") === "1";
 
   const supabase = await createAdminClient();
   const { error } = await supabase
     .from("category_groups")
-    .update({ label, sort_order: sortOrder, active } as never)
+    .update({ label, label_de: labelDe, sort_order: sortOrder, active } as never)
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
@@ -152,6 +160,7 @@ export async function createCategory(formData: FormData): Promise<ActionResult> 
   const slug = slugInput ? toSlug(slugInput) : toSlug(label);
   if (!slug) return { ok: false, error: "Nie udało się wygenerować sluga" };
 
+  const labelDe = sanitizeOptionalLabel(formData.get("label_de"));
   const baselinkerCategoryId = parseOptionalBigInt(formData.get("baselinker_category_id"));
   const sortOrder = parseInteger(formData.get("sort_order"));
   const crossSellCategories = formData
@@ -165,6 +174,7 @@ export async function createCategory(formData: FormData): Promise<ActionResult> 
     .insert({
       slug,
       label,
+      label_de: labelDe,
       group_id: groupId,
       baselinker_category_id: baselinkerCategoryId,
       cross_sell_categories: crossSellCategories,
@@ -192,6 +202,7 @@ export async function updateCategory(formData: FormData): Promise<ActionResult> 
   const groupId = String(formData.get("group_id") ?? "");
   if (!groupId) return { ok: false, error: "Wybierz grupę" };
 
+  const labelDe = sanitizeOptionalLabel(formData.get("label_de"));
   const baselinkerCategoryId = parseOptionalBigInt(formData.get("baselinker_category_id"));
   const sortOrder = parseInteger(formData.get("sort_order"));
   const active = formData.get("active") === "1";
@@ -205,6 +216,7 @@ export async function updateCategory(formData: FormData): Promise<ActionResult> 
     .from("categories")
     .update({
       label,
+      label_de: labelDe,
       group_id: groupId,
       baselinker_category_id: baselinkerCategoryId,
       cross_sell_categories: crossSellCategories,

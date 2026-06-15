@@ -25,8 +25,18 @@ export function sanitizeSearchTerm(raw: string): string {
 // Buduje filtr .or() (name/description ILIKE) z odsanityzowanej frazy.
 // Zwraca null gdy po sanityzacji nic nie zostaje (pusta/sama-interpunkcja
 // fraza = nie zawężaj wyników).
-export function buildSearchOrFilter(raw: string): string | null {
+//
+// `locale==='de'` szuka po kolumnach _de (name_de/description_de). UWAGA:
+// celowo NIE fallbackujemy do PL przy wyszukiwaniu — produkty bez tłumaczenia
+// DE nie matchują się na DE search dopóki nie zostaną przetłumaczone (decyzja
+// projektowa: wyniki DE pokazują tylko przetłumaczoną treść).
+export function buildSearchOrFilter(
+  raw: string,
+  locale: "pl" | "de" = "pl"
+): string | null {
   const term = sanitizeSearchTerm(raw);
   if (!term) return null;
-  return `name.ilike.%${term}%,description.ilike.%${term}%`;
+  const nameCol = locale === "de" ? "name_de" : "name";
+  const descCol = locale === "de" ? "description_de" : "description";
+  return `${nameCol}.ilike.%${term}%,${descCol}.ilike.%${term}%`;
 }

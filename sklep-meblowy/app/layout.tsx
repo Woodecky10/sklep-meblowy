@@ -10,6 +10,8 @@ import CartToast from "./_components/layout/CartToast";
 import { CartProvider } from "./_context/CartContext";
 import { ToastProvider } from "./_context/ToastContext";
 import { COMPANY } from "./_lib/company";
+import { getLocale } from "./_lib/i18n-server";
+import { getDictionary } from "./_lib/dictionaries";
 
 const inter = Inter({
   subsets: ["latin", "latin-ext"],
@@ -30,36 +32,41 @@ const playfair = Playfair_Display({
   fallback: ["Georgia", "Times New Roman", "serif"],
 });
 
-export const metadata: Metadata = {
-  metadataBase: new URL(`https://${COMPANY.domain}`),
-  title: {
-    default: `${COMPANY.brandName} | Meble premium`,
-    template: `%s | ${COMPANY.brandName}`,
-  },
-  description:
-    "Odkryj kolekcję eleganckich mebli premium. Sofy, narożniki, łóżka, fotele i pufy najwyższej jakości.",
-  keywords: ["meble", "sofy", "narożniki", "łóżka", "fotele", "sklep meblowy", COMPANY.brandName],
-  openGraph: {
-    type: "website",
-    locale: "pl_PL",
-    siteName: COMPANY.brandName,
-    images: [{ url: "/logo.svg", width: 945, height: 618, alt: COMPANY.brandName }],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${COMPANY.brandName} | Meble premium`,
-    images: ["/logo.svg"],
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  const t = getDictionary(locale);
+  const title = `${COMPANY.brandName} | ${t.meta.tagline}`;
+  return {
+    metadataBase: new URL(`https://${COMPANY.domain}`),
+    title: {
+      default: title,
+      template: `%s | ${COMPANY.brandName}`,
+    },
+    description: t.meta.description,
+    keywords: [...t.meta.keywords.split(", "), COMPANY.brandName],
+    openGraph: {
+      type: "website",
+      locale: locale === "de" ? "de_DE" : "pl_PL",
+      siteName: COMPANY.brandName,
+      images: [{ url: "/logo.svg", width: 945, height: 618, alt: COMPANY.brandName }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      images: ["/logo.svg"],
+    },
+  };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const locale = await getLocale();
   return (
     <html
-      lang="pl"
+      lang={locale}
       className={`${inter.variable} ${playfair.variable}`}
       suppressHydrationWarning
     >

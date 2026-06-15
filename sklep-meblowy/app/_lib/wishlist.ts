@@ -1,6 +1,8 @@
 import "server-only";
 import { cache } from "react";
 import { createClient } from "./supabase/server";
+import { localizeProduct } from "./localize";
+import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Product } from "./types";
 
 // Zwraca Set z product_id ulubionych zalogowanego usera. Pusty Set
@@ -33,7 +35,9 @@ export async function getWishlistCount(): Promise<number> {
 
 // Lista pełnych produktów z wishlist — używana na stronie /ulubione.
 // Sortowanie: najnowsze pierwsze (zgodnie z idx_wishlists_user).
-export async function getWishlistProducts(): Promise<Product[]> {
+export async function getWishlistProducts(
+  locale: Locale = DEFAULT_LOCALE
+): Promise<Product[]> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -49,5 +53,6 @@ export async function getWishlistProducts(): Promise<Product[]> {
   if (error || !data) return [];
   return data
     .map((r) => (r as unknown as { product: Product | null }).product)
-    .filter((p): p is Product => p !== null);
+    .filter((p): p is Product => p !== null)
+    .map((p) => localizeProduct(p, locale));
 }

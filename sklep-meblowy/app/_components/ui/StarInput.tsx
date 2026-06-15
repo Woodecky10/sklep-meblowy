@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
 
 // Interaktywny input oceny — hover + click.
 export default function StarInput({
@@ -14,16 +15,17 @@ export default function StarInput({
 }) {
   const [hover, setHover] = useState(0);
   const display = hover || value;
+  const de = useClientLocale() === "de";
 
   return (
-    <div className="inline-flex items-center gap-1" role="radiogroup" aria-label="Ocena">
+    <div className="inline-flex items-center gap-1" role="radiogroup" aria-label={de ? "Bewertung" : "Ocena"}>
       {[1, 2, 3, 4, 5].map((n) => (
         <button
           key={n}
           type="button"
           role="radio"
           aria-checked={value === n}
-          aria-label={`${n} z 5`}
+          aria-label={`${n} / 5`}
           onMouseEnter={() => setHover(n)}
           onMouseLeave={() => setHover(0)}
           onClick={() => onChange(n)}

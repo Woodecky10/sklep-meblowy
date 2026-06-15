@@ -2,6 +2,8 @@
 
 import { useTheme } from "next-themes";
 import { useSyncExternalStore } from "react";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
+import { getDictionary } from "@/app/_lib/dictionaries";
 
 // Hydration gate bez setState-w-efekcie: serwer widzi false, klient po
 // hydracji true. useSyncExternalStore z pustą subskrypcją to zalecany
@@ -18,13 +20,14 @@ function useMounted(): boolean {
 export default function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const mounted = useMounted();
+  const t = getDictionary(useClientLocale());
   if (!mounted) return <div className="w-9 h-9" />;
 
   return (
     <button
       onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
       className="w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] transition-colors"
-      aria-label="Przełącz motyw"
+      aria-label={t.a11y.toggleTheme}
     >
       {theme === "dark" ? (
         <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">

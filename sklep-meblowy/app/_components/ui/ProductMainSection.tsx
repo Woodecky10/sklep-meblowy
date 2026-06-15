@@ -3,6 +3,9 @@
 import { useState } from "react";
 import type { Product, ProductRating } from "@/app/_lib/types";
 import { getVariantImages, getVariantPrice } from "@/app/_lib/variants";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
+import { getDictionary } from "@/app/_lib/dictionaries";
+import { formatPrice } from "@/app/_lib/format";
 import ImageGallery from "./ImageGallery";
 import ProductActions from "./ProductActions";
 import StarRating from "./StarRating";
@@ -29,6 +32,8 @@ export default function ProductMainSection({
   // plus dodatkowe features z BL. Renderowane w lewej kolumnie pod galerią.
   specifications: { label: string; value: string }[];
 }) {
+  const locale = useClientLocale();
+  const t = getDictionary(locale);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const images = getVariantImages(product, selected);
   // Jedna, aktualna cena: bazowa przed wyborem wariantu, z modyfikatorem po
@@ -43,10 +48,10 @@ export default function ProductMainSection({
         {specifications.length > 0 && (
           <div>
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-              Specyfikacja
+              {t.product.specificationEyebrow}
             </p>
             <h2 className="font-display text-2xl font-bold text-[var(--fg)] mb-5">
-              Szczegóły produktu
+              {t.product.specificationHeading}
             </h2>
             <dl className="flex flex-col">
               {specifications.map((s) => (
@@ -84,27 +89,41 @@ export default function ProductMainSection({
               <StarRating value={rating.average} size={16} />
               <span>
                 {rating.average.toFixed(1)} ({rating.count}{" "}
-                {rating.count === 1 ? "opinia" : rating.count < 5 ? "opinie" : "opinii"})
+                {rating.count === 1
+                  ? t.product.reviewOne
+                  : rating.count < 5
+                    ? t.product.reviewFew
+                    : t.product.reviewMany})
               </span>
             </a>
           )}
 
           <p className="font-sans text-3xl font-bold text-[var(--fg)]">
-            {currentPrice.toLocaleString("pl-PL")} zł
+            {formatPrice(currentPrice, locale)}
           </p>
         </div>
 
-        <ProductActions product={product} selected={selected} onChange={setSelected} />
+        <ProductActions
+          product={product}
+          selected={selected}
+          onChange={setSelected}
+          addToCartLabel={t.product.addToCart}
+          selectVariantLabel={t.product.selectVariant}
+        />
 
-        <InquiryModal productId={product.id} productName={product.name} />
+        <InquiryModal
+          productId={product.id}
+          productName={product.name}
+          triggerLabel={t.product.inquireColors}
+        />
 
         <div className="border-t border-[var(--border)] pt-6 text-sm text-[var(--muted)] space-y-2">
-          <p>✓ Zwrot do 30 dni</p>
-          <p>✓ Gwarancja 2 lata</p>
+          <p>✓ {t.product.returns}</p>
+          <p>✓ {t.product.warranty}</p>
           <p>
-            ✓ Czas dostawy:{" "}
+            ✓ {t.product.deliveryTimeLabel}{" "}
             <strong className="text-[var(--fg)]">
-              {product.delivery_time || "14–21 dni roboczych"}
+              {product.delivery_time || t.product.deliveryTimeDefault}
             </strong>
           </p>
         </div>

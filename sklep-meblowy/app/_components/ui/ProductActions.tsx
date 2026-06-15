@@ -19,10 +19,16 @@ export default function ProductActions({
   product,
   selected,
   onChange,
+  addToCartLabel,
+  selectVariantLabel,
 }: {
   product: Product;
   selected: Record<string, string>;
   onChange: (next: Record<string, string>) => void;
+  // Zlokalizowane etykiety CTA — przekazywane z ProductMainSection (client),
+  // bo komponenty "use client" nie wołają getLocale().
+  addToCartLabel?: string;
+  selectVariantLabel?: string;
 }) {
   const showVariants = hasVariants(product);
   const complete = isVariantSelectionComplete(product, selected);
@@ -47,6 +53,8 @@ export default function ProductActions({
         selectedValues={selected}
         currentPrice={price}
         needsVariant={showVariants && !complete}
+        addToCartLabel={addToCartLabel}
+        selectVariantLabel={selectVariantLabel}
       />
     </div>
   );

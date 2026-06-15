@@ -4,6 +4,9 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toggleWishlist } from "@/app/_lib/wishlist-actions";
 import { useToast } from "@/app/_context/ToastContext";
+import { localizeHref } from "@/app/_lib/i18n";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
+import { getDictionary } from "@/app/_lib/dictionaries";
 
 // Serce do dodawania/usuwania produktu z ulubionych.
 // Optymistyczna aktualizacja UI — natychmiast pokazujemy nowy stan,
@@ -24,6 +27,8 @@ export default function WishlistButton({
   const [isInWishlist, setIsInWishlist] = useState(initialIsInWishlist);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+  const locale = useClientLocale();
+  const t = getDictionary(locale);
   const showToast = useToast();
 
   function handleClick(e: React.MouseEvent) {
@@ -39,7 +44,7 @@ export default function WishlistButton({
       if (res.ok) {
         // Sukces — revalidatePath w server action odświeży licznik w navbar.
         showToast(
-          nextState ? "Dodano do ulubionych" : "Usunięto z ulubionych",
+          nextState ? t.wishlist.addedToast : t.wishlist.removedToast,
           "success"
         );
         return;
@@ -47,7 +52,7 @@ export default function WishlistButton({
       // Rollback
       setIsInWishlist(!nextState);
       if (res.error === "unauthenticated") {
-        router.push("/logowanie");
+        router.push(localizeHref("/logowanie", locale));
       } else {
         // Spójny toast zamiast blokującego alert() (audyt LOW #11).
         showToast(res.message, "error");
@@ -68,7 +73,7 @@ export default function WishlistButton({
       type="button"
       onClick={handleClick}
       disabled={pending}
-      aria-label={isInWishlist ? "Usuń z ulubionych" : "Dodaj do ulubionych"}
+      aria-label={isInWishlist ? t.wishlist.removeAria : t.wishlist.addAria}
       aria-pressed={isInWishlist}
       className={`${baseClasses} ${variantClasses}`}
     >

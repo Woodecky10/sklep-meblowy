@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "./supabase/server";
+import { getLocale } from "@/app/_lib/i18n-server";
 
 export type WishlistActionResult =
   | { ok: true; added: boolean }
@@ -12,6 +13,7 @@ export type WishlistActionResult =
 export async function toggleWishlist(
   productId: string
 ): Promise<WishlistActionResult> {
+  const de = (await getLocale()) === "de";
   const supabase = await createClient();
   const {
     data: { user },
@@ -21,7 +23,9 @@ export async function toggleWishlist(
     return {
       ok: false,
       error: "unauthenticated",
-      message: "Zaloguj się żeby dodać do ulubionych",
+      message: de
+        ? "Bitte melden Sie sich an, um zu den Favoriten hinzuzufügen"
+        : "Zaloguj się żeby dodać do ulubionych",
     };
   }
 

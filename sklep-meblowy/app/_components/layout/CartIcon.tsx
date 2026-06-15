@@ -1,15 +1,18 @@
 "use client";
 
-import Link from "next/link";
+import LocalizedLink from "../ui/LocalizedLink";
 import { useCart } from "@/app/_context/CartContext";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
+import { getDictionary } from "@/app/_lib/dictionaries";
 
 export default function CartIcon() {
   const { count } = useCart();
+  const t = getDictionary(useClientLocale());
   return (
-    <Link
+    <LocalizedLink
       href="/koszyk"
       className="relative w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] transition-colors"
-      aria-label="Koszyk"
+      aria-label={t.nav.cart}
     >
       <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
         <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
@@ -21,6 +24,6 @@ export default function CartIcon() {
           {count > 9 ? "9+" : count}
         </span>
       )}
-    </Link>
+    </LocalizedLink>
   );
 }

@@ -2,12 +2,26 @@
 
 import { useActionState } from "react";
 import { requestPasswordReset, type AuthState } from "@/app/_lib/auth-actions";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
 
 export default function RequestResetForm() {
+  const de = useClientLocale() === "de";
   const [state, action, pending] = useActionState<AuthState, FormData>(
     requestPasswordReset,
     null
   );
+
+  const c = de
+    ? {
+        email: "E-Mail",
+        loading: "Senden...",
+        submit: "Link zum Zurücksetzen senden",
+      }
+    : {
+        email: "Email",
+        loading: "Wysyłam...",
+        submit: "Wyślij link do resetu",
+      };
 
   // Po sukcesie pokazujemy info — formularz znika żeby user nie wysyłał n-razy
   if (state?.info) {
@@ -22,7 +36,7 @@ export default function RequestResetForm() {
     <form action={action} className="flex flex-col gap-4">
       <label className="flex flex-col gap-2">
         <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
-          Email
+          {c.email}
         </span>
         <input
           name="email"
@@ -45,7 +59,7 @@ export default function RequestResetForm() {
         disabled={pending}
         className="w-full py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {pending ? "Wysyłam..." : "Wyślij link do resetu"}
+        {pending ? c.loading : c.submit}
       </button>
     </form>
   );

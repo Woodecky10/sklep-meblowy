@@ -2,18 +2,36 @@
 
 import { useActionState } from "react";
 import { updatePassword, type AuthState } from "@/app/_lib/auth-actions";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
 
 export default function ResetForm() {
+  const de = useClientLocale() === "de";
   const [state, action, pending] = useActionState<AuthState, FormData>(
     updatePassword,
     null
   );
 
+  const c = de
+    ? {
+        newPassword: "Neues Passwort",
+        repeatPassword: "Passwort wiederholen",
+        note: "Mind. 6 Zeichen. Nach der Änderung werden Sie zum Panel weitergeleitet.",
+        loading: "Speichern...",
+        submit: "Neues Passwort speichern",
+      }
+    : {
+        newPassword: "Nowe hasło",
+        repeatPassword: "Powtórz hasło",
+        note: "Min. 6 znaków. Po zmianie zostaniesz przekierowany do panelu.",
+        loading: "Zapisuję...",
+        submit: "Zapisz nowe hasło",
+      };
+
   return (
     <form action={action} className="flex flex-col gap-4">
       <label className="flex flex-col gap-2">
         <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
-          Nowe hasło
+          {c.newPassword}
         </span>
         <input
           name="password"
@@ -28,7 +46,7 @@ export default function ResetForm() {
 
       <label className="flex flex-col gap-2">
         <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
-          Powtórz hasło
+          {c.repeatPassword}
         </span>
         <input
           name="confirm"
@@ -41,7 +59,7 @@ export default function ResetForm() {
       </label>
 
       <p className="text-xs text-[var(--muted)]">
-        Min. 6 znaków. Po zmianie zostaniesz przekierowany do panelu.
+        {c.note}
       </p>
 
       {state?.error && (
@@ -55,7 +73,7 @@ export default function ResetForm() {
         disabled={pending}
         className="w-full py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {pending ? "Zapisuję..." : "Zapisz nowe hasło"}
+        {pending ? c.loading : c.submit}
       </button>
     </form>
   );

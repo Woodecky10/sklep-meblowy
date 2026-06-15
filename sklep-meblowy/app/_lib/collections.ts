@@ -4,6 +4,8 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
+import { localizeProduct } from "./localize";
+import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Collection, Product } from "./types";
 
 export const COLLECTIONS_CACHE_TAG = "collections";
@@ -45,7 +47,8 @@ export async function getCollection(
 export async function getCollectionSiblings(
   collectionId: string,
   excludeProductId: string,
-  limit = 8
+  limit = 8,
+  locale: Locale = DEFAULT_LOCALE
 ): Promise<Product[]> {
   const supabase = await createAdminClient();
   const { data } = await supabase
@@ -55,7 +58,7 @@ export async function getCollectionSiblings(
     .neq("id", excludeProductId)
     .order("name", { ascending: true })
     .limit(limit);
-  return (data ?? []) as Product[];
+  return ((data ?? []) as Product[]).map((p) => localizeProduct(p, locale));
 }
 
 // ============================================================
@@ -64,9 +67,9 @@ export async function getCollectionSiblings(
 // Zwraca tylko kolekcje które mają co najmniej jeden produkt — puste kolekcje
 // nie pokazują się klientom. Dla każdej dodaje do 4 sample produktów żeby
 // front mógł zrobić mozaikę miniaturek.
-export async function getCollectionsForHome(): Promise<
-  Array<{ collection: Collection; sampleProducts: Product[] }>
-> {
+export async function getCollectionsForHome(
+  locale: Locale = DEFAULT_LOCALE
+): Promise<Array<{ collection: Collection; sampleProducts: Product[] }>> {
   const supabase = await createAdminClient();
   const collections = await getAllCollections();
   if (collections.length === 0) return [];
@@ -82,7 +85,7 @@ export async function getCollectionsForHome(): Promise<
   for (const p of (data ?? []) as Product[]) {
     if (!p.collection_id) continue;
     const arr = byCollection.get(p.collection_id) ?? [];
-    if (arr.length < 4) arr.push(p);
+    if (arr.length < 4) arr.push(localizeProduct(p, locale));
     byCollection.set(p.collection_id, arr);
   }
 

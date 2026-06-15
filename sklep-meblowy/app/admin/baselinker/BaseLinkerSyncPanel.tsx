@@ -17,8 +17,10 @@ type Toast = { type: "success" | "error" | "warning"; message: string } | null;
 
 export default function BaseLinkerSyncPanel({
   initialLogs,
+  pendingTranslations,
 }: {
   initialLogs: SyncLogRow[];
+  pendingTranslations: number;
 }) {
   // Logi przychodzą z serwera przez prop — router.refresh() po sync
   // (sukces I błąd) odświeża server component i lista aktualizuje się
@@ -123,6 +125,32 @@ export default function BaseLinkerSyncPanel({
           <ResultSummary result={lastResult} />
         </Card>
       )}
+
+      {/* Tłumaczenia DE — licznik zaległych (status; tłumaczenie ręczne w edytorze produktu) */}
+      <Card>
+        <div>
+          <h2 className="font-display text-lg font-semibold text-[var(--fg)] mb-1">
+            Tłumaczenia niemieckie (DE)
+          </h2>
+          <p className="text-sm text-[var(--muted)] leading-relaxed max-w-xl">
+            Nowe i zmienione produkty wymagają ręcznego tłumaczenia DE — wpisz je
+            w edytorze produktu, sekcja „Tłumaczenie niemieckie (DE)”.
+          </p>
+          <p className="text-sm text-[var(--fg)] mt-3">
+            Czeka na tłumaczenie:{" "}
+            <strong
+              className={
+                pendingTranslations > 0
+                  ? "text-amber-700 dark:text-amber-300"
+                  : "text-emerald-700 dark:text-emerald-300"
+              }
+            >
+              {pendingTranslations}{" "}
+              {pendingTranslations === 1 ? "produkt" : "produktów"}
+            </strong>
+          </p>
+        </div>
+      </Card>
 
       {/* Historia synchronizacji */}
       <div>

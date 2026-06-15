@@ -1,19 +1,28 @@
 "use client";
 
 import { useEffect, useReducer } from "react";
-import Link from "next/link";
+import LocalizedLink from "./LocalizedLink";
 import Image from "next/image";
 import {
   addRecentlyViewed,
   RECENTLY_VIEWED_LS_KEY,
   type RecentlyViewedItem,
 } from "@/app/_lib/recently-viewed";
+import { DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
+import { getDictionary } from "@/app/_lib/dictionaries";
+import { formatPrice } from "@/app/_lib/format";
 
 // Sekcja „Ostatnio oglądane" na stronie produktu. Czyta snapshoty z
 // localStorage (wzorzec jak CartContext), dopisuje bieżący produkt na mount
 // i pokazuje to, co oglądane WCZEŚNIEJ (bez bieżącego). Gdy nic wcześniej nie
 // oglądano — nie renderuje nic. `current.category` to gotowy label (nie slug).
-export default function RecentlyViewed({ current }: { current: RecentlyViewedItem }) {
+export default function RecentlyViewed({
+  current,
+  locale = DEFAULT_LOCALE,
+}: {
+  current: RecentlyViewedItem;
+  locale?: Locale;
+}) {
   // useReducer (nie useState) — synchroniczny setState w efekcie łamie regułę
   // react-hooks/set-state-in-effect; dispatch jej nie łamie (wzorzec hydracji
   // z localStorage jak w CartContext). Reducer tylko podstawia świeżą listę.
@@ -48,19 +57,21 @@ export default function RecentlyViewed({ current }: { current: RecentlyViewedIte
 
   if (items.length === 0) return null;
 
+  const t = getDictionary(locale);
+
   return (
     <section className="mt-24">
       <div className="mb-10">
         <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-          Dla Ciebie
+          {t.product.recentlyViewedEyebrow}
         </p>
         <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
-          Ostatnio oglądane
+          {t.product.recentlyViewedHeading}
         </h2>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
         {items.map((p) => (
-          <Link key={p.id} href={`/produkt/${p.id}`} className="group flex flex-col">
+          <LocalizedLink key={p.id} href={`/produkt/${p.id}`} className="group flex flex-col">
             <div className="relative aspect-[4/3] bg-stone-100 dark:bg-stone-800 rounded-2xl overflow-hidden mb-4">
               {p.image ? (
                 <Image
@@ -72,7 +83,7 @@ export default function RecentlyViewed({ current }: { current: RecentlyViewedIte
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-[var(--muted)] text-sm">
-                  Brak zdjęcia
+                  {t.common.noImage}
                 </div>
               )}
             </div>
@@ -83,9 +94,9 @@ export default function RecentlyViewed({ current }: { current: RecentlyViewedIte
               {p.name}
             </p>
             <p className="font-sans font-bold text-[var(--fg)] mt-auto">
-              {p.price.toLocaleString("pl-PL")} zł
+              {formatPrice(p.price, locale)}
             </p>
-          </Link>
+          </LocalizedLink>
         ))}
       </div>
     </section>

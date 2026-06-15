@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import type { Metadata } from "next";
 import {
   getProduct,
@@ -23,6 +23,10 @@ import ReviewForm from "@/app/_components/ui/ReviewForm";
 import { sanitizeProductHtml } from "@/app/_lib/product-html";
 import ProductDescriptionSections from "@/app/_components/ui/ProductDescriptionSections";
 import { COMPANY } from "@/app/_lib/company";
+import { getLocale } from "@/app/_lib/i18n-server";
+import { localizePath } from "@/app/_lib/i18n";
+import { alternatesFor } from "@/app/_lib/sitemap-i18n";
+import { getDictionary } from "@/app/_lib/dictionaries";
 import type { Product } from "@/app/_lib/types";
 
 type Props = { params: Promise<{ id: string }> };
@@ -51,13 +55,26 @@ function productPlainDescription(product: Product): string {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const product = await getProduct(id);
-  if (!product) return { title: "Produkt nie znaleziony" };
+  const locale = await getLocale();
+  const product = await getProduct(id, locale);
+  if (!product) return { title: locale === "de" ? "Produkt nicht gefunden" : "Produkt nie znaleziony" };
+  // DE w SEO tylko gdy produkt przetłumaczony. `needs_translation` NIE jest w
+  // typie Product (data layer zwraca je przez select("*")) — dostęp przez cast.
+  const hasDe =
+    (product as { needs_translation?: boolean }).needs_translation === false;
+  const plPath = `/produkt/${id}`;
   return {
     title: product.name,
     // Meta description = plain text (bez HTML, max 160 znaków)
     description: stripHtml(productPlainDescription(product)).slice(0, 160),
+    alternates: {
+      // canonical = self dla bieżącego locale (relatywne, rozwiązane przez
+      // metadataBase z app/layout.tsx). Na PL → /produkt/X, na DE → /de/produkt/X.
+      canonical: localizePath(plPath, locale),
+      languages: alternatesFor(plPath, { hasDe }).languages,
+    },
     openGraph: {
+      locale: locale === "de" ? "de_DE" : "pl_PL",
       images: product.images?.[0] ? [{ url: product.images[0] }] : [],
     },
   };
@@ -65,18 +82,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProduktPage({ params }: Props) {
   const { id } = await params;
-  const product = await getProduct(id);
+  const locale = await getLocale();
+  const t = getDictionary(locale);
+  const product = await getProduct(id, locale);
   if (!product) notFound();
 
   const [related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell, wishlistIds] =
     await Promise.all([
-      getRelatedProducts(product.id, product.category),
+      getRelatedProducts(product.id, product.category, 4, locale),
       getProductRating(product.id),
-      getReviewsForProduct(product.id),
+      getReviewsForProduct(product.id, 50, locale),
       getReviewStatus(product.id),
-      getCategoryLabel(product.category),
-      getAllCategories(),
-      getCrossSellProducts([product.category], [product.id], 4),
+      getCategoryLabel(product.category, locale),
+      getAllCategories(locale),
+      getCrossSellProducts([product.category], [product.id], 4, locale),
       getUserWishlistIds(),
     ]);
 
@@ -94,7 +113,7 @@ export default async function ProduktPage({ params }: Props) {
   const [collection, collectionSiblings] = product.collection_id
     ? await Promise.all([
         getCollection(product.collection_id),
-        getCollectionSiblings(product.collection_id, product.id, 8),
+        getCollectionSiblings(product.collection_id, product.id, 8, locale),
       ])
     : [null, []];
 
@@ -102,27 +121,27 @@ export default async function ProduktPage({ params }: Props) {
   if (product.dimensions) {
     const { width, depth, height } = product.dimensions;
     details.push({
-      label: "Wymiary",
-      value: `${width} × ${depth} × ${height} cm (szer. × gł. × wys.)`,
+      label: t.product.specWidth,
+      value: `${width} × ${depth} × ${height} cm (${t.product.dimensionsHint})`,
     });
   }
   if (product.weight !== null && product.weight !== undefined) {
-    details.push({ label: "Waga", value: `${product.weight} kg` });
+    details.push({ label: t.product.specWeight, value: `${product.weight} kg` });
   }
   if (product.material) {
-    details.push({ label: "Materiał", value: product.material });
+    details.push({ label: t.product.specMaterial, value: product.material });
   }
   if (product.color) {
-    details.push({ label: "Kolor bazowy", value: product.color });
+    details.push({ label: t.product.specBaseColor, value: product.color });
   }
   if (product.construction) {
-    details.push({ label: "Konstrukcja", value: product.construction });
+    details.push({ label: t.product.specConstruction, value: product.construction });
   }
   if (product.delivery_time) {
-    details.push({ label: "Czas realizacji", value: product.delivery_time });
+    details.push({ label: t.product.specDeliveryTime, value: product.delivery_time });
   }
   if (product.warranty) {
-    details.push({ label: "Gwarancja", value: product.warranty });
+    details.push({ label: t.product.specWarranty, value: product.warranty });
   }
 
   // Dodatkowe cechy z BL (features) — Allegro template parametry. Pomijamy
@@ -194,16 +213,16 @@ export default async function ProduktPage({ params }: Props) {
 
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-xs font-sans text-[var(--muted)] mb-12 uppercase tracking-widest">
-        <Link href="/" className="hover:text-[var(--color-gold)] transition-colors">Dom</Link>
+        <LocalizedLink href="/" className="hover:text-[var(--color-gold)] transition-colors">{t.product.breadcrumbHome}</LocalizedLink>
         <span>/</span>
-        <Link href="/sklep" className="hover:text-[var(--color-gold)] transition-colors">Sklep</Link>
+        <LocalizedLink href="/sklep" className="hover:text-[var(--color-gold)] transition-colors">{t.product.breadcrumbShop}</LocalizedLink>
         <span>/</span>
-        <Link
+        <LocalizedLink
           href={`/sklep?kategoria=${product.category}`}
           className="hover:text-[var(--color-gold)] transition-colors"
         >
           {categoryLabel ?? product.category}
-        </Link>
+        </LocalizedLink>
         <span>/</span>
         <span className="text-[var(--fg)] normal-case tracking-normal">{product.name}</span>
       </nav>
@@ -247,10 +266,10 @@ export default async function ProduktPage({ params }: Props) {
           <section className="mb-24">
             <div className="mb-8">
               <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-                Opis produktu
+                {t.product.descriptionEyebrow}
               </p>
               <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
-                Wszystko, co musisz wiedzieć
+                {t.product.descriptionHeading}
               </h2>
             </div>
             <ProductDescriptionSections sections={visibleSections} />
@@ -263,10 +282,10 @@ export default async function ProduktPage({ params }: Props) {
         <section className="mb-24">
           <div className="mb-8">
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-              Pełny opis
+              {t.product.fullDescriptionEyebrow}
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
-              Opis produktu
+              {t.product.fullDescriptionHeading}
             </h2>
           </div>
           <div
@@ -281,15 +300,17 @@ export default async function ProduktPage({ params }: Props) {
         <section className="mb-24">
           <div className="mb-8">
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-              Dopełnienie
+              {t.product.crossSellEyebrow}
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
-              {crossSellLabel ? `Polecane ${crossSellLabel.toLowerCase()}` : "Może Cię zainteresować"}
+              {crossSellLabel
+                ? `${t.product.crossSellRecommendedPrefix} ${crossSellLabel.toLowerCase()}`
+                : t.product.crossSellFallbackHeading}
             </h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {crossSell.map((p) => (
-              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} />
+              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} locale={locale} />
             ))}
           </div>
         </section>
@@ -300,7 +321,7 @@ export default async function ProduktPage({ params }: Props) {
         <section className="mb-24">
           <div className="mb-8">
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-              Pełna kolekcja
+              {t.product.fullCollectionEyebrow}
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
               {collection.label}
@@ -313,7 +334,7 @@ export default async function ProduktPage({ params }: Props) {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {collectionSiblings.map((p) => (
-              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} />
+              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} locale={locale} />
             ))}
           </div>
         </section>
@@ -324,10 +345,10 @@ export default async function ProduktPage({ params }: Props) {
         <div className="mb-8 flex items-end justify-between flex-wrap gap-4">
           <div>
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-              Opinie
+              {t.product.reviews}
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
-              Co mówią klienci
+              {t.product.reviewsHeading}
             </h2>
           </div>
           {rating.count > 0 && (
@@ -356,19 +377,14 @@ export default async function ProduktPage({ params }: Props) {
               <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 text-sm text-[var(--muted)] leading-relaxed">
                 {reviewStatus.reason === "not_logged_in" ? (
                   <>
-                    Opinie mogą dodawać tylko osoby, które kupiły produkt.{" "}
+                    {t.product.reviewGuardLoggedOut}{" "}
                     <a href="/logowanie" className="text-[var(--color-gold)] underline">
-                      Zaloguj się
+                      {t.product.reviewGuardLogin}
                     </a>
-                    , a jeśli ten produkt jest w Twoich zamówieniach, zobaczysz tu
-                    formularz.
+                    {t.product.reviewGuardLoggedOutSuffix}
                   </>
                 ) : (
-                  <>
-                    Opinię możesz dodać po dokonaniu zakupu tego produktu.
-                    Weryfikujemy autentyczność opinii na podstawie historii
-                    zamówień.
-                  </>
+                  <>{t.product.reviewGuardNotPurchased}</>
                 )}
               </div>
             )}
@@ -381,21 +397,22 @@ export default async function ProduktPage({ params }: Props) {
         <section>
           <div className="mb-10">
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-              Zobacz też
+              {t.product.relatedProducts}
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
-              Podobne produkty
+              {t.product.relatedProductsHeading}
             </h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {related.map((p) => (
-              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} />
+              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} locale={locale} />
             ))}
           </div>
         </section>
       )}
 
       <RecentlyViewed
+        locale={locale}
         current={{
           id: product.id,
           name: product.name,

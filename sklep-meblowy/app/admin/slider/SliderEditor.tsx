@@ -575,6 +575,88 @@ function SlideForm({
           </div>
         </fieldset>
 
+        {/* Wersja niemiecka (DE) — pokazywana na /de. Puste pole = polski tekst. */}
+        <fieldset className="border border-[var(--border)] rounded-xl p-4 flex flex-col gap-3">
+          <legend className="text-xs font-sans uppercase tracking-widest text-[var(--color-gold-text)] px-2">
+            Wersja niemiecka (DE)
+          </legend>
+          <p className="text-xs text-[var(--muted)] leading-relaxed">
+            Tłumaczenia pokazywane klientom na /de. Każde puste pole = użyjemy
+            polskiego odpowiednika.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="Etykieta nad tytułem (DE)">
+              <input
+                name="eyebrow_de"
+                defaultValue={initial?.eyebrow_de ?? ""}
+                maxLength={100}
+                placeholder="z. B. Kollektion 2026"
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Tytuł (DE)">
+              <input
+                name="title_de"
+                defaultValue={initial?.title_de ?? ""}
+                maxLength={200}
+                placeholder="z. B. Möbel, die eine Geschichte erzählen"
+                className={inputCls}
+              />
+            </Field>
+          </div>
+          <Field
+            label="Słowo do podświetlenia (DE)"
+            hint="Musi być słowem z tytułu DE powyżej."
+          >
+            <input
+              name="highlighted_word_de"
+              defaultValue={initial?.highlighted_word_de ?? ""}
+              maxLength={100}
+              placeholder="z. B. erzählen"
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Podpis (DE)">
+            <textarea
+              name="subtitle_de"
+              defaultValue={initial?.subtitle_de ?? ""}
+              maxLength={500}
+              rows={3}
+              placeholder="z. B. Entdecken Sie unsere Premium-Möbelkollektion..."
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Opis zdjęcia / alt (DE)">
+            <input
+              name="image_alt_de"
+              defaultValue={initial?.image_alt_de ?? ""}
+              maxLength={200}
+              placeholder="z. B. Elegantes Sofa im hellen Wohnzimmer"
+              className={inputCls}
+            />
+          </Field>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="Napis głównego przycisku (DE)">
+              <input
+                name="cta_primary_label_de"
+                defaultValue={initial?.cta_primary_label_de ?? ""}
+                maxLength={100}
+                placeholder="z. B. Kollektion ansehen"
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Napis drugiego przycisku (DE)">
+              <input
+                name="cta_secondary_label_de"
+                defaultValue={initial?.cta_secondary_label_de ?? ""}
+                maxLength={100}
+                placeholder="z. B. Neuheiten"
+                className={inputCls}
+              />
+            </Field>
+          </div>
+        </fieldset>
+
         {/* Daty obowiązywania */}
         <fieldset className="border border-[var(--border)] rounded-xl p-4 flex flex-col gap-3">
           <legend className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] px-2">

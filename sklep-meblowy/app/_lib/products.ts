@@ -1,6 +1,8 @@
 import { createClient } from "./supabase/server";
 import { getCategories } from "./categories";
 import { buildSearchOrFilter } from "./search-filter";
+import { localizeProduct, buildLocalizedFacets } from "./localize";
+import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Category, Product } from "./types";
 
 // Górny limit rozmiaru strony — broni przed ?limit=999999 (kosztowny request).
@@ -46,6 +48,10 @@ export type ProductFilters = {
   // sub-kategorię. Gdy oba `category` i `sectionSlug` są ustawione,
   // `category` wygrywa (bardziej szczegółowy filtr).
   sectionSlug?: string;
+  // Język odczytu — gdy "de", pola tekstowe (name/description/color/material/
+  // sekcje) wracają zlokalizowane (z fallbackiem PL), a wyszukiwanie szuka po
+  // kolumnach _de. Domyślnie PL (admin/cron/legacy callerzy działają bez zmian).
+  locale?: Locale;
 };
 
 export async function getProducts(filters: ProductFilters = {}) {
@@ -63,6 +69,7 @@ export async function getProducts(filters: ProductFilters = {}) {
     materials,
     collectionSlug,
     sectionSlug,
+    locale = DEFAULT_LOCALE,
   } = filters;
 
   // Normalizacja paginacji — chroni przed NaN/0/ujemnymi (patrz clampPage).
@@ -107,7 +114,8 @@ export async function getProducts(filters: ProductFilters = {}) {
   if (search && search.trim()) {
     // Sanityzacja + budowa filtra .or() w search-filter.ts (escape składni
     // .or() i wildcardów ILIKE). null = po sanityzacji nic nie zostało.
-    const orFilter = buildSearchOrFilter(search);
+    // DE szuka po name_de/description_de (bez fallbacku — patrz search-filter).
+    const orFilter = buildSearchOrFilter(search, locale);
     if (orFilter) query = query.or(orFilter);
   }
 
@@ -144,13 +152,13 @@ export async function getProducts(filters: ProductFilters = {}) {
   if (error) throw error;
 
   return {
-    products: (data ?? []) as Product[],
+    products: ((data ?? []) as Product[]).map((p) => localizeProduct(p, locale)),
     total: count ?? 0,
     pages: Math.ceil((count ?? 0) / safeLimit),
   };
 }
 
-export async function getProduct(id: string) {
+export async function getProduct(id: string, locale: Locale = DEFAULT_LOCALE) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("products")
@@ -159,7 +167,7 @@ export async function getProduct(id: string) {
     .single();
 
   if (error) return null;
-  return data as Product;
+  return localizeProduct(data as Product, locale);
 }
 
 // ============================================================
@@ -172,7 +180,8 @@ export async function getProduct(id: string) {
 export async function getCrossSellProducts(
   cartCategorySlugs: string[],
   excludeProductIds: string[] = [],
-  limit = 4
+  limit = 4,
+  locale: Locale = DEFAULT_LOCALE
 ): Promise<Product[]> {
   if (cartCategorySlugs.length === 0) return [];
 
@@ -208,10 +217,13 @@ export async function getCrossSellProducts(
   }
 
   const { data } = await query;
-  return (data ?? []) as Product[];
+  return ((data ?? []) as Product[]).map((p) => localizeProduct(p, locale));
 }
 
-export async function getFeaturedProducts(limit = 4) {
+export async function getFeaturedProducts(
+  limit = 4,
+  locale: Locale = DEFAULT_LOCALE
+) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("products")
@@ -219,10 +231,15 @@ export async function getFeaturedProducts(limit = 4) {
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  return (data ?? []) as Product[];
+  return ((data ?? []) as Product[]).map((p) => localizeProduct(p, locale));
 }
 
-export async function getRelatedProducts(productId: string, category: Category, limit = 4) {
+export async function getRelatedProducts(
+  productId: string,
+  category: Category,
+  limit = 4,
+  locale: Locale = DEFAULT_LOCALE
+) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("products")
@@ -231,7 +248,7 @@ export async function getRelatedProducts(productId: string, category: Category, 
     .neq("id", productId)
     .limit(limit);
 
-  return (data ?? []) as Product[];
+  return ((data ?? []) as Product[]).map((p) => localizeProduct(p, locale));
 }
 
 // Pobiera unikalne wartości color/material z CAŁEJ bazy produktów — użyte
@@ -246,32 +263,45 @@ export async function getRelatedProducts(productId: string, category: Category, 
 //
 // Jeśli kolor nie ma żadnego produktu spełniającego pozostałe filtry —
 // kliknięcie zwróci pustą listę i user wyczyści filtry sam.
-export async function getFilterFacets() {
+export async function getFilterFacets(locale: Locale = DEFAULT_LOCALE) {
   const supabase = await createClient();
 
+  // Każdy facet niesie KANONICZNĄ wartość PL (`value`) + zlokalizowany `label`.
+  // Dedupe robimy po PL value, więc kliknięcie zawsze wysyła ?kolor=<PL> i
+  // pasuje do `.in("color", ...)` w getProducts (predykat dalej PL — patrz
+  // niżej). DE produkty pokażą niemiecką etykietę (label), ale filtrują po PL.
+  // Selektujemy obie kolumny i składamy { value, label } w JS przez
+  // buildLocalizedFacets (czysty, testowalny helper).
   const [
     { data: colorsData },
     { data: materialsData },
   ] = await Promise.all([
-    supabase.from("products").select("color").not("color", "is", null),
-    supabase.from("products").select("material").not("material", "is", null),
+    supabase
+      .from("products")
+      .select("color, color_de")
+      .not("color", "is", null),
+    supabase
+      .from("products")
+      .select("material, material_de")
+      .not("material", "is", null),
   ]);
 
-  const colors = Array.from(
-    new Set(
-      (colorsData ?? [])
-        .map((r) => (r as { color: string | null }).color?.trim() ?? "")
-        .filter((c) => c.length > 0)
-    )
-  ).sort((a, b) => a.localeCompare(b, "pl"));
+  const colors = buildLocalizedFacets(
+    ((colorsData ?? []) as { color: string | null; color_de: string | null }[]).map(
+      (r) => ({ value: r.color, value_de: r.color_de })
+    ),
+    locale
+  );
 
-  const materials = Array.from(
-    new Set(
-      (materialsData ?? [])
-        .map((r) => (r as { material: string | null }).material?.trim() ?? "")
-        .filter((m) => m.length > 0)
-    )
-  ).sort((a, b) => a.localeCompare(b, "pl"));
+  const materials = buildLocalizedFacets(
+    (
+      (materialsData ?? []) as {
+        material: string | null;
+        material_de: string | null;
+      }[]
+    ).map((r) => ({ value: r.material, value_de: r.material_de })),
+    locale
+  );
 
   return { colors, materials };
 }

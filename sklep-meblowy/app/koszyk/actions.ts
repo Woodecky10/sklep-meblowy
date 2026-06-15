@@ -5,6 +5,7 @@ import { getCrossSellProducts } from "@/app/_lib/products";
 import { getUserWishlistIds } from "@/app/_lib/wishlist";
 import { getCategories } from "@/app/_lib/categories";
 import { createAdminClient } from "@/app/_lib/supabase/server";
+import { getLocale } from "@/app/_lib/i18n-server";
 import type { Product } from "@/app/_lib/types";
 
 export type PromoApplyResult =
@@ -25,7 +26,8 @@ export async function applyPromoCodeAction(
   rawCode: string,
   cartTotal: number
 ): Promise<PromoApplyResult> {
-  const result = await validatePromoCode(rawCode, cartTotal);
+  const locale = await getLocale();
+  const result = await validatePromoCode(rawCode, cartTotal, locale);
   if (!result.ok) return result;
   return {
     ok: true,
@@ -84,7 +86,13 @@ export async function getCartCrossSellAction(
   );
   const cartProductIds = items.map((i) => i.id);
 
-  const products = await getCrossSellProducts(cartCategories, cartProductIds, 4);
+  const locale = await getLocale();
+  const products = await getCrossSellProducts(
+    cartCategories,
+    cartProductIds,
+    4,
+    locale
+  );
 
   // Które z poleconych produktów są już w ulubionych usera. getUserWishlistIds
   // zwraca pusty Set dla niezalogowanego — wtedy wishlistIds = [].
@@ -95,7 +103,7 @@ export async function getCartCrossSellAction(
 
   // Etykiety kategorii poleconych produktów (getCategories jest cache'owane).
   const labelBySlug = new Map(
-    (await getCategories()).map((c) => [c.slug, c.label])
+    (await getCategories(locale)).map((c) => [c.slug, c.label])
   );
   const categoryLabels: Record<string, string> = {};
   for (const p of products) {

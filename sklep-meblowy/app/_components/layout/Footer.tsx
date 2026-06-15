@@ -1,24 +1,28 @@
-import Link from "next/link";
+import LocalizedLink from "../ui/LocalizedLink";
 import Image from "next/image";
 import { getSections, getCategories } from "@/app/_lib/categories";
 import { COMPANY, isFilled } from "@/app/_lib/company";
-
-const INFO_LINKS: [string, string][] = [
-  ["O nas", "/o-nas"],
-  ["Kontakt", "/kontakt"],
-  ["Moje konto", "/konto"],
-  ["Historia zamówień", "/konto/zamowienia"],
-  ["Dostawa i płatności", "/dostawa"],
-  ["Zwroty i reklamacje", "/zwroty"],
-  ["Regulamin", "/regulamin"],
-  ["Polityka prywatności", "/prywatnosc"],
-];
+import { getLocale } from "@/app/_lib/i18n-server";
+import { getDictionary } from "@/app/_lib/dictionaries";
 
 export default async function Footer() {
+  const locale = await getLocale();
+  const t = getDictionary(locale);
   const [sections, categories] = await Promise.all([
-    getSections(),
-    getCategories(),
+    getSections(locale),
+    getCategories(locale),
   ]);
+
+  const infoLinks: [string, string][] = [
+    [t.footer.about, "/o-nas"],
+    [t.footer.contact, "/kontakt"],
+    [t.footer.account, "/konto"],
+    [t.footer.orderHistory, "/konto/zamowienia"],
+    [t.footer.delivery, "/dostawa"],
+    [t.footer.returns, "/zwroty"],
+    [t.footer.terms, "/regulamin"],
+    [t.footer.privacy, "/prywatnosc"],
+  ];
 
   return (
     <footer className="bg-[var(--color-navy)] text-white mt-24">
@@ -37,8 +41,7 @@ export default async function Footer() {
             </p>
           </div>
           <p className="text-sm text-white/60 leading-relaxed max-w-xs mb-4">
-            Tworzymy przestrzenie, w których chce się żyć. Meble najwyższej
-            jakości, z pasją do detalu.
+            {t.footer.tagline}
           </p>
           <p className="text-xs text-white/70 leading-relaxed">
             {COMPANY.email}
@@ -61,12 +64,12 @@ export default async function Footer() {
                 .filter((c) => c.group_slug === section.slug)
                 .map((c) => (
                   <li key={c.slug}>
-                    <Link
+                    <LocalizedLink
                       href={`/sklep?kategoria=${c.slug}`}
                       className="hover:text-[var(--color-gold)] transition-colors"
                     >
                       {c.label}
-                    </Link>
+                    </LocalizedLink>
                   </li>
                 ))}
             </ul>
@@ -75,14 +78,14 @@ export default async function Footer() {
 
         <div>
           <p className="font-sans text-xs uppercase tracking-widest text-[var(--color-gold)] mb-4">
-            Informacje
+            {t.footer.information}
           </p>
           <ul className="space-y-3 text-sm text-white/70">
-            {INFO_LINKS.map(([label, href]) => (
+            {infoLinks.map(([label, href]) => (
               <li key={href}>
-                <Link href={href} className="hover:text-[var(--color-gold)] transition-colors">
+                <LocalizedLink href={href} className="hover:text-[var(--color-gold)] transition-colors">
                   {label}
-                </Link>
+                </LocalizedLink>
               </li>
             ))}
           </ul>
@@ -90,7 +93,7 @@ export default async function Footer() {
       </div>
 
       <div className="border-t border-white/10 py-6 text-center text-xs text-white/70 px-6">
-        © {new Date().getFullYear()} {COMPANY.brandName}. Wszelkie prawa zastrzeżone.
+        © {new Date().getFullYear()} {COMPANY.brandName}. {t.footer.rightsReserved}
         {isFilled(COMPANY.nip) && (
           <>
             {" "}

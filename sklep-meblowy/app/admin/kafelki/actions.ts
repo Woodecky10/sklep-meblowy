@@ -103,8 +103,11 @@ export async function createTile(formData: FormData): Promise<ActionResult> {
   const { error } = await supabase.from("home_tiles").insert({
     image_url: upload.url,
     image_alt: sanitize(formData.get("image_alt"), 200),
+    image_alt_de: emptyToNull(sanitize(formData.get("image_alt_de"), 200)),
     label,
+    label_de: emptyToNull(sanitize(formData.get("label_de"), 200)),
     description: emptyToNull(sanitize(formData.get("description"), 500)),
+    description_de: emptyToNull(sanitize(formData.get("description_de"), 500)),
     href,
     sort_order: nextOrder,
     active: formData.get("active") === "1",
@@ -150,8 +153,11 @@ export async function updateTile(formData: FormData): Promise<ActionResult> {
 
   const updates: Record<string, unknown> = {
     image_alt: sanitize(formData.get("image_alt"), 200),
+    image_alt_de: emptyToNull(sanitize(formData.get("image_alt_de"), 200)),
     label,
+    label_de: emptyToNull(sanitize(formData.get("label_de"), 200)),
     description: emptyToNull(sanitize(formData.get("description"), 500)),
+    description_de: emptyToNull(sanitize(formData.get("description_de"), 500)),
     href,
     active: formData.get("active") === "1",
   };

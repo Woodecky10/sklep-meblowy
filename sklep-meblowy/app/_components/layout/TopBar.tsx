@@ -1,8 +1,14 @@
+import { Suspense } from "react";
 import { COMPANY } from "@/app/_lib/company";
+import LanguageSwitcher from "./LanguageSwitcher";
+import { getLocale } from "@/app/_lib/i18n-server";
+import { getDictionary } from "@/app/_lib/dictionaries";
 
 // Cienki pasek nad headerem z kontaktem i krótką informacją o dostawie.
 // Ciemne tło (navy) + jasny tekst — identyczny wygląd w light i dark mode.
-export default function TopBar() {
+export default async function TopBar() {
+  const locale = await getLocale();
+  const t = getDictionary(locale);
   return (
     <div className="bg-[var(--color-navy)] text-white/80 text-xs">
       <div className="max-w-7xl mx-auto px-6 h-9 flex items-center justify-between gap-4">
@@ -51,10 +57,15 @@ export default function TopBar() {
           )}
         </div>
 
-        {/* Slogan po prawej */}
-        <span className="hidden md:inline text-white/70 tracking-wide">
-          Polski producent mebli tapicerowanych
-        </span>
+        {/* Slogan + przełącznik języka po prawej */}
+        <div className="flex items-center gap-5">
+          <span className="hidden md:inline text-white/70 tracking-wide">
+            {t.topbar.slogan}
+          </span>
+          <Suspense fallback={<div className="w-12 h-4" />}>
+            <LanguageSwitcher className="text-white/80" />
+          </Suspense>
+        </div>
       </div>
     </div>
   );

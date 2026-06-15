@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useModal } from "@/app/_lib/useModal";
+import { localizeHref, stripLocale, type Locale } from "@/app/_lib/i18n";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
+import { getDictionary, type Dictionary } from "@/app/_lib/dictionaries";
+import { formatPrice } from "@/app/_lib/format";
 import type { SearchSuggestion } from "@/app/api/search/suggest/route";
 
 type Variant = "icon" | "inline";
@@ -14,6 +18,11 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const locale = useClientLocale();
+  const t = getDictionary(locale);
+  // Pod '/de' usePathname() zwraca '/de/sklep'. Porównujemy ścieżkę BEZ prefiksu
+  // locale, inaczej cała logika "jesteśmy na /sklep" gubiła się pod DE.
+  const isOnSklep = stripLocale(pathname ?? "/").pathname === "/sklep";
 
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(searchParams.get("q") ?? "");
@@ -31,7 +40,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
   // każda nawigacja w /sklep (paginacja, filtry) ma przywracać do inputa
   // aktualne q z URL, tak jak robił to dawny efekt z deps [pathname,
   // searchParams] — np. po ręcznym wyczyszczeniu pola i zmianie strony.
-  const urlKey = pathname === "/sklep" ? searchParams.toString() : null;
+  const urlKey = isOnSklep ? searchParams.toString() : null;
   const [prevUrlKey, setPrevUrlKey] = useState(urlKey);
   if (urlKey !== prevUrlKey) {
     setPrevUrlKey(urlKey);
@@ -64,7 +73,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
     let cancelled = false;
     const handle = setTimeout(() => {
       setLoading(true);
-      fetch(`/api/search/suggest?q=${encodeURIComponent(trimmed)}`)
+      fetch(`/api/search/suggest?q=${encodeURIComponent(trimmed)}&loc=${locale}`)
         .then((r) => (r.ok ? r.json() : []))
         .then((data: SearchSuggestion[]) => {
           if (cancelled) return;
@@ -84,7 +93,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
       cancelled = true;
       clearTimeout(handle);
     };
-  }, [value]);
+  }, [value, locale]);
 
   // Click outside zamyka dropdown (tylko dla inline)
   useEffect(() => {
@@ -107,18 +116,18 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
     }
     const q = value.trim();
     const params = new URLSearchParams(
-      pathname === "/sklep" ? searchParams.toString() : ""
+      isOnSklep ? searchParams.toString() : ""
     );
     if (q) params.set("q", q);
     else params.delete("q");
     params.delete("strona");
-    router.push(`/sklep?${params.toString()}`);
+    router.push(localizeHref(`/sklep?${params.toString()}`, locale));
     setOpen(false);
     setSuggestionsOpen(false);
   }
 
   function goToProduct(id: string) {
-    router.push(`/produkt/${id}`);
+    router.push(localizeHref(`/produkt/${id}`, locale));
     setOpen(false);
     setSuggestionsOpen(false);
   }
@@ -168,7 +177,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
             onChange={(e) => setValue(e.target.value)}
             onFocus={() => setSuggestionsOpen(true)}
             onKeyDown={onKeyDown}
-            placeholder="Szukaj mebli…"
+            placeholder={t.search.placeholderInline}
             className="flex-1 bg-transparent outline-none text-sm text-[var(--fg)] placeholder:text-[var(--muted)] min-w-0"
           />
           {value && (
@@ -179,7 +188,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
                 setSuggestions([]);
                 inputRef.current?.focus();
               }}
-              aria-label="Wyczyść"
+              aria-label={t.filter.clear}
               className="text-[var(--muted)] hover:text-[var(--fg)] text-xs shrink-0"
             >
               ✕
@@ -194,6 +203,8 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
             highlighted={highlighted}
             onHover={setHighlighted}
             onSelect={goToProduct}
+            t={t}
+            locale={locale}
             className="absolute top-full left-0 right-0 mt-2 z-50"
           />
         )}
@@ -208,7 +219,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        aria-label="Szukaj"
+        aria-label={t.nav.search}
         className="w-10 h-10 flex items-center justify-center text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors"
       >
         <SearchIcon size={20} />
@@ -236,7 +247,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
                 }}
                 onFocus={() => setSuggestionsOpen(true)}
                 onKeyDown={onKeyDown}
-                placeholder="Szukaj produktów…"
+                placeholder={t.search.placeholderModal}
                 className="flex-1 bg-transparent outline-none text-[var(--fg)] placeholder:text-[var(--muted)]"
               />
               {value && (
@@ -246,7 +257,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
                     setValue("");
                     setSuggestions([]);
                   }}
-                  aria-label="Wyczyść"
+                  aria-label={t.filter.clear}
                   className="text-[var(--muted)] hover:text-[var(--fg)]"
                 >
                   ✕
@@ -256,7 +267,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
                 type="submit"
                 className="px-4 py-1.5 rounded-full bg-[var(--color-navy)] text-white text-xs font-sans uppercase tracking-widest hover:bg-[var(--color-gold)] transition-colors"
               >
-                Szukaj
+                {t.nav.search}
               </button>
             </form>
 
@@ -267,6 +278,8 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
                 highlighted={highlighted}
                 onHover={setHighlighted}
                 onSelect={goToProduct}
+                t={t}
+                locale={locale}
                 className="mt-2"
               />
             )}
@@ -287,6 +300,8 @@ function SuggestionsList({
   highlighted,
   onHover,
   onSelect,
+  t,
+  locale,
   className,
 }: {
   suggestions: SearchSuggestion[];
@@ -294,12 +309,14 @@ function SuggestionsList({
   highlighted: number;
   onHover: (i: number) => void;
   onSelect: (id: string) => void;
+  t: Dictionary;
+  locale: Locale;
   className?: string;
 }) {
   if (loading && suggestions.length === 0) {
     return (
       <div className={`bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-2xl p-4 text-xs text-[var(--muted)] ${className ?? ""}`}>
-        Szukam…
+        {t.search.searching}
       </div>
     );
   }
@@ -339,7 +356,7 @@ function SuggestionsList({
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center text-[10px] text-[var(--muted)]">
-                    brak
+                    {t.search.noImageShort}
                   </div>
                 )}
               </div>
@@ -350,7 +367,7 @@ function SuggestionsList({
                 </p>
               </div>
               <p className="text-sm font-semibold text-[var(--fg)] shrink-0">
-                {s.price.toLocaleString("pl-PL")} zł
+                {formatPrice(s.price, locale)}
               </p>
             </button>
           </li>

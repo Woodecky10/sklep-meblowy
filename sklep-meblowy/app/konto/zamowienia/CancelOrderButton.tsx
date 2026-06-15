@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { cancelOrder } from "./actions";
 
 // Anulowanie zamówienia przez klienta. Wymaga potwierdzenia żeby uniknąć
@@ -9,11 +10,25 @@ import { cancelOrder } from "./actions";
 // na serverze już zaktualizował cache).
 export default function CancelOrderButton({ orderId }: { orderId: string }) {
   const router = useRouter();
+  const de = useClientLocale() === "de";
+  const c = de
+    ? {
+        confirm:
+          "Möchten Sie diese Bestellung wirklich stornieren? Dieser Vorgang kann nicht rückgängig gemacht werden.",
+        cancelling: "Wird storniert...",
+        cancel: "Bestellung stornieren",
+      }
+    : {
+        confirm:
+          "Czy na pewno chcesz anulować to zamówienie? Tej operacji nie da się cofnąć.",
+        cancelling: "Anulowanie...",
+        cancel: "Anuluj zamówienie",
+      };
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   function handleClick() {
-    if (!window.confirm("Czy na pewno chcesz anulować to zamówienie? Tej operacji nie da się cofnąć.")) {
+    if (!window.confirm(c.confirm)) {
       return;
     }
     setError(null);
@@ -49,7 +64,7 @@ export default function CancelOrderButton({ orderId }: { orderId: string }) {
           <line x1="15" y1="9" x2="9" y2="15" />
           <line x1="9" y1="9" x2="15" y2="15" />
         </svg>
-        {pending ? "Anulowanie..." : "Anuluj zamówienie"}
+        {pending ? c.cancelling : c.cancel}
       </button>
       {error && (
         <p className="text-xs text-red-600 dark:text-red-400">{error}</p>

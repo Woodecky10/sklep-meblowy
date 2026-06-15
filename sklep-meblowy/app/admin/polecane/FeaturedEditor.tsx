@@ -30,6 +30,7 @@ import {
 } from "./actions";
 import type { FeaturedItem } from "@/app/_lib/featured";
 import type { Product } from "@/app/_lib/types";
+import { BADGE_OPTIONS } from "@/app/_lib/de-content-maps";
 
 type Toast = { type: "success" | "error"; message: string } | null;
 
@@ -218,14 +219,19 @@ function AddForm({
         <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
           Badge (opcjonalny)
         </span>
-        <input
+        <select
           name="badge"
           value={badge}
           onChange={(e) => setBadge(e.target.value)}
-          placeholder="np. Bestseller, Nowość"
-          maxLength={50}
           className={inputCls}
-        />
+        >
+          <option value="">— bez plakietki —</option>
+          {BADGE_OPTIONS.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
       </label>
       <button
         type="submit"
@@ -308,13 +314,22 @@ function SortableRow({
       </div>
 
       <div className="flex items-center gap-2">
-        <input
+        <select
           value={badge}
           onChange={(e) => setBadge(e.target.value)}
-          placeholder="badge (opcjonalny)"
-          maxLength={50}
           className={`${inputCls} w-48`}
-        />
+        >
+          <option value="">— bez plakietki —</option>
+          {/* Legacy/własna wartość spoza listy — zachowaj możliwość wyboru */}
+          {badge && !(BADGE_OPTIONS as readonly string[]).includes(badge) && (
+            <option value={badge}>{badge} (własna)</option>
+          )}
+          {BADGE_OPTIONS.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
         <button
           type="button"
           disabled={!dirty || pendingBadge}

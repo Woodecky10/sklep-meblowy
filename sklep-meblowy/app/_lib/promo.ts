@@ -2,6 +2,8 @@
 // Klient wpisuje kod w koszyku/checkout, server walidacja przed Stripe.
 
 import { createAdminClient } from "./supabase/server";
+import { DEFAULT_LOCALE, type Locale } from "./i18n";
+import { PROMO_ERROR_DE, mapDe } from "./de-content-maps";
 
 export type PromoCode = {
   id: string;
@@ -37,12 +39,15 @@ export function normalizeCode(raw: string): string {
 // kodów których klient nie powinien zobaczyć w listingu.
 export async function validatePromoCode(
   rawCode: string,
-  cartTotal: number
+  cartTotal: number,
+  locale: Locale = DEFAULT_LOCALE
 ): Promise<ValidationResult> {
+  // Tłumaczy komunikat błędu na DE (mapa stała); PL = oryginał.
+  const tr = (pl: string) => (locale === "de" ? mapDe(PROMO_ERROR_DE, pl) ?? pl : pl);
   const code = normalizeCode(rawCode);
-  if (!code) return { ok: false, error: "Wpisz kod rabatowy" };
+  if (!code) return { ok: false, error: tr("Wpisz kod rabatowy") };
   if (!Number.isFinite(cartTotal) || cartTotal <= 0) {
-    return { ok: false, error: "Koszyk jest pusty" };
+    return { ok: false, error: tr("Koszyk jest pusty") };
   }
 
   const supabase = await createAdminClient();
@@ -52,27 +57,31 @@ export async function validatePromoCode(
     .eq("code", code)
     .maybeSingle();
 
-  if (error) return { ok: false, error: "Błąd weryfikacji kodu" };
-  if (!data) return { ok: false, error: "Nieprawidłowy kod rabatowy" };
+  if (error) return { ok: false, error: tr("Błąd weryfikacji kodu") };
+  if (!data) return { ok: false, error: tr("Nieprawidłowy kod rabatowy") };
 
   const promo = data as PromoCode;
 
-  if (!promo.active) return { ok: false, error: "Kod jest nieaktywny" };
+  if (!promo.active) return { ok: false, error: tr("Kod jest nieaktywny") };
 
   const now = Date.now();
   if (promo.valid_from && now < new Date(promo.valid_from).getTime()) {
-    return { ok: false, error: "Kod jeszcze nie obowiązuje" };
+    return { ok: false, error: tr("Kod jeszcze nie obowiązuje") };
   }
   if (promo.valid_to && now > new Date(promo.valid_to).getTime()) {
-    return { ok: false, error: "Kod wygasł" };
+    return { ok: false, error: tr("Kod wygasł") };
   }
   if (promo.max_uses !== null && promo.used_count >= promo.max_uses) {
-    return { ok: false, error: "Limit użyć tego kodu został wyczerpany" };
+    return { ok: false, error: tr("Limit użyć tego kodu został wyczerpany") };
   }
   if (promo.min_order_value !== null && cartTotal < promo.min_order_value) {
+    const amount = `${promo.min_order_value.toFixed(2)} zł`;
     return {
       ok: false,
-      error: `Minimalna wartość zamówienia: ${promo.min_order_value.toFixed(2)} zł`,
+      error:
+        locale === "de"
+          ? `Mindestbestellwert: ${amount}`
+          : `Minimalna wartość zamówienia: ${amount}`,
     };
   }
 

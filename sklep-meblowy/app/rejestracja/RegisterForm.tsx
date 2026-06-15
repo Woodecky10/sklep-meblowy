@@ -2,12 +2,39 @@
 
 import { useActionState } from "react";
 import { signUp, signInWithGoogle, type AuthState } from "@/app/_lib/auth-actions";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
 
 export default function RegisterForm() {
+  const de = useClientLocale() === "de";
   const [state, action, pending] = useActionState<AuthState, FormData>(
     signUp,
     null
   );
+
+  const c = de
+    ? {
+        checkInbox: "Prüfen Sie Ihren Posteingang",
+        google: "Mit Google fortfahren",
+        orEmail: "oder E-Mail",
+        fullName: "Vor- und Nachname",
+        email: "E-Mail",
+        password: "Passwort (mind. 6 Zeichen)",
+        loading: "Konto wird erstellt...",
+        submit: "Konto erstellen",
+        confirmNote:
+          "Nach der Registrierung senden wir Ihnen eine E-Mail mit einem Bestätigungslink.",
+      }
+    : {
+        checkInbox: "Sprawdź skrzynkę",
+        google: "Kontynuuj z Google",
+        orEmail: "lub email",
+        fullName: "Imię i nazwisko",
+        email: "Email",
+        password: "Hasło (min. 6 znaków)",
+        loading: "Tworzę konto...",
+        submit: "Utwórz konto",
+        confirmNote: "Po rejestracji wyślemy email z linkiem potwierdzającym.",
+      };
 
   if (state?.info) {
     return (
@@ -18,7 +45,7 @@ export default function RegisterForm() {
           </svg>
         </div>
         <h2 className="font-display text-xl font-bold text-[var(--fg)] mb-2">
-          Sprawdź skrzynkę
+          {c.checkInbox}
         </h2>
         <p className="text-sm text-[var(--muted)]">{state.info}</p>
       </div>
@@ -33,14 +60,14 @@ export default function RegisterForm() {
           className="w-full py-3.5 border border-[var(--border)] rounded-full font-sans text-sm font-semibold text-[var(--fg)] hover:bg-[var(--card-bg)] transition-colors flex items-center justify-center gap-3"
         >
           <GoogleIcon />
-          Kontynuuj z Google
+          {c.google}
         </button>
       </form>
 
       <div className="relative flex items-center">
         <div className="flex-1 border-t border-[var(--border)]" />
         <span className="px-4 text-xs uppercase tracking-widest text-[var(--muted)]">
-          lub email
+          {c.orEmail}
         </span>
         <div className="flex-1 border-t border-[var(--border)]" />
       </div>
@@ -48,7 +75,7 @@ export default function RegisterForm() {
       <form action={action} className="flex flex-col gap-4">
         <label className="flex flex-col gap-2">
           <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
-            Imię i nazwisko
+            {c.fullName}
           </span>
           <input
             name="full_name"
@@ -62,7 +89,7 @@ export default function RegisterForm() {
 
         <label className="flex flex-col gap-2">
           <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
-            Email
+            {c.email}
           </span>
           <input
             name="email"
@@ -75,7 +102,7 @@ export default function RegisterForm() {
 
         <label className="flex flex-col gap-2">
           <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
-            Hasło (min. 6 znaków)
+            {c.password}
           </span>
           <input
             name="password"
@@ -98,11 +125,11 @@ export default function RegisterForm() {
           disabled={pending}
           className="w-full py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {pending ? "Tworzę konto..." : "Utwórz konto"}
+          {pending ? c.loading : c.submit}
         </button>
 
         <p className="text-xs text-[var(--muted)] text-center">
-          Po rejestracji wyślemy email z linkiem potwierdzającym.
+          {c.confirmNote}
         </p>
       </form>
     </div>

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, createAdminClient } from "@/app/_lib/supabase/server";
+import { getLocale } from "@/app/_lib/i18n-server";
 
 export type CancelOrderResult =
   | { ok: true; message: string }
@@ -16,11 +17,13 @@ export type CancelOrderResult =
 // - used_count jest inkrementowany dopiero w Stripe webhook po opłaceniu —
 //   więc dla pending order kupon NIE jest jeszcze policzony jako użyty.
 export async function cancelOrder(orderId: string): Promise<CancelOrderResult> {
+  const de = (await getLocale()) === "de";
+  const tr = (pl: string, deTxt: string) => (de ? deTxt : pl);
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Musisz być zalogowany" };
+  if (!user) return { ok: false, error: tr("Musisz być zalogowany", "Sie müssen angemeldet sein") };
 
   // Service-role: po utwardzeniu RLS (migracja 26) klient nie ma prawa UPDATE
   // na orders — mutacja idzie service-rolem, a ownership i dozwolone przejście
@@ -36,13 +39,15 @@ export async function cancelOrder(orderId: string): Promise<CancelOrderResult> {
     .single();
 
   if (loadErr || !order) {
-    return { ok: false, error: "Zamówienie nie istnieje lub nie należy do Ciebie" };
+    return { ok: false, error: tr("Zamówienie nie istnieje lub nie należy do Ciebie", "Bestellung existiert nicht oder gehört nicht Ihnen") };
   }
   if ((order as { status: string }).status !== "pending") {
     return {
       ok: false,
-      error:
+      error: tr(
         "Tego zamówienia nie można już anulować z poziomu konta. Skontaktuj się z nami.",
+        "Diese Bestellung kann nicht mehr storniert werden. Bitte kontaktieren Sie uns."
+      ),
     };
   }
 
@@ -61,13 +66,15 @@ export async function cancelOrder(orderId: string): Promise<CancelOrderResult> {
     // Status zmienił się między odczytem a CAS (np. webhook pending→paid).
     return {
       ok: false,
-      error:
+      error: tr(
         "Tego zamówienia nie można już anulować z poziomu konta. Skontaktuj się z nami.",
+        "Diese Bestellung kann nicht mehr storniert werden. Bitte kontaktieren Sie uns."
+      ),
     };
   }
 
   revalidatePath(`/konto/zamowienia/${orderId}`);
   revalidatePath("/konto/zamowienia");
 
-  return { ok: true, message: "Zamówienie zostało anulowane" };
+  return { ok: true, message: tr("Zamówienie zostało anulowane", "Die Bestellung wurde storniert") };
 }

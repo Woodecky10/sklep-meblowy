@@ -3,6 +3,7 @@ import { createAdminClient } from "@/app/_lib/supabase/server";
 import { COMPANY } from "@/app/_lib/company";
 import { getCategories } from "@/app/_lib/categories";
 import { getAllCollections } from "@/app/_lib/collections";
+import { sitemapAlternates } from "@/app/_lib/sitemap-i18n";
 
 // Sitemap dla Google. Renderowany przy każdym żądaniu (no caching) —
 // na razie OK przy małej liczbie produktów. Jeśli kiedyś będzie 10k+
@@ -15,10 +16,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const BASE = `https://${COMPANY.domain}`;
   const now = new Date();
 
+  // Strony zakupowe (home, /sklep) są w PEŁNI przetłumaczone przez słownik UI
+  // (nie zależą od `needs_translation` per produkt) — zawsze publikujemy DE.
+  // Dodajemy osobne wpisy /de i /de/sklep + wzajemne alternates na obu wpisach.
+  const homeAlts = sitemapAlternates("/", { hasDe: true }, BASE).languages;
+  const sklepAlts = sitemapAlternates("/sklep", { hasDe: true }, BASE).languages;
+
   // Statyczne strony publiczne — kolejność = priorytet wizualny.
+  // Info/legal (o-nas, kontakt, dostawa, zwroty, regulamin, prywatnosc) NIE
+  // dostają DE na tym etapie (brak tłumaczeń) — zostają PL-only.
   const staticRoutes: MetadataRoute.Sitemap = [
-    { url: `${BASE}/`,            lastModified: now, changeFrequency: "daily",   priority: 1.0 },
-    { url: `${BASE}/sklep`,       lastModified: now, changeFrequency: "daily",   priority: 0.9 },
+    { url: `${BASE}/`,            lastModified: now, changeFrequency: "daily",   priority: 1.0, alternates: { languages: homeAlts } },
+    { url: `${BASE}/de`,          lastModified: now, changeFrequency: "daily",   priority: 1.0, alternates: { languages: homeAlts } },
+    { url: `${BASE}/sklep`,       lastModified: now, changeFrequency: "daily",   priority: 0.9, alternates: { languages: sklepAlts } },
+    { url: `${BASE}/de/sklep`,    lastModified: now, changeFrequency: "daily",   priority: 0.9, alternates: { languages: sklepAlts } },
     { url: `${BASE}/o-nas`,       lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${BASE}/kontakt`,     lastModified: now, changeFrequency: "monthly", priority: 0.6 },
     { url: `${BASE}/dostawa`,     lastModified: now, changeFrequency: "monthly", priority: 0.5 },
@@ -55,18 +66,45 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const supabase = await createAdminClient();
     const { data: products } = await supabase
       .from("products")
-      .select("id, created_at")
+      .select("id, created_at, needs_translation")
       .eq("is_active", true)
       .order("created_at", { ascending: false });
 
-    const productRoutes: MetadataRoute.Sitemap = (products ?? []).map((p) => {
-      const product = p as { id: string; created_at: string };
-      return {
-        url: `${BASE}/produkt/${product.id}`,
-        lastModified: new Date(product.created_at),
-        changeFrequency: "weekly",
-        priority: 0.8,
+    // Per produkt: wpis PL zawsze; wpis DE TYLKO gdy produkt przetłumaczony
+    // (`needs_translation === false`). Oba wpisy noszą tę samą mapę alternates
+    // (wzajemnie się referują) — gdy DE istnieje, mapa zawiera `de`, inaczej
+    // tylko `pl` + `x-default` (Google.de nie zindeksuje pół-polskiej strony).
+    const productRoutes: MetadataRoute.Sitemap = (products ?? []).flatMap((p) => {
+      const product = p as {
+        id: string;
+        created_at: string;
+        needs_translation?: boolean;
       };
+      const plPath = `/produkt/${product.id}`;
+      const hasDe = product.needs_translation === false;
+      const lastModified = new Date(product.created_at);
+      const alternates = {
+        languages: sitemapAlternates(plPath, { hasDe }, BASE).languages,
+      };
+      const entries: MetadataRoute.Sitemap = [
+        {
+          url: `${BASE}${plPath}`,
+          lastModified,
+          changeFrequency: "weekly",
+          priority: 0.8,
+          alternates,
+        },
+      ];
+      if (hasDe) {
+        entries.push({
+          url: `${BASE}/de${plPath}`,
+          lastModified,
+          changeFrequency: "weekly",
+          priority: 0.8,
+          alternates,
+        });
+      }
+      return entries;
     });
 
     return [...staticRoutes, ...categoryRoutes, ...collectionRoutes, ...productRoutes];

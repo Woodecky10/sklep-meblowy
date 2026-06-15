@@ -463,3 +463,48 @@ export async function updateProductDescriptionSections(
   revalidatePath(`/produkt/${productId}`);
   return { ok: true, message: "Zapisano sekcje opisu" };
 }
+
+// ============================================================
+// saveProductDe — ręczny zapis tłumaczenia DE produktu
+// ============================================================
+// Admin wpisuje ręcznie pola _de (nazwa/opis/kolor/materiał/sekcje).
+// Zapis czyści needs_translation (admin ma kontrolę) i stempluje translated_at.
+// Sekcje opisu DE (description_sections_de) zapisywane tylko gdy przekazane.
+export async function saveProductDe(
+  id: string,
+  fields: {
+    name_de: string;
+    description_de: string;
+    color_de: string | null;
+    material_de: string | null;
+    description_sections_de?: unknown;
+  }
+): Promise<ActionResult> {
+  await requireAdmin();
+  if (!id) return { ok: false, error: "Brak id produktu" };
+
+  const updates: Record<string, unknown> = {
+    name_de: sanitize(fields.name_de, 300),
+    description_de: sanitize(fields.description_de, 20000),
+    color_de: emptyToNull(sanitize(fields.color_de ?? "", 100)),
+    material_de: emptyToNull(sanitize(fields.material_de ?? "", 100)),
+    needs_translation: false,
+    translated_at: new Date().toISOString(),
+  };
+  // Sekcje DE — zapisujemy tylko gdy explicit przekazane (inaczej nie ruszamy).
+  if (fields.description_sections_de !== undefined) {
+    updates.description_sections_de = fields.description_sections_de;
+  }
+
+  const supabase = await createAdminClient();
+  const { error } = await supabase
+    .from("products")
+    .update(updates as never)
+    .eq("id", id);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/admin/produkty/${id}`);
+  revalidatePath(`/produkt/${id}`);
+  return { ok: true, message: "Zapisano tłumaczenie DE" };
+}

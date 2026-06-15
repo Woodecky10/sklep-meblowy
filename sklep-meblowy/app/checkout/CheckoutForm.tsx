@@ -6,6 +6,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { useCart, cartItemKey } from "@/app/_context/CartContext";
 import { formatVariantLabel } from "@/app/_lib/variants";
+import { localizeHref } from "@/app/_lib/i18n";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
+import { formatPrice } from "@/app/_lib/format";
 import type { Address } from "@/app/_lib/types";
 
 export default function CheckoutForm({
@@ -20,14 +23,82 @@ export default function CheckoutForm({
   isLoggedIn: boolean;
 }) {
   const router = useRouter();
+  const locale = useClientLocale();
+  const de = locale === "de";
   const { items, total, count, appliedPromo } = useCart();
+
+  const c = de
+    ? {
+        haveAccount: "Hast du bereits ein Konto?",
+        login: "Anmelden",
+        autofill: "— die Daten werden automatisch ausgefüllt.",
+        contact: "Kontakt",
+        fullName: "Vor- und Nachname",
+        email: "E-Mail",
+        deliveryAddress: "Lieferadresse",
+        streetAndNumber: "Straße und Hausnummer",
+        postalCode: "Postleitzahl",
+        city: "Stadt",
+        country: "Land",
+        agreePrefix: "Ich habe die",
+        terms: "AGB",
+        and: "und die",
+        privacy: "Datenschutzerklärung",
+        agreeSuffix: "gelesen und akzeptiere sie.",
+        redirecting: "Weiterleitung...",
+        payNow: "Sicher bezahlen →",
+        backToCart: "← Zurück zum Warenkorb",
+        order: "Bestellung",
+        products: "Produkte",
+        shipping: "Versand",
+        shippingFrom: "ab 99 zł",
+        shippingNote:
+          "den genauen Preis nennen wir Ihnen nach der Bestellung telefonisch oder per E-Mail",
+        total: "Gesamt",
+        payment: "🔒 Zahlung über Stripe (Karte, BLIK, Przelewy24)",
+        ssl: "✓ SSL-Verschlüsselung",
+        defaultCountry: "Polen",
+      }
+    : {
+        haveAccount: "Masz już konto?",
+        login: "Zaloguj się",
+        autofill: "— dane wypełnią się automatycznie.",
+        contact: "Kontakt",
+        fullName: "Imię i nazwisko",
+        email: "Email",
+        deliveryAddress: "Adres dostawy",
+        streetAndNumber: "Ulica i numer",
+        postalCode: "Kod pocztowy",
+        city: "Miasto",
+        country: "Kraj",
+        agreePrefix: "Zapoznałem/am się i akceptuję",
+        terms: "regulamin sklepu",
+        and: "oraz",
+        privacy: "politykę prywatności",
+        agreeSuffix: ".",
+        redirecting: "Przekierowuję...",
+        payNow: "Zapłać bezpiecznie →",
+        backToCart: "← Wróć do koszyka",
+        order: "Zamówienie",
+        products: "Produkty",
+        shipping: "Dostawa",
+        shippingFrom: "od 99 zł",
+        shippingNote:
+          "dokładną wycenę podajemy telefonicznie lub mailowo po zamówieniu",
+        total: "Razem",
+        payment: "🔒 Płatność Stripe (karta, BLIK, Przelewy24)",
+        ssl: "✓ Szyfrowanie SSL",
+        defaultCountry: "Polska",
+      };
 
   const [fullName, setFullName] = useState(defaultFullName);
   const [email, setEmail] = useState(defaultEmail);
   const [street, setStreet] = useState(defaultAddress?.street ?? "");
   const [city, setCity] = useState(defaultAddress?.city ?? "");
   const [postalCode, setPostalCode] = useState(defaultAddress?.postal_code ?? "");
-  const [country, setCountry] = useState(defaultAddress?.country ?? "Polska");
+  const [country, setCountry] = useState(
+    defaultAddress?.country ?? c.defaultCountry
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Wymagana akceptacja regulaminu + polityki przed płatnością.
@@ -36,9 +107,9 @@ export default function CheckoutForm({
 
   useEffect(() => {
     if (items.length === 0) {
-      router.replace("/koszyk");
+      router.replace(localizeHref("/koszyk", locale));
     }
-  }, [items.length, router]);
+  }, [items.length, router, locale]);
 
   // Koszt dostawy ustalany indywidualnie po zamówieniu — meble różnią się
   // wagą, gabarytami i miejscem dostawy, ten sam ryczałtowy koszt dla
@@ -50,7 +121,11 @@ export default function CheckoutForm({
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!acceptedTerms) {
-      setError("Musisz zaakceptować regulamin i politykę prywatności, żeby kontynuować.");
+      setError(
+        de
+          ? "Sie müssen die AGB und die Datenschutzerklärung akzeptieren, um fortzufahren."
+          : "Musisz zaakceptować regulamin i politykę prywatności, żeby kontynuować."
+      );
       return;
     }
     setError(null);
@@ -80,6 +155,7 @@ export default function CheckoutForm({
             fullname: fullName,
           },
           promoCode: appliedPromo?.code ?? null,
+          locale: de ? "de" : "pl",
         }),
       });
 
@@ -89,21 +165,33 @@ export default function CheckoutForm({
         data = text ? JSON.parse(text) : {};
       } catch {
         throw new Error(
-          `Serwer zwrócił nieprawidłową odpowiedź (${res.status}): ${text.slice(0, 200)}`
+          de
+            ? `Der Server hat eine ungültige Antwort zurückgegeben (${res.status}): ${text.slice(0, 200)}`
+            : `Serwer zwrócił nieprawidłową odpowiedź (${res.status}): ${text.slice(0, 200)}`
         );
       }
 
       if (!res.ok) {
-        throw new Error(data.error ?? `Błąd ${res.status}`);
+        throw new Error(
+          data.error ?? (de ? `Fehler ${res.status}` : `Błąd ${res.status}`)
+        );
       }
       if (!data.url) {
-        throw new Error("Brak URL płatności w odpowiedzi");
+        throw new Error(
+          de
+            ? "Keine Zahlungs-URL in der Antwort"
+            : "Brak URL płatności w odpowiedzi"
+        );
       }
       window.location.href = data.url;
     } catch (err) {
       console.error("Checkout form error:", err);
       setError(
-        err instanceof Error ? err.message : `Nieznany błąd: ${String(err)}`
+        err instanceof Error
+          ? err.message
+          : de
+            ? `Unbekannter Fehler: ${String(err)}`
+            : `Nieznany błąd: ${String(err)}`
       );
       setLoading(false);
     }
@@ -115,31 +203,31 @@ export default function CheckoutForm({
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
       {!isLoggedIn && (
         <div className="lg:col-span-3 -mt-4 mb-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl px-5 py-3 text-sm text-[var(--muted)] flex flex-wrap items-center gap-2">
-          <span>Masz już konto?</span>
+          <span>{c.haveAccount}</span>
           <Link
             href="/logowanie"
             className="text-[var(--color-gold)] font-semibold hover:underline"
           >
-            Zaloguj się
+            {c.login}
           </Link>
-          <span className="text-xs">— dane wypełnią się automatycznie.</span>
+          <span className="text-xs">{c.autofill}</span>
         </div>
       )}
 
       <form onSubmit={onSubmit} className="lg:col-span-2 flex flex-col gap-6">
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8">
           <h2 className="font-display text-xl font-bold text-[var(--fg)] mb-6">
-            Kontakt
+            {c.contact}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field
-              label="Imię i nazwisko"
+              label={c.fullName}
               value={fullName}
               onChange={setFullName}
               required
             />
             <Field
-              label="Email"
+              label={c.email}
               type="email"
               value={email}
               onChange={setEmail}
@@ -151,27 +239,27 @@ export default function CheckoutForm({
 
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8">
           <h2 className="font-display text-xl font-bold text-[var(--fg)] mb-6">
-            Adres dostawy
+            {c.deliveryAddress}
           </h2>
           <div className="flex flex-col gap-4">
             <Field
-              label="Ulica i numer"
+              label={c.streetAndNumber}
               value={street}
               onChange={setStreet}
               required
             />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field
-                label="Kod pocztowy"
+                label={c.postalCode}
                 value={postalCode}
                 onChange={setPostalCode}
                 placeholder="00-000"
                 required
               />
-              <Field label="Miasto" value={city} onChange={setCity} required />
+              <Field label={c.city} value={city} onChange={setCity} required />
             </div>
             <Field
-              label="Kraj"
+              label={c.country}
               value={country}
               onChange={setCountry}
               required
@@ -196,23 +284,23 @@ export default function CheckoutForm({
             className="mt-0.5 w-4 h-4 accent-[var(--color-gold)] cursor-pointer shrink-0"
           />
           <span className="leading-relaxed">
-            Zapoznałem/am się i akceptuję{" "}
+            {c.agreePrefix}{" "}
             <Link
               href="/regulamin"
               target="_blank"
               className="text-[var(--color-gold-text)] underline hover:opacity-80"
             >
-              regulamin sklepu
+              {c.terms}
             </Link>{" "}
-            oraz{" "}
+            {c.and}{" "}
             <Link
               href="/prywatnosc"
               target="_blank"
               className="text-[var(--color-gold-text)] underline hover:opacity-80"
             >
-              politykę prywatności
+              {c.privacy}
             </Link>
-            . <span className="text-red-500">*</span>
+            {c.agreeSuffix} <span className="text-red-500">*</span>
           </span>
         </label>
 
@@ -221,21 +309,21 @@ export default function CheckoutForm({
           disabled={loading || !acceptedTerms}
           className="w-full py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? "Przekierowuję..." : "Zapłać bezpiecznie →"}
+          {loading ? c.redirecting : c.payNow}
         </button>
 
         <Link
           href="/koszyk"
           className="text-center text-xs font-sans text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors uppercase tracking-widest"
         >
-          ← Wróć do koszyka
+          {c.backToCart}
         </Link>
       </form>
 
       <div className="lg:col-span-1">
         <div className="sticky top-24 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8 flex flex-col gap-6">
           <h2 className="font-display text-2xl font-bold text-[var(--fg)]">
-            Zamówienie ({count})
+            {c.order} ({count})
           </h2>
 
           <div className="flex flex-col gap-4 max-h-64 overflow-y-auto">
@@ -260,16 +348,15 @@ export default function CheckoutForm({
                     </p>
                     {item.variantValues && (
                       <p className="text-[11px] text-[var(--muted)] truncate">
-                        {formatVariantLabel(item.variantValues)}
+                        {formatVariantLabel(item.variantValues, locale)}
                       </p>
                     )}
                     <p className="text-xs text-[var(--muted)]">
-                      {item.quantity} ×{" "}
-                      {item.price.toLocaleString("pl-PL")} zł
+                      {item.quantity} × {formatPrice(item.price, locale)}
                     </p>
                   </div>
                   <p className="text-sm font-semibold text-[var(--fg)] whitespace-nowrap">
-                    {(item.price * item.quantity).toLocaleString("pl-PL")} zł
+                    {formatPrice(item.price * item.quantity, locale)}
                   </p>
                 </div>
               );
@@ -278,34 +365,32 @@ export default function CheckoutForm({
 
           <div className="border-t border-[var(--border)] pt-4 flex flex-col gap-2 text-sm">
             <div className="flex justify-between text-[var(--muted)]">
-              <span>Produkty</span>
-              <span>{total.toLocaleString("pl-PL")} zł</span>
+              <span>{c.products}</span>
+              <span>{formatPrice(total, locale)}</span>
             </div>
             {appliedPromo && discount > 0 && (
               <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
                 <span className="font-mono">{appliedPromo.code}</span>
-                <span>−{discount.toLocaleString("pl-PL")} zł</span>
+                <span>−{formatPrice(discount, locale)}</span>
               </div>
             )}
             <div className="flex justify-between items-start text-[var(--muted)] gap-3">
-              <span className="shrink-0">Dostawa</span>
+              <span className="shrink-0">{c.shipping}</span>
               <span className="text-right text-xs leading-snug">
-                od&nbsp;99&nbsp;zł
+                {c.shippingFrom}
                 <br />
-                <span className="text-[var(--muted)]">
-                  dokładną wycenę podajemy telefonicznie lub mailowo po&nbsp;zamówieniu
-                </span>
+                <span className="text-[var(--muted)]">{c.shippingNote}</span>
               </span>
             </div>
             <div className="border-t border-[var(--border)] pt-2 flex justify-between font-bold text-base text-[var(--fg)]">
-              <span>Razem</span>
-              <span>{grandTotal.toLocaleString("pl-PL")} zł</span>
+              <span>{c.total}</span>
+              <span>{formatPrice(grandTotal, locale)}</span>
             </div>
           </div>
 
           <div className="border-t border-[var(--border)] pt-4 text-xs text-[var(--muted)] space-y-1">
-            <p>🔒 Płatność Stripe (karta, BLIK, Przelewy24)</p>
-            <p>✓ Szyfrowanie SSL</p>
+            <p>{c.payment}</p>
+            <p>{c.ssl}</p>
           </div>
         </div>
       </div>
