@@ -1,9 +1,10 @@
 import StarRating from "./StarRating";
+import { getLocale } from "@/app/_lib/i18n-server";
 import type { ProductReview } from "@/app/_lib/types";
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, de: boolean): string {
   try {
-    return new Date(iso).toLocaleDateString("pl-PL", {
+    return new Date(iso).toLocaleDateString(de ? "de-DE" : "pl-PL", {
       day: "numeric",
       month: "long",
       year: "numeric",
@@ -14,8 +15,8 @@ function formatDate(iso: string): string {
 }
 
 // Zastąp pełne imię i nazwisko formą "Anna K." — zgodne z RODO (minimalizacja danych).
-function anonymize(name: string | null | undefined): string {
-  if (!name) return "Klient";
+function anonymize(name: string | null | undefined, de: boolean): string {
+  if (!name) return de ? "Kunde" : "Klient";
   const parts = name.trim().split(/\s+/);
   if (parts.length === 1) return parts[0];
   const first = parts[0];
@@ -23,11 +24,23 @@ function anonymize(name: string | null | undefined): string {
   return `${first} ${lastInitial}.`;
 }
 
-export default function ReviewList({ reviews }: { reviews: ProductReview[] }) {
+export default async function ReviewList({ reviews }: { reviews: ProductReview[] }) {
+  const locale = await getLocale();
+  const de = locale === "de";
+  const c = de
+    ? {
+        empty: "Für dieses Produkt gibt es noch keine Bewertungen. Seien Sie nach dem Kauf der Erste.",
+        verified: "Verifizierter Kauf",
+      }
+    : {
+        empty: "Ten produkt nie ma jeszcze opinii. Bądź pierwszy po zakupie.",
+        verified: "Zweryfikowany zakup",
+      };
+
   if (reviews.length === 0) {
     return (
       <p className="text-sm text-[var(--muted)] italic">
-        Ten produkt nie ma jeszcze opinii. Bądź pierwszy po zakupie.
+        {c.empty}
       </p>
     );
   }
@@ -43,7 +56,7 @@ export default function ReviewList({ reviews }: { reviews: ProductReview[] }) {
             <div className="flex items-center gap-3">
               <StarRating value={r.rating} size={14} />
               <p className="font-sans text-sm font-semibold text-[var(--fg)]">
-                {anonymize(r.author_name)}
+                {anonymize(r.author_name, de)}
               </p>
               <span className="inline-flex items-center gap-1 text-[10px] font-sans uppercase tracking-widest text-[var(--color-gold)]">
                 <svg
@@ -58,11 +71,11 @@ export default function ReviewList({ reviews }: { reviews: ProductReview[] }) {
                 >
                   <path d="M20 6 9 17l-5-5" />
                 </svg>
-                Zweryfikowany zakup
+                {c.verified}
               </span>
             </div>
             <p className="text-xs text-[var(--muted)]">
-              {formatDate(r.created_at)}
+              {formatDate(r.created_at, de)}
             </p>
           </div>
           {r.comment && (

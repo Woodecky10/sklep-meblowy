@@ -11,6 +11,7 @@ import { getCollection, getAllCollections } from "@/app/_lib/collections";
 import { getUserWishlistIds } from "@/app/_lib/wishlist";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { localizePath } from "@/app/_lib/i18n";
+import { getDictionary } from "@/app/_lib/dictionaries";
 import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import ProductCard from "@/app/_components/ui/ProductCard";
 import FilterBar from "@/app/_components/ui/FilterBar";
@@ -21,8 +22,9 @@ import Pagination from "@/app/_components/ui/Pagination";
 // metadataBase z app/layout.tsx.
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
+  const t = getDictionary(locale);
   return {
-    title: "Sklep",
+    title: t.shop.title,
     alternates: {
       canonical: localizePath("/sklep", locale),
       languages: alternatesFor("/sklep", { hasDe: true }).languages,
@@ -60,6 +62,7 @@ export default async function SklepPage({
 }) {
   const sp = await searchParams;
   const locale = await getLocale();
+  const t = getDictionary(locale);
   const category = sp.kategoria || undefined;
   // sekcja działa tylko jeśli kategoria nie jest ustawiona — kategoria
   // bardziej szczegółowa wygrywa (user kliknął sub-kategorię z dropdown).
@@ -137,12 +140,12 @@ export default async function SklepPage({
   const heading = collection
     ? collection.label
     : search
-    ? `Wyniki: „${search}”`
+    ? `${t.shop.searchPrefix}: „${search}”`
     : category
-    ? categoryLabel ?? "Sklep"
+    ? categoryLabel ?? t.shop.title
     : sectionLabel
     ? sectionLabel
-    : "Wszystkie produkty";
+    : t.shop.allProducts;
 
   // Projekcja dla FilterBar (client) — slug + label per sekcja.
   const filterSections = sections.map((s) => ({
@@ -157,12 +160,19 @@ export default async function SklepPage({
     <div className="max-w-7xl mx-auto px-6 py-16">
       <div className="mb-10">
         <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-          Kolekcja
+          {t.shop.eyebrow}
         </p>
         <h1 className="font-display text-4xl font-bold text-[var(--fg)]">
           {heading}
         </h1>
-        <p className="text-sm text-[var(--muted)] mt-2">{total} produktów</p>
+        <p className="text-sm text-[var(--muted)] mt-2">
+          {total}{" "}
+          {total === 1
+            ? t.home.productOne
+            : total < 5
+              ? t.home.productFew
+              : t.home.productMany}
+        </p>
       </div>
 
       <Suspense>
@@ -176,8 +186,8 @@ export default async function SklepPage({
 
       {products.length === 0 ? (
         <div className="text-center py-24 text-[var(--muted)]">
-          <p className="font-display text-2xl mb-2">Brak produktów</p>
-          <p className="text-sm">Spróbuj zmienić filtry lub frazę wyszukiwania.</p>
+          <p className="font-display text-2xl mb-2">{t.shop.emptyTitle}</p>
+          <p className="text-sm">{t.shop.emptyHint}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
@@ -194,7 +204,7 @@ export default async function SklepPage({
         </div>
       )}
 
-      <Pagination page={page} pages={pages} searchParams={rawParams} />
+      <Pagination page={page} pages={pages} searchParams={rawParams} locale={locale} />
     </div>
   );
 }

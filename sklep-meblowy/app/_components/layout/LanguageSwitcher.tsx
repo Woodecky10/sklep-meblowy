@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { LOCALES, stripLocale, localizePath, type Locale } from "@/app/_lib/i18n";
+import { getDictionary } from "@/app/_lib/dictionaries";
 
 const LABELS: Record<Locale, string> = { pl: "PL", de: "DE" };
 
@@ -15,12 +16,13 @@ export default function LanguageSwitcher({ className = "" }: { className?: strin
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
   const { locale: current, pathname: base } = stripLocale(pathname);
+  const t = getDictionary(current);
 
   const query = searchParams?.toString() ?? "";
   const suffix = query ? `?${query}` : "";
 
   return (
-    <div className={`flex items-center gap-1 text-xs font-sans ${className}`} aria-label="Język">
+    <div className={`flex items-center gap-1 text-xs font-sans ${className}`} aria-label={t.a11y.language}>
       {LOCALES.map((loc, i) => {
         const isActive = loc === current;
         const href = `${localizePath(base, loc)}${suffix}`;

@@ -4,11 +4,14 @@ import { useEffect, useState } from "react";
 import LocalizedLink from "../ui/LocalizedLink";
 import Image from "next/image";
 import { useCart } from "@/app/_context/CartContext";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
+import { getDictionary } from "@/app/_lib/dictionaries";
 
 const VISIBLE_MS = 3500;
 
 export default function CartToast() {
   const { notification, dismissNotification } = useCart();
+  const t = getDictionary(useClientLocale());
   const [visible, setVisible] = useState(false);
 
   // Nowa notyfikacja → start od ukrytego (fade-in robi timer w efekcie).
@@ -59,7 +62,7 @@ export default function CartToast() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-sans text-[10px] uppercase tracking-widest text-[var(--color-gold)] mb-1">
-            Dodano do koszyka
+            {t.cart.toastAdded}
           </p>
           <p className="font-display text-sm font-semibold text-[var(--fg)] truncate">
             {item.name}
@@ -69,7 +72,7 @@ export default function CartToast() {
             onClick={() => dismissNotification()}
             className="inline-block mt-2 text-xs font-sans uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors"
           >
-            Zobacz koszyk →
+            {t.cart.viewCart} →
           </LocalizedLink>
         </div>
         <button
@@ -77,7 +80,7 @@ export default function CartToast() {
             setVisible(false);
             setTimeout(() => dismissNotification(), 300);
           }}
-          aria-label="Zamknij"
+          aria-label={t.common.close}
           className="shrink-0 -mr-1 -mt-1 w-6 h-6 flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] transition-colors"
         >
           <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">

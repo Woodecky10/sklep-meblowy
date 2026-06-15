@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import StarInput from "./StarInput";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
 import type { ProductReview } from "@/app/_lib/types";
 
 // Formularz dodawania/edycji opinii. Wyświetlany tylko użytkownikom, którzy kupili
@@ -15,6 +16,42 @@ export default function ReviewForm({
   existingReview?: ProductReview;
 }) {
   const router = useRouter();
+  const de = useClientLocale() === "de";
+  const c = de
+    ? {
+        editTitle: "Ihre Bewertung bearbeiten",
+        newTitle: "Bewertung schreiben",
+        intro: "Ihre Bewertung wird öffentlich sichtbar sein. Vielen Dank, dass Sie anderen Kunden helfen.",
+        rating: "Bewertung",
+        comment: "Kommentar (optional)",
+        placeholder: "Was halten Sie von dem Produkt? Wie bewährt es sich im Alltag?",
+        deleteReview: "Bewertung löschen",
+        saving: "Wird gespeichert...",
+        update: "Aktualisieren",
+        publish: "Bewertung veröffentlichen",
+        pickRating: "Bitte wählen Sie eine Bewertung (1–5 Sterne)",
+        confirmDelete: "Ihre Bewertung löschen?",
+        saveError: "Bewertung konnte nicht gespeichert werden",
+        deleteError: "Bewertung konnte nicht gelöscht werden",
+        unknownError: "Unbekannter Fehler",
+      }
+    : {
+        editTitle: "Edytuj swoją opinię",
+        newTitle: "Napisz opinię",
+        intro: "Twoja ocena będzie widoczna publicznie. Dziękujemy za pomoc innym klientom.",
+        rating: "Ocena",
+        comment: "Komentarz (opcjonalnie)",
+        placeholder: "Co sądzisz o produkcie? Jak się sprawdza w codziennym użytkowaniu?",
+        deleteReview: "Usuń opinię",
+        saving: "Zapisuję...",
+        update: "Zaktualizuj",
+        publish: "Opublikuj opinię",
+        pickRating: "Wybierz ocenę (1–5 gwiazdek)",
+        confirmDelete: "Usunąć swoją opinię?",
+        saveError: "Nie udało się zapisać opinii",
+        deleteError: "Nie udało się usunąć opinii",
+        unknownError: "Nieznany błąd",
+      };
   const [rating, setRating] = useState<number>(existingReview?.rating ?? 0);
   const [comment, setComment] = useState<string>(existingReview?.comment ?? "");
   const [loading, setLoading] = useState(false);
@@ -24,7 +61,7 @@ export default function ReviewForm({
     e.preventDefault();
     setError(null);
     if (rating < 1) {
-      setError("Wybierz ocenę (1–5 gwiazdek)");
+      setError(c.pickRating);
       return;
     }
     setLoading(true);
@@ -35,27 +72,27 @@ export default function ReviewForm({
         body: JSON.stringify({ productId, rating, comment }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Nie udało się zapisać opinii");
+      if (!res.ok) throw new Error(data.error ?? c.saveError);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nieznany błąd");
+      setError(err instanceof Error ? err.message : c.unknownError);
     } finally {
       setLoading(false);
     }
   }
 
   async function onDelete() {
-    if (!confirm("Usunąć swoją opinię?")) return;
+    if (!confirm(c.confirmDelete)) return;
     setLoading(true);
     try {
       const res = await fetch(`/api/reviews?productId=${productId}`, { method: "DELETE" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Nie udało się usunąć opinii");
+      if (!res.ok) throw new Error(data.error ?? c.deleteError);
       setRating(0);
       setComment("");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nieznany błąd");
+      setError(err instanceof Error ? err.message : c.unknownError);
     } finally {
       setLoading(false);
     }
@@ -68,16 +105,16 @@ export default function ReviewForm({
     >
       <div>
         <h3 className="font-display text-xl font-bold text-[var(--fg)] mb-1">
-          {existingReview ? "Edytuj swoją opinię" : "Napisz opinię"}
+          {existingReview ? c.editTitle : c.newTitle}
         </h3>
         <p className="text-xs text-[var(--muted)]">
-          Twoja ocena będzie widoczna publicznie. Dziękujemy za pomoc innym klientom.
+          {c.intro}
         </p>
       </div>
 
       <div>
         <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
-          Ocena
+          {c.rating}
         </p>
         <StarInput value={rating} onChange={setRating} />
       </div>
@@ -87,7 +124,7 @@ export default function ReviewForm({
           htmlFor="review-comment"
           className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-2 block"
         >
-          Komentarz (opcjonalnie)
+          {c.comment}
         </label>
         <textarea
           id="review-comment"
@@ -95,7 +132,7 @@ export default function ReviewForm({
           onChange={(e) => setComment(e.target.value)}
           rows={4}
           maxLength={2000}
-          placeholder="Co sądzisz o produkcie? Jak się sprawdza w codziennym użytkowaniu?"
+          placeholder={c.placeholder}
           className="w-full px-4 py-3 bg-transparent border border-[var(--border)] rounded-xl text-sm text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)] transition-colors resize-y"
         />
         <p className="text-xs text-[var(--muted)] mt-1 text-right">
@@ -117,7 +154,7 @@ export default function ReviewForm({
             disabled={loading}
             className="text-xs font-sans uppercase tracking-widest text-red-600 hover:text-red-700 transition-colors disabled:opacity-40"
           >
-            Usuń opinię
+            {c.deleteReview}
           </button>
         )}
         <button
@@ -125,7 +162,7 @@ export default function ReviewForm({
           disabled={loading || rating < 1}
           className="ml-auto px-6 py-3 bg-[var(--color-navy)] text-white font-sans text-xs font-semibold uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {loading ? "Zapisuję..." : existingReview ? "Zaktualizuj" : "Opublikuj opinię"}
+          {loading ? c.saving : existingReview ? c.update : c.publish}
         </button>
       </div>
     </form>

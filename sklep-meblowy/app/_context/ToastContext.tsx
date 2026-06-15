@@ -9,6 +9,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
+import { getDictionary } from "@/app/_lib/dictionaries";
 
 // Globalny system toastów (audyt 2026-06-11 LOW #11): spójne, nieblokujące
 // powiadomienia zamiast natywnego alert(). Wcześniej każdy edytor admina miał
@@ -68,6 +70,7 @@ function ToastView({
   toast: ToastItem;
   onDismiss: (id: number) => void;
 }) {
+  const t = getDictionary(useClientLocale());
   const [visible, setVisible] = useState(false);
 
   // Fade-in po pierwszym paint, auto-hide, usunięcie po fade-out (jak CartToast).
@@ -113,7 +116,7 @@ function ToastView({
           setVisible(false);
           setTimeout(() => onDismiss(toast.id), 300);
         }}
-        aria-label="Zamknij"
+        aria-label={t.common.close}
         className="shrink-0 -mr-1 -mt-1 w-6 h-6 flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] transition-colors"
       >
         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">

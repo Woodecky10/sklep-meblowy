@@ -2,8 +2,8 @@ import LocalizedLink from "./_components/ui/LocalizedLink";
 import Image from "next/image";
 import type { Metadata } from "next";
 import HomeHeroSlider from "./_components/layout/HomeHeroSlider";
-import { getActiveSlides, DEFAULT_FALLBACK_SLIDE } from "./_lib/slides";
-import { getActiveTiles, DEFAULT_FALLBACK_TILES } from "./_lib/home-tiles";
+import { getActiveSlides, DEFAULT_FALLBACK_SLIDE, localizeSlide } from "./_lib/slides";
+import { getActiveTiles, DEFAULT_FALLBACK_TILES, localizeTile } from "./_lib/home-tiles";
 import { getFeaturedOrFallback } from "./_lib/featured";
 import { getCategories } from "./_lib/categories";
 import { getCollectionsForHome } from "./_lib/collections";
@@ -19,8 +19,9 @@ import ProductCard from "./_components/ui/ProductCard";
 // dla "/". canonical = self per locale, og:locale dopasowany.
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
+  const t = getDictionary(locale);
   return {
-    title: "Meble Premium | Eleganckie Meble do Twojego Domu",
+    title: t.meta.homeTitle,
     alternates: {
       canonical: localizePath("/", locale),
       languages: alternatesFor("/", { hasDe: true }).languages,
@@ -51,8 +52,13 @@ export default async function HomePage() {
   ]);
   const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
   // Fallback gdy admin jeszcze nic nie dodał — żeby home nie była pusta.
-  const slides = dbSlides.length > 0 ? dbSlides : [DEFAULT_FALLBACK_SLIDE];
-  const tiles = dbTiles.length > 0 ? dbTiles : DEFAULT_FALLBACK_TILES;
+  // localizeSlide/localizeTile tłumaczą treść (DB i fallback) na DE przez mapy.
+  const slides = (dbSlides.length > 0 ? dbSlides : [DEFAULT_FALLBACK_SLIDE]).map(
+    (s) => localizeSlide(s, locale)
+  );
+  const tiles = (dbTiles.length > 0 ? dbTiles : DEFAULT_FALLBACK_TILES).map((t) =>
+    localizeTile(t, locale)
+  );
 
   return (
     <>
@@ -132,7 +138,7 @@ export default async function HomePage() {
 
           {featured.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">
-              Brak polecanych produktów. Wybierz je w Admin → Polecane.
+              {t.home.featuredEmpty}
             </p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

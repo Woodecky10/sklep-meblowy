@@ -91,6 +91,48 @@ describe("localizeProduct", () => {
   });
 });
 
+describe("localizeProduct — pola wolnotekstowe + cechy BL (mapy DE)", () => {
+  const withExtras = () => ({
+    ...baseProduct(),
+    construction: "Lite drewno dębowe, niska bryła, bez zagłówka",
+    delivery_time: "14 dni roboczych",
+    warranty: "2 lata",
+    features: [
+      { key: "Kolekcja", value: "SISI" },
+      { key: "System Boxspring", value: "Tak" },
+      { key: "Powierzchnia spania", value: "180x200" },
+    ],
+  });
+
+  it("DE: tłumaczy construction/delivery_time/warranty znanymi mapami", () => {
+    const out = localizeProduct(withExtras(), "de");
+    expect(out.construction).toBe("Massives Eichenholz, niedrige Form, ohne Kopfteil");
+    expect(out.delivery_time).toBe("14 Werktage");
+    expect(out.warranty).toBe("2 Jahre");
+  });
+
+  it("DE: tłumaczy klucze cech; nieznane wartości (kody/wymiary) bez zmian", () => {
+    const out = localizeProduct(withExtras(), "de");
+    expect(out.features).toEqual([
+      { key: "Kollektion", value: "SISI" },
+      { key: "Boxspring-System", value: "Ja" },
+      { key: "Liegefläche", value: "180x200" },
+    ]);
+  });
+
+  it("DE: nieznana wartość wolnotekstowa przechodzi bez zmian", () => {
+    const out = localizeProduct({ ...baseProduct(), warranty: "dożywotnia" }, "de");
+    expect(out.warranty).toBe("dożywotnia");
+  });
+
+  it("PL: pola wolnotekstowe/cechy bez zmian", () => {
+    const out = localizeProduct(withExtras(), "pl");
+    expect(out.construction).toBe("Lite drewno dębowe, niska bryła, bez zagłówka");
+    expect(out.warranty).toBe("2 lata");
+    expect(out.features?.[0]).toEqual({ key: "Kolekcja", value: "SISI" });
+  });
+});
+
 describe("localizeCategory / localizeCategoryGroup", () => {
   it("DE z label_de → zamienia label", () => {
     expect(localizeCategory({ slug: "sofy", label: "Sofy", label_de: "Sofas" }, "de").label).toBe(

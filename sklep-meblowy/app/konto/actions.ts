@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/app/_lib/supabase/server";
 import type { Address } from "@/app/_lib/types";
+import { getLocale } from "@/app/_lib/i18n-server";
 
 export type ProfileState = { error?: string; success?: boolean } | null;
 
@@ -10,14 +11,16 @@ export async function updateProfile(
   _state: ProfileState,
   formData: FormData
 ): Promise<ProfileState> {
+  const de = (await getLocale()) === "de";
+  const tr = (pl: string, deTxt: string) => (de ? deTxt : pl);
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Brak autoryzacji" };
+  if (!user) return { error: tr("Brak autoryzacji", "Nicht autorisiert") };
 
   const full_name = String(formData.get("full_name") ?? "").trim();
-  if (full_name.length < 2) return { error: "Podaj imię i nazwisko" };
+  if (full_name.length < 2) return { error: tr("Podaj imię i nazwisko", "Bitte geben Sie Vor- und Nachname an") };
 
   const street = String(formData.get("street") ?? "").trim();
   const city = String(formData.get("city") ?? "").trim();

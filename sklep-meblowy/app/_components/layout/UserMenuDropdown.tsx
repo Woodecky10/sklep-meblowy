@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import LocalizedLink from "../ui/LocalizedLink";
 import { signOut } from "@/app/_lib/auth-actions";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
+import { getDictionary } from "@/app/_lib/dictionaries";
 
 export default function UserMenuDropdown({
   label,
@@ -15,6 +17,7 @@ export default function UserMenuDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const t = getDictionary(useClientLocale());
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -30,7 +33,7 @@ export default function UserMenuDropdown({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        aria-label="Moje konto"
+        aria-label={t.nav.myAccount}
         className="hidden sm:inline-flex w-9 h-9 items-center justify-center rounded-full bg-[var(--color-navy)] text-white text-sm font-semibold hover:bg-[var(--color-gold)] transition-colors"
       >
         {initial}
@@ -40,7 +43,7 @@ export default function UserMenuDropdown({
         <div className="absolute right-0 top-full mt-2 w-56 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-lg overflow-hidden z-50">
           <div className="px-4 py-3 border-b border-[var(--border)]">
             <p className="text-xs text-[var(--muted)] uppercase tracking-widest mb-1">
-              Zalogowano jako
+              {t.nav.loggedInAs}
             </p>
             <p className="text-sm font-semibold text-[var(--fg)] truncate">
               {label}
@@ -59,7 +62,7 @@ export default function UserMenuDropdown({
                   <rect x="3" y="14" width="7" height="7" rx="1" />
                   <rect x="14" y="14" width="7" height="7" rx="1" />
                 </svg>
-                Panel admina
+                {t.nav.adminPanel}
               </LocalizedLink>
             )}
             <LocalizedLink
@@ -67,21 +70,21 @@ export default function UserMenuDropdown({
               onClick={() => setOpen(false)}
               className="px-4 py-2.5 text-sm text-[var(--fg)] hover:bg-[var(--border)] transition-colors"
             >
-              Profil
+              {t.nav.profile}
             </LocalizedLink>
             <LocalizedLink
               href="/konto/zamowienia"
               onClick={() => setOpen(false)}
               className="px-4 py-2.5 text-sm text-[var(--fg)] hover:bg-[var(--border)] transition-colors"
             >
-              Zamówienia
+              {t.nav.orders}
             </LocalizedLink>
             <form action={signOut} className="border-t border-[var(--border)]">
               <button
                 type="submit"
                 className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
               >
-                Wyloguj
+                {t.nav.logout}
               </button>
             </form>
           </nav>

@@ -3,12 +3,34 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { signIn, signInWithGoogle, type AuthState } from "@/app/_lib/auth-actions";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
 
 export default function LoginForm() {
+  const de = useClientLocale() === "de";
   const [state, action, pending] = useActionState<AuthState, FormData>(
     signIn,
     null
   );
+
+  const c = de
+    ? {
+        google: "Mit Google anmelden",
+        orEmail: "oder E-Mail",
+        email: "E-Mail",
+        password: "Passwort",
+        forgot: "Passwort vergessen",
+        loading: "Anmeldung läuft...",
+        submit: "Anmelden",
+      }
+    : {
+        google: "Zaloguj przez Google",
+        orEmail: "lub email",
+        email: "Email",
+        password: "Hasło",
+        forgot: "Zapomniałem hasła",
+        loading: "Loguję...",
+        submit: "Zaloguj się",
+      };
 
   return (
     <div className="flex flex-col gap-6">
@@ -18,14 +40,14 @@ export default function LoginForm() {
           className="w-full py-3.5 border border-[var(--border)] rounded-full font-sans text-sm font-semibold text-[var(--fg)] hover:bg-[var(--card-bg)] transition-colors flex items-center justify-center gap-3"
         >
           <GoogleIcon />
-          Zaloguj przez Google
+          {c.google}
         </button>
       </form>
 
       <div className="relative flex items-center">
         <div className="flex-1 border-t border-[var(--border)]" />
         <span className="px-4 text-xs uppercase tracking-widest text-[var(--muted)]">
-          lub email
+          {c.orEmail}
         </span>
         <div className="flex-1 border-t border-[var(--border)]" />
       </div>
@@ -33,7 +55,7 @@ export default function LoginForm() {
       <form action={action} className="flex flex-col gap-4">
         <label className="flex flex-col gap-2">
           <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
-            Email
+            {c.email}
           </span>
           <input
             name="email"
@@ -47,13 +69,13 @@ export default function LoginForm() {
         <label className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
-              Hasło
+              {c.password}
             </span>
             <Link
               href="/zapomnialem-hasla"
               className="text-xs font-sans text-[var(--color-gold)] hover:underline"
             >
-              Zapomniałem hasła
+              {c.forgot}
             </Link>
           </div>
           <input
@@ -77,7 +99,7 @@ export default function LoginForm() {
           disabled={pending}
           className="w-full py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {pending ? "Loguję..." : "Zaloguj się"}
+          {pending ? c.loading : c.submit}
         </button>
       </form>
     </div>

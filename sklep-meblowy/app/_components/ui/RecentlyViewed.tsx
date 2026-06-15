@@ -9,6 +9,7 @@ import {
   type RecentlyViewedItem,
 } from "@/app/_lib/recently-viewed";
 import { DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
+import { getDictionary } from "@/app/_lib/dictionaries";
 import { formatPrice } from "@/app/_lib/format";
 
 // Sekcja „Ostatnio oglądane" na stronie produktu. Czyta snapshoty z
@@ -56,14 +57,16 @@ export default function RecentlyViewed({
 
   if (items.length === 0) return null;
 
+  const t = getDictionary(locale);
+
   return (
     <section className="mt-24">
       <div className="mb-10">
         <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-          Dla Ciebie
+          {t.product.recentlyViewedEyebrow}
         </p>
         <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
-          Ostatnio oglądane
+          {t.product.recentlyViewedHeading}
         </h2>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -80,7 +83,7 @@ export default function RecentlyViewed({
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-[var(--muted)] text-sm">
-                  Brak zdjęcia
+                  {t.common.noImage}
                 </div>
               )}
             </div>

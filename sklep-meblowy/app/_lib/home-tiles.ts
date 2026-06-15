@@ -4,6 +4,8 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
+import type { Locale } from "./i18n";
+import { HOME_TEXT_DE, mapDe } from "./de-content-maps";
 
 export const TILES_CACHE_TAG = "home-tiles";
 
@@ -19,6 +21,10 @@ export type TileRow = {
   active: boolean;
   created_at: string;
   updated_at: string;
+  // Kolumny _de (migracja 30). Opcjonalne — przed migracją absent/undefined.
+  label_de?: string | null;
+  description_de?: string | null;
+  image_alt_de?: string | null;
 };
 
 // ============================================================
@@ -41,6 +47,23 @@ const fetchActiveTiles = unstable_cache(
 );
 
 export const getActiveTiles = cache(fetchActiveTiles);
+
+// Tłumaczy kafelek na DE: priorytet kolumna _de (z panelu), potem statyczna mapa
+// HOME_TEXT_DE (treść sprzed migracji 30), na końcu fallback do PL.
+export function localizeTile(tile: TileRow, locale: Locale): TileRow {
+  if (locale !== "de") return tile;
+  const pick = (de: string | null | undefined, pl: string) =>
+    de && de.trim() ? de : mapDe(HOME_TEXT_DE, pl) ?? pl;
+  return {
+    ...tile,
+    label: pick(tile.label_de, tile.label),
+    description:
+      tile.description_de && tile.description_de.trim()
+        ? tile.description_de
+        : mapDe(HOME_TEXT_DE, tile.description) ?? null,
+    image_alt: pick(tile.image_alt_de, tile.image_alt),
+  };
+}
 
 // ============================================================
 // Admin read: WSZYSTKIE kafelki — do edycji

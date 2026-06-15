@@ -6,6 +6,7 @@ import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
 import { localizeProduct } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
+import { BADGE_DE, mapDe } from "./de-content-maps";
 import type { Product } from "./types";
 
 export const FEATURED_CACHE_TAG = "featured-products";
@@ -135,7 +136,7 @@ export async function getFeaturedOrFallback(
   if (items.length > 0) {
     return items.map((it) => ({
       product: localizeProduct(it.product, locale),
-      badge: it.badge,
+      badge: locale === "de" ? mapDe(BADGE_DE, it.badge) ?? it.badge : it.badge,
     }));
   }
 

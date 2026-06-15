@@ -5,6 +5,33 @@ import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
 import type { HeroSlide } from "../_components/layout/HomeHeroSlider";
+import type { Locale } from "./i18n";
+import { HOME_TEXT_DE, mapDe } from "./de-content-maps";
+
+// Tłumaczy treść slajdu na DE: priorytet kolumna _de (z panelu /admin/slider),
+// potem statyczna mapa HOME_TEXT_DE (treść sprzed migracji 30), na końcu PL.
+export function localizeSlide(slide: HeroSlide, locale: Locale): HeroSlide {
+  if (locale !== "de") return slide;
+  // pick: _de z panelu → mapa → oryginał PL.
+  const pick = (deCol: string | null | undefined, pl: string | null | undefined) =>
+    deCol && deCol.trim() ? deCol : mapDe(HOME_TEXT_DE, pl);
+  const pickReq = (deCol: string | null | undefined, pl: string) =>
+    deCol && deCol.trim() ? deCol : mapDe(HOME_TEXT_DE, pl) ?? pl;
+  return {
+    ...slide,
+    eyebrow: pick(slide.eyebrowDe, slide.eyebrow),
+    title: pickReq(slide.titleDe, slide.title),
+    highlightedWord: pick(slide.highlightedWordDe, slide.highlightedWord),
+    subtitle: pick(slide.subtitleDe, slide.subtitle),
+    imageAlt: pickReq(slide.imageAltDe, slide.imageAlt),
+    ctaPrimary: slide.ctaPrimary
+      ? { ...slide.ctaPrimary, label: pickReq(slide.ctaPrimaryLabelDe, slide.ctaPrimary.label) }
+      : slide.ctaPrimary,
+    ctaSecondary: slide.ctaSecondary
+      ? { ...slide.ctaSecondary, label: pickReq(slide.ctaSecondaryLabelDe, slide.ctaSecondary.label) }
+      : slide.ctaSecondary,
+  };
+}
 
 export const SLIDES_CACHE_TAG = "home-slides";
 
@@ -27,6 +54,14 @@ export type SlideRow = {
   active: boolean;
   created_at: string;
   updated_at: string;
+  // Kolumny _de (migracja 30). Opcjonalne — przed migracją absent/undefined.
+  eyebrow_de?: string | null;
+  title_de?: string | null;
+  highlighted_word_de?: string | null;
+  subtitle_de?: string | null;
+  image_alt_de?: string | null;
+  cta_primary_label_de?: string | null;
+  cta_secondary_label_de?: string | null;
 };
 
 function rowToSlide(row: SlideRow): HeroSlide {
@@ -46,6 +81,14 @@ function rowToSlide(row: SlideRow): HeroSlide {
       row.cta_secondary_href && row.cta_secondary_label
         ? { label: row.cta_secondary_label, href: row.cta_secondary_href }
         : null,
+    // Tłumaczenia DE niesione obok PL — używa ich localizeSlide na /de.
+    eyebrowDe: row.eyebrow_de,
+    titleDe: row.title_de,
+    highlightedWordDe: row.highlighted_word_de,
+    subtitleDe: row.subtitle_de,
+    imageAltDe: row.image_alt_de,
+    ctaPrimaryLabelDe: row.cta_primary_label_de,
+    ctaSecondaryLabelDe: row.cta_secondary_label_de,
   };
 }
 

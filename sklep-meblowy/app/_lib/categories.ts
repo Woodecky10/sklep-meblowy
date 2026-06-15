@@ -10,6 +10,27 @@ import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
 import { localizeCategory, localizeCategoryGroup } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
+import { GROUP_LABEL_DE, CATEGORY_LABEL_DE } from "./de-content-maps";
+
+// Lokalizacja etykiety DE: najpierw kolumna `label_de` z DB (gdy admin uzupełni),
+// w przeciwnym razie ręczna mapa po slug (de-content-maps), na końcu fallback PL.
+function deGroup(g: Section, locale: Locale): Section {
+  const r = localizeCategoryGroup(g, locale);
+  if (locale === "de" && !(g.label_de && g.label_de.trim())) {
+    const de = GROUP_LABEL_DE[g.slug];
+    if (de) return { ...r, label: de };
+  }
+  return r;
+}
+
+function deCat(c: CategoryDef, locale: Locale): CategoryDef {
+  const r = localizeCategory(c, locale);
+  if (locale === "de" && !(c.label_de && c.label_de.trim())) {
+    const de = CATEGORY_LABEL_DE[c.slug];
+    if (de) return { ...r, label: de };
+  }
+  return r;
+}
 
 // Tag używany przez `unstable_cache` i `revalidateTag` po mutacjach z admina.
 export const CATEGORIES_CACHE_TAG = "categories";
@@ -144,7 +165,7 @@ export async function getSections(
   const data = await getData();
   return data.groups
     .filter((g) => g.active)
-    .map((g) => localizeCategoryGroup(g, locale));
+    .map((g) => deGroup(g, locale));
 }
 
 export async function getCategories(
@@ -153,22 +174,23 @@ export async function getCategories(
   const data = await getData();
   return data.categories
     .filter((c) => c.active)
-    .map((c) => localizeCategory(c, locale));
+    .map((c) => deCat(c, locale));
 }
 
 export async function getAllCategories(
   locale: Locale = DEFAULT_LOCALE
 ): Promise<CategoryDef[]> {
-  // Bez filtra `active` — używane w admin UI (domyślnie PL).
+  // Bez filtra `active` — używane w admin UI (domyślnie PL). deCat tłumaczy
+  // tylko gdy locale='de', więc admin (PL) dostaje surowe etykiety jak dotąd.
   const data = await getData();
-  return data.categories.map((c) => localizeCategory(c, locale));
+  return data.categories.map((c) => deCat(c, locale));
 }
 
 export async function getAllSections(
   locale: Locale = DEFAULT_LOCALE
 ): Promise<Section[]> {
   const data = await getData();
-  return data.groups.map((g) => localizeCategoryGroup(g, locale));
+  return data.groups.map((g) => deGroup(g, locale));
 }
 
 export async function getCategory(
@@ -178,7 +200,7 @@ export async function getCategory(
   if (!slug) return undefined;
   const data = await getData();
   const found = data.categories.find((c) => c.slug === slug);
-  return found ? localizeCategory(found, locale) : undefined;
+  return found ? deCat(found, locale) : undefined;
 }
 
 export async function getCategoryLabel(
@@ -195,7 +217,7 @@ export async function getSection(
   if (!slug) return undefined;
   const data = await getData();
   const found = data.groups.find((g) => g.slug === slug);
-  return found ? localizeCategoryGroup(found, locale) : undefined;
+  return found ? deGroup(found, locale) : undefined;
 }
 
 export async function getCategoriesBySection(
@@ -205,7 +227,7 @@ export async function getCategoriesBySection(
   const data = await getData();
   return data.categories
     .filter((c) => c.active && c.group_slug === sectionSlug)
-    .map((c) => localizeCategory(c, locale));
+    .map((c) => deCat(c, locale));
 }
 
 export async function getCategoryByBaselinkerId(

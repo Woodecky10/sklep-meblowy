@@ -2,6 +2,7 @@ import LocalizedLink from "./LocalizedLink";
 import Image from "next/image";
 import type { Product, ProductRating } from "@/app/_lib/types";
 import { DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
+import { getDictionary } from "@/app/_lib/dictionaries";
 import { formatPrice } from "@/app/_lib/format";
 import AddToCartButton from "./AddToCartButton";
 import StarRating from "./StarRating";
@@ -33,6 +34,7 @@ export default function ProductCard({
   locale?: Locale;
 }) {
   const image = product.images?.[0];
+  const t = getDictionary(locale);
 
   return (
     <div className="group flex flex-col">
@@ -48,7 +50,7 @@ export default function ProductCard({
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-[var(--muted)] text-sm">
-              Brak zdjęcia
+              {t.common.noImage}
             </div>
           )}
           {badge && (

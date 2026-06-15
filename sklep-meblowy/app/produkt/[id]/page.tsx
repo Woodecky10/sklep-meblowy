@@ -57,7 +57,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const locale = await getLocale();
   const product = await getProduct(id, locale);
-  if (!product) return { title: "Produkt nie znaleziony" };
+  if (!product) return { title: locale === "de" ? "Produkt nicht gefunden" : "Produkt nie znaleziony" };
   // DE w SEO tylko gdy produkt przetłumaczony. `needs_translation` NIE jest w
   // typie Product (data layer zwraca je przez select("*")) — dostęp przez cast.
   const hasDe =

@@ -3,8 +3,11 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useModal } from "@/app/_lib/useModal";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
+import { getDictionary } from "@/app/_lib/dictionaries";
 
 export default function ImageGallery({ images, name }: { images: string[]; name: string }) {
+  const t = getDictionary(useClientLocale());
   const [active, setActive] = useState(0);
   const [lightbox, setLightbox] = useState(false);
   const lightboxRef = useRef<HTMLDivElement>(null);
@@ -163,7 +166,7 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
         <button
           type="button"
           onClick={() => setLightbox(true)}
-          aria-label="Powiększ zdjęcie"
+          aria-label={t.a11y.zoomImage}
           className="relative aspect-[4/3] bg-stone-100 dark:bg-stone-800 rounded-3xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-[var(--color-gold)]/40 transition-all"
         >
           <Image
@@ -181,7 +184,7 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
               <button
                 key={i}
                 onClick={() => setActive(i)}
-                aria-label={`Pokaż zdjęcie ${i + 1}`}
+                aria-label={`${t.a11y.showImage} ${i + 1}`}
                 aria-current={i === active}
                 className={`relative w-20 aspect-square rounded-xl overflow-hidden border-2 transition-colors cursor-pointer ${
                   i === active ? "border-[var(--color-gold)]" : "border-transparent hover:border-[var(--color-gold)]/50"
@@ -199,7 +202,7 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
           ref={lightboxRef}
           role="dialog"
           aria-modal="true"
-          aria-label={`Zdjęcie produktu ${name}`}
+          aria-label={`${t.a11y.productImageDialog} ${name}`}
           onClick={() => setLightbox(false)}
           className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4"
         >
@@ -233,7 +236,7 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
                   e.stopPropagation();
                   setActive((i) => (i - 1 + list.length) % list.length);
                 }}
-                aria-label="Poprzednie zdjęcie"
+                aria-label={t.a11y.prevImage}
                 className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white z-10 cursor-pointer"
               >
                 <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -245,7 +248,7 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
                   e.stopPropagation();
                   setActive((i) => (i + 1) % list.length);
                 }}
-                aria-label="Następne zdjęcie"
+                aria-label={t.a11y.nextImage}
                 className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white z-10 cursor-pointer"
               >
                 <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -256,7 +259,7 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
           )}
           <button
             onClick={() => setLightbox(false)}
-            aria-label="Zamknij"
+            aria-label={t.common.close}
             className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white cursor-pointer"
           >
             <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">

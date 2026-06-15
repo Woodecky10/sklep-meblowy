@@ -32,19 +32,25 @@ type CheckoutBody = {
   fullName: string;
   address: Address;
   promoCode?: string | null;
+  locale?: "pl" | "de";
 };
 
 export async function POST(request: NextRequest) {
   try {
     const stripe = getStripe();
     const body = (await request.json()) as CheckoutBody;
+    const locale = body.locale === "de" ? "de" : "pl";
+    const tr = (pl: string, de: string) => (locale === "de" ? de : pl);
 
     if (!body.items?.length) {
-      return NextResponse.json({ error: "Koszyk jest pusty" }, { status: 400 });
+      return NextResponse.json(
+        { error: tr("Koszyk jest pusty", "Ihr Warenkorb ist leer") },
+        { status: 400 }
+      );
     }
     if (!body.email || !body.fullName) {
       return NextResponse.json(
-        { error: "Brak wymaganych danych" },
+        { error: tr("Brak wymaganych danych", "Fehlende Pflichtangaben") },
         { status: 400 }
       );
     }
@@ -186,7 +192,7 @@ export async function POST(request: NextRequest) {
     let stripeCouponId: string | null = null;
 
     if (body.promoCode) {
-      const promoResult = await validatePromoCode(body.promoCode, total);
+      const promoResult = await validatePromoCode(body.promoCode, total, locale);
       if (!promoResult.ok) {
         return NextResponse.json({ error: promoResult.error }, { status: 400 });
       }

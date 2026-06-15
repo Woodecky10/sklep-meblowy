@@ -1,9 +1,12 @@
 import LocalizedLink from "./LocalizedLink";
+import { DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
+import { getDictionary } from "@/app/_lib/dictionaries";
 
 type Props = {
   page: number;
   pages: number;
   searchParams: Record<string, string>;
+  locale?: Locale;
 };
 
 // Okienkowanie: zawsze 1 i ostatnia + bieżąca ±2, reszta jako "…".
@@ -22,8 +25,10 @@ function pageWindow(page: number, pages: number): (number | "ellipsis")[] {
   return items;
 }
 
-export default function Pagination({ page, pages, searchParams }: Props) {
+export default function Pagination({ page, pages, searchParams, locale = DEFAULT_LOCALE }: Props) {
   if (pages <= 1) return null;
+
+  const t = getDictionary(locale);
 
   function pageHref(p: number) {
     const params = new URLSearchParams({ ...searchParams, strona: String(p) });
@@ -35,7 +40,7 @@ export default function Pagination({ page, pages, searchParams }: Props) {
       {page > 1 && (
         <LocalizedLink
           href={pageHref(page - 1)}
-          aria-label="Poprzednia strona"
+          aria-label={t.pagination.prev}
           className="w-10 h-10 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
         >
           ←
@@ -54,7 +59,7 @@ export default function Pagination({ page, pages, searchParams }: Props) {
           <LocalizedLink
             key={item}
             href={pageHref(item)}
-            aria-label={`Strona ${item}`}
+            aria-label={`${t.pagination.page} ${item}`}
             aria-current={item === page ? "page" : undefined}
             className={`w-10 h-10 flex items-center justify-center rounded-full text-sm font-sans transition-colors ${
               item === page
@@ -69,7 +74,7 @@ export default function Pagination({ page, pages, searchParams }: Props) {
       {page < pages && (
         <LocalizedLink
           href={pageHref(page + 1)}
-          aria-label="Następna strona"
+          aria-label={t.pagination.next}
           className="w-10 h-10 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
         >
           →

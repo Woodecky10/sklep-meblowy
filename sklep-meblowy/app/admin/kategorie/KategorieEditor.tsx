@@ -300,6 +300,18 @@ function GroupForm({
           />
         </Field>
 
+        <Field
+          label="Nazwa po niemiecku (DE)"
+          hint="Pokazywana w niemieckiej wersji sklepu. Zostaw puste = polska nazwa."
+        >
+          <input
+            name="label_de"
+            defaultValue={initial?.label_de ?? ""}
+            placeholder="np. Wohnzimmer"
+            className="w-full px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
+          />
+        </Field>
+
         {mode === "create" && (
           <Field label="Slug (link)" hint="Zostaw puste żeby wygenerować z nazwy">
             <input

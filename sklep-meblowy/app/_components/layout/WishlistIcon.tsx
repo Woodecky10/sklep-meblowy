@@ -1,13 +1,16 @@
 import LocalizedLink from "../ui/LocalizedLink";
+import { getLocale } from "@/app/_lib/i18n-server";
+import { getDictionary } from "@/app/_lib/dictionaries";
 
 // Serce w navbarze z liczbą ulubionych. SSR — count przekazany z Navbar.
 // Renderujemy nawet gdy count = 0 (puste serce zachęca do dodawania).
-export default function WishlistIcon({ count }: { count: number }) {
+export default async function WishlistIcon({ count }: { count: number }) {
+  const t = getDictionary(await getLocale());
   return (
     <LocalizedLink
       href="/ulubione"
       className="relative w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] transition-colors"
-      aria-label="Ulubione"
+      aria-label={t.nav.favorites}
     >
       <svg
         width="18"

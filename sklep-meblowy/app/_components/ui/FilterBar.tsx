@@ -4,13 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { localizeHref } from "@/app/_lib/i18n";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
-
-const SORTS = [
-  { value: "alphabetic", label: "Alfabetycznie A-Z" },
-  { value: "newest", label: "Najnowsze" },
-  { value: "price_asc", label: "Cena: rosnąco" },
-  { value: "price_desc", label: "Cena: malejąco" },
-];
+import { getDictionary } from "@/app/_lib/dictionaries";
 
 export type FilterBarSection = {
   slug: string;
@@ -55,6 +49,14 @@ export default function FilterBar({
   const router = useRouter();
   const searchParams = useSearchParams();
   const locale = useClientLocale();
+  const t = getDictionary(locale);
+
+  const SORTS = [
+    { value: "alphabetic", label: t.filter.sortAlpha },
+    { value: "newest", label: t.filter.sortNewest },
+    { value: "price_asc", label: t.filter.sortPriceAsc },
+    { value: "price_desc", label: t.filter.sortPriceDesc },
+  ];
 
   const category = searchParams.get("kategoria") ?? "";
   const collection = searchParams.get("kolekcja") ?? "";
@@ -184,7 +186,7 @@ export default function FilterBar({
       <div className="flex items-center gap-2 overflow-x-auto md:overflow-x-visible md:flex-wrap pb-2 md:pb-0 -mx-1 px-1 scrollbar-thin">
         {sections.length > 0 && (
           <FilterPill
-            label="Kategoria"
+            label={t.filter.category}
             count={categoryCount}
             open={openDropdown === "category"}
             onClick={() => toggleDropdown("category")}
@@ -192,7 +194,7 @@ export default function FilterBar({
         )}
         {collections.length > 0 && (
           <FilterPill
-            label="Kolekcja"
+            label={t.filter.collection}
             count={collectionCount}
             open={openDropdown === "collection"}
             onClick={() => toggleDropdown("collection")}
@@ -200,7 +202,7 @@ export default function FilterBar({
         )}
         {colors.length > 0 && (
           <FilterPill
-            label="Kolor"
+            label={t.filter.color}
             count={selectedColors.length}
             open={openDropdown === "color"}
             onClick={() => toggleDropdown("color")}
@@ -208,14 +210,14 @@ export default function FilterBar({
         )}
         {materials.length > 0 && (
           <FilterPill
-            label="Materiał"
+            label={t.filter.material}
             count={selectedMaterials.length}
             open={openDropdown === "material"}
             onClick={() => toggleDropdown("material")}
           />
         )}
         <FilterPill
-          label="Cena"
+          label={t.filter.price}
           count={priceCount}
           open={openDropdown === "price"}
           onClick={() => toggleDropdown("price")}
@@ -223,7 +225,7 @@ export default function FilterBar({
 
         {/* Toggle switch zamiast checkboxa w pillu */}
         <ToggleSwitch
-          label="Dostępne od ręki"
+          label={t.filter.inStock}
           checked={inStockOnly}
           onChange={(v) => update("dostepne", v ? "1" : "")}
         />
@@ -236,7 +238,7 @@ export default function FilterBar({
             <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
-            Wyczyść ({totalActiveFilters})
+            {t.filter.clear} ({totalActiveFilters})
           </button>
         )}
 
@@ -244,6 +246,7 @@ export default function FilterBar({
             dropdown ma checkmark + zamykanie po kliknięciu. */}
         <div className="ml-auto shrink-0">
           <SortPill
+            label={t.filter.sortLabel}
             current={activeSort.label}
             open={openDropdown === "sort"}
             onClick={() => toggleDropdown("sort")}
@@ -265,7 +268,7 @@ export default function FilterBar({
                 : "border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
             }`}
           >
-            Wszystkie kategorie
+            {t.filter.allCategories}
           </button>
           {sections.map((section) => (
             <div key={section.slug} className="mb-3 last:mb-0">
@@ -308,7 +311,7 @@ export default function FilterBar({
                 : "border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
             }`}
           >
-            Wszystkie kolekcje
+            {t.filter.allCollections}
           </button>
           <div className="flex flex-wrap gap-1.5">
             {collections.map((col) => {
@@ -383,14 +386,14 @@ export default function FilterBar({
       {openDropdown === "price" && (
         <DropdownPanel align="left">
           <p className="text-[10px] font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
-            Zakres cenowy
+            {t.filter.priceRange}
           </p>
           <div className="flex items-center gap-2 text-sm text-[var(--fg)]">
             <input
               type="number"
               inputMode="numeric"
               min={0}
-              placeholder="od"
+              placeholder={t.filter.priceFrom}
               value={priceMin}
               onChange={(e) => setPriceMin(e.target.value)}
               className="w-24 px-3 py-1.5 text-sm border border-[var(--border)] bg-[var(--bg)] rounded-full outline-none focus:border-[var(--color-gold)]"
@@ -400,7 +403,7 @@ export default function FilterBar({
               type="number"
               inputMode="numeric"
               min={0}
-              placeholder="do"
+              placeholder={t.filter.priceTo}
               value={priceMax}
               onChange={(e) => setPriceMax(e.target.value)}
               className="w-24 px-3 py-1.5 text-sm border border-[var(--border)] bg-[var(--bg)] rounded-full outline-none focus:border-[var(--color-gold)]"
@@ -446,33 +449,38 @@ export default function FilterBar({
         <div className="flex flex-wrap items-center gap-1.5 mt-3">
           {activeCategory && (
             <ActiveChip
-              label={`Kategoria: ${activeCategory.label}`}
+              label={`${t.filter.category}: ${activeCategory.label}`}
+              removeLabel={t.filter.removeFilter}
               onRemove={() => update("kategoria", "")}
             />
           )}
           {activeCollection && (
             <ActiveChip
-              label={`Kolekcja: ${activeCollection.label}`}
+              label={`${t.filter.collection}: ${activeCollection.label}`}
+              removeLabel={t.filter.removeFilter}
               onRemove={() => update("kolekcja", "")}
             />
           )}
           {selectedColors.map((c) => (
             <ActiveChip
               key={`color-${c}`}
-              label={`Kolor: ${colorLabel(c)}`}
+              label={`${t.filter.color}: ${colorLabel(c)}`}
+              removeLabel={t.filter.removeFilter}
               onRemove={() => toggleMulti("kolor", selectedColors, c)}
             />
           ))}
           {selectedMaterials.map((m) => (
             <ActiveChip
               key={`material-${m}`}
-              label={`Materiał: ${materialLabel(m)}`}
+              label={`${t.filter.material}: ${materialLabel(m)}`}
+              removeLabel={t.filter.removeFilter}
               onRemove={() => toggleMulti("material", selectedMaterials, m)}
             />
           ))}
           {priceActive && (
             <ActiveChip
-              label={`Cena: ${priceMin || "0"}–${priceMax || "∞"} zł`}
+              label={`${t.filter.price}: ${priceMin || "0"}–${priceMax || "∞"} zł`}
+              removeLabel={t.filter.removeFilter}
               onRemove={() => {
                 setPriceMin("");
                 setPriceMax("");
@@ -481,7 +489,8 @@ export default function FilterBar({
           )}
           {inStockOnly && (
             <ActiveChip
-              label="Dostępne od ręki"
+              label={t.filter.inStock}
+              removeLabel={t.filter.removeFilter}
               onRemove={() => update("dostepne", "")}
             />
           )}
@@ -543,10 +552,12 @@ function FilterPill({
 }
 
 function SortPill({
+  label,
   current,
   open,
   onClick,
 }: {
+  label: string;
   current: string;
   open: boolean;
   onClick: () => void;
@@ -564,7 +575,7 @@ function SortPill({
       <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
         <path d="M3 6h18M6 12h12M10 18h4" />
       </svg>
-      <span className="text-[var(--muted)] uppercase tracking-widest">Sortuj:</span>
+      <span className="text-[var(--muted)] uppercase tracking-widest">{label}</span>
       <span className="font-medium">{current}</span>
       <svg
         width="10"
@@ -640,9 +651,11 @@ function DropdownPanel({
 
 function ActiveChip({
   label,
+  removeLabel,
   onRemove,
 }: {
   label: string;
+  removeLabel: string;
   onRemove: () => void;
 }) {
   return (
@@ -650,7 +663,7 @@ function ActiveChip({
       {label}
       <button
         onClick={onRemove}
-        aria-label={`Usuń filtr: ${label}`}
+        aria-label={`${removeLabel}: ${label}`}
         className="w-4 h-4 rounded-full bg-[var(--bg)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:bg-red-50 hover:border-red-300 hover:text-red-500 dark:hover:bg-red-950 dark:hover:border-red-900 transition-colors"
       >
         <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">

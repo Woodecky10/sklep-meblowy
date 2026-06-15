@@ -17,6 +17,8 @@ export type PlShape = {
     logout: string;
     login: string;
     register: string;
+    profile: string;
+    loggedInAs: string;
   };
   topbar: { slogan: string };
   home: {
@@ -31,11 +33,14 @@ export type PlShape = {
     productOne: string;
     productFew: string;
     productMany: string;
+    featuredEmpty: string;
   };
   product: {
     addToCart: string;
     selectVariant: string;
     outOfStock: string;
+    recentlyViewedEyebrow: string;
+    recentlyViewedHeading: string;
     reviews: string;
     reviewsHeading: string;
     description: string;
@@ -110,8 +115,129 @@ export type PlShape = {
     trustWarranty: string;
     crossSellEyebrow: string;
     crossSellHeading: string;
+    toastAdded: string;
+    viewCart: string;
   };
-  common: { loading: string; filter: string; sort: string; all: string; back: string; more: string };
+  common: {
+    loading: string;
+    filter: string;
+    sort: string;
+    all: string;
+    back: string;
+    more: string;
+    close: string;
+    noImage: string;
+    browseShop: string;
+  };
+  meta: {
+    tagline: string;
+    description: string;
+    keywords: string;
+    homeTitle: string;
+    shopTitle: string;
+    wishlistTitle: string;
+  };
+  shop: {
+    eyebrow: string;
+    title: string;
+    allProducts: string;
+    searchPrefix: string;
+    emptyTitle: string;
+    emptyHint: string;
+  };
+  filter: {
+    sortAlpha: string;
+    sortNewest: string;
+    sortPriceAsc: string;
+    sortPriceDesc: string;
+    sortLabel: string;
+    category: string;
+    collection: string;
+    color: string;
+    material: string;
+    price: string;
+    inStock: string;
+    clear: string;
+    allCategories: string;
+    allCollections: string;
+    priceRange: string;
+    priceFrom: string;
+    priceTo: string;
+    removeFilter: string;
+  };
+  cookies: {
+    heading: string;
+    body: string;
+    privacyLink: string;
+    necessary: string;
+    necessaryDesc: string;
+    analytics: string;
+    analyticsDesc: string;
+    marketing: string;
+    marketingDesc: string;
+    customize: string;
+    save: string;
+    onlyNecessary: string;
+    acceptAll: string;
+  };
+  notFound: {
+    eyebrow: string;
+    heading: string;
+    body: string;
+    home: string;
+    popularCategories: string;
+  };
+  wishlist: {
+    emptyTitle: string;
+    emptyHint: string;
+    addAria: string;
+    removeAria: string;
+    addedToast: string;
+    removedToast: string;
+  };
+  search: {
+    placeholderInline: string;
+    placeholderModal: string;
+    searching: string;
+    noImageShort: string;
+  };
+  a11y: {
+    toggleTheme: string;
+    language: string;
+    carousel: string;
+    slideOf: string;
+    prevSlide: string;
+    nextSlide: string;
+    goToSlide: string;
+    zoomImage: string;
+    showImage: string;
+    prevImage: string;
+    nextImage: string;
+    productImageDialog: string;
+  };
+  pagination: {
+    prev: string;
+    next: string;
+    page: string;
+  };
+  inquiry: {
+    dialogAria: string;
+    eyebrow: string;
+    heading: string;
+    productLabel: string;
+    sentTitle: string;
+    nameLabel: string;
+    emailLabel: string;
+    phoneLabel: string;
+    phoneHint: string;
+    messageLabel: string;
+    messageHint: string;
+    messagePlaceholder: string;
+    submit: string;
+    submitting: string;
+    cancel: string;
+    privacyNote: string;
+  };
   footer: {
     information: string;
     about: string;
@@ -145,6 +271,8 @@ export const pl = {
     logout: "Wyloguj",
     login: "Zaloguj się",
     register: "Zarejestruj się",
+    profile: "Profil",
+    loggedInAs: "Zalogowano jako",
   },
   topbar: {
     slogan: "Polski producent mebli tapicerowanych",
@@ -161,11 +289,14 @@ export const pl = {
     productOne: "produkt",
     productFew: "produkty",
     productMany: "produktów",
+    featuredEmpty: "Brak polecanych produktów.",
   },
   product: {
     addToCart: "Dodaj do koszyka",
     selectVariant: "Wybierz wariant",
     outOfStock: "Niedostępny",
+    recentlyViewedEyebrow: "Dla Ciebie",
+    recentlyViewedHeading: "Ostatnio oglądane",
     reviews: "Opinie",
     reviewsHeading: "Co mówią klienci",
     description: "Opis",
@@ -243,6 +374,8 @@ export const pl = {
     trustWarranty: "Gwarancja 2 lata",
     crossSellEyebrow: "Polecane do koszyka",
     crossSellHeading: "Może Cię zainteresować",
+    toastAdded: "Dodano do koszyka",
+    viewCart: "Zobacz koszyk",
   },
   common: {
     loading: "Ładowanie…",
@@ -251,6 +384,121 @@ export const pl = {
     all: "Wszystkie",
     back: "Wstecz",
     more: "Więcej",
+    close: "Zamknij",
+    noImage: "Brak zdjęcia",
+    browseShop: "Przeglądaj sklep",
+  },
+  meta: {
+    tagline: "Meble premium",
+    description:
+      "Odkryj kolekcję eleganckich mebli premium. Sofy, narożniki, łóżka, fotele i pufy najwyższej jakości.",
+    keywords: "meble, sofy, narożniki, łóżka, fotele, sklep meblowy",
+    homeTitle: "Meble Premium | Eleganckie Meble do Twojego Domu",
+    shopTitle: "Sklep",
+    wishlistTitle: "Ulubione",
+  },
+  shop: {
+    eyebrow: "Kolekcja",
+    title: "Sklep",
+    allProducts: "Wszystkie produkty",
+    searchPrefix: "Wyniki",
+    emptyTitle: "Brak produktów",
+    emptyHint: "Spróbuj zmienić filtry lub frazę wyszukiwania.",
+  },
+  filter: {
+    sortAlpha: "Alfabetycznie A-Z",
+    sortNewest: "Najnowsze",
+    sortPriceAsc: "Cena: rosnąco",
+    sortPriceDesc: "Cena: malejąco",
+    sortLabel: "Sortuj:",
+    category: "Kategoria",
+    collection: "Kolekcja",
+    color: "Kolor",
+    material: "Materiał",
+    price: "Cena",
+    inStock: "Dostępne od ręki",
+    clear: "Wyczyść",
+    allCategories: "Wszystkie kategorie",
+    allCollections: "Wszystkie kolekcje",
+    priceRange: "Zakres cenowy",
+    priceFrom: "od",
+    priceTo: "do",
+    removeFilter: "Usuń filtr",
+  },
+  cookies: {
+    heading: "Dbamy o Twoją prywatność",
+    body: "Używamy plików cookies, aby sklep działał poprawnie i aby móc lepiej rozumieć, jak z niego korzystasz. Niezbędne cookies są zawsze aktywne. Analitykę i marketing włączamy wyłącznie za Twoją zgodą. Szczegóły w",
+    privacyLink: "Polityce prywatności",
+    necessary: "Niezbędne",
+    necessaryDesc: "Wymagane do działania sklepu: sesja logowania, koszyk, zabezpieczenia.",
+    analytics: "Analityczne",
+    analyticsDesc: "Anonimowe statystyki ruchu – pomagają ulepszać sklep.",
+    marketing: "Marketingowe",
+    marketingDesc: "Reklamy dopasowane do Twoich zainteresowań.",
+    customize: "Dostosuj",
+    save: "Zapisz wybór",
+    onlyNecessary: "Tylko niezbędne",
+    acceptAll: "Akceptuj wszystkie",
+  },
+  notFound: {
+    eyebrow: "Strona nie znaleziona",
+    heading: "Hmm, ta strona zniknęła jak ostatnia sztuka w wyprzedaży",
+    body: "Link mógł się zdezaktualizować albo produkt został zdjęty z oferty. Wróć na stronę główną albo przejrzyj sklep — na pewno znajdziemy coś ciekawego.",
+    home: "Strona główna",
+    popularCategories: "Popularne kategorie",
+  },
+  wishlist: {
+    emptyTitle: "Twoja lista ulubionych jest pusta",
+    emptyHint:
+      "Klikaj serce na karcie produktu, żeby zachować swoje typy na później. Wrócisz do nich w każdej chwili tutaj.",
+    addAria: "Dodaj do ulubionych",
+    removeAria: "Usuń z ulubionych",
+    addedToast: "Dodano do ulubionych",
+    removedToast: "Usunięto z ulubionych",
+  },
+  search: {
+    placeholderInline: "Szukaj mebli…",
+    placeholderModal: "Szukaj produktów…",
+    searching: "Szukam…",
+    noImageShort: "brak",
+  },
+  a11y: {
+    toggleTheme: "Przełącz motyw",
+    language: "Język",
+    carousel: "Polecane kolekcje",
+    slideOf: "z",
+    prevSlide: "Poprzedni slajd",
+    nextSlide: "Następny slajd",
+    goToSlide: "Przejdź do slajdu",
+    zoomImage: "Powiększ zdjęcie",
+    showImage: "Pokaż zdjęcie",
+    prevImage: "Poprzednie zdjęcie",
+    nextImage: "Następne zdjęcie",
+    productImageDialog: "Zdjęcie produktu",
+  },
+  pagination: {
+    prev: "Poprzednia strona",
+    next: "Następna strona",
+    page: "Strona",
+  },
+  inquiry: {
+    dialogAria: "Zapytanie o niestandardowy wariant",
+    eyebrow: "Pytanie",
+    heading: "Inny kolor, własny wariant?",
+    productLabel: "Produkt",
+    sentTitle: "Wiadomość wysłana ✓",
+    nameLabel: "Twoje imię i nazwisko",
+    emailLabel: "Email",
+    phoneLabel: "Telefon (opcjonalny)",
+    phoneHint: "Jeśli wolisz kontakt telefoniczny.",
+    messageLabel: "Wiadomość",
+    messageHint: "Napisz jakiego koloru / wariantu szukasz.",
+    messagePlaceholder:
+      "Szukam wersji w kolorze butelkowej zieleni. Czy macie tkaninę Velvet w tym odcieniu?",
+    submit: "Wyślij zapytanie",
+    submitting: "Wysyłam...",
+    cancel: "Anuluj",
+    privacyNote: "Twoje dane będą wykorzystane wyłącznie do odpowiedzi na to zapytanie.",
   },
   footer: {
     information: "Informacje",

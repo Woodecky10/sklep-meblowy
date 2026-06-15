@@ -1,6 +1,9 @@
 "use client";
 
 import type { Product, ProductVariants } from "@/app/_lib/types";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
+import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "@/app/_lib/de-content-maps";
+import type { Locale } from "@/app/_lib/i18n";
 
 type Props = {
   variants: ProductVariants;
@@ -10,18 +13,20 @@ type Props = {
   product?: Product;
 };
 
-function getOptionName(p: Product | undefined, optionName: string): string {
-  return p?.variants?.overrides?.option_names?.[optionName] ?? optionName;
+// Override admina → potem (na DE) ręczna mapa tłumaczeń; kody/wymiary bez zmian.
+function getOptionName(p: Product | undefined, optionName: string, locale: Locale): string {
+  const raw = p?.variants?.overrides?.option_names?.[optionName] ?? optionName;
+  return locale === "de" ? mapDe(VARIANT_OPTION_DE, raw) ?? raw : raw;
 }
 
 function getValueLabel(
   p: Product | undefined,
   optionName: string,
-  value: string
+  value: string,
+  locale: Locale
 ): string {
-  return (
-    p?.variants?.overrides?.value_labels?.[optionName]?.[value] ?? value
-  );
+  const raw = p?.variants?.overrides?.value_labels?.[optionName]?.[value] ?? value;
+  return locale === "de" ? mapDe(VARIANT_VALUE_DE, raw) ?? raw : raw;
 }
 
 export default function VariantSelector({
@@ -30,6 +35,7 @@ export default function VariantSelector({
   onChange,
   product,
 }: Props) {
+  const locale = useClientLocale();
   function pick(name: string, value: string) {
     onChange({ ...selected, [name]: value });
   }
@@ -38,23 +44,23 @@ export default function VariantSelector({
     <div className="flex flex-col gap-4">
       {variants.options.map((option) => {
         const current = selected[option.name];
-        const displayName = getOptionName(product, option.name);
+        const displayName = getOptionName(product, option.name, locale);
         return (
           <div key={option.name}>
             <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
               {displayName}:{" "}
               <span className="text-[var(--fg)] normal-case tracking-normal font-semibold">
                 {current ? (
-                  getValueLabel(product, option.name, current)
+                  getValueLabel(product, option.name, current, locale)
                 ) : (
-                  <span className="text-[var(--muted)]">wybierz</span>
+                  <span className="text-[var(--muted)]">{locale === "de" ? "wählen" : "wybierz"}</span>
                 )}
               </span>
             </p>
             <div className="flex flex-wrap gap-2">
               {option.values.map((v) => {
                 const isActive = current === v;
-                const label = getValueLabel(product, option.name, v);
+                const label = getValueLabel(product, option.name, v, locale);
                 return (
                   <button
                     key={v}

@@ -1,10 +1,18 @@
+import type { Metadata } from "next";
 import { createClient } from "@/app/_lib/supabase/server";
+import { getLocale } from "@/app/_lib/i18n-server";
 import type { Profile } from "@/app/_lib/types";
 import CheckoutForm from "./CheckoutForm";
 
-export const metadata = { title: "Kasa — MeblePremium" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  const de = locale === "de";
+  return { title: de ? "Kasse — MeblePremium" : "Kasa — MeblePremium" };
+}
 
 export default async function CheckoutPage() {
+  const locale = await getLocale();
+  const de = locale === "de";
   const supabase = await createClient();
   const {
     data: { user },
@@ -20,14 +28,18 @@ export default async function CheckoutPage() {
     profile = (data as Profile | null) ?? null;
   }
 
+  const c = de
+    ? { eyebrow: "Kasse", heading: "Lieferadresse" }
+    : { eyebrow: "Kasa", heading: "Dane dostawy" };
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
       <div className="mb-10">
         <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-          Kasa
+          {c.eyebrow}
         </p>
         <h1 className="font-display text-4xl font-bold text-[var(--fg)]">
-          Dane dostawy
+          {c.heading}
         </h1>
       </div>
 

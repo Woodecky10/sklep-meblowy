@@ -26,7 +26,8 @@ export async function applyPromoCodeAction(
   rawCode: string,
   cartTotal: number
 ): Promise<PromoApplyResult> {
-  const result = await validatePromoCode(rawCode, cartTotal);
+  const locale = await getLocale();
+  const result = await validatePromoCode(rawCode, cartTotal, locale);
   if (!result.ok) return result;
   return {
     ok: true,

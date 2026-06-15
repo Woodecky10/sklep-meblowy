@@ -17,6 +17,30 @@ export default function ReorderButton({ items }: { items: OrderItem[] }) {
   const { add } = useCart();
   const router = useRouter();
   const locale = useClientLocale();
+  const de = locale === "de";
+  const c = de
+    ? {
+        allUnavailable:
+          "Alle Produkte aus dieser Bestellung sind im Shop nicht verfügbar.",
+        reorder: "Erneut bestellen",
+        item: "Position",
+        items: "Positionen",
+        skipped: (n: number) =>
+          `${n} Position(en) übersprungen — Produkte im Shop nicht verfügbar.`,
+        partial: (missing: number, total: number) =>
+          `${missing} von ${total} Position(en) sind nicht mehr verfügbar — wir überspringen sie.`,
+      }
+    : {
+        allUnavailable:
+          "Wszystkie produkty z tego zamówienia są niedostępne w sklepie.",
+        reorder: "Złóż ponownie",
+        item: "pozycja",
+        items: "pozycji",
+        skipped: (n: number) =>
+          `Pominięto ${n} pozycji — produkty niedostępne w sklepie.`,
+        partial: (missing: number, total: number) =>
+          `${missing} z ${total} pozycji jest już niedostępnych — pominiemy je.`,
+      };
   const [pending, startTransition] = useTransition();
   const [skipped, setSkipped] = useState(0);
 
@@ -27,7 +51,7 @@ export default function ReorderButton({ items }: { items: OrderItem[] }) {
   if (availableCount === 0) {
     return (
       <div className="text-sm text-[var(--muted)] italic">
-        Wszystkie produkty z tego zamówienia są niedostępne w sklepie.
+        {c.allUnavailable}
       </div>
     );
   }
@@ -79,18 +103,17 @@ export default function ReorderButton({ items }: { items: OrderItem[] }) {
           <path d="M3 12a9 9 0 0 1 15.5-6.3M21 4v5h-5" />
           <path d="M21 12a9 9 0 0 1-15.5 6.3M3 20v-5h5" />
         </svg>
-        Złóż ponownie ({availableCount}{" "}
-        {availableCount === 1 ? "pozycja" : "pozycji"})
+        {c.reorder} ({availableCount}{" "}
+        {availableCount === 1 ? c.item : c.items})
       </button>
       {skipped > 0 && (
         <p className="text-xs text-amber-600 dark:text-amber-400">
-          Pominięto {skipped} pozycji — produkty niedostępne w sklepie.
+          {c.skipped(skipped)}
         </p>
       )}
       {availableItems.length < items.length && (
         <p className="text-xs text-[var(--muted)]">
-          {items.length - availableItems.length} z {items.length} pozycji
-          jest już niedostępnych — pominiemy je.
+          {c.partial(items.length - availableItems.length, items.length)}
         </p>
       )}
     </div>

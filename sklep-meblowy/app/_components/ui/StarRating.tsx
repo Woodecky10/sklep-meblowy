@@ -16,7 +16,7 @@ export default function StarRating({
   const rounded = value - full >= 0.75 ? full + 1 : full;
 
   return (
-    <div className={`inline-flex items-center gap-0.5 ${className}`} aria-label={`${value} z 5`}>
+    <div className={`inline-flex items-center gap-0.5 ${className}`} aria-label={`${value} / 5`}>
       {[0, 1, 2, 3, 4].map((i) => {
         const showFull = hasHalf ? i < full : i < rounded;
         const showHalf = hasHalf && i === full;

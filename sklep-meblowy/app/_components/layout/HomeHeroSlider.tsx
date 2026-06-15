@@ -5,6 +5,8 @@ import LocalizedLink from "../ui/LocalizedLink";
 import Image from "next/image";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
+import { getDictionary } from "@/app/_lib/dictionaries";
 
 export type HeroSlide = {
   /** stabilny key (np. id z DB albo slug) */
@@ -25,11 +27,20 @@ export type HeroSlide = {
   ctaPrimary?: { label: string; href: string } | null;
   /** opcjonalne drugie CTA */
   ctaSecondary?: { label: string; href: string } | null;
+  /** Tłumaczenia DE (migracja 30) — niesione obok PL, używane przez localizeSlide na /de. */
+  eyebrowDe?: string | null;
+  titleDe?: string | null;
+  highlightedWordDe?: string | null;
+  subtitleDe?: string | null;
+  imageAltDe?: string | null;
+  ctaPrimaryLabelDe?: string | null;
+  ctaSecondaryLabelDe?: string | null;
 };
 
 const AUTOPLAY_MS = 6000;
 
 export default function HomeHeroSlider({ slides }: { slides: HeroSlide[] }) {
+  const t = getDictionary(useClientLocale());
   const [emblaRef, emblaApi] = useEmblaCarousel(
     { loop: true, duration: 30 },
     [
@@ -66,7 +77,7 @@ export default function HomeHeroSlider({ slides }: { slides: HeroSlide[] }) {
     <section
       className="relative overflow-hidden"
       aria-roledescription="carousel"
-      aria-label="Polecane kolekcje"
+      aria-label={t.a11y.carousel}
     >
       <div ref={emblaRef} className="overflow-hidden">
         <div className="flex">
@@ -76,7 +87,7 @@ export default function HomeHeroSlider({ slides }: { slides: HeroSlide[] }) {
               className="relative flex-[0_0_100%] min-w-0 min-h-[80vh] flex items-center"
               role="group"
               aria-roledescription="slide"
-              aria-label={`${idx + 1} z ${slides.length}`}
+              aria-label={`${idx + 1} ${t.a11y.slideOf} ${slides.length}`}
             >
               {/* Tło — zdjęcie (jeśli brak, fallback navy). Pierwszy slide
                   to LCP element — fetchPriority="high" daje Chrome'owi sygnał
@@ -154,7 +165,7 @@ export default function HomeHeroSlider({ slides }: { slides: HeroSlide[] }) {
         <>
           <button
             onClick={scrollPrev}
-            aria-label="Poprzedni slajd"
+            aria-label={t.a11y.prevSlide}
             className="hidden md:flex absolute left-6 top-1/2 -translate-y-1/2 w-12 h-12 items-center justify-center rounded-full bg-black/30 backdrop-blur-sm text-white border border-white/20 hover:bg-[var(--color-gold)] hover:text-[var(--color-navy)] hover:border-transparent transition-colors z-10"
           >
             <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -163,7 +174,7 @@ export default function HomeHeroSlider({ slides }: { slides: HeroSlide[] }) {
           </button>
           <button
             onClick={scrollNext}
-            aria-label="Następny slajd"
+            aria-label={t.a11y.nextSlide}
             className="hidden md:flex absolute right-6 top-1/2 -translate-y-1/2 w-12 h-12 items-center justify-center rounded-full bg-black/30 backdrop-blur-sm text-white border border-white/20 hover:bg-[var(--color-gold)] hover:text-[var(--color-navy)] hover:border-transparent transition-colors z-10"
           >
             <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -180,7 +191,7 @@ export default function HomeHeroSlider({ slides }: { slides: HeroSlide[] }) {
             <button
               key={idx}
               onClick={() => scrollTo(idx)}
-              aria-label={`Przejdź do slajdu ${idx + 1}`}
+              aria-label={`${t.a11y.goToSlide} ${idx + 1}`}
               aria-current={idx === selectedIndex}
               className={`h-1.5 rounded-full transition-all ${
                 idx === selectedIndex

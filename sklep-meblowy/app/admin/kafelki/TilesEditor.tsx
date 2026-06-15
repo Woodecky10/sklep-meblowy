@@ -433,6 +433,16 @@ function TileForm({
           />
         </Field>
 
+        <Field label="Etykieta po niemiecku (DE)" hint="Pokazywana na /de. Zostaw puste = polska etykieta.">
+          <input
+            name="label_de"
+            defaultValue={initial?.label_de ?? ""}
+            maxLength={200}
+            placeholder="np. 3-Sitzer-Sofas"
+            className={inputCls}
+          />
+        </Field>
+
         <Field label="Krótki opis" hint="Opcjonalne. Pojawia się pod etykietą, np. „Komfort i elegancja…”.">
           <textarea
             name="description"
@@ -440,6 +450,17 @@ function TileForm({
             maxLength={500}
             rows={2}
             placeholder="np. Komfort i elegancja w każdym salonie"
+            className={`${inputCls} resize-y`}
+          />
+        </Field>
+
+        <Field label="Krótki opis po niemiecku (DE)" hint="Pokazywany na /de. Zostaw puste = polski opis.">
+          <textarea
+            name="description_de"
+            defaultValue={initial?.description_de ?? ""}
+            maxLength={500}
+            rows={2}
+            placeholder="np. Komfort und Eleganz in jedem Wohnzimmer"
             className={`${inputCls} resize-y`}
           />
         </Field>

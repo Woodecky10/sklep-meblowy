@@ -2,6 +2,8 @@
 
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
+import { getDictionary } from "@/app/_lib/dictionaries";
 
 // Kategorie cookies zgodne z dobrą praktyką RODO:
 // - necessary: zawsze włączone, niezbędne do działania sklepu (sesja, koszyk)
@@ -62,6 +64,7 @@ export default function CookieBanner() {
   const [showDetails, setShowDetails] = useState(false);
   const [analytics, setAnalytics] = useState(false);
   const [marketing, setMarketing] = useState(false);
+  const t = getDictionary(useClientLocale());
 
   // saveConsent emituje "cookie-consent" → consentDecided=true → baner znika.
   function acceptAll() {
@@ -84,17 +87,15 @@ export default function CookieBanner() {
         <div className="flex flex-col gap-4">
           <div>
             <h2 className="font-display text-xl font-bold text-[var(--fg)] mb-2">
-              Dbamy o Twoją prywatność
+              {t.cookies.heading}
             </h2>
             <p className="text-sm text-[var(--muted)] leading-relaxed">
-              Używamy plików cookies, aby sklep działał poprawnie i aby móc lepiej rozumieć, jak z
-              niego korzystasz. Niezbędne cookies są zawsze aktywne. Analitykę i marketing
-              włączamy wyłącznie za Twoją zgodą. Szczegóły w{" "}
+              {t.cookies.body}{" "}
               <Link
                 href="/prywatnosc"
                 className="underline text-[var(--color-gold-text)] hover:opacity-80"
               >
-                Polityce prywatności
+                {t.cookies.privacyLink}
               </Link>
               .
             </p>
@@ -103,21 +104,21 @@ export default function CookieBanner() {
           {showDetails && (
             <div className="flex flex-col gap-3 border-t border-[var(--border)] pt-4">
               <Row
-                name="Niezbędne"
-                desc="Wymagane do działania sklepu: sesja logowania, koszyk, zabezpieczenia."
+                name={t.cookies.necessary}
+                desc={t.cookies.necessaryDesc}
                 checked
                 disabled
                 onChange={() => {}}
               />
               <Row
-                name="Analityczne"
-                desc="Anonimowe statystyki ruchu – pomagają ulepszać sklep."
+                name={t.cookies.analytics}
+                desc={t.cookies.analyticsDesc}
                 checked={analytics}
                 onChange={setAnalytics}
               />
               <Row
-                name="Marketingowe"
-                desc="Reklamy dopasowane do Twoich zainteresowań."
+                name={t.cookies.marketing}
+                desc={t.cookies.marketingDesc}
                 checked={marketing}
                 onChange={setMarketing}
               />
@@ -130,7 +131,7 @@ export default function CookieBanner() {
                 onClick={() => setShowDetails(true)}
                 className="px-5 py-2.5 text-sm font-sans font-semibold uppercase tracking-wider rounded-full border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--fg)] transition-colors"
               >
-                Dostosuj
+                {t.cookies.customize}
               </button>
             )}
             {showDetails && (
@@ -138,20 +139,20 @@ export default function CookieBanner() {
                 onClick={saveCustom}
                 className="px-5 py-2.5 text-sm font-sans font-semibold uppercase tracking-wider rounded-full border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--fg)] transition-colors"
               >
-                Zapisz wybór
+                {t.cookies.save}
               </button>
             )}
             <button
               onClick={rejectAll}
               className="px-5 py-2.5 text-sm font-sans font-semibold uppercase tracking-wider rounded-full border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--fg)] transition-colors"
             >
-              Tylko niezbędne
+              {t.cookies.onlyNecessary}
             </button>
             <button
               onClick={acceptAll}
               className="px-5 py-2.5 text-sm font-sans font-semibold uppercase tracking-wider rounded-full bg-[var(--color-navy)] text-white hover:bg-[var(--color-gold)] transition-colors"
             >
-              Akceptuj wszystkie
+              {t.cookies.acceptAll}
             </button>
           </div>
         </div>

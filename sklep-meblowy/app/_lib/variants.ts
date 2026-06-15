@@ -1,4 +1,6 @@
 import type { Product, ProductVariant } from "./types";
+import { DEFAULT_LOCALE, type Locale } from "./i18n";
+import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "./de-content-maps";
 
 // Czy produkt ma warianty (i przynajmniej jedną opcję)?
 export function hasVariants(product: Product): boolean {
@@ -85,9 +87,18 @@ export function isOptionValueAvailable(
 }
 
 // Krótka, czytelna etykieta wybranych wartości — np. "Strona: Lewa, Kolor: Beżowy".
-export function formatVariantLabel(values: Record<string, string>): string {
+// Na DE tłumaczy nazwę opcji i (znaną) wartość; kody/wymiary przechodzą bez zmian.
+export function formatVariantLabel(
+  values: Record<string, string>,
+  locale: Locale = DEFAULT_LOCALE
+): string {
+  const de = locale === "de";
   return Object.entries(values)
-    .map(([k, v]) => `${k}: ${v}`)
+    .map(([k, v]) => {
+      const key = de ? mapDe(VARIANT_OPTION_DE, k) ?? k : k;
+      const val = de ? mapDe(VARIANT_VALUE_DE, v) ?? v : v;
+      return `${key}: ${val}`;
+    })
     .join(", ");
 }
 

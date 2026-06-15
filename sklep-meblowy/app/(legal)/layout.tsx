@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { getLocale } from "@/app/_lib/i18n-server";
 
-const LEGAL_LINKS: { href: string; label: string }[] = [
+const LEGAL_LINKS_PL: { href: string; label: string }[] = [
   { href: "/o-nas", label: "O nas" },
   { href: "/kontakt", label: "Kontakt" },
   { href: "/dostawa", label: "Dostawa i płatności" },
@@ -9,15 +10,29 @@ const LEGAL_LINKS: { href: string; label: string }[] = [
   { href: "/prywatnosc", label: "Polityka prywatności" },
 ];
 
-export default function LegalLayout({ children }: { children: React.ReactNode }) {
+const LEGAL_LINKS_DE: { href: string; label: string }[] = [
+  { href: "/o-nas", label: "Über uns" },
+  { href: "/kontakt", label: "Kontakt" },
+  { href: "/dostawa", label: "Versand und Zahlung" },
+  { href: "/zwroty", label: "Rückgabe und Reklamation" },
+  { href: "/regulamin", label: "AGB" },
+  { href: "/prywatnosc", label: "Datenschutzerklärung" },
+];
+
+export default async function LegalLayout({ children }: { children: React.ReactNode }) {
+  const locale = await getLocale();
+  const de = locale === "de";
+  const links = de ? LEGAL_LINKS_DE : LEGAL_LINKS_PL;
+  const heading = de ? "Informationen" : "Informacje";
+
   return (
     <div className="max-w-6xl mx-auto px-6 py-16 grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-12">
       <aside className="lg:sticky lg:top-24 lg:self-start">
         <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-4">
-          Informacje
+          {heading}
         </p>
         <ul className="flex flex-col gap-2 text-sm">
-          {LEGAL_LINKS.map((l) => (
+          {links.map((l) => (
             <li key={l.href}>
               <Link
                 href={l.href}

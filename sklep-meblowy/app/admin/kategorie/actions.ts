@@ -73,12 +73,13 @@ export async function createGroup(formData: FormData): Promise<ActionResult> {
   const slug = slugInput ? toSlug(slugInput) : toSlug(label);
   if (!slug) return { ok: false, error: "Nie udało się wygenerować sluga z nazwy" };
 
+  const labelDe = sanitizeOptionalLabel(formData.get("label_de"));
   const sortOrder = parseInteger(formData.get("sort_order"));
 
   const supabase = await createAdminClient();
   const { error } = await supabase
     .from("category_groups")
-    .insert({ slug, label, sort_order: sortOrder } as never);
+    .insert({ slug, label, label_de: labelDe, sort_order: sortOrder } as never);
 
   if (error) {
     if (error.code === "23505") return { ok: false, error: `Grupa o slug "${slug}" już istnieje` };
@@ -98,13 +99,14 @@ export async function updateGroup(formData: FormData): Promise<ActionResult> {
   const label = sanitizeLabel(formData.get("label"));
   if (label.length < 2) return { ok: false, error: "Nazwa grupy jest za krótka" };
 
+  const labelDe = sanitizeOptionalLabel(formData.get("label_de"));
   const sortOrder = parseInteger(formData.get("sort_order"));
   const active = formData.get("active") === "1";
 
   const supabase = await createAdminClient();
   const { error } = await supabase
     .from("category_groups")
-    .update({ label, sort_order: sortOrder, active } as never)
+    .update({ label, label_de: labelDe, sort_order: sortOrder, active } as never)
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };

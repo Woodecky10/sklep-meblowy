@@ -8,7 +8,15 @@
 // Komponenty renderują wtedy zwykłe `product.name` — nie muszą znać locale.
 
 import { pickLocalized, type Locale } from "./i18n";
-import type { ProductDescriptionSection } from "./types";
+import type { ProductDescriptionSection, ProductFeature } from "./types";
+import {
+  CONSTRUCTION_DE,
+  DELIVERY_TIME_DE,
+  WARRANTY_DE,
+  FEATURE_KEY_DE,
+  FEATURE_VALUE_DE,
+  mapDe,
+} from "./de-content-maps";
 
 // Akceptujemy dowolny kształt wiersza produktu, byle miał pola PL + _de.
 // Generic <T> żeby zachować pozostałe pola (id, price, images...) bez utraty typu.
@@ -23,6 +31,11 @@ type ProductLocalizable = {
   color_de?: string | null;
   material_de?: string | null;
   description_sections_de?: ProductDescriptionSection[] | null;
+  // Wolnotekstowe pola bez kolumn _de — tłumaczone przez mapy de-content-maps.
+  construction?: string | null;
+  delivery_time?: string | null;
+  warranty?: string | null;
+  features?: ProductFeature[];
 };
 
 // Podmienia color/material na _de tylko gdy _de jest niepuste. PRESERWUJE null
@@ -41,12 +54,24 @@ export function localizeProduct<T extends ProductLocalizable>(
 ): T {
   if (locale !== "de") return row;
   const sectionsDe = row.description_sections_de;
+  // Cechy BL: tłumaczymy klucz i (jeśli znana) wartość; nieznane (kody, liczby,
+  // wymiary, nazwy własne) przechodzą bez zmian.
+  const featuresDe: ProductFeature[] | undefined = Array.isArray(row.features)
+    ? row.features.map((f) => ({
+        key: mapDe(FEATURE_KEY_DE, f.key) ?? f.key,
+        value: mapDe(FEATURE_VALUE_DE, f.value) ?? f.value,
+      }))
+    : row.features;
   return {
     ...row,
     name: pickLocalized(row.name, row.name_de, locale),
     description: pickLocalized(row.description, row.description_de, locale),
     color: pickNullable(row.color, row.color_de),
     material: pickNullable(row.material, row.material_de),
+    construction: mapDe(CONSTRUCTION_DE, row.construction),
+    delivery_time: mapDe(DELIVERY_TIME_DE, row.delivery_time),
+    warranty: mapDe(WARRANTY_DE, row.warranty),
+    features: featuresDe,
     description_sections:
       Array.isArray(sectionsDe) && sectionsDe.length > 0
         ? sectionsDe

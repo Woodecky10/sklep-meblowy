@@ -2,15 +2,17 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { localizeHref } from "@/app/_lib/i18n";
+import { useClientLocale } from "@/app/_lib/useClientLocale";
 import type { Order, OrderItem, OrderStatus } from "@/app/_lib/types";
 
-const STATUS_LABELS: Record<OrderStatus, { label: string; className: string }> = {
-  pending: { label: "Oczekuje", className: "text-amber-700 bg-amber-100 dark:bg-amber-950 dark:text-amber-300" },
-  paid: { label: "Opłacone", className: "text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300" },
-  processing: { label: "W realizacji", className: "text-blue-700 bg-blue-100 dark:bg-blue-950 dark:text-blue-300" },
-  shipped: { label: "Wysłane", className: "text-indigo-700 bg-indigo-100 dark:bg-indigo-950 dark:text-indigo-300" },
-  delivered: { label: "Dostarczone", className: "text-emerald-700 bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300" },
-  cancelled: { label: "Anulowane", className: "text-red-700 bg-red-100 dark:bg-red-950 dark:text-red-300" },
+const STATUS_LABELS: Record<OrderStatus, { label: string; labelDe: string; className: string }> = {
+  pending: { label: "Oczekuje", labelDe: "Ausstehend", className: "text-amber-700 bg-amber-100 dark:bg-amber-950 dark:text-amber-300" },
+  paid: { label: "Opłacone", labelDe: "Bezahlt", className: "text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300" },
+  processing: { label: "W realizacji", labelDe: "In Bearbeitung", className: "text-blue-700 bg-blue-100 dark:bg-blue-950 dark:text-blue-300" },
+  shipped: { label: "Wysłane", labelDe: "Versandt", className: "text-indigo-700 bg-indigo-100 dark:bg-indigo-950 dark:text-indigo-300" },
+  delivered: { label: "Dostarczone", labelDe: "Geliefert", className: "text-emerald-700 bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300" },
+  cancelled: { label: "Anulowane", labelDe: "Storniert", className: "text-red-700 bg-red-100 dark:bg-red-950 dark:text-red-300" },
 };
 
 const FILTER_ORDER: (OrderStatus | "all")[] = [
@@ -28,6 +30,27 @@ export default function OrdersList({
 }: {
   orders: (Order & { items: OrderItem[] })[];
 }) {
+  const locale = useClientLocale();
+  const de = locale === "de";
+  const c = de
+    ? {
+        heading: "Ihre Bestellungen",
+        all: "Alle",
+        emptyFilter: "Keine Bestellungen in diesem Filter.",
+        item: "Position",
+        items: "Positionen",
+      }
+    : {
+        heading: "Twoje zamówienia",
+        all: "Wszystkie",
+        emptyFilter: "Brak zamówień w tym filtrze.",
+        item: "pozycja",
+        items: "pozycji",
+      };
+
+  const statusLabel = (s: OrderStatus) =>
+    de ? STATUS_LABELS[s].labelDe : STATUS_LABELS[s].label;
+
   const [filter, setFilter] = useState<OrderStatus | "all">("all");
 
   const counts = useMemo(() => {
@@ -56,7 +79,7 @@ export default function OrdersList({
   return (
     <div className="flex flex-col gap-4">
       <h2 className="font-display text-2xl font-bold text-[var(--fg)] mb-2">
-        Twoje zamówienia
+        {c.heading}
       </h2>
 
       {visibleFilters.length > 1 && (
@@ -71,7 +94,7 @@ export default function OrdersList({
                   : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
               }`}
             >
-              {s === "all" ? "Wszystkie" : STATUS_LABELS[s].label}{" "}
+              {s === "all" ? c.all : statusLabel(s)}{" "}
               <span className="opacity-60">({counts[s]})</span>
             </button>
           ))}
@@ -80,17 +103,21 @@ export default function OrdersList({
 
       {filtered.length === 0 ? (
         <div className="bg-[var(--card-bg)] border border-dashed border-[var(--border)] rounded-2xl p-10 text-center text-[var(--muted)]">
-          Brak zamówień w tym filtrze.
+          {c.emptyFilter}
         </div>
       ) : (
         filtered.map((order) => {
           const status = STATUS_LABELS[order.status] ?? STATUS_LABELS.pending;
+          const statusText =
+            de
+              ? (STATUS_LABELS[order.status] ?? STATUS_LABELS.pending).labelDe
+              : status.label;
           const itemsCount =
             order.items?.reduce((s, i) => s + i.quantity, 0) ?? 0;
           return (
             <Link
               key={order.id}
-              href={`/konto/zamowienia/${order.id}`}
+              href={localizeHref(`/konto/zamowienia/${order.id}`, locale)}
               className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 hover:border-[var(--color-gold)] transition-colors flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6"
             >
               <div className="flex-1 min-w-0">
@@ -98,24 +125,27 @@ export default function OrdersList({
                   #{order.id.slice(0, 8).toUpperCase()}
                 </p>
                 <p className="text-xs text-[var(--muted)]">
-                  {new Date(order.created_at).toLocaleDateString("pl-PL", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
+                  {new Date(order.created_at).toLocaleDateString(
+                    de ? "de-DE" : "pl-PL",
+                    {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    }
+                  )}
                   {" · "}
-                  {itemsCount} {itemsCount === 1 ? "pozycja" : "pozycji"}
+                  {itemsCount} {itemsCount === 1 ? c.item : c.items}
                 </p>
               </div>
 
               <span
                 className={`px-3 py-1 rounded-full text-xs font-sans uppercase tracking-widest ${status.className}`}
               >
-                {status.label}
+                {statusText}
               </span>
 
               <p className="font-display text-lg font-bold text-[var(--fg)] whitespace-nowrap">
-                {Number(order.total).toLocaleString("pl-PL")} zł
+                {Number(order.total).toLocaleString(locale)} zł
               </p>
             </Link>
           );

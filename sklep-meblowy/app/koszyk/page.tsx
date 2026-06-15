@@ -168,7 +168,7 @@ export default function KoszykPage() {
                   </LocalizedLink>
                   {item.variantValues && (
                     <p className="text-xs text-[var(--muted)] mb-3">
-                      {formatVariantLabel(item.variantValues)}
+                      {formatVariantLabel(item.variantValues, locale)}
                     </p>
                   )}
 

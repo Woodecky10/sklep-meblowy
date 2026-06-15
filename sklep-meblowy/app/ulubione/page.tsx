@@ -5,11 +5,13 @@ import { createClient } from "@/app/_lib/supabase/server";
 import { getWishlistProducts, getUserWishlistIds } from "@/app/_lib/wishlist";
 import { getCategories } from "@/app/_lib/categories";
 import { getLocale } from "@/app/_lib/i18n-server";
+import { getDictionary } from "@/app/_lib/dictionaries";
 import ProductCard from "@/app/_components/ui/ProductCard";
 
-export const metadata: Metadata = {
-  title: "Ulubione",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = getDictionary(await getLocale());
+  return { title: t.meta.wishlistTitle };
+}
 
 export default async function WishlistPage() {
   const supabase = await createClient();
@@ -19,6 +21,7 @@ export default async function WishlistPage() {
   if (!user) redirect("/logowanie?next=/ulubione");
 
   const locale = await getLocale();
+  const t = getDictionary(locale);
   const [products, wishlistIds, categories] = await Promise.all([
     getWishlistProducts(locale),
     getUserWishlistIds(),
@@ -33,16 +36,16 @@ export default async function WishlistPage() {
           Mollien
         </p>
         <h1 className="font-display text-4xl font-bold text-[var(--fg)]">
-          Ulubione
+          {t.nav.favorites}
         </h1>
         {products.length > 0 && (
           <p className="text-sm text-[var(--muted)] mt-2">
             {products.length}{" "}
             {products.length === 1
-              ? "produkt"
+              ? t.home.productOne
               : products.length < 5
-                ? "produkty"
-                : "produktów"}
+                ? t.home.productFew
+                : t.home.productMany}
           </p>
         )}
       </div>
@@ -50,17 +53,16 @@ export default async function WishlistPage() {
       {products.length === 0 ? (
         <div className="bg-[var(--card-bg)] border border-dashed border-[var(--border)] rounded-2xl p-12 text-center">
           <h2 className="font-display text-2xl font-bold text-[var(--fg)] mb-3">
-            Twoja lista ulubionych jest pusta
+            {t.wishlist.emptyTitle}
           </h2>
           <p className="text-[var(--muted)] mb-6 max-w-md mx-auto">
-            Klikaj serce na karcie produktu, żeby zachować swoje typy na
-            później. Wrócisz do nich w każdej chwili tutaj.
+            {t.wishlist.emptyHint}
           </p>
           <LocalizedLink
             href="/sklep"
             className="inline-flex px-8 py-3.5 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
           >
-            Przeglądaj sklep
+            {t.common.browseShop}
           </LocalizedLink>
         </div>
       ) : (
