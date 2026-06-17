@@ -123,3 +123,79 @@ export async function applyBlStatus(
   if (error) throw error;
   return (data?.length ?? 0) > 0;
 }
+
+const ADMIN_ORDERS_PAGE_SIZE = 30;
+
+export type AdminOrderRow = Order & { items: { quantity: number }[] };
+
+// Lista zamówień dla panelu admina — filtr statusu, szukajka (numer / e-mail
+// gościa / nazwisko z adresu), paginacja po dacie malejąco. `items` to tylko
+// ilości (do policzenia liczby pozycji) — szczegóły ładuje getOrderById.
+export async function getAdminOrders({
+  status,
+  search,
+  page = 1,
+}: {
+  status?: OrderStatus | "all";
+  search?: string;
+  page?: number;
+}): Promise<{ orders: AdminOrderRow[]; total: number; pages: number; page: number }> {
+  const supabase = await createAdminClient();
+  const safePage = Number.isFinite(page) && page > 0 ? Math.trunc(page) : 1;
+  const from = (safePage - 1) * ADMIN_ORDERS_PAGE_SIZE;
+  const to = from + ADMIN_ORDERS_PAGE_SIZE - 1;
+
+  let query = supabase
+    .from("orders")
+    .select("*, items:order_items(quantity)", { count: "exact" })
+    .order("created_at", { ascending: false });
+
+  if (status && status !== "all") {
+    query = query.eq("status", status);
+  }
+
+  const term = search?.trim();
+  if (term) {
+    const numeric = term.replace(/^#/, "");
+    if (/^\d+$/.test(numeric)) {
+      query = query.eq("order_number", Number(numeric));
+    } else {
+      // Usuwamy znaki łamiące składnię filtra `or` PostgREST.
+      const esc = term.replace(/[%,()*]/g, " ").trim();
+      query = query.or(
+        `guest_email.ilike.%${esc}%,shipping_address->>fullname.ilike.%${esc}%`
+      );
+    }
+  }
+
+  const { data, error, count } = await query.range(from, to);
+  if (error) throw error;
+
+  const orders = (data ?? []) as unknown as AdminOrderRow[];
+  const total = count ?? 0;
+  return {
+    orders,
+    total,
+    pages: Math.max(1, Math.ceil(total / ADMIN_ORDERS_PAGE_SIZE)),
+    page: safePage,
+  };
+}
+
+// Mapa profili (email + nazwisko) po id usera — do wyświetlenia klienta na liście.
+export async function getProfilesByIds(
+  ids: string[]
+): Promise<Record<string, { email: string; full_name: string | null }>> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) return {};
+  const supabase = await createAdminClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, email, full_name")
+    .in("id", unique);
+  if (error) throw error;
+  const map: Record<string, { email: string; full_name: string | null }> = {};
+  for (const p of (data ?? []) as { id: string; email: string; full_name: string | null }[]) {
+    map[p.id] = { email: p.email, full_name: p.full_name };
+  }
+  return map;
+}
