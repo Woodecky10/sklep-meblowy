@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 const CARDS = [
+  { href: "/admin/zamowienia", title: "Zamówienia", cta: "Zarządzaj zamówieniami" },
   { href: "/admin/produkty", title: "Produkty", cta: "Edytuj produkty" },
   { href: "/admin/polecane", title: "Polecane produkty", cta: "Edytuj polecane" },
   { href: "/admin/slider", title: "Slider na stronie głównej", cta: "Edytuj slider" },

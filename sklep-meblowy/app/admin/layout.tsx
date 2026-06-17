@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Pulpit", icon: DashboardIcon },
+  { href: "/admin/zamowienia", label: "Zamówienia", icon: OrdersIcon },
   { href: "/admin/produkty", label: "Produkty", icon: ProductsIcon },
   { href: "/admin/polecane", label: "Polecane", icon: StarIcon },
   { href: "/admin/slider", label: "Slider", icon: SliderIcon },
@@ -172,6 +173,15 @@ function BLIcon() {
     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
       <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
       <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
+function OrdersIcon() {
+  return (
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <path d="M6 2h9l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" />
+      <path d="M14 2v6h6M9 13h6M9 17h6" />
     </svg>
   );
 }

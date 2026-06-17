@@ -7,6 +7,7 @@ type Props = {
   pages: number;
   searchParams: Record<string, string>;
   locale?: Locale;
+  basePath?: string;
 };
 
 // Okienkowanie: zawsze 1 i ostatnia + bieżąca ±2, reszta jako "…".
@@ -25,14 +26,14 @@ function pageWindow(page: number, pages: number): (number | "ellipsis")[] {
   return items;
 }
 
-export default function Pagination({ page, pages, searchParams, locale = DEFAULT_LOCALE }: Props) {
+export default function Pagination({ page, pages, searchParams, locale = DEFAULT_LOCALE, basePath = "/sklep" }: Props) {
   if (pages <= 1) return null;
 
   const t = getDictionary(locale);
 
   function pageHref(p: number) {
     const params = new URLSearchParams({ ...searchParams, strona: String(p) });
-    return `/sklep?${params.toString()}`;
+    return `${basePath}?${params.toString()}`;
   }
 
   return (
