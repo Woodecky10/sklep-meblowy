@@ -22,18 +22,26 @@ export default async function AdminProductsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-          Admin
-        </p>
-        <h1 className="font-display text-4xl font-bold text-[var(--fg)]">
-          Produkty
-        </h1>
-        <p className="text-sm text-[var(--muted)] mt-2">
-          Łącznie: {products.length}{" "}
-          {products.length === 1 ? "produkt" : products.length < 5 ? "produkty" : "produktów"}.
-          Kliknij &bdquo;Edytuj&rdquo; przy produkcie, żeby zmienić nazwę, cenę, opis, zdjęcia lub warianty.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
+            Admin
+          </p>
+          <h1 className="font-display text-4xl font-bold text-[var(--fg)]">
+            Produkty
+          </h1>
+          <p className="text-sm text-[var(--muted)] mt-2">
+            Łącznie: {products.length}{" "}
+            {products.length === 1 ? "produkt" : products.length < 5 ? "produkty" : "produktów"}.
+            Kliknij &bdquo;Edytuj&rdquo; przy produkcie, żeby zmienić nazwę, cenę, opis, zdjęcia lub warianty.
+          </p>
+        </div>
+        <Link
+          href="/admin/produkty/nowy"
+          className="shrink-0 px-5 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
+        >
+          + Nowy produkt
+        </Link>
       </div>
 
       {error && (
@@ -44,7 +52,7 @@ export default async function AdminProductsPage() {
 
       {products.length === 0 ? (
         <div className="p-8 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl text-center text-[var(--muted)]">
-          Brak produktów. Dodaj je w BaseLinkerze i zsynchronizuj (Admin → BaseLinker).
+          Brak produktów. Kliknij &bdquo;+ Nowy produkt&rdquo;, żeby dodać pierwszy.
         </div>
       ) : (
         <ul className="flex flex-col gap-3">
