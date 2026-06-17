@@ -166,6 +166,14 @@ export type Order = {
   promo_code_id: string | null;
   promo_discount: number;
   created_at: string;
+  // Panel admina (migracja 31)
+  order_number: number;
+  admin_note: string | null;
+  carrier: string | null;
+  tracking_number: string | null;
+  delivery_cost: number | null;
+  delivery_paid: boolean;
+  status_updated_at: string | null;
   items?: OrderItem[];
   // Dołączane przez query — kod promo z joina. Null jeśli zamówienie bez kuponu
   // albo gdy admin usunął kod (FK ON DELETE SET NULL).

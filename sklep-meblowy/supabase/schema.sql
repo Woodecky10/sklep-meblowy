@@ -75,6 +75,10 @@ create index if not exists idx_products_needs_translation
 -- ============================================================
 -- TABELA: orders
 -- ============================================================
+
+-- Sekwencja numeru zamówienia (panel admina, migracja 31)
+create sequence if not exists public.orders_order_number_seq;
+
 create table if not exists public.orders (
   id                     uuid primary key default uuid_generate_v4(),
   user_id                uuid not null references auth.users(id) on delete restrict,
@@ -83,7 +87,15 @@ create table if not exists public.orders (
   total                  numeric(10, 2) not null check (total >= 0),
   shipping_address       jsonb not null,
   stripe_payment_intent  text,
-  created_at             timestamptz not null default now()
+  created_at             timestamptz not null default now(),
+  -- Panel admina (migracja 31)
+  order_number           bigint not null default nextval('public.orders_order_number_seq') unique,
+  admin_note             text,
+  carrier                text,
+  tracking_number        text,
+  delivery_cost          numeric(10, 2),
+  delivery_paid          boolean not null default false,
+  status_updated_at      timestamptz
 );
 
 create index if not exists idx_orders_user_id   on public.orders (user_id);
