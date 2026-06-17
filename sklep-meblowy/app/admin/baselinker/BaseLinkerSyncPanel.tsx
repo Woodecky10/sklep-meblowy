@@ -1,19 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import {
-  syncProductsAction,
-  type SyncActionResult,
-  type SyncLogRow,
-} from "./actions";
+import { useState } from "react";
+import { type SyncLogRow } from "./actions";
 import type {
   SyncInventoryResult,
   SyncSkippedProduct,
   SyncedProduct,
 } from "@/app/_lib/baselinker-sync";
-
-type Toast = { type: "success" | "error" | "warning"; message: string } | null;
 
 export default function BaseLinkerSyncPanel({
   initialLogs,
@@ -22,111 +15,26 @@ export default function BaseLinkerSyncPanel({
   initialLogs: SyncLogRow[];
   pendingTranslations: number;
 }) {
-  // Logi przychodzą z serwera przez prop — router.refresh() po sync
-  // (sukces I błąd) odświeża server component i lista aktualizuje się
-  // bez pełnego reloadu (toast i karta wyniku zostają widoczne).
   const logs = initialLogs;
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [lastResult, setLastResult] = useState<SyncActionResult | null>(null);
-  const [toast, setToast] = useState<Toast>(null);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
-
-  function showToast(t: Toast) {
-    setToast(t);
-    if (t) setTimeout(() => setToast(null), 5000);
-  }
-
-  function handleSync() {
-    startTransition(async () => {
-      const result = await syncProductsAction();
-      setLastResult(result);
-
-      if (!result.ok) {
-        showToast({
-          type: "error",
-          message: `Sync nieudany: ${result.error}`,
-        });
-        // Wpis status=error też ląduje w historii — odśwież listę.
-        router.refresh();
-        return;
-      }
-
-      const t = result.outcome.totals;
-      const msg = `Zsynchronizowano: ${t.inserted} nowych, ${t.updated} zaktualizowanych${
-        t.skipped_count > 0 ? `, ${t.skipped_count} pominiętych` : ""
-      }`;
-
-      showToast({
-        type: t.skipped_count > 0 ? "warning" : "success",
-        message: msg,
-      });
-
-      router.refresh();
-    });
-  }
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-            Mollien
-          </p>
-          <h1 className="font-display text-4xl font-bold text-[var(--fg)]">BaseLinker</h1>
-          <p className="text-sm text-[var(--muted)] mt-2 max-w-2xl leading-relaxed">
-            Synchronizacja produktów z BaseLinkera na stronę. Odpalenie tu pobierze
-            wszystkie produkty z BL i utworzy lub zaktualizuje je w bazie sklepu.
-            Bezpieczne — żadne istniejące produkty nie zostaną usunięte.
-          </p>
-        </div>
-        <button
-          onClick={handleSync}
-          disabled={pending}
-          className="shrink-0 px-6 py-3.5 bg-[var(--color-gold)] text-[var(--color-navy)] font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold-light)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {pending ? (
-            <span className="flex items-center gap-2">
-              <Spinner />
-              Synchronizuję...
-            </span>
-          ) : (
-            "Synchronizuj teraz"
-          )}
-        </button>
+      <div>
+        <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
+          Mollien
+        </p>
+        <h1 className="font-display text-4xl font-bold text-[var(--fg)]">
+          BaseLinker (archiwum)
+        </h1>
+        <p className="text-sm text-[var(--muted)] mt-2 max-w-2xl leading-relaxed">
+          Synchronizacja produktów z BaseLinkera została wyłączona — produkty
+          dodaje się teraz bezpośrednio w sklepie (Admin → Produkty → Nowy
+          produkt). Poniżej zostaje archiwalna historia dawnych synchronizacji.
+        </p>
       </div>
 
-      {toast && <ToastView toast={toast} onClose={() => setToast(null)} />}
-
-      {/* Trwały blok błędu — toast znika po 5 s, a admin musi widzieć,
-          że sync się nie powiódł, dopóki nie spróbuje ponownie. */}
-      {lastResult && !lastResult.ok && (
-        <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-2xl p-6">
-          <h2 className="font-display text-lg font-semibold text-red-700 dark:text-red-300 mb-1">
-            Ostatnia synchronizacja nie powiodła się
-          </h2>
-          <p className="text-sm text-red-700/90 dark:text-red-300/90 leading-relaxed">
-            {lastResult.error}
-          </p>
-          <p className="text-xs text-[var(--muted)] mt-2">
-            Czas: {(lastResult.duration_ms / 1000).toFixed(1)}s · Spróbuj
-            ponownie przyciskiem „Synchronizuj teraz”. Wpis trafił też do
-            historii poniżej.
-          </p>
-        </div>
-      )}
-
-      {/* Wynik ostatniej synchronizacji (świeżo zrobionej w tym okienku) */}
-      {lastResult && lastResult.ok && (
-        <Card>
-          <h2 className="font-display text-lg font-semibold text-[var(--fg)] mb-3">
-            Wynik ostatniej synchronizacji
-          </h2>
-          <ResultSummary result={lastResult} />
-        </Card>
-      )}
-
-      {/* Tłumaczenia DE — licznik zaległych (status; tłumaczenie ręczne w edytorze produktu) */}
+      {/* Tłumaczenia DE — licznik zaległych (tłumaczenie ręczne w edytorze produktu) */}
       <Card>
         <div>
           <h2 className="font-display text-lg font-semibold text-[var(--fg)] mb-1">
@@ -134,7 +42,7 @@ export default function BaseLinkerSyncPanel({
           </h2>
           <p className="text-sm text-[var(--muted)] leading-relaxed max-w-xl">
             Nowe i zmienione produkty wymagają ręcznego tłumaczenia DE — wpisz je
-            w edytorze produktu, sekcja „Tłumaczenie niemieckie (DE)”.
+            w edytorze produktu, sekcja {"„Tłumaczenie niemieckie (DE)”"}.
           </p>
           <p className="text-sm text-[var(--fg)] mt-3">
             Czeka na tłumaczenie:{" "}
@@ -152,14 +60,14 @@ export default function BaseLinkerSyncPanel({
         </div>
       </Card>
 
-      {/* Historia synchronizacji */}
+      {/* Archiwalna historia synchronizacji */}
       <div>
         <h2 className="font-display text-2xl font-semibold text-[var(--fg)] mb-4">
-          Historia synchronizacji
+          Historia synchronizacji (archiwum)
         </h2>
 
         {logs.length === 0 ? (
-          <EmptyState message='Brak synchronizacji w historii. Kliknij „Synchronizuj teraz” żeby zacząć.' />
+          <EmptyState message="Brak synchronizacji w historii." />
         ) : (
           <div className="flex flex-col gap-2">
             {logs.map((log) => (
@@ -175,67 +83,6 @@ export default function BaseLinkerSyncPanel({
           </div>
         )}
       </div>
-
-      {/* Instrukcja dla nietechnicznego usera */}
-      <Card>
-        <h2 className="font-display text-lg font-semibold text-[var(--fg)] mb-3">
-          Co robić gdy produkt jest „pominięty”?
-        </h2>
-        <div className="text-sm text-[var(--muted)] leading-relaxed space-y-2">
-          <p>
-            <strong className="text-[var(--fg)]">„kategoria BL X nie zmapowana”</strong> —
-            wejdź w <a href="/admin/kategorie" className="text-[var(--color-gold)] hover:underline">Kategorie</a>,
-            znajdź odpowiednią kategorię i wpisz w polu „ID kategorii w BaseLinker”
-            liczbę z BL (Magazyn → Kategorie → kliknij kategorię → ID widoczne w URL).
-            Potem wróć tu i kliknij „Synchronizuj teraz” ponownie.
-          </p>
-          <p>
-            <strong className="text-[var(--fg)]">„brak ceny lub cena = 0”</strong> —
-            ustaw cenę produktu w BL.
-          </p>
-          <p>
-            <strong className="text-[var(--fg)]">„brak nazwy”</strong> — wypełnij nazwę produktu w BL.
-          </p>
-          <p>
-            <strong className="text-[var(--fg)]">„brak kategorii w BL”</strong> —
-            przypisz produkt do kategorii w BL (Magazyn → produkt → Kategoria).
-          </p>
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-// ============================================================
-// Wynik synchronizacji — szczegółowy widok per inventory
-// ============================================================
-
-function ResultSummary({
-  result,
-}: {
-  result: Extract<SyncActionResult, { ok: true }>;
-}) {
-  const totals = result.outcome.totals;
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat label="W BL" value={totals.total_in_bl} />
-        <Stat label="Dodanych" value={totals.inserted} variant="success" />
-        <Stat label="Zaktualizowanych" value={totals.updated} variant="info" />
-        <Stat
-          label="Pominiętych"
-          value={totals.skipped_count}
-          variant={totals.skipped_count > 0 ? "warning" : "neutral"}
-        />
-      </div>
-      <p className="text-xs text-[var(--muted)]">
-        Czas: {(result.duration_ms / 1000).toFixed(1)}s
-        {result.outcome.warning && ` · ${result.outcome.warning}`}
-      </p>
-      <SyncReport report={result.outcome as SyncReportData} />
-      {result.outcome.results.map((inv) => (
-        <InventoryResult key={inv.inventory_id} inv={inv} />
-      ))}
     </div>
   );
 }
@@ -600,29 +447,6 @@ function LogRow({
 // Pomocnicze
 // ============================================================
 
-function Stat({
-  label,
-  value,
-  variant = "neutral",
-}: {
-  label: string;
-  value: number;
-  variant?: "success" | "info" | "warning" | "neutral";
-}) {
-  const colors = {
-    success: "bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200",
-    info: "bg-blue-50 dark:bg-blue-950 text-blue-800 dark:text-blue-200",
-    warning: "bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-200",
-    neutral: "bg-[var(--bg)] text-[var(--fg)]",
-  };
-  return (
-    <div className={`px-4 py-3 rounded-xl ${colors[variant]}`}>
-      <p className="text-xs font-sans uppercase tracking-widest opacity-70">{label}</p>
-      <p className="font-display text-2xl font-bold mt-0.5">{value}</p>
-    </div>
-  );
-}
-
 function StatusBadge({ status }: { status: SyncLogRow["status"] }) {
   const config = {
     success: {
@@ -663,45 +487,3 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
-function Spinner() {
-  return (
-    <svg
-      className="animate-spin"
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="3"
-    >
-      <circle cx="12" cy="12" r="10" opacity="0.25" />
-      <path d="M22 12a10 10 0 0 0-10-10" />
-    </svg>
-  );
-}
-
-function ToastView({ toast, onClose }: { toast: NonNullable<Toast>; onClose: () => void }) {
-  const colors = {
-    success:
-      "bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-200",
-    warning:
-      "bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-200",
-    error:
-      "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-900 text-red-800 dark:text-red-200",
-  };
-  return (
-    <div
-      role="status"
-      className={`fixed top-24 right-6 z-50 max-w-md px-5 py-4 rounded-2xl shadow-2xl border ${colors[toast.type]}`}
-    >
-      <div className="flex items-start gap-3">
-        <p className="text-sm flex-1 leading-relaxed">{toast.message}</p>
-        <button onClick={onClose} aria-label="Zamknij" className="shrink-0 opacity-70 hover:opacity-100">
-          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-    </div>
-  );
-}
