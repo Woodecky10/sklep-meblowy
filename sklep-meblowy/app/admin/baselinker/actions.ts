@@ -1,13 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { createClient, createAdminClient } from "@/app/_lib/supabase/server";
+import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
-import {
-  syncProductsFromBaseLinker,
-  logSyncOutcome,
-  type SyncOutcome,
-} from "@/app/_lib/baselinker-sync";
+import { type SyncOutcome } from "@/app/_lib/baselinker-sync";
 
 export type SyncActionResult =
   | {
@@ -24,33 +19,15 @@ export type SyncActionResult =
 // ============================================================
 export async function syncProductsAction(): Promise<SyncActionResult> {
   await requireAdmin();
-
-  // Pobierz user_id żeby zalogować kto wywołał sync
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const triggeredBy = user?.id ?? null;
-
-  const startedAt = Date.now();
-  const outcome = await syncProductsFromBaseLinker();
-  const durationMs = Date.now() - startedAt;
-
-  // Best-effort log
-  await logSyncOutcome(outcome, durationMs, triggeredBy).catch((err) => {
-    console.error("[BL sync] zapis logu nieudany:", err);
-  });
-
-  // Inwalidacja stron które pokazują produkty
-  revalidatePath("/admin/baselinker");
-  revalidatePath("/sklep");
-  revalidatePath("/");
-
-  if (!outcome.ok) {
-    return { ok: false, error: outcome.error, duration_ms: durationMs };
-  }
-
-  return { ok: true, duration_ms: durationMs, outcome };
+  // Synchronizacja z BaseLinker WYŁĄCZONA — produkty zarządzane natywnie
+  // w sklepie (Admin → Produkty → Nowy produkt). Kod syncu (baselinker-sync.ts)
+  // zostaje jako legacy; tu tylko zwracamy odmowę w istniejącym kształcie typu.
+  return {
+    ok: false,
+    error:
+      "Synchronizacja z BaseLinker została wyłączona — produkty dodaje się teraz bezpośrednio w sklepie (Admin → Produkty → Nowy produkt).",
+    duration_ms: 0,
+  };
 }
 
 // ============================================================
