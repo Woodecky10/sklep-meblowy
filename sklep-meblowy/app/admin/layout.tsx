@@ -19,7 +19,6 @@ const NAV_ITEMS = [
   { href: "/admin/kolekcje", label: "Kolekcje", icon: CollectionsIcon },
   { href: "/admin/kody-rabatowe", label: "Kody rabatowe", icon: TicketIcon },
   { href: "/admin/zapytania", label: "Zapytania", icon: InboxIcon },
-  { href: "/admin/baselinker", label: "BaseLinker", icon: BLIcon },
 ];
 
 export default async function AdminLayout({
@@ -164,15 +163,6 @@ function InboxIcon() {
     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
       <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
       <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
-    </svg>
-  );
-}
-
-function BLIcon() {
-  return (
-    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-      <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
-      <path d="M12 7v5l3 2" />
     </svg>
   );
 }

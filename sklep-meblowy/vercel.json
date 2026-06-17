@@ -1,8 +1,3 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/reconcile-bl",
-      "schedule": "0 3 * * *"
-    }
-  ]
+  "crons": []
 }

@@ -10,7 +10,6 @@ const CARDS = [
   { href: "/admin/kolekcje", title: "Kolekcje produktów", cta: "Zarządzaj kolekcjami" },
   { href: "/admin/kody-rabatowe", title: "Kody rabatowe", cta: "Zarządzaj kodami" },
   { href: "/admin/zapytania", title: "Zapytania klientów", cta: "Otwórz skrzynkę" },
-  { href: "/admin/baselinker", title: "BaseLinker", cta: "Otwórz" },
 ];
 
 export default function AdminDashboardPage() {

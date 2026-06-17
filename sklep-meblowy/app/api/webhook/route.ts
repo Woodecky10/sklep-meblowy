@@ -4,13 +4,11 @@ import { getStripe } from "@/app/_lib/stripe";
 import { shouldSettleOrder } from "@/app/_lib/stripe-events";
 import { markOrderPaid } from "@/app/_lib/orders";
 import { incrementPromoUsage } from "@/app/_lib/promo";
-import { pushOrderToBaseLinker } from "@/app/_lib/baselinker-orders";
-import { hasCompletedBlPush } from "@/app/_lib/baselinker-orders";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import type { OrderStatus } from "@/app/_lib/types";
 
 // Rozliczenie FAKTYCZNIE opłaconego zamówienia: dedup eventów Stripe,
-// markOrderPaid (CAS), increment promo (zwycięzca claimu), push do BaseLinker.
+// markOrderPaid (CAS) oraz increment promo (zwycięzca claimu).
 // Wywoływane tylko gdy shouldSettleOrder()=true (completed+'paid' albo
 // async_payment_succeeded). Zwraca NextResponse — 500 sprawia, że Stripe
 // ponowi event (przejściowa awaria DB).
@@ -32,12 +30,12 @@ async function settlePaidOrder(
   }
 
   // Guard statusu = deduplikacja eventów Stripe. Duplikat eventu nie może
-  // podwójnie inkrementować promo, ponownie push'ować do BL ani cofać statusu
-  // zamówienia (np. po tym jak admin przestawił na processing/shipped).
+  // podwójnie inkrementować promo ani cofać statusu zamówienia (np. po tym
+  // jak admin przestawił na processing/shipped).
   const supabase = await createAdminClient();
   const { data: orderRow, error: orderErr } = await supabase
     .from("orders")
-    .select("id, status, promo_code_id, baselinker_order_id")
+    .select("id, status, promo_code_id")
     .eq("id", orderId)
     .maybeSingle();
 
@@ -57,7 +55,6 @@ async function settlePaidOrder(
   const ord = orderRow as unknown as {
     status: OrderStatus;
     promo_code_id: string | null;
-    baselinker_order_id: string | null;
   };
 
   if (ord.status === "cancelled") {
@@ -71,8 +68,8 @@ async function settlePaidOrder(
       .from("orders")
       .update({
         stripe_payment_intent: paymentIntent ?? session.id,
-        baselinker_push_error:
-          "płatność Stripe doszła po anulowaniu zamówienia — wymaga ręcznej obsługi",
+        admin_note:
+          "płatność Stripe doszła po anulowaniu zamówienia — wymaga ręcznej obsługi (zwrot/przywrócenie)",
       } as never)
       .eq("id", orderId);
     if (cancelTraceErr) {
@@ -90,13 +87,9 @@ async function settlePaidOrder(
     return NextResponse.json({ received: true });
   }
 
-  // Dedup vs odzyskiwanie: status != pending znaczy "markOrderPaid już
-  // przeszedł", ale Stripe retry'uje też po crashu W TRAKCIE handlera
-  // (markOrderPaid OK → crash przed pushem do BL). Taki retry MUSI dokończyć
-  // push — inaczej opłacone zamówienie nigdy nie trafi do BL. Pomijamy
-  // wyłącznie to, co faktycznie się już w pełni wydarzyło.
-  if (ord.status !== "pending" && hasCompletedBlPush(ord.baselinker_order_id)) {
-    // W pełni przetworzone (duplikat eventu) — idempotentny skip.
+  // Status != pending oznacza, że zamówienie zostało już rozliczone
+  // (markOrderPaid przeszedł). Duplikaty eventu Stripe pomijamy idempotentnie.
+  if (ord.status !== "pending") {
     return NextResponse.json({ received: true });
   }
 
@@ -129,21 +122,6 @@ async function settlePaidOrder(
     } catch (err) {
       console.error("[promo] increment used_count nieudany:", err);
     }
-  }
-
-  // Push do BaseLinker — best-effort, nie blokuje webhooka jeśli zawiedzie.
-  // Nieudany push można zsynchronizować później (cron reconcile-bl).
-  try {
-    const result = await pushOrderToBaseLinker(orderId);
-    if (result.baselinker_order_id) {
-      console.log(
-        `[BL] order ${orderId} → BaseLinker order_id=${result.baselinker_order_id}`
-      );
-    } else {
-      console.warn(`[BL] push pominięty: ${result.reason}`);
-    }
-  } catch (err) {
-    console.error("[BL] push do BaseLinker nieudany:", err);
   }
 
   return NextResponse.json({ received: true });
