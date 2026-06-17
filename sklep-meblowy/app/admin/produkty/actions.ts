@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
 import { validateImageUpload } from "@/app/_lib/image-upload";
+import { buildNewProductPayload } from "@/app/_lib/new-product";
 import type {
   ProductDescriptionSection,
   ProductDimensions,
@@ -507,4 +508,40 @@ export async function saveProductDe(
   revalidatePath(`/admin/produkty/${id}`);
   revalidatePath(`/produkt/${id}`);
   return { ok: true, message: "Zapisano tłumaczenie DE" };
+}
+
+// ============================================================
+// Tworzenie nowego produktu (natywne — bez BaseLinkera)
+// ============================================================
+// Minimalny szkic (nazwa/cena/kategoria). Resztę admin uzupełnia w edytorze
+// /admin/produkty/[id]. Zwraca productId do redirectu po stronie klienta.
+export async function createProduct(
+  formData: FormData
+): Promise<{ ok: true; productId: string } | { ok: false; error: string }> {
+  await requireAdmin();
+
+  const built = buildNewProductPayload({
+    name: formData.get("name"),
+    price: formData.get("price"),
+    category: formData.get("category"),
+  });
+  if (!built.ok) return { ok: false, error: built.error };
+
+  const supabase = await createAdminClient();
+  const { data, error } = await supabase
+    .from("products")
+    .insert(built.payload as never)
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    return {
+      ok: false,
+      error: error?.message ?? "Nie udało się utworzyć produktu",
+    };
+  }
+
+  revalidatePath("/admin/produkty");
+  revalidatePath("/sklep");
+  return { ok: true, productId: (data as { id: string }).id };
 }
