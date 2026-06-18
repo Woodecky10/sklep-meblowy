@@ -8,6 +8,7 @@ import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "@/app/_lib/de-conten
 import type { Order, OrderItem } from "@/app/_lib/types";
 import ReorderButton from "@/app/_components/ui/ReorderButton";
 import CancelOrderButton from "../CancelOrderButton";
+import { deliveryView } from "@/app/_lib/delivery";
 
 export async function generateMetadata() {
   const locale = await getLocale();
@@ -48,6 +49,9 @@ export default async function OrderDetailPage({
         shippingIndividual: "individuell festgelegt",
         total: "Gesamt",
         shippingAddress: "Lieferadresse",
+        delivery: "Versand",
+        carrier: "Spediteur",
+        trackingNumber: "Sendungsnummer",
         pendingTitle: "Bestellung wartet auf Zahlung",
         pendingDesc:
           "Falls Sie es sich anders überlegt haben, können Sie die Bestellung vor der Bezahlung stornieren. Nach der Bezahlung ist für die Stornierung eine Kontaktaufnahme mit uns erforderlich.",
@@ -66,6 +70,9 @@ export default async function OrderDetailPage({
         shippingIndividual: "ustalana indywidualnie",
         total: "Razem",
         shippingAddress: "Adres dostawy",
+        delivery: "Dostawa",
+        carrier: "Przewoźnik",
+        trackingNumber: "Numer śledzenia",
         pendingTitle: "Zamówienie czeka na płatność",
         pendingDesc:
           "Jeśli się rozmyśliłeś, możesz anulować zamówienie zanim zostanie opłacone. Po opłaceniu anulowanie wymaga kontaktu z nami.",
@@ -104,6 +111,7 @@ export default async function OrderDetailPage({
   const promoDiscount = Number(order.promo_discount ?? 0);
   // total = subtotal - promo_discount + shipping  =>  shipping = total - subtotal + promo_discount
   const shipping = Number(order.total) - subtotal + promoDiscount;
+  const delivery = deliveryView(order);
 
   return (
     <div className="flex flex-col gap-6">
@@ -250,6 +258,32 @@ export default async function OrderDetailPage({
             <br />
             {order.shipping_address.country}
           </address>
+        </div>
+      )}
+
+      {delivery.hasInfo && (
+        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8">
+          <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-4">
+            {c.delivery}
+          </h3>
+          <dl className="flex flex-col gap-3 text-sm">
+            {delivery.carrier && (
+              <div className="flex flex-col gap-0.5">
+                <dt className="font-sans uppercase tracking-widest text-[10px] text-[var(--color-gold)]">
+                  {c.carrier}
+                </dt>
+                <dd className="text-[var(--fg)]">{delivery.carrier}</dd>
+              </div>
+            )}
+            {delivery.trackingNumber && (
+              <div className="flex flex-col gap-0.5">
+                <dt className="font-sans uppercase tracking-widest text-[10px] text-[var(--color-gold)]">
+                  {c.trackingNumber}
+                </dt>
+                <dd className="font-mono text-[var(--fg)]">{delivery.trackingNumber}</dd>
+              </div>
+            )}
+          </dl>
         </div>
       )}
 
