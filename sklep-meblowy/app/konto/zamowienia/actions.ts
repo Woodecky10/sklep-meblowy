@@ -9,8 +9,8 @@ export type CancelOrderResult =
   | { ok: false; error: string };
 
 // Anulowanie zamówienia przez klienta — TYLKO gdy status === 'pending'
-// (jeszcze nieopłacone). Po opłaceniu BL już dostał order, anulowanie
-// musi iść przez admin/BL panel.
+// (jeszcze nieopłacone). Po opłaceniu zamówieniem zarządza admin w panelu
+// /admin/zamowienia — anulowanie wymaga wtedy kontaktu ze sklepem.
 //
 // Stock i promo_codes.used_count nie są dotykane:
 // - Stock nie jest dekrementowany przy tworzeniu zamówienia w tym sklepie.

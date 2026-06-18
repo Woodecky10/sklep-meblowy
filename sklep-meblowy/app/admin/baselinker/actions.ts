@@ -2,33 +2,10 @@
 
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
-import { type SyncOutcome } from "@/app/_lib/baselinker-sync";
 
-export type SyncActionResult =
-  | {
-      ok: true;
-      duration_ms: number;
-      outcome: Extract<SyncOutcome, { ok: true }>;
-    }
-  // duration_ms spójnie z gałęzią sukcesu i kolumną DB (wcześniej camelCase
-  // durationMs tylko w gałęzi błędu — rozjazd nazw UI↔API).
-  | { ok: false; error: string; duration_ms: number };
-
-// ============================================================
-// Wywoływane z admin panelu — przycisk "Synchronizuj teraz"
-// ============================================================
-export async function syncProductsAction(): Promise<SyncActionResult> {
-  await requireAdmin();
-  // Synchronizacja z BaseLinker WYŁĄCZONA — produkty zarządzane natywnie
-  // w sklepie (Admin → Produkty → Nowy produkt). Kod syncu (baselinker-sync.ts)
-  // zostaje jako legacy; tu tylko zwracamy odmowę w istniejącym kształcie typu.
-  return {
-    ok: false,
-    error:
-      "Synchronizacja z BaseLinker została wyłączona — produkty dodaje się teraz bezpośrednio w sklepie (Admin → Produkty → Nowy produkt).",
-    duration_ms: 0,
-  };
-}
+// Sync produktów z BaseLinker jest wyłączony (produkty zarządzane natywnie
+// w sklepie) — dawna akcja `syncProductsAction` została usunięta. Panel BL to
+// teraz read-only archiwum: poniżej zostaje tylko odczyt historii synchronizacji.
 
 // ============================================================
 // Pobiera log historii sync (do tabeli w admin)

@@ -1,7 +1,8 @@
 // Reużywalna logika sync produktów BaseLinker → Supabase.
-// Wywoływana z:
-//  - /api/baselinker/sync-products (cron / external trigger po sekrecie)
-//  - server action `syncProductsAction` w admin panelu (po requireAdmin)
+// LEGACY — sync produktów z BL jest wyłączony (produkty zarządzane natywnie
+// w sklepie). Endpoint /api/baselinker/sync-products zwraca 410, a dawna
+// server action `syncProductsAction` została usunięta. Kod zostaje wyłącznie
+// jako referencja historyczna i nie jest nigdzie wywoływany.
 
 import { createAdminClient } from "./supabase/server";
 import {
