@@ -6,7 +6,7 @@ import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
 import { validateImageUpload } from "@/app/_lib/image-upload";
 import { buildNewProductPayload } from "@/app/_lib/new-product";
-import { sanitizeSectionsHtml } from "@/app/_lib/product-html";
+import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-html";
 import type {
   ProductDescriptionSection,
   ProductDimensions,
@@ -469,6 +469,33 @@ export async function updateProductDescriptionSections(
 }
 
 // ============================================================
+// updateProductDescription — pojedynczy opis produktu (PL)
+// ============================================================
+// Opis renderuje sie na karcie jako fallback TYLKO gdy produkt nie ma sekcji.
+// Ma wlasny zapis (jak zdjecia/sekcje/warianty); updateProductBasics go pomija.
+export async function updateProductDescription(
+  productId: string,
+  html: string
+): Promise<ActionResult> {
+  await requireAdmin();
+  if (!productId) return { ok: false, error: "Brak id produktu" };
+  if (typeof html !== "string") return { ok: false, error: "Opis musi być tekstem" };
+
+  const supabase = await createAdminClient();
+  const { error } = await supabase
+    .from("products")
+    .update({ description: sanitizeProductHtml(html) } as never)
+    .eq("id", productId);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/admin/produkty/${productId}`);
+  revalidatePath(`/produkt/${productId}`);
+  revalidatePath("/sklep");
+  return { ok: true, message: "Zapisano opis produktu" };
+}
+
+// ============================================================
 // saveProductDe — ręczny zapis tłumaczenia DE produktu
 // ============================================================
 // Admin wpisuje ręcznie pola _de (nazwa/opis/kolor/materiał/sekcje).
@@ -489,7 +516,7 @@ export async function saveProductDe(
 
   const updates: Record<string, unknown> = {
     name_de: sanitize(fields.name_de, 300),
-    description_de: sanitize(fields.description_de, 20000),
+    description_de: sanitizeProductHtml(fields.description_de ?? ""),
     color_de: emptyToNull(sanitize(fields.color_de ?? "", 100)),
     material_de: emptyToNull(sanitize(fields.material_de ?? "", 100)),
     needs_translation: false,
