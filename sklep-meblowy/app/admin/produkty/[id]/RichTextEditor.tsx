@@ -1,7 +1,7 @@
 // app/admin/produkty/[id]/RichTextEditor.tsx
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -9,7 +9,10 @@ import TextAlign from "@tiptap/extension-text-align";
 // W TipTap 3.x TextStyle i Color są eksportowane z @tiptap/extension-text-style
 import { TextStyle, Color } from "@tiptap/extension-text-style";
 import Highlight from "@tiptap/extension-highlight";
+import Image from "@tiptap/extension-image";
 import { normalizeEditorHtml } from "@/app/_lib/rich-text";
+import { uploadProductImage } from "../actions";
+import { compressIfNeeded } from "./_shared";
 
 type RichTextEditorProps = {
   value: string;
@@ -64,6 +67,7 @@ export default function RichTextEditor({
       TextStyle,
       Color,
       Highlight, // bez multicolor -> zwykły <mark>
+      Image.configure({ inline: false, allowBase64: false }),
     ],
     content: value || "",
     onUpdate: ({ editor }) => onChange(normalizeEditorHtml(editor.getHTML())),
@@ -75,6 +79,29 @@ export default function RichTextEditor({
       },
     },
   });
+
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploadingImg, setUploadingImg] = useState(false);
+
+  // Upload pliku → kompresja → Supabase storage → wstaw <img> w pozycji kursora.
+  async function handleInsertImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !editor) return;
+    setUploadingImg(true);
+    try {
+      const compressed = await compressIfNeeded(file);
+      const fd = new FormData();
+      fd.set("image", compressed, compressed.name);
+      const res = await uploadProductImage(fd);
+      if (!res.ok) { window.alert("Upload nieudany: " + res.error); return; }
+      const url = (res.data as { url: string } | undefined)?.url;
+      if (!url) { window.alert("Brak URL po uploadzie"); return; }
+      editor.chain().focus().setImage({ src: url, alt: "" }).run();
+    } finally {
+      setUploadingImg(false);
+    }
+  }
 
   // Synchronizuj zewnętrzną zmianę `value` z edytorem (np. reset formularza,
   // załadowanie danych async). Porównujemy znormalizowany HTML, żeby NIE
@@ -144,8 +171,10 @@ export default function RichTextEditor({
         <button type="button" onClick={() => editor.chain().focus().unsetColor().run()} className={btn(false)} aria-label="Domyślny kolor">A</button>
         <button type="button" onClick={() => editor.chain().focus().toggleHighlight().run()} className={btn(editor.isActive("highlight"))} aria-label="Wyróżnienie">🖍</button>
         <span className="w-px h-5 bg-[var(--border)] mx-1" />
-        {/* Link */}
+        {/* Link i obraz */}
         <button type="button" onClick={addLink} className={btn(editor.isActive("link"))} aria-label="Wstaw link">🔗</button>
+        <button type="button" onClick={() => fileRef.current?.click()} disabled={uploadingImg} className={btn(false)} aria-label="Wstaw obraz">{uploadingImg ? "…" : "🖼"}</button>
+        <input ref={fileRef} type="file" accept="image/*" onChange={handleInsertImage} className="hidden" />
         <span className="w-px h-5 bg-[var(--border)] mx-1" />
         {/* Historia i reset */}
         <button type="button" onClick={() => editor.chain().focus().undo().run()} className={btn(false)} aria-label="Cofnij">↶</button>
