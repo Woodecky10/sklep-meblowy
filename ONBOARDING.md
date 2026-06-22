@@ -17,8 +17,17 @@ Decyzja właścicielki (2026-06-17): sklep przejmuje funkcje BaseLinkera natywni
 
 Kod i kolumny BaseLinkera zostają jako **legacy** — nie usuwać przedwcześnie (zamówienia w locie mają `baselinker_*`). Pełny cleanup = osobne, późniejsze zadanie. Dawne audyty BL (`docs/audyt-baselinker-*`, `docs/bl-*`) są już nieaktualne kierunkowo.
 
+## Edytor WYSIWYG opisów produktu (2026-06-22)
+Opisy produktu edytuje się w panelu pełnym edytorem WYSIWYG (**TipTap**) — bez ręcznego HTML. Zrobione w 3 slice'ach (każdy: spec → plan → subagent-driven → merge):
+1. **Edytor sekcji opisu** — komponent `app/admin/produkty/[id]/RichTextEditor.tsx` (TipTap, client-only, `immediatelyRender:false`, value-sync `useEffect`), wpięty w sekcje opisu (PL custom, override z BL, DE). Helper `app/_lib/rich-text.ts` (`normalizeEditorHtml`: pusty edytor → `""`).
+2. **Pojedyncze pole opisu** (`products.description`/`_de`, renderowane jako fallback gdy brak sekcji) — blok „Opis produktu" (`DescriptionFieldEditor.tsx`) + akcja `updateProductDescription`; DE „Opis (DE)" też przez edytor.
+3. **Pełny pasek**: cofnij/ponów, B/I/U/S, listy, cytat, H2–H4, wyrównanie, kolor (paleta), marker, link, obraz w treści (upload przez `uploadProductImage` + `compressIfNeeded`).
+
+**Bezpieczeństwo (WAŻNE):** render = `dangerouslySetInnerHTML` po `sanitizeProductHtml` (`app/_lib/product-html.ts`) — regexowy, dependency-free sanitizer. Whitelist tagów: `p,br,ul,ol,li,strong,em,b,i,u,s,a,h2,h3,h4,span,blockquote,mark,img`. Atrybut `style` dopuszczony **wąsko**: tylko `text-align` (na blokach) i `color` (na `span`), z walidacją (`sanitizeStyleAttr` — odrzuca `url()`/`expression()`/escapes); `img src` tylko bezpieczny schemat (http/https). Sanitize-on-save w akcjach zapisu (sekcje + opis). **Nie poszerzać whitelisty bez adwersarskich testów** w `app/_lib/__tests__/product-html.test.ts`.
+Specy/plany: `docs/superpowers/specs|plans/2026-06-22-edytor-*`. Odłożone kosmetyki: undo/redo + reset koloru zawsze wizualnie nieaktywne (mogłyby użyć `editor.can()`/`isActive`); luźny `rgb(,,,)` w `isSafeColorValue` (nieszkodliwy); zdublowana asercja w teście XSS.
+
 ## Stan repo
-- `origin/main` = commit `b02ae0c` (2026-06-18: podprojekty 1+2 + pierwszy slice podprojektu 4 + dokumentacja rozpoznania faktur/wysyłki).
+- `origin/main` = commit `f1516f8` (2026-06-22: 3 slice'y edytora WYSIWYG opisów; wcześniej podprojekty 1+2 + pierwszy slice wysyłki + cleanup BL PR #39).
 - **Specy:** `sklep-meblowy/docs/superpowers/specs/2026-06-17-panel-zamowien-admin-design.md`, `...-produkty-natywne-design.md`, `2026-06-18-konto-dostawa-przewoznik-design.md`
 - **Plany (TDD):** `sklep-meblowy/docs/superpowers/plans/2026-06-17-panel-zamowien-admin.md`, `...-produkty-natywne.md`, `2026-06-18-konto-dostawa-przewoznik.md`
 - **Rozpoznanie faktur (KSeF) + wysyłki** (pytania do właścicielki + stan kodu): `sklep-meblowy/docs/2026-06-18-rozpoznanie-faktury-wysylka.md` — **odpowiedzi właścicielki mają tam wylądować**.
@@ -43,7 +52,7 @@ Podprojekt 2 (produkty) migracji nie wymaga (kolumny były już od migr. 29).
 > Claude/agent NIE ma dostępu DDL — migracje uruchamia człowiek w Supabase SQL Editorze (przez przeglądarkę).
 
 ## Bramki jakości (uruchamiać z `sklep-meblowy/`)
-`npx tsc --noEmit` (0 błędów) · `npm run lint` (0) · `npm test` (vitest, zielony) · `npm run build` (przechodzi). Stan na 3e93d2e: 187 testów, 48 tras.
+`npx tsc --noEmit` (0 błędów) · `npm run lint` (0) · `npm test` (vitest, zielony) · `npm run build` (przechodzi). Stan na f1516f8: 221 testów, 48 tras.
 
 ## Push do origin
 Origin wymaga konta **Woodecky10** — `mwlo1403` NIE ma write (push → 403). Każdy push do `main` — za wyraźną zgodą właściciela.
@@ -66,4 +75,5 @@ brainstorming → spec (`docs/superpowers/specs/`) → plan TDD (`docs/superpowe
 
 ## Drobne follow-upy (nieblokujące, do cleanupu BL)
 - `schema.sql` jest niekompletnym baseline'em (pre-existing) — fresh-DB bootstrap z samego pliku byłby niepełny; źródłem prawdy są migracje.
-- Martwy `syncProductsAction` + nieaktualny komentarz BL w `app/konto/zamowienia/actions.ts` — do sprzątnięcia przy pełnym usuwaniu BL.
+- ✅ Martwy `syncProductsAction` + `SyncActionResult` i nieaktualne komentarze BL — usunięte (PR #39 / `23c3e7c`). `app/konto/zamowienia/actions.ts` czyste.
+- Pełne usunięcie legacy BL = osobne, późniejsze zadanie (NIE teraz). Co świadomie zostaje, bo niemartwe albo żywe: nagrobek `410` w `api/baselinker/sync-products`; `syncProductsFromBaseLinker` w `baselinker-sync.ts` (niewołany, ale eksportuje testowane helpery `planDeactivations`/`aggregateUnmappedCategories` + typy dla read-only panelu); `pushOrderToBaseLinker` w `baselinker-orders.ts` **wciąż żywy** (cron `reconcile-bl` + route `push-order`). Usuwać dopiero, gdy w bazie nie ma już zamówień z `baselinker_*` w locie.
