@@ -192,6 +192,19 @@ body {
   text-underline-offset: 2px;
 }
 
+/* Podkreślenie, przekreślenie, zaznaczenie i cytat w opisie produktu */
+.product-description u { text-decoration: underline; }
+.product-description s { text-decoration: line-through; }
+.product-description mark { background: var(--color-gold); color: inherit; padding: 0 0.15em; border-radius: 2px; }
+.product-description blockquote {
+  border-left: 3px solid var(--color-gold);
+  padding-left: 1rem;
+  margin: 1rem 0;
+  font-style: italic;
+  color: var(--muted);
+}
+.product-description img { max-width: 100%; height: auto; border-radius: 8px; margin: 1rem 0; }
+
 /* Placeholder dla pustego edytora TipTap (RichTextEditor).
    ProseMirror oznacza pusty akapit klasą is-editor-empty. */
 .product-description p.is-editor-empty:first-child::before {
