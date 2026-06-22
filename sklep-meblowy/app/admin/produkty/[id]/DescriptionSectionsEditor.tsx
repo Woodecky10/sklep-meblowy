@@ -5,6 +5,7 @@ import Image from "next/image";
 import { updateProductDescriptionSections, uploadProductImage } from "../actions";
 import type { ProductDescriptionSection } from "@/app/_lib/types";
 import { compressIfNeeded, IconBtn, inputClass, type Toast } from "./_shared";
+import RichTextEditor from "./RichTextEditor";
 
 // Sekcja + stabilne lokalne id (klucz Reacta). Id NIE jest częścią danych
 // zapisywanych do DB — służy tylko do identyfikacji wiersza w UI.
@@ -407,14 +408,13 @@ function TextSectionRow({
           </div>
           <div>
             <label className="block text-[10px] font-sans uppercase tracking-widest text-[var(--muted)] mb-1">
-              Nadpisz treść (zostaw puste = z BL). HTML dozwolony.
+              Nadpisz treść (zostaw puste = z BL).
             </label>
-            <textarea
+            <RichTextEditor
               value={section.admin_body ?? ""}
-              onChange={(e) => onAdminBodyChange(e.target.value)}
-              placeholder={section.body.slice(0, 200)}
-              rows={6}
-              className={`${inputClass} font-mono text-xs leading-relaxed resize-y`}
+              onChange={onAdminBodyChange}
+              ariaLabel="Nadpisz treść sekcji"
+              placeholder={section.body.slice(0, 80) || "Wpisz treść, by nadpisać import z BL"}
             />
           </div>
           <label className="flex items-center gap-2 text-xs text-[var(--fg)] cursor-pointer">
@@ -537,12 +537,11 @@ function CustomTextSectionRow({
           maxLength={120}
           className={inputClass}
         />
-        <textarea
+        <RichTextEditor
           value={section.body}
-          onChange={(e) => onBodyChange(e.target.value)}
-          placeholder="Treść sekcji. HTML dozwolony (akapity, listy, pogrubienia)."
-          rows={6}
-          className={`${inputClass} font-mono text-xs leading-relaxed resize-y`}
+          onChange={onBodyChange}
+          ariaLabel="Treść własnej sekcji opisu"
+          placeholder="Napisz opis — użyj paska do pogrubień, list i nagłówków."
         />
       </div>
       <div className="flex flex-col gap-1 shrink-0">
