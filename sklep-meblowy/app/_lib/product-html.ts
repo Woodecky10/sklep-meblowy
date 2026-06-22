@@ -27,11 +27,22 @@ const ALLOWED_TAGS = new Set([
   "h3",
   "h4",
   "span",
+  "u",
+  "s",
+  "blockquote",
+  "mark",
+  "img",
 ]);
 
-// Atrybuty dozwolone per tag. Domyślnie brak — dla <a> wyjątek.
+// Atrybuty dozwolone per tag. Domyślnie brak — wyjątki poniżej.
 const ALLOWED_ATTRS_PER_TAG: Record<string, Set<string>> = {
   a: new Set(["href", "target", "rel"]),
+  img: new Set(["src", "alt"]),
+  p: new Set(["style"]),
+  h2: new Set(["style"]),
+  h3: new Set(["style"]),
+  h4: new Set(["style"]),
+  span: new Set(["style"]),
 };
 
 // Domeny które wycinamy z linków w opisie BL — sprzedaż na Allegro idzie
@@ -82,6 +93,48 @@ const DANGEROUS_BLOCK_TAGS = [
   "svg",
   "math",
 ];
+
+// Wlasciwosci CSS dozwolone per tag — reszta wycinana.
+const ALLOWED_STYLE_PROPS: Record<string, Set<string>> = {
+  p: new Set(["text-align"]),
+  h2: new Set(["text-align"]),
+  h3: new Set(["text-align"]),
+  h4: new Set(["text-align"]),
+  span: new Set(["color"]),
+};
+const TEXT_ALIGN_VALUES = new Set(["left", "center", "right", "justify"]);
+
+// Bezpieczna wartosc koloru: hex / rgb()/rgba() / nazwa CSS. Twardo odrzuca
+// konstrukcje mogace wstrzyknac kod (url, expression, komentarze, nawiasy klamrowe).
+function isSafeColorValue(v: string): boolean {
+  const s = v.trim().toLowerCase();
+  if (/[<>;{}\\]/.test(s)) return false;
+  if (s.includes("url(") || s.includes("expression") || s.includes("/*") || s.includes("*/")) return false;
+  if (/^#[0-9a-f]{3,8}$/.test(s)) return true;
+  if (/^rgba?\([0-9.,%\s]+\)$/.test(s)) return true;
+  if (/^[a-z]+$/.test(s)) return true; // nazwa CSS np. "red"
+  return false;
+}
+
+// Przepuszcza WYLACZNIE bezpieczne deklaracje CSS dla danego tagu.
+export function sanitizeStyleAttr(tag: string, raw: string): string {
+  const allowed = ALLOWED_STYLE_PROPS[tag];
+  if (!allowed) return "";
+  const out: string[] = [];
+  for (const decl of raw.split(";")) {
+    const idx = decl.indexOf(":");
+    if (idx === -1) continue;
+    const prop = decl.slice(0, idx).trim().toLowerCase();
+    const value = decl.slice(idx + 1).trim();
+    if (!allowed.has(prop)) continue;
+    if (prop === "text-align") {
+      if (TEXT_ALIGN_VALUES.has(value.toLowerCase())) out.push(`text-align: ${value.toLowerCase()}`);
+    } else if (prop === "color") {
+      if (isSafeColorValue(value)) out.push(`color: ${value}`);
+    }
+  }
+  return out.join("; ");
+}
 
 function escapeHtmlAttr(value: string): string {
   return value
@@ -144,6 +197,12 @@ export function sanitizeProductHtml(html: string | null | undefined): string {
           (attrName === "href" || attrName === "src") &&
           !hasSafeUrlScheme(attrValue)
         ) {
+          continue;
+        }
+
+        if (attrName === "style") {
+          const cleanStyle = sanitizeStyleAttr(tag, attrValue);
+          if (cleanStyle) cleanAttrs.push(`style="${escapeHtmlAttr(cleanStyle)}"`);
           continue;
         }
 

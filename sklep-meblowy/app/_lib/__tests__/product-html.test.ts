@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeProductHtml, sanitizeSectionsHtml } from "@/app/_lib/product-html";
+import { sanitizeProductHtml, sanitizeSectionsHtml, sanitizeStyleAttr } from "@/app/_lib/product-html";
 import type { ProductDescriptionSection } from "@/app/_lib/types";
 
 // Normalizacja jak przeglądarka traktuje URL w href: ignoruje znaki sterujące.
@@ -19,7 +19,10 @@ describe("sanitizeProductHtml — wektory XSS (audyt HIGH#4)", () => {
   it("podwojony < nie tworzy żywego <img onerror>", () => {
     const out = sanitizeProductHtml("<<img src=x onerror=alert(1)>");
     expect(out.toLowerCase()).not.toContain("onerror");
-    expect(out.toLowerCase()).not.toContain("<img");
+    // img jest teraz na whiteliście — tag przechodzi, ale bez niebezpiecznych atrybutów;
+    // atrybuty bez cudzysłowów (src=x) są ignorowane przez regex atrybutów.
+    expect(out.toLowerCase()).not.toContain("onerror");
+    expect(out.toLowerCase()).not.toContain("src=x");
   });
 
   it("zwykły javascript: href usuwany (regresja)", () => {
@@ -105,5 +108,59 @@ describe("sanitizeSectionsHtml — sanityzacja body sekcji przy zapisie", () => 
     ];
     const out = sanitizeSectionsHtml(sections);
     if (out[0].kind === "text") expect(out[0].admin_body).toBeUndefined();
+  });
+});
+
+describe("sanitizeStyleAttr — waska whitelista CSS", () => {
+  it("text-align dozwolone na p", () => {
+    expect(sanitizeStyleAttr("p", "text-align: center")).toBe("text-align: center");
+  });
+  it("color dozwolony na span", () => {
+    expect(sanitizeStyleAttr("span", "color: #c00")).toBe("color: #c00");
+  });
+  it("wycina niedozwolona property, zostawia text-align", () => {
+    expect(sanitizeStyleAttr("p", "text-align:center; background:url(x)")).toBe("text-align: center");
+  });
+  it("odrzuca color z expression", () => {
+    expect(sanitizeStyleAttr("span", "color: expression(alert(1))")).toBe("");
+  });
+  it("odrzuca color z url()", () => {
+    expect(sanitizeStyleAttr("span", "color: url(javascript:1)")).toBe("");
+  });
+  it("text-align spoza enuma odrzucony", () => {
+    expect(sanitizeStyleAttr("p", "text-align: end")).toBe("");
+  });
+  it("color na p (niedozwolone na bloku) wyciety", () => {
+    expect(sanitizeStyleAttr("p", "color: red")).toBe("");
+  });
+  it("nieznany tag -> pusto", () => {
+    expect(sanitizeStyleAttr("div", "text-align: center")).toBe("");
+  });
+});
+
+describe("sanitizeProductHtml — nowe tagi i style", () => {
+  it("przepuszcza u/s/blockquote/mark", () => {
+    const html = "<p><u>a</u> <s>b</s> <mark>c</mark></p><blockquote>d</blockquote>";
+    expect(sanitizeProductHtml(html)).toBe(html);
+  });
+  it("przepuszcza wyrownanie i kolor", () => {
+    const html = '<p style="text-align: center">x</p><p><span style="color: #c00">y</span></p>';
+    expect(sanitizeProductHtml(html)).toBe(html);
+  });
+  it("przepuszcza img z bezpiecznym src", () => {
+    expect(sanitizeProductHtml('<img src="https://x/y.jpg" alt="Sofa" />')).toContain('src="https://x/y.jpg"');
+  });
+  it("wycina onerror z img", () => {
+    const out = sanitizeProductHtml('<img src="https://x/y.jpg" onerror="alert(1)" />');
+    expect(out.toLowerCase()).not.toContain("onerror");
+  });
+  it("odrzuca img z javascript: src", () => {
+    const out = sanitizeProductHtml('<img src="javascript:alert(1)" />');
+    expect(out.toLowerCase()).not.toContain("javascript:");
+  });
+  it("czysci niebezpieczny style zostawiajac text-align", () => {
+    const out = sanitizeProductHtml('<p style="text-align:center; background:url(x)">x</p>');
+    expect(out).toContain("text-align: center");
+    expect(out.toLowerCase()).not.toContain("url(");
   });
 });
