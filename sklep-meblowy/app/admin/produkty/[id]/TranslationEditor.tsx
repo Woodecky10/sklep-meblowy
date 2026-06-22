@@ -216,13 +216,12 @@ export default function TranslationEditor({
           />
         </Field>
 
-        <Field label="Opis (DE)" className="md:col-span-2" hint="HTML dozwolony (jak w polskim opisie).">
-          <textarea
+        <Field label="Opis (DE)" className="md:col-span-2" hint="Pokazywany na /de tylko gdy produkt nie ma sekcji opisu DE.">
+          <RichTextEditor
             value={descriptionDe}
-            onChange={(e) => setDescriptionDe(e.target.value)}
-            rows={6}
+            onChange={setDescriptionDe}
+            ariaLabel="Niemiecki opis produktu"
             placeholder="Niemiecki opis produktu"
-            className={`${inputClass} resize-y`}
           />
         </Field>
 
