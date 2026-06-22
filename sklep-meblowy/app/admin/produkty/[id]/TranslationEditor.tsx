@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { saveProductDe } from "../actions";
 import type { ProductDescriptionSection } from "@/app/_lib/types";
 import { Field, inputClass, type Toast } from "./_shared";
+import RichTextEditor from "./RichTextEditor";
 
 // Surowe pola tłumaczenia DE produktu (niezlokalizowane — patrz page.tsx).
 // Wszystkie treści DE wpisuje admin RĘCZNIE (nie ma już DeepL): krótkie pola
@@ -354,13 +355,12 @@ function TextSectionTranslator({
             className={inputClass}
           />
         </Field>
-        <Field label="Treść (DE)" hint="HTML dozwolony (jak w polskiej treści).">
-          <textarea
+        <Field label="Treść (DE)" hint="Formatuj paskiem — jak w polskiej treści.">
+          <RichTextEditor
             value={de.body}
-            onChange={(e) => onBodyChange(e.target.value)}
-            rows={6}
+            onChange={onBodyChange}
+            ariaLabel="Niemiecka treść sekcji"
             placeholder="Niemiecka treść sekcji"
-            className={`${inputClass} font-mono text-xs leading-relaxed resize-y`}
           />
         </Field>
       </div>
