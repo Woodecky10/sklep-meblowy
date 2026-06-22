@@ -1,8 +1,10 @@
 // app/admin/produkty/[id]/RichTextEditor.tsx
 "use client";
 
+import { useEffect } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import Placeholder from "@tiptap/extension-placeholder";
 import { normalizeEditorHtml } from "@/app/_lib/rich-text";
 
 type RichTextEditorProps = {
@@ -43,6 +45,7 @@ export default function RichTextEditor({
           HTMLAttributes: { rel: "noopener nofollow" },
         },
       }),
+      Placeholder.configure({ placeholder: placeholder ?? "" }),
     ],
     content: value || "",
     onUpdate: ({ editor }) => onChange(normalizeEditorHtml(editor.getHTML())),
@@ -51,10 +54,21 @@ export default function RichTextEditor({
         "aria-label": ariaLabel,
         class:
           "product-description min-h-[140px] px-3 py-2 focus:outline-none",
-        ...(placeholder ? { "data-placeholder": placeholder } : {}),
       },
     },
   });
+
+  // Synchronizuj zewnętrzną zmianę `value` z edytorem (np. reset formularza,
+  // załadowanie danych async). Porównujemy znormalizowany HTML, żeby NIE
+  // wywoływać setContent podczas zwykłego pisania (onUpdate -> onChange ->
+  // value nie zmienia się naprawdę). emitUpdate:false blokuje pętlę
+  // onUpdate → onChange → value → effect → setContent → onUpdate.
+  useEffect(() => {
+    if (!editor) return;
+    if (normalizeEditorHtml(editor.getHTML()) !== value) {
+      editor.commands.setContent(value || "", { emitUpdate: false });
+    }
+  }, [value, editor]);
 
   if (!editor) return null;
 
