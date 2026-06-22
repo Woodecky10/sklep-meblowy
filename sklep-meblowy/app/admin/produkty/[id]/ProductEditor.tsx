@@ -15,6 +15,7 @@ import { hasVariants } from "@/app/_lib/variants";
 import { Field, IconBtn, compressIfNeeded, inputClass, type Toast } from "./_shared";
 import VariantsEditor from "./VariantsEditor";
 import DescriptionSectionsEditor from "./DescriptionSectionsEditor";
+import DescriptionFieldEditor from "./DescriptionFieldEditor";
 import TranslationEditor, { type ProductDeFields } from "./TranslationEditor";
 
 export default function ProductEditor({
@@ -387,6 +388,15 @@ export default function ProductEditor({
           Sekcja: Warianty (pełny editor)
           ============================================================ */}
       <VariantsEditor productId={product.id} initial={product.variants} onToast={showToast} />
+
+      {/* ============================================================
+          Sekcja: Pojedynczy opis (fallback gdy brak sekcji)
+          ============================================================ */}
+      <DescriptionFieldEditor
+        productId={product.id}
+        initial={product.description ?? ""}
+        onToast={showToast}
+      />
 
       {/* ============================================================
           Sekcja: Edytor sekcji opisu (BL text + admin images)
