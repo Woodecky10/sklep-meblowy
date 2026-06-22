@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeProductHtml } from "@/app/_lib/product-html";
+import { sanitizeProductHtml, sanitizeSectionsHtml } from "@/app/_lib/product-html";
+import type { ProductDescriptionSection } from "@/app/_lib/types";
 
 // Normalizacja jak przeglądarka traktuje URL w href: ignoruje znaki sterujące.
 const stripCtrl = (s: string) => s.toLowerCase().replace(/[\x00-\x20]/g, "");
@@ -69,5 +70,40 @@ describe("sanitizeProductHtml — parytet z wyjściem TipTap", () => {
   it("dropuje link z niebezpiecznym schematem (javascript:)", () => {
     const out = sanitizeProductHtml('<a href="javascript:alert(1)">x</a>');
     expect(out).not.toContain("javascript:");
+  });
+});
+
+describe("sanitizeSectionsHtml — sanityzacja body sekcji przy zapisie", () => {
+  it("sanityzuje body i admin_body sekcji text", () => {
+    const sections: ProductDescriptionSection[] = [
+      {
+        kind: "text",
+        title: "Opis",
+        body: '<p>OK</p><script>alert(1)</script>',
+        admin_body: "<div>nadpis</div>",
+      },
+    ];
+    const out = sanitizeSectionsHtml(sections);
+    expect(out[0].kind).toBe("text");
+    if (out[0].kind === "text") {
+      expect(out[0].body).toBe("<p>OK</p>");
+      expect(out[0].admin_body).toBe("nadpis");
+      expect(out[0].title).toBe("Opis"); // tytuł nietknięty
+    }
+  });
+
+  it("nie rusza sekcji image", () => {
+    const sections: ProductDescriptionSection[] = [
+      { kind: "image", image_url: "https://x/y.jpg", image_alt: "Sofa" },
+    ];
+    expect(sanitizeSectionsHtml(sections)).toEqual(sections);
+  });
+
+  it("pomija admin_body gdy nieobecne", () => {
+    const sections: ProductDescriptionSection[] = [
+      { kind: "text", title: "T", body: "<p>x</p>" },
+    ];
+    const out = sanitizeSectionsHtml(sections);
+    if (out[0].kind === "text") expect(out[0].admin_body).toBeUndefined();
   });
 });

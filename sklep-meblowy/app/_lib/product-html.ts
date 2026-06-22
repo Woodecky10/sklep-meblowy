@@ -10,6 +10,8 @@
 // Source produktu jest zaufany (admin lub BL → sklep), więc nie potrzebujemy
 // pełnej HTML5 spec compliance. Wystarczy whitelist + block javascript:.
 
+import type { ProductDescriptionSection } from "@/app/_lib/types";
+
 const ALLOWED_TAGS = new Set([
   "p",
   "br",
@@ -212,4 +214,26 @@ function stripTags(html: string): string {
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/\s+/g, " ");
+}
+
+// ============================================================
+// Sanitize sekcji opisu przy ZAPISIE (defense-in-depth)
+// ============================================================
+// Render już sanityzuje, ale sanityzacja przy zapisie gwarantuje, że w bazie
+// ląduje wyłącznie whitelistowany HTML — niezależnie od tego, co wypluje edytor
+// WYSIWYG. Tytuły (plain text) zostają nietknięte. Sekcje image bez zmian.
+export function sanitizeSectionsHtml(
+  sections: ProductDescriptionSection[]
+): ProductDescriptionSection[] {
+  return sections.map((s) => {
+    if (s.kind !== "text") return s;
+    const next: ProductDescriptionSection = {
+      ...s,
+      body: sanitizeProductHtml(s.body),
+    };
+    if (typeof s.admin_body === "string") {
+      next.admin_body = sanitizeProductHtml(s.admin_body);
+    }
+    return next;
+  });
 }

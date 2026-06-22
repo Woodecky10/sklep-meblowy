@@ -6,6 +6,7 @@ import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
 import { validateImageUpload } from "@/app/_lib/image-upload";
 import { buildNewProductPayload } from "@/app/_lib/new-product";
+import { sanitizeSectionsHtml } from "@/app/_lib/product-html";
 import type {
   ProductDescriptionSection,
   ProductDimensions,
@@ -452,10 +453,12 @@ export async function updateProductDescriptionSections(
     }
   }
 
+  const clean = sanitizeSectionsHtml(sections);
+
   const supabase = await createAdminClient();
   const { error } = await supabase
     .from("products")
-    .update({ description_sections: sections } as never)
+    .update({ description_sections: clean } as never)
     .eq("id", productId);
 
   if (error) return { ok: false, error: error.message };
@@ -494,7 +497,11 @@ export async function saveProductDe(
   };
   // Sekcje DE — zapisujemy tylko gdy explicit przekazane (inaczej nie ruszamy).
   if (fields.description_sections_de !== undefined) {
-    updates.description_sections_de = fields.description_sections_de;
+    updates.description_sections_de = Array.isArray(fields.description_sections_de)
+      ? sanitizeSectionsHtml(
+          fields.description_sections_de as ProductDescriptionSection[]
+        )
+      : fields.description_sections_de;
   }
 
   const supabase = await createAdminClient();
