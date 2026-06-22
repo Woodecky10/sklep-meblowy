@@ -191,3 +191,13 @@ body {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* Placeholder dla pustego edytora TipTap (RichTextEditor).
+   ProseMirror oznacza pusty akapit klasą is-editor-empty. */
+.product-description p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
