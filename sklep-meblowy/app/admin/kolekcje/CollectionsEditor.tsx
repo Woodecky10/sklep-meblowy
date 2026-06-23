@@ -282,10 +282,30 @@ function CollectionForm({
         )}
       </div>
 
+      <Field label="Nazwa kolekcji (DE)" hint="Puste → na /de pokaże się nazwa PL.">
+        <input
+          name="label_de"
+          defaultValue={initial?.label_de ?? ""}
+          maxLength={200}
+          placeholder="z. B. Kollektion Lisbon"
+          className={inputCls}
+        />
+      </Field>
+
       <Field label="Opis" hint="Opcjonalny opis pokazywany w sekcji.">
         <textarea
           name="description"
           defaultValue={initial?.description ?? ""}
+          rows={3}
+          maxLength={1000}
+          className={`${inputCls} resize-y`}
+        />
+      </Field>
+
+      <Field label="Opis (DE)" hint="Puste → na /de pokaże się opis PL.">
+        <textarea
+          name="description_de"
+          defaultValue={initial?.description_de ?? ""}
           rows={3}
           maxLength={1000}
           className={`${inputCls} resize-y`}

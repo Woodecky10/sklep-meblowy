@@ -122,7 +122,9 @@ export type Collection = {
   id: string;
   slug: string;
   label: string;
+  label_de: string | null;
   description: string | null;
+  description_de: string | null;
   created_at: string;
   updated_at: string;
 };

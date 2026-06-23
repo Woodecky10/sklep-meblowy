@@ -95,6 +95,27 @@ export function localizeCategory<T extends LabelLocalizable>(
 // Grupy kategorii mają identyczny kształt (label/label_de) — alias dla czytelności.
 export const localizeCategoryGroup = localizeCategory;
 
+type CollectionLocalizable = {
+  label: string;
+  label_de?: string | null;
+  description: string | null;
+  description_de?: string | null;
+};
+
+// Kolekcja: label (zawsze string, fallback PL) + description (nullable, PRESERWUJE
+// null gdy PL=null i _de puste — jak color/material w produkcie).
+export function localizeCollection<T extends CollectionLocalizable>(
+  row: T,
+  locale: Locale
+): T {
+  if (locale !== "de") return row;
+  return {
+    ...row,
+    label: pickLocalized(row.label, row.label_de, locale),
+    description: pickNullable(row.description, row.description_de),
+  };
+}
+
 // Facet (kolor/materiał) na /sklep: dedupe po KANONICZNEJ wartości PL (używanej
 // do query + filtra DB), z localized labelem do wyświetlenia. Czysty helper —
 // testowalny bez mockowania supabase (getFilterFacets tylko dostarcza wiersze).

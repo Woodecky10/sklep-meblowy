@@ -3,6 +3,7 @@ import {
   localizeProduct,
   localizeCategory,
   localizeCategoryGroup,
+  localizeCollection,
   localizeReview,
   buildLocalizedFacets,
 } from "@/app/_lib/localize";
@@ -156,6 +157,47 @@ describe("localizeCategory / localizeCategoryGroup", () => {
     expect(localizeCategory({ slug: "sofy", label: "Sofy", label_de: "Sofas" }, "pl").label).toBe(
       "Sofy"
     );
+  });
+});
+
+describe("localizeCollection", () => {
+  const base = () => ({
+    slug: "lisbon",
+    label: "Kolekcja Lisbon",
+    description: "Polski opis kolekcji",
+    label_de: "Kollektion Lisbon",
+    description_de: "Deutsche Beschreibung",
+  });
+
+  it("DE z label_de i description_de → zamienia oba pola", () => {
+    const out = localizeCollection(base(), "de");
+    expect(out.label).toBe("Kollektion Lisbon");
+    expect(out.description).toBe("Deutsche Beschreibung");
+    // slug (pole pomocnicze) zostaje
+    expect(out.slug).toBe("lisbon");
+  });
+
+  it("DE bez _de → fallback PL (label) i description PL", () => {
+    const out = localizeCollection(
+      { ...base(), label_de: null, description_de: "" },
+      "de"
+    );
+    expect(out.label).toBe("Kolekcja Lisbon");
+    expect(out.description).toBe("Polski opis kolekcji");
+  });
+
+  it("DE: description PL = null + brak _de → zostaje null", () => {
+    const out = localizeCollection(
+      { ...base(), description: null, description_de: null },
+      "de"
+    );
+    expect(out.description).toBeNull();
+  });
+
+  it("PL → passthrough bez zmian", () => {
+    const out = localizeCollection(base(), "pl");
+    expect(out.label).toBe("Kolekcja Lisbon");
+    expect(out.description).toBe("Polski opis kolekcji");
   });
 });
 

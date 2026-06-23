@@ -8,6 +8,7 @@ import {
   getCategories,
 } from "@/app/_lib/categories";
 import { getCollection, getAllCollections } from "@/app/_lib/collections";
+import { localizeCollection } from "@/app/_lib/localize";
 import { getUserWishlistIds } from "@/app/_lib/wishlist";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { localizePath } from "@/app/_lib/i18n";
@@ -107,7 +108,7 @@ export default async function SklepPage({
     getCategories(locale),
     getAllCollections(),
     getCategoryLabel(category, locale),
-    collectionSlug ? getCollection(collectionSlug) : Promise.resolve(null),
+    collectionSlug ? getCollection(collectionSlug, locale) : Promise.resolve(null),
   ]);
 
   // Batch pobrania ocen — jedno zapytanie dla całej strony list.
@@ -180,7 +181,10 @@ export default async function SklepPage({
           colors={facets.colors}
           materials={facets.materials}
           sections={filterSections}
-          collections={allCollections.map((c) => ({ slug: c.slug, label: c.label }))}
+          collections={allCollections.map((c) => {
+            const lc = localizeCollection(c, locale);
+            return { slug: lc.slug, label: lc.label };
+          })}
         />
       </Suspense>
 
