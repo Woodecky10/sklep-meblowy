@@ -49,6 +49,8 @@ Ta instrukcja pokazuje, jak dodać nową kategorię produktów (np. „Komoda", 
 
 > ✅ Od tego momentu kategoria pojawia się w menu nawigacji sklepu (Salon → Komody / Sypialnia → ...) oraz na liście filtrów.
 
+> 🇩🇪 **Wersja niemiecka:** nowa kategoria na `/de` pokaże się **po polsku**, dopóki deweloper nie doda jej tłumaczenia (mapa w kodzie — patrz `docs/i18n-tlumaczenia-de.md`). Daj znać deweloperowi nazwę + slug nowej kategorii.
+
 ---
 
 ## Krok 3 — Synchronizuj produkty z BaseLinkera
