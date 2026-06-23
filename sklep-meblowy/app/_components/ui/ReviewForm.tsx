@@ -66,7 +66,7 @@ export default function ReviewForm({
     }
     setLoading(true);
     try {
-      const res = await fetch("/api/reviews", {
+      const res = await fetch(`/api/reviews?locale=${de ? "de" : "pl"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productId, rating, comment }),
@@ -85,7 +85,10 @@ export default function ReviewForm({
     if (!confirm(c.confirmDelete)) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/reviews?productId=${productId}`, { method: "DELETE" });
+      const res = await fetch(
+        `/api/reviews?productId=${productId}&locale=${de ? "de" : "pl"}`,
+        { method: "DELETE" }
+      );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? c.deleteError);
       setRating(0);

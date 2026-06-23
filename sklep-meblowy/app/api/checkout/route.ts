@@ -36,11 +36,15 @@ type CheckoutBody = {
 };
 
 export async function POST(request: NextRequest) {
+  // locale + tr POZA try: blok catch (500) też musi zwrócić komunikat wg języka.
+  // body.locale to źródło prawdy — proxy ustawia x-locale z prefiksu URL, a fetch
+  // do /api/checkout nie ma prefiksu /de, więc x-locale byłby tu zawsze "pl".
+  let locale: "pl" | "de" = "pl";
+  const tr = (pl: string, de: string) => (locale === "de" ? de : pl);
   try {
     const stripe = getStripe();
     const body = (await request.json()) as CheckoutBody;
-    const locale = body.locale === "de" ? "de" : "pl";
-    const tr = (pl: string, de: string) => (locale === "de" ? de : pl);
+    locale = body.locale === "de" ? "de" : "pl";
 
     if (!body.items?.length) {
       return NextResponse.json(
@@ -62,7 +66,7 @@ export async function POST(request: NextRequest) {
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)
     ) {
       return NextResponse.json(
-        { error: "Nieprawidłowy adres e-mail" },
+        { error: tr("Nieprawidłowy adres e-mail", "Ungültige E-Mail-Adresse") },
         { status: 400 }
       );
     }
@@ -76,7 +80,7 @@ export async function POST(request: NextRequest) {
       !shippingAddress?.city?.trim()
     ) {
       return NextResponse.json(
-        { error: "Brak pełnego adresu dostawy" },
+        { error: tr("Brak pełnego adresu dostawy", "Unvollständige Lieferadresse") },
         { status: 400 }
       );
     }
@@ -91,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     if (prodErr || !products) {
       return NextResponse.json(
-        { error: "Błąd bazy produktów" },
+        { error: tr("Błąd bazy produktów", "Fehler in der Produktdatenbank") },
         { status: 500 }
       );
     }
@@ -115,7 +119,12 @@ export async function POST(request: NextRequest) {
       const product = productMap.get(item.id);
       if (!product) {
         return NextResponse.json(
-          { error: `Produkt ${item.name} niedostępny` },
+          {
+            error: tr(
+              `Produkt ${item.name} niedostępny`,
+              `Produkt ${item.name} nicht verfügbar`
+            ),
+          },
           { status: 400 }
         );
       }
@@ -129,7 +138,12 @@ export async function POST(request: NextRequest) {
         item.quantity > 99
       ) {
         return NextResponse.json(
-          { error: `Nieprawidłowa ilość dla: ${product.name}` },
+          {
+            error: tr(
+              `Nieprawidłowa ilość dla: ${product.name}`,
+              `Ungültige Menge für: ${product.name}`
+            ),
+          },
           { status: 400 }
         );
       }
@@ -145,14 +159,24 @@ export async function POST(request: NextRequest) {
           !isVariantSelectionComplete(product, item.variantValues)
         ) {
           return NextResponse.json(
-            { error: `Brak wyboru wariantu dla: ${product.name}` },
+            {
+              error: tr(
+                `Brak wyboru wariantu dla: ${product.name}`,
+                `Keine Variante ausgewählt für: ${product.name}`
+              ),
+            },
             { status: 400 }
           );
         }
         const variant = findVariant(product, item.variantValues);
         if (!variant) {
           return NextResponse.json(
-            { error: `Nieprawidłowy wariant dla: ${product.name}` },
+            {
+              error: tr(
+                `Nieprawidłowy wariant dla: ${product.name}`,
+                `Ungültige Variante für: ${product.name}`
+              ),
+            },
             { status: 400 }
           );
         }
@@ -273,7 +297,12 @@ export async function POST(request: NextRequest) {
     // wewnętrzne detale (Stripe/Supabase) do klienta.
     console.error("Checkout error:", err);
     return NextResponse.json(
-      { error: "Nie udało się rozpocząć płatności. Spróbuj ponownie za chwilę." },
+      {
+        error: tr(
+          "Nie udało się rozpocząć płatności. Spróbuj ponownie za chwilę.",
+          "Die Zahlung konnte nicht gestartet werden. Bitte versuchen Sie es in Kürze erneut."
+        ),
+      },
       { status: 500 }
     );
   }
