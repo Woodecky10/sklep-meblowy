@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import { useActionState } from "react";
 import { signIn, signInWithGoogle, type AuthState } from "@/app/_lib/auth-actions";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
@@ -71,12 +71,12 @@ export default function LoginForm() {
             <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
               {c.password}
             </span>
-            <Link
+            <LocalizedLink
               href="/zapomnialem-hasla"
               className="text-xs font-sans text-[var(--color-gold)] hover:underline"
             >
               {c.forgot}
-            </Link>
+            </LocalizedLink>
           </div>
           <input
             name="password"

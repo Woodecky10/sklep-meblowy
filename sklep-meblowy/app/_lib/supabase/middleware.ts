@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { stripLocale } from "../i18n";
+import { localizePath, stripLocale } from "../i18n";
 
 export async function updateSession(request: NextRequest) {
   // Rozbij ścieżkę na locale + ścieżkę bez prefiksu '/de'.
@@ -50,7 +50,7 @@ export async function updateSession(request: NextRequest) {
   // Niezalogowany → /konto/* przekieruj na logowanie
   if (!user && path.startsWith("/konto")) {
     const url = request.nextUrl.clone();
-    url.pathname = "/logowanie";
+    url.pathname = localizePath("/logowanie", locale);
     url.search = "";
     return NextResponse.redirect(url);
   }
@@ -80,7 +80,7 @@ export async function updateSession(request: NextRequest) {
   if (user && (path === "/logowanie" || path === "/rejestracja")) {
     const role = (user.app_metadata as { role?: string } | undefined)?.role;
     const url = request.nextUrl.clone();
-    url.pathname = role === "admin" ? "/admin" : "/konto";
+    url.pathname = role === "admin" ? "/admin" : localizePath("/konto", locale);
     url.search = "";
     return NextResponse.redirect(url);
   }

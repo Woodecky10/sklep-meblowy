@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import LocalizedLink from "@/app/_components/ui/LocalizedLink";
+import { localizePath } from "@/app/_lib/i18n";
 import { redirect } from "next/navigation";
 import { createClient } from "@/app/_lib/supabase/server";
 import { isAdmin } from "@/app/_lib/admin";
@@ -18,7 +19,7 @@ export default async function LoginPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user) redirect(isAdmin(user) ? "/admin" : "/konto");
+  if (user) redirect(isAdmin(user) ? "/admin" : localizePath("/konto", de ? "de" : "pl"));
 
   const c = de
     ? {
@@ -49,12 +50,12 @@ export default async function LoginPage() {
 
       <p className="mt-8 text-center text-sm text-[var(--muted)]">
         {c.noAccount}{" "}
-        <Link
+        <LocalizedLink
           href="/rejestracja"
           className="text-[var(--color-gold)] font-semibold hover:underline"
         >
           {c.register}
-        </Link>
+        </LocalizedLink>
       </p>
     </div>
   );

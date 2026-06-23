@@ -60,7 +60,14 @@ export async function cancelOrder(orderId: string): Promise<CancelOrderResult> {
     .select("id");
 
   if (updateErr) {
-    return { ok: false, error: updateErr.message };
+    console.error(updateErr.message);
+    return {
+      ok: false,
+      error: tr(
+        "Nie udało się anulować zamówienia. Spróbuj ponownie.",
+        "Die Bestellung konnte nicht storniert werden. Bitte versuchen Sie es erneut."
+      ),
+    };
   }
   if (!updated || updated.length === 0) {
     // Status zmienił się między odczytem a CAS (np. webhook pending→paid).

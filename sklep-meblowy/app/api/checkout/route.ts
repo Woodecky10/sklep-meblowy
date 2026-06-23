@@ -277,13 +277,18 @@ export async function POST(request: NextRequest) {
       process.env.NEXT_PUBLIC_APP_URL ??
       "http://localhost:3000";
 
+    // Prefiks języka dla URL-i powrotnych — strony /checkout/* żyją pod /de/*
+    // dla locale "de" (proxy przepisuje /de/* na /*). Dla "pl" zostaje pusty,
+    // więc URL pozostaje oryginalny.
+    const localePrefix = locale === "de" ? "/de" : "";
+
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card", "blik", "p24"],
       line_items: stripeLineItems,
       customer_email: body.email,
-      success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/checkout/cancel`,
+      success_url: `${origin}${localePrefix}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}${localePrefix}/checkout/cancel`,
       metadata: { order_id: order.id },
       locale: "pl",
       ...(stripeCouponId

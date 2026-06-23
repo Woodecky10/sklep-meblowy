@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getStripe } from "@/app/_lib/stripe";
 import { getOrderById } from "@/app/_lib/orders";
 import { getLocale } from "@/app/_lib/i18n-server";
+import { localizeHref } from "@/app/_lib/i18n";
 import { formatPrice } from "@/app/_lib/format";
 import ClearCart from "./ClearCart";
 
@@ -114,7 +115,7 @@ export default async function SuccessPage({
       )}
 
       <Link
-        href="/sklep"
+        href={localizeHref("/sklep", locale)}
         className="inline-flex px-8 py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
       >
         {c.continue}

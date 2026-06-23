@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getLocale } from "@/app/_lib/i18n-server";
+import { localizeHref } from "@/app/_lib/i18n";
 
 const LEGAL_LINKS_PL: { href: string; label: string }[] = [
   { href: "/o-nas", label: "O nas" },
@@ -35,7 +36,7 @@ export default async function LegalLayout({ children }: { children: React.ReactN
           {links.map((l) => (
             <li key={l.href}>
               <Link
-                href={l.href}
+                href={localizeHref(l.href, locale)}
                 className="block py-1 text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors"
               >
                 {l.label}

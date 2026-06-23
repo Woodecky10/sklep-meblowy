@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getLocale } from "@/app/_lib/i18n-server";
+import { localizeHref } from "@/app/_lib/i18n";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
@@ -223,7 +224,7 @@ export default async function DostawaPage() {
       <h2>{c.h2Damage}</h2>
       <p>
         {c.damageBefore}
-        <a href="/kontakt">{c.damageLink}</a>
+        <a href={localizeHref("/kontakt", locale)}>{c.damageLink}</a>
         {c.damageAfter}
       </p>
     </>

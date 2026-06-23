@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { COMPANY } from "@/app/_lib/company";
 import { getLocale } from "@/app/_lib/i18n-server";
+import { localizeHref } from "@/app/_lib/i18n";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
@@ -119,7 +120,7 @@ export default async function OnasPage() {
       <h2>{c.h2Contact}</h2>
       <p>
         {c.contactBefore}
-        <Link href="/kontakt">{c.contactLink}</Link>
+        <Link href={localizeHref("/kontakt", locale)}>{c.contactLink}</Link>
         {c.contactAfter}
       </p>
     </>

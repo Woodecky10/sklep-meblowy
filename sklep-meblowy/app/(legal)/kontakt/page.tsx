@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { COMPANY, formatFullAddress, isFilled } from "@/app/_lib/company";
+import { localizeHref } from "@/app/_lib/i18n";
 import { getLocale } from "@/app/_lib/i18n-server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -220,17 +221,21 @@ export default async function KontaktPage() {
       <ul>
         <li>
           {c.commonOrderBefore}
-          <Link href="/konto/zamowienia">{c.commonOrderLink}</Link>
+          <Link href={localizeHref("/konto/zamowienia", locale)}>
+            {c.commonOrderLink}
+          </Link>
           {c.commonOrderAfter}
         </li>
         <li>
           {c.commonReturnBefore}
-          <Link href="/zwroty">{c.commonReturnLink}</Link>
+          <Link href={localizeHref("/zwroty", locale)}>{c.commonReturnLink}</Link>
           {c.commonReturnAfter}
         </li>
         <li>
           {c.commonComplaintBefore}
-          <Link href="/zwroty">{c.commonComplaintLink}</Link>
+          <Link href={localizeHref("/zwroty", locale)}>
+            {c.commonComplaintLink}
+          </Link>
           {c.commonComplaintAfter}
         </li>
         <li>{c.commonAdvice}</li>

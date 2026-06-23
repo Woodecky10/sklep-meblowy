@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getLocale } from "@/app/_lib/i18n-server";
+import { localizeHref } from "@/app/_lib/i18n";
 
 export default async function CancelPage() {
   const locale = await getLocale();
@@ -52,13 +53,13 @@ export default async function CancelPage() {
 
       <div className="flex flex-col sm:flex-row gap-4 justify-center">
         <Link
-          href="/koszyk"
+          href={localizeHref("/koszyk", locale)}
           className="inline-flex px-8 py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
         >
           {c.backToCart}
         </Link>
         <Link
-          href="/sklep"
+          href={localizeHref("/sklep", locale)}
           className="inline-flex px-8 py-4 border border-[var(--border)] text-[var(--fg)] font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:border-[var(--color-gold)] transition-colors"
         >
           {c.continue}
