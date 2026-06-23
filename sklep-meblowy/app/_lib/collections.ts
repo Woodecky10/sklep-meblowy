@@ -4,7 +4,7 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
-import { localizeProduct } from "./localize";
+import { localizeProduct, localizeCollection } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Collection, Product } from "./types";
 
@@ -32,12 +32,13 @@ export const getAllCollections = cache(fetchAllCollections);
 // Pobierz pojedynczą kolekcję po slug lub id
 // ============================================================
 export async function getCollection(
-  slugOrId: string
+  slugOrId: string,
+  locale: Locale = DEFAULT_LOCALE
 ): Promise<Collection | null> {
   const all = await getAllCollections();
-  return (
-    all.find((c) => c.slug === slugOrId || c.id === slugOrId) ?? null
-  );
+  const found =
+    all.find((c) => c.slug === slugOrId || c.id === slugOrId) ?? null;
+  return found ? localizeCollection(found, locale) : null;
 }
 
 // ============================================================
@@ -91,7 +92,7 @@ export async function getCollectionsForHome(
 
   return collections
     .map((collection) => ({
-      collection,
+      collection: localizeCollection(collection, locale),
       sampleProducts: byCollection.get(collection.id) ?? [],
     }))
     .filter((row) => row.sampleProducts.length > 0);

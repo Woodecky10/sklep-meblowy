@@ -112,7 +112,7 @@ export default async function ProduktPage({ params }: Props) {
   // Kolekcja: jeśli produkt jest w kolekcji, pobierz inne produkty z niej.
   const [collection, collectionSiblings] = product.collection_id
     ? await Promise.all([
-        getCollection(product.collection_id),
+        getCollection(product.collection_id, locale),
         getCollectionSiblings(product.collection_id, product.id, 8, locale),
       ])
     : [null, []];

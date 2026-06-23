@@ -42,11 +42,19 @@ export async function createCollection(formData: FormData): Promise<ActionResult
   if (!slug) return { ok: false, error: "Nie udało się wygenerować sluga" };
 
   const description = emptyToNull(sanitize(formData.get("description"), 1000));
+  const labelDe = emptyToNull(sanitize(formData.get("label_de"), 200));
+  const descriptionDe = emptyToNull(sanitize(formData.get("description_de"), 1000));
 
   const supabase = await createAdminClient();
   const { error, data } = await supabase
     .from("collections")
-    .insert({ slug, label, description } as never)
+    .insert({
+      slug,
+      label,
+      label_de: labelDe,
+      description,
+      description_de: descriptionDe,
+    } as never)
     .select()
     .single();
 
@@ -158,12 +166,16 @@ export async function saveCollection(
   if (!label) return { ok: false, error: "Nazwa kolekcji jest wymagana" };
 
   const description = emptyToNull(sanitize(formData.get("description"), 1000));
+  const labelDe = emptyToNull(sanitize(formData.get("label_de"), 200));
+  const descriptionDe = emptyToNull(sanitize(formData.get("description_de"), 1000));
 
   const supabase = await createAdminClient();
   const { error } = await supabase.rpc("save_collection", {
     p_id: id,
     p_label: label,
+    p_label_de: labelDe,
     p_description: description,
+    p_description_de: descriptionDe,
     p_product_ids: productIds,
   });
   if (error) return { ok: false, error: error.message };
