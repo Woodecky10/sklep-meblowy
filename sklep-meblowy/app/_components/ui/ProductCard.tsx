@@ -4,7 +4,7 @@ import type { Product, ProductRating } from "@/app/_lib/types";
 import { DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { formatMoney } from "@/app/_lib/money";
-import { DEFAULT_EUR_RATE } from "@/app/_lib/eur-constants";
+
 import AddToCartButton from "./AddToCartButton";
 import StarRating from "./StarRating";
 import WishlistButton from "./WishlistButton";
@@ -16,7 +16,7 @@ export default function ProductCard({
   categoryLabel,
   isInWishlist = false,
   locale = DEFAULT_LOCALE,
-  rate = DEFAULT_EUR_RATE,
+  rate,
 }: {
   product: Product;
   rating?: ProductRating;
@@ -35,8 +35,8 @@ export default function ProductCard({
   // dla call-site'ów które jeszcze go nie przekazują.
   locale?: Locale;
   // Kurs PLN→EUR do wyświetlenia ceny w EUR na /de. Przekazywany z rodzica
-  // (serwer: getEurRate(); klient: useEurRate()). Default = stała awaryjna.
-  rate?: number;
+  // (serwer: getEurRate(); klient: useEurRate()). Wymagany — brak = błąd tsc.
+  rate: number;
 }) {
   const image = product.images?.[0];
   const t = getDictionary(locale);

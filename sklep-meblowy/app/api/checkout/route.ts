@@ -293,7 +293,7 @@ export async function POST(request: NextRequest) {
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      payment_method_types: ["card", "blik", "p24"],
+      payment_method_types: isDe ? ["card", "p24"] : ["card", "blik", "p24"],
       line_items: stripeLineItems,
       customer_email: body.email,
       success_url: `${origin}${localePrefix}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
