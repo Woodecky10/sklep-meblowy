@@ -3,7 +3,7 @@ import { requireAdmin } from "@/app/_lib/admin";
 import { getAdminOrders, getProfilesByIds } from "@/app/_lib/orders";
 import { orderCustomerDisplay } from "@/app/_lib/admin-orders";
 import { ADMIN_STATUS_LABELS } from "@/app/_lib/order-status";
-import { formatPrice } from "@/app/_lib/format";
+import { formatOrderAmount } from "@/app/_lib/money";
 import { EmptyState, inputCls } from "@/app/admin/_shared";
 import Pagination from "@/app/_components/ui/Pagination";
 import type { OrderStatus } from "@/app/_lib/types";
@@ -158,7 +158,7 @@ export default async function AdminOrdersPage({
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-[var(--fg)] whitespace-nowrap">
-                      {formatPrice(Number(o.total), "pl")}
+                      {formatOrderAmount(Number(o.total), o.currency)}
                     </td>
                     <td className="px-4 py-3 text-center">
                       {o.delivery_paid ? (

@@ -3,7 +3,8 @@ import Image from "next/image";
 import type { Product, ProductRating } from "@/app/_lib/types";
 import { DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
-import { formatPrice } from "@/app/_lib/format";
+import { formatMoney } from "@/app/_lib/money";
+
 import AddToCartButton from "./AddToCartButton";
 import StarRating from "./StarRating";
 import WishlistButton from "./WishlistButton";
@@ -15,6 +16,7 @@ export default function ProductCard({
   categoryLabel,
   isInWishlist = false,
   locale = DEFAULT_LOCALE,
+  rate,
 }: {
   product: Product;
   rating?: ProductRating;
@@ -32,6 +34,9 @@ export default function ProductCard({
   // Locale dla formatowania ceny (PL/DE). Default PL — bezpieczny fallback
   // dla call-site'ów które jeszcze go nie przekazują.
   locale?: Locale;
+  // Kurs PLN→EUR do wyświetlenia ceny w EUR na /de. Przekazywany z rodzica
+  // (serwer: getEurRate(); klient: useEurRate()). Wymagany — brak = błąd tsc.
+  rate: number;
 }) {
   const image = product.images?.[0];
   const t = getDictionary(locale);
@@ -82,7 +87,7 @@ export default function ProductCard({
       )}
       <div className="flex items-center justify-between mt-auto">
         <p className="font-sans font-bold text-[var(--fg)]">
-          {formatPrice(product.price, locale)}
+          {formatMoney(product.price, locale, rate)}
         </p>
         <AddToCartButton product={product} compact />
       </div>

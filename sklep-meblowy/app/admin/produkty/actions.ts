@@ -8,16 +8,15 @@ import { validateImageUpload } from "@/app/_lib/image-upload";
 import { buildNewProductPayload } from "@/app/_lib/new-product";
 import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-html";
 import type {
+  ActionResult,
   ProductDescriptionSection,
   ProductDimensions,
   ProductVariants,
 } from "@/app/_lib/types";
 
-const STORAGE_BUCKET = "products";
+export type { ActionResult };
 
-export type ActionResult =
-  | { ok: true; message?: string; data?: unknown }
-  | { ok: false; error: string };
+const STORAGE_BUCKET = "products";
 
 // ============================================================
 // Helpers

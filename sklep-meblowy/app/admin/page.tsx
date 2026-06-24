@@ -11,6 +11,7 @@ const CARDS = [
   { href: "/admin/kolekcje", title: "Kolekcje produktów", cta: "Zarządzaj kolekcjami" },
   { href: "/admin/kody-rabatowe", title: "Kody rabatowe", cta: "Zarządzaj kodami" },
   { href: "/admin/zapytania", title: "Zapytania klientów", cta: "Otwórz skrzynkę" },
+  { href: "/admin/ustawienia", title: "Ustawienia (kurs EUR)", cta: "Edytuj ustawienia" },
 ];
 
 export default async function AdminDashboardPage() {

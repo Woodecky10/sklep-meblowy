@@ -5,6 +5,7 @@ import { createClient, createAdminClient } from "@/app/_lib/supabase/server";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { localizeProduct } from "@/app/_lib/localize";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "@/app/_lib/de-content-maps";
+import { formatOrderAmount } from "@/app/_lib/money";
 import type { Order, OrderItem } from "@/app/_lib/types";
 import ReorderButton from "@/app/_components/ui/ReorderButton";
 import CancelOrderButton from "../CancelOrderButton";
@@ -173,7 +174,7 @@ export default async function OrderDetailPage({
                     {prod?.name ?? c.product}
                   </p>
                   <p className="text-sm text-[var(--muted)]">
-                    {item.quantity} × {Number(item.price).toLocaleString(locale)} zł
+                    {item.quantity} × {formatOrderAmount(Number(item.price), order.currency)}
                   </p>
                   {variantEntries.length > 0 && (
                     <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5">
@@ -202,7 +203,7 @@ export default async function OrderDetailPage({
                   )}
                 </div>
                 <p className="text-sm font-semibold text-[var(--fg)] whitespace-nowrap">
-                  {(Number(item.price) * item.quantity).toLocaleString(locale)} zł
+                  {formatOrderAmount(Number(item.price) * item.quantity, order.currency)}
                 </p>
               </div>
             );
@@ -212,7 +213,7 @@ export default async function OrderDetailPage({
         <dl className="border-t border-[var(--border)] mt-6 pt-6 flex flex-col gap-2 text-sm">
           <div className="flex justify-between text-[var(--muted)]">
             <dt>{c.products}</dt>
-            <dd>{subtotal.toLocaleString(locale)} zł</dd>
+            <dd>{formatOrderAmount(subtotal, order.currency)}</dd>
           </div>
           {promoDiscount > 0 && (
             <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
@@ -224,14 +225,14 @@ export default async function OrderDetailPage({
                   </span>
                 )}
               </dt>
-              <dd>−{promoDiscount.toLocaleString(locale)} zł</dd>
+              <dd>−{formatOrderAmount(promoDiscount, order.currency)}</dd>
             </div>
           )}
           <div className="flex justify-between items-start text-[var(--muted)] gap-3">
             <dt className="shrink-0">{c.shipping}</dt>
             <dd className="text-right">
               {shipping > 0 ? (
-                `${shipping.toLocaleString(locale)} zł`
+                formatOrderAmount(shipping, order.currency)
               ) : (
                 <span className="text-xs leading-snug">
                   {c.shippingIndividual}
@@ -241,7 +242,7 @@ export default async function OrderDetailPage({
           </div>
           <div className="flex justify-between border-t border-[var(--border)] pt-2 font-bold text-base text-[var(--fg)]">
             <dt>{c.total}</dt>
-            <dd>{Number(order.total).toLocaleString(locale)} zł</dd>
+            <dd>{formatOrderAmount(Number(order.total), order.currency)}</dd>
           </div>
         </dl>
       </div>

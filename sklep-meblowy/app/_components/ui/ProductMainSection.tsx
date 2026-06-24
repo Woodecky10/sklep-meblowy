@@ -5,7 +5,8 @@ import type { Product, ProductRating } from "@/app/_lib/types";
 import { getVariantImages, getVariantPrice } from "@/app/_lib/variants";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
-import { formatPrice } from "@/app/_lib/format";
+import { formatMoney } from "@/app/_lib/money";
+import { useEurRate } from "@/app/_lib/rate-context";
 import ImageGallery from "./ImageGallery";
 import ProductActions from "./ProductActions";
 import StarRating from "./StarRating";
@@ -33,6 +34,7 @@ export default function ProductMainSection({
   specifications: { label: string; value: string }[];
 }) {
   const locale = useClientLocale();
+  const rate = useEurRate();
   const t = getDictionary(locale);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const images = getVariantImages(product, selected);
@@ -99,7 +101,7 @@ export default function ProductMainSection({
           )}
 
           <p className="font-sans text-3xl font-bold text-[var(--fg)]">
-            {formatPrice(currentPrice, locale)}
+            {formatMoney(currentPrice, locale, rate)}
           </p>
         </div>
 

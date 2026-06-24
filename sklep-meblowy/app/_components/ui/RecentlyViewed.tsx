@@ -10,7 +10,8 @@ import {
 } from "@/app/_lib/recently-viewed";
 import { DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
-import { formatPrice } from "@/app/_lib/format";
+import { formatMoney } from "@/app/_lib/money";
+import { useEurRate } from "@/app/_lib/rate-context";
 
 // Sekcja „Ostatnio oglądane" na stronie produktu. Czyta snapshoty z
 // localStorage (wzorzec jak CartContext), dopisuje bieżący produkt na mount
@@ -55,6 +56,8 @@ export default function RecentlyViewed({
     }
   }, [current]);
 
+  const rate = useEurRate();
+
   if (items.length === 0) return null;
 
   const t = getDictionary(locale);
@@ -94,7 +97,7 @@ export default function RecentlyViewed({
               {p.name}
             </p>
             <p className="font-sans font-bold text-[var(--fg)] mt-auto">
-              {formatPrice(p.price, locale)}
+              {formatMoney(p.price, locale, rate)}
             </p>
           </LocalizedLink>
         ))}

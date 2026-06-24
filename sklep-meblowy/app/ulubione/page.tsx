@@ -8,6 +8,7 @@ import { getLocale } from "@/app/_lib/i18n-server";
 import { localizeHref, localizePath } from "@/app/_lib/i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import ProductCard from "@/app/_components/ui/ProductCard";
+import { getEurRate } from "@/app/_lib/store-settings";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = getDictionary(await getLocale());
@@ -26,10 +27,11 @@ export default async function WishlistPage() {
     );
 
   const t = getDictionary(locale);
-  const [products, wishlistIds, categories] = await Promise.all([
+  const [products, wishlistIds, categories, rate] = await Promise.all([
     getWishlistProducts(locale),
     getUserWishlistIds(),
     getCategories(locale),
+    getEurRate(),
   ]);
   const categoryLabels = new Map(categories.map((c) => [c.slug, c.label]));
 
@@ -78,6 +80,7 @@ export default async function WishlistPage() {
               categoryLabel={categoryLabels.get(product.category)}
               isInWishlist={wishlistIds.has(product.id)}
               locale={locale}
+              rate={rate}
             />
           ))}
         </div>

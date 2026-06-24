@@ -7,7 +7,8 @@ import { useModal } from "@/app/_lib/useModal";
 import { localizeHref, stripLocale, type Locale } from "@/app/_lib/i18n";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary, type Dictionary } from "@/app/_lib/dictionaries";
-import { formatPrice } from "@/app/_lib/format";
+import { formatMoney } from "@/app/_lib/money";
+import { useEurRate } from "@/app/_lib/rate-context";
 import type { SearchSuggestion } from "@/app/api/search/suggest/route";
 
 type Variant = "icon" | "inline";
@@ -19,6 +20,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const locale = useClientLocale();
+  const rate = useEurRate();
   const t = getDictionary(locale);
   // Pod '/de' usePathname() zwraca '/de/sklep'. Porównujemy ścieżkę BEZ prefiksu
   // locale, inaczej cała logika "jesteśmy na /sklep" gubiła się pod DE.
@@ -205,6 +207,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
             onSelect={goToProduct}
             t={t}
             locale={locale}
+            rate={rate}
             className="absolute top-full left-0 right-0 mt-2 z-50"
           />
         )}
@@ -280,6 +283,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
                 onSelect={goToProduct}
                 t={t}
                 locale={locale}
+                rate={rate}
                 className="mt-2"
               />
             )}
@@ -302,6 +306,7 @@ function SuggestionsList({
   onSelect,
   t,
   locale,
+  rate,
   className,
 }: {
   suggestions: SearchSuggestion[];
@@ -311,6 +316,7 @@ function SuggestionsList({
   onSelect: (id: string) => void;
   t: Dictionary;
   locale: Locale;
+  rate: number;
   className?: string;
 }) {
   if (loading && suggestions.length === 0) {
@@ -367,7 +373,7 @@ function SuggestionsList({
                 </p>
               </div>
               <p className="text-sm font-semibold text-[var(--fg)] shrink-0">
-                {formatPrice(s.price, locale)}
+                {formatMoney(s.price, locale, rate)}
               </p>
             </button>
           </li>

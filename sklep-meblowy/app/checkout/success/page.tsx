@@ -3,7 +3,7 @@ import { getStripe } from "@/app/_lib/stripe";
 import { getOrderById } from "@/app/_lib/orders";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { localizeHref } from "@/app/_lib/i18n";
-import { formatPrice } from "@/app/_lib/format";
+import { formatOrderAmount } from "@/app/_lib/money";
 import ClearCart from "./ClearCart";
 
 export default async function SuccessPage({
@@ -42,6 +42,7 @@ export default async function SuccessPage({
   let orderId: string | null = null;
   let total: number | null = null;
   let email: string | null = null;
+  let orderCurrency: "pln" | "eur" = "pln";
 
   if (session_id) {
     try {
@@ -51,6 +52,7 @@ export default async function SuccessPage({
       if (orderId) {
         const order = await getOrderById(orderId);
         total = Number(order.total);
+        orderCurrency = order.currency;
       }
     } catch {
       // sesja mogła wygasnąć — pokaż ogólny komunikat
@@ -106,7 +108,7 @@ export default async function SuccessPage({
               <div className="flex justify-between font-bold text-base">
                 <dt className="text-[var(--fg)]">{c.amount}</dt>
                 <dd className="text-[var(--fg)]">
-                  {formatPrice(total, locale)}
+                  {formatOrderAmount(total, orderCurrency)}
                 </dd>
               </div>
             )}

@@ -9,6 +9,7 @@ import { getCategories } from "./_lib/categories";
 import { getCollectionsForHome } from "./_lib/collections";
 import { getUserWishlistIds } from "./_lib/wishlist";
 import { getLocale } from "./_lib/i18n-server";
+import { getEurRate } from "./_lib/store-settings";
 import { localizePath } from "./_lib/i18n";
 import { alternatesFor } from "./_lib/sitemap-i18n";
 import { getDictionary } from "./_lib/dictionaries";
@@ -42,13 +43,14 @@ function protectOrphans(text: string): string {
 export default async function HomePage() {
   const locale = await getLocale();
   const t = getDictionary(locale);
-  const [dbSlides, dbTiles, featured, allCategories, collectionsForHome, wishlistIds] = await Promise.all([
+  const [dbSlides, dbTiles, featured, allCategories, collectionsForHome, wishlistIds, rate] = await Promise.all([
     getActiveSlides(),
     getActiveTiles(),
     getFeaturedOrFallback(locale),
     getCategories(locale),
     getCollectionsForHome(locale),
     getUserWishlistIds(),
+    getEurRate(),
   ]);
   const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
   // Fallback gdy admin jeszcze nic nie dodał — żeby home nie była pusta.
@@ -150,6 +152,7 @@ export default async function HomePage() {
                   categoryLabel={categoryLabels.get(product.category)}
                   isInWishlist={wishlistIds.has(product.id)}
                   locale={locale}
+                  rate={rate}
                 />
               ))}
             </div>
