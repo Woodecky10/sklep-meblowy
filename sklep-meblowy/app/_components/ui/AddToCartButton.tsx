@@ -5,6 +5,7 @@ import { useCart } from "@/app/_context/CartContext";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import type { Product } from "@/app/_lib/types";
+import { effectivePrice } from "@/app/_lib/pricing";
 
 type Props = {
   product: Product;
@@ -36,7 +37,7 @@ export default function AddToCartButton({
   const variantLabel = selectVariantLabel ?? t.product.selectVariant;
 
   const hasSelection = selectedValues && Object.keys(selectedValues).length > 0;
-  const price = currentPrice ?? product.price;
+  const price = currentPrice ?? effectivePrice(product.price, product.sale_price);
   // Compact (na ProductCard) nie ma wyboru wariantu — sprawdzamy bezpośrednio
   // czy produkt ma jakiekolwiek opcje. Jeśli tak, NIE pozwalamy na quick-add
   // (bo wpadłby do koszyka z variantValues=undefined, a checkout potem

@@ -5,6 +5,7 @@ import {
   hasVariants,
   isVariantSelectionComplete,
   getVariantPrice,
+  getVariantEffectivePrice,
 } from "@/app/_lib/variants";
 import VariantSelector from "./VariantSelector";
 import AddToCartButton from "./AddToCartButton";
@@ -32,7 +33,7 @@ export default function ProductActions({
 }) {
   const showVariants = hasVariants(product);
   const complete = isVariantSelectionComplete(product, selected);
-  const price = getVariantPrice(product, selected);
+  const price = getVariantEffectivePrice(product, selected);
 
   return (
     <div className="flex flex-col gap-6">

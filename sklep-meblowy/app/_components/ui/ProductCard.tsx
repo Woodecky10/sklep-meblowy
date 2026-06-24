@@ -4,6 +4,7 @@ import type { Product, ProductRating } from "@/app/_lib/types";
 import { DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { formatMoney } from "@/app/_lib/money";
+import { effectivePrice, isOnSale } from "@/app/_lib/pricing";
 
 import AddToCartButton from "./AddToCartButton";
 import StarRating from "./StarRating";
@@ -86,9 +87,27 @@ export default function ProductCard({
         </div>
       )}
       <div className="flex items-center justify-between mt-auto">
-        <p className="font-sans font-bold text-[var(--fg)]">
-          {formatMoney(product.price, locale, rate)}
-        </p>
+        {isOnSale(product.price, product.sale_price) ? (
+          <div className="flex flex-col">
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="font-sans font-bold text-[var(--fg)]">
+                {formatMoney(effectivePrice(product.price, product.sale_price), locale, rate)}
+              </span>
+              <span className="font-sans text-sm text-[var(--muted)] line-through">
+                {formatMoney(product.price, locale, rate)}
+              </span>
+            </div>
+            {product.omnibus_price !== null && (
+              <span className="text-[10px] text-[var(--muted)] leading-tight">
+                {t.product.omnibusLabel}: {formatMoney(product.omnibus_price, locale, rate)}
+              </span>
+            )}
+          </div>
+        ) : (
+          <p className="font-sans font-bold text-[var(--fg)]">
+            {formatMoney(product.price, locale, rate)}
+          </p>
+        )}
         <AddToCartButton product={product} compact />
       </div>
     </div>

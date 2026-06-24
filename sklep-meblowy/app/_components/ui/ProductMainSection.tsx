@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import type { Product, ProductRating } from "@/app/_lib/types";
-import { getVariantImages, getVariantPrice } from "@/app/_lib/variants";
+import {
+  getVariantImages,
+  getVariantPrice,
+  getVariantEffectivePrice,
+  getVariantSalePrice,
+  getVariantOmnibus,
+  isVariantOnSale,
+} from "@/app/_lib/variants";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { formatMoney } from "@/app/_lib/money";
@@ -42,9 +49,10 @@ export default function ProductMainSection({
   const t = getDictionary(locale);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const images = getVariantImages(product, selected);
-  // Jedna, aktualna cena: bazowa przed wyborem wariantu, z modyfikatorem po
-  // wyborze. Bez przekreśleń — zmiana ceny wariantu to nie promocja.
-  const currentPrice = getVariantPrice(product, selected);
+  const regularPrice = getVariantPrice(product, selected);
+  const effective = getVariantEffectivePrice(product, selected);
+  const onSale = isVariantOnSale(product, selected);
+  const omnibus = getVariantOmnibus(product, selected);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-16">
@@ -104,9 +112,30 @@ export default function ProductMainSection({
             </a>
           )}
 
-          <p className="font-sans text-3xl font-bold text-[var(--fg)]">
-            {formatMoney(currentPrice, locale, rate)}
-          </p>
+          {onSale ? (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-baseline gap-3 flex-wrap">
+                <span className="font-sans text-3xl font-bold text-[var(--fg)]">
+                  {formatMoney(effective, locale, rate)}
+                </span>
+                <span className="font-sans text-lg text-[var(--muted)] line-through">
+                  {formatMoney(regularPrice, locale, rate)}
+                </span>
+                <span className="px-2 py-0.5 bg-[var(--color-gold)] text-[var(--color-navy)] text-[10px] font-sans font-semibold uppercase tracking-widest rounded-full">
+                  {t.product.saleBadge}
+                </span>
+              </div>
+              {omnibus !== null && (
+                <span className="text-xs text-[var(--muted)]">
+                  {t.product.omnibusLabel}: {formatMoney(omnibus, locale, rate)}
+                </span>
+              )}
+            </div>
+          ) : (
+            <p className="font-sans text-3xl font-bold text-[var(--fg)]">
+              {formatMoney(regularPrice, locale, rate)}
+            </p>
+          )}
         </div>
 
         <SizeSelector options={sizeOptions} />
