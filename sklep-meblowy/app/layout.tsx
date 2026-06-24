@@ -12,6 +12,8 @@ import { ToastProvider } from "./_context/ToastContext";
 import { COMPANY } from "./_lib/company";
 import { getLocale } from "./_lib/i18n-server";
 import { getDictionary } from "./_lib/dictionaries";
+import { getEurRate } from "@/app/_lib/store-settings";
+import { RateProvider } from "@/app/_lib/rate-context";
 
 const inter = Inter({
   subsets: ["latin", "latin-ext"],
@@ -64,6 +66,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const locale = await getLocale();
+  const eurRate = await getEurRate();
   return (
     <html
       lang={locale}
@@ -72,16 +75,18 @@ export default async function RootLayout({
     >
       <body className="min-h-screen flex flex-col antialiased">
         <ThemeProvider>
-          <CartProvider>
-            <ToastProvider>
-              <TopBar />
-              <Navbar />
-              <main className="flex-1">{children}</main>
-              <Footer />
-              <CookieBanner />
-              <CartToast />
-            </ToastProvider>
-          </CartProvider>
+          <RateProvider rate={eurRate}>
+            <CartProvider>
+              <ToastProvider>
+                <TopBar />
+                <Navbar />
+                <main className="flex-1">{children}</main>
+                <Footer />
+                <CookieBanner />
+                <CartToast />
+              </ToastProvider>
+            </CartProvider>
+          </RateProvider>
         </ThemeProvider>
       </body>
     </html>

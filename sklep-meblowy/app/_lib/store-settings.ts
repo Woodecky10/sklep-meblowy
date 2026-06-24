@@ -1,10 +1,10 @@
 import "server-only";
 import { cache } from "react";
 import { createClient } from "./supabase/server";
+import { DEFAULT_EUR_RATE } from "./eur-constants";
 
-// Fallback gdy DB nie zwróci sensownego kursu (np. migracja jeszcze nie odpalona).
-// Ta sama wartość co seed migracji 33.
-export const DEFAULT_EUR_RATE = 0.23;
+// Re-export so existing importers of DEFAULT_EUR_RATE from store-settings keep working.
+export { DEFAULT_EUR_RATE };
 
 // Kurs PLN->EUR (ile € za 1 zł). cache() => jeden odczyt na request, niezależnie
 // od liczby komponentów serwerowych, które go wołają.
