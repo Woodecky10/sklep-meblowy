@@ -1,4 +1,4 @@
--- supabase/migrations/33_drop_baselinker.sql
+-- supabase/migrations/34_drop_baselinker.sql
 -- Pelne wyciecie BaseLinkera: usuniecie kolumn i tabeli logu BL.
 -- DESTRUKCYJNE: traci historyczne odniesienia baselinker_* na zamowieniach/produktach.
 -- Uruchomic PO deployu kodu bez BL (kod juz nie czyta tych kolumn).
