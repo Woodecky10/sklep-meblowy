@@ -89,7 +89,7 @@ export default async function OrderDetailPage({
   if (!user) notFound();
 
   // Zapytanie przez admin client: RLS na products (is_active=true) ukrywałby
-  // kupione produkty, które później zostały ukryte (znikły z BL / admin),
+  // kupione produkty, które później zostały ukryte (znikły z importu / admina),
   // a promo_codes nie ma polityki odczytu dla klienta — embed kodu kuponu
   // zawsze zwracał null. Ownership wymusza .eq("user_id", user.id) z sesji.
   const adminSupabase = await createAdminClient();

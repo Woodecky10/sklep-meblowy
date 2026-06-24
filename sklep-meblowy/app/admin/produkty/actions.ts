@@ -98,7 +98,7 @@ async function deleteStorageImage(url: string | null): Promise<void> {
 }
 
 // Usuń zdjęcie ze storage — tylko jeśli URL należy do naszego bucketa.
-// URL-e zewnętrzne (Unsplash, BL) ignorujemy (no-op).
+// URL-e zewnętrzne (Unsplash, z importu) ignorujemy (no-op).
 export async function deleteProductImage(url: string): Promise<ActionResult> {
   await requireAdmin();
   if (!url) return { ok: false, error: "Brak URL" };
@@ -139,7 +139,7 @@ export async function updateProductBasics(
   }
 
   // UWAGA: pole `description` celowo pomijane w updates — opis nie jest
-  // synchronizowany z BL (mapBlToProduct go nie ustawia). Opis edytuje się
+  // synchronizowany z importem (mapBlToProduct go nie ustawia). Opis edytuje się
   // przez sekcje w DescriptionSectionsEditor, nie przez to pole.
   const updates: Record<string, unknown> = {
     name,
@@ -264,12 +264,8 @@ export async function updateProductVariants(
 // są CASCADE, inquiries SET NULL — usuną się automatycznie.
 //
 // Storage cleanup: tylko URL-e w naszym bucket "products" są usuwane
-// fizycznie. URL-e zewnętrzne (BaseLinker, Unsplash) zostają w sieci
+// fizycznie. URL-e zewnętrzne (Unsplash itp.) zostają w sieci
 // — nie nasze, nie nasz problem. Czyścimy też zdjęcia variantów.
-//
-// UWAGA: nie usuwa produktu z BaseLinkera. BL to osobne źródło prawdy —
-// produkt usuwa się tam niezależnie, w panelu BL. Tu czyścimy tylko
-// kopię w naszej bazie.
 export async function deleteProduct(formData: FormData): Promise<ActionResult> {
   await requireAdmin();
 
@@ -348,7 +344,6 @@ export async function deleteProduct(formData: FormData): Promise<ActionResult> {
 // setProductActive — ręczne ukrycie/przywrócenie produktu
 // ============================================================
 // Ukrycie → is_active=false, deactivation_source='manual'
-// (sync BaseLinker NIE reaktywuje produktów ukrytych ręcznie).
 // Przywrócenie → is_active=true, deactivation_source=null.
 export async function setProductActive(
   productId: string,
@@ -378,7 +373,7 @@ export async function setProductActive(
 // updateProductDescriptionSections — zapisuje sekcje opisu
 // ============================================================
 // Admin może dodawać/usuwać/przesuwać image sekcje między text sekcjami
-// (które przychodzą z BL i są read-only z poziomu sklepu).
+// (które przychodzą z importu i są read-only z poziomu sklepu).
 // Walidacja: każda sekcja musi mieć poprawne pola dla swojego kind.
 export async function updateProductDescriptionSections(
   productId: string,
@@ -544,7 +539,7 @@ export async function saveProductDe(
 }
 
 // ============================================================
-// Tworzenie nowego produktu (natywne — bez BaseLinkera)
+// Tworzenie nowego produktu (natywne)
 // ============================================================
 // Minimalny szkic (nazwa/cena/kategoria). Resztę admin uzupełnia w edytorze
 // /admin/produkty/[id]. Zwraca productId do redirectu po stronie klienta.

@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    // Adres dostawy wymagany w całości — bez tego zamówienie w BL powstaje
+    // Adres dostawy wymagany w całości — bez tego zamówienie w systemie powstaje
     // bez adresu i kurier nie ma gdzie jechać. Formularz to waliduje, ale
     // route musi być odporny na bezpośrednie wywołania.
     const shippingAddress = body.address;
@@ -232,10 +232,10 @@ export async function POST(request: NextRequest) {
 
       // Stripe Coupon (one-shot, dla tej sesji). Zawsze amount_off (kwotowo,
       // w groszach) — także dla kuponów procentowych. percent_off liczyłby
-      // Stripe po swojemu (własne zaokrąglenia), a rabat w BL (ujemna
+      // Stripe po swojemu (własne zaokrąglenia), a rabat w systemie (ujemna
       // pozycja K1) i orders.promo_discount używają NASZEJ kwoty z
       // validatePromoCode — jedna kwota wszędzie eliminuje rozjazd o grosz
-      // między kwotą pobraną a sumą pozycji w BL.
+      // między kwotą pobraną a sumą pozycji w systemie.
       // amount_off=0 jest błędem w Stripe (np. 1% z 0,49 zł zaokrągla się
       // do 0 gr) — wtedy po prostu nie tworzymy kuponu.
       const amountOffGr = Math.round(toCharge(promoDiscount) * 100);
@@ -258,7 +258,7 @@ export async function POST(request: NextRequest) {
 
     // Koszt dostawy NIE jest doliczany do Stripe — meble różnią się wagą
     // i gabarytami. Po zamówieniu admin kontaktuje klienta i ustala koszt
-    // dostawy indywidualnie (płatność osobno: przelew albo doliczone do BL
+    // dostawy indywidualnie (płatność osobno: przelew albo doliczone do zamówienia
     // jako delivery_price).
     const finalTotal = toCharge(Math.max(0, total - promoDiscount));
 

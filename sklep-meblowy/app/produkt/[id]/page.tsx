@@ -147,7 +147,7 @@ export default async function ProduktPage({ params }: Props) {
     details.push({ label: t.product.specWarranty, value: product.warranty });
   }
 
-  // Dodatkowe cechy z BL (features) — Allegro template parametry. Pomijamy
+  // Dodatkowe cechy produktu (features) — parametry z panelu admina. Pomijamy
   // te które już są dedykowane (Kolor, Materiał, Wymiary, Konstrukcja, Czas
   // realizacji, Gwarancja) — żeby nie dublować linii w specyfikacji.
   const DEDICATED_KEYS = new Set(
@@ -178,7 +178,7 @@ export default async function ProduktPage({ params }: Props) {
     name: product.name,
     description: plainDescription,
     image: product.images ?? [],
-    sku: product.baselinker_id ?? product.id,
+    sku: product.id,
     brand: {
       "@type": "Brand",
       name: COMPANY.brandName,
@@ -188,7 +188,7 @@ export default async function ProduktPage({ params }: Props) {
       url: productUrl,
       priceCurrency: locale === "de" ? "EUR" : "PLN",
       price: (locale === "de" ? convertToEur(product.price, rate) : product.price).toFixed(2),
-      // Meble robione na zamówienie — zawsze "dostępne", BL realizuje.
+      // Meble robione na zamówienie — zawsze "dostępne".
       availability: "https://schema.org/InStock",
       itemCondition: "https://schema.org/NewCondition",
     },
@@ -203,7 +203,7 @@ export default async function ProduktPage({ params }: Props) {
     };
   }
 
-  // Escape `<` → <: bez tego product.name/description z BL zawierające
+  // Escape `<` → <: bez tego product.name/description zawierające
   // </script> wybiłyby się z bloku JSON-LD i wstrzyknęły skrypt (audyt LOW).
   const jsonLdHtml = JSON.stringify(jsonLd).replace(/</g, "\\u003c");
 
@@ -241,14 +241,14 @@ export default async function ProduktPage({ params }: Props) {
       />
 
       {/* Sekcja: opis produktu.
-          - Jeśli mamy description_sections (IKEA-style 5 akordeonów z BL) →
+          - Jeśli mamy description_sections (IKEA-style akordeony) →
             renderujemy ProductDescriptionSections.
           - Inaczej fallback do legacy flat description (stare produkty
-            sprzed migracji 22, albo BL pełnia opisu w polu głównym). */}
+            sprzed migracji 22, z opisem w polu głównym). */}
       {(() => {
         // Pre-process: aplikuj admin overrides (admin_title / admin_body /
-        // hidden) — admin może per produkt naprawić rozjazd treści w BL
-        // bez konieczności edytowania w panelu BL.
+        // hidden) — admin może per produkt naprawić treść
+        // bez konieczności edytowania każdej sekcji z osobna.
         //
         // Sanitize body server-side (PR #35) — sanitizer jest na serwerze,
         // ProductDescriptionSections.tsx jako "use client" otrzymuje już

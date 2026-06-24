@@ -2,9 +2,6 @@
 // Wcześniej każdy edytor (slider/kafelki/polecane/kolekcje/kody/kategorie) miał
 // własne kopie Field/Card/EmptyState/ToastView/inputCls — rozjeżdżały się
 // (np. inputCls raz z text-sm, raz bez). Jedno źródło prawdy.
-//
-// UWAGA: BaseLinkerSyncPanel ma celowo bogatszy, 3-stanowy ToastView (z
-// 'warning') i własny EmptyState — nie korzysta z tego modułu.
 
 import type { ReactNode } from "react";
 

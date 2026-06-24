@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "tlvgsddpiikolgdwuwmc.supabase.co" },
-      // BaseLinker — CDN ze zdjęciami produktów synchronizowanych z BL
+      // Legacy CDN obrazów (stare produkty z dawnego importu) — do audytu i ewentualnego usunięcia, gdy żaden produkt nie używa już tych hostów.
       { protocol: "https", hostname: "upload.cdn.baselinker.com" },
       { protocol: "https", hostname: "*.cdn.baselinker.com" },
     ],

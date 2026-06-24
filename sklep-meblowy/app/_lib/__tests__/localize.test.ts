@@ -92,7 +92,7 @@ describe("localizeProduct", () => {
   });
 });
 
-describe("localizeProduct — pola wolnotekstowe + cechy BL (mapy DE)", () => {
+describe("localizeProduct — pola wolnotekstowe + cechy z importu (mapy DE)", () => {
   const withExtras = () => ({
     ...baseProduct(),
     construction: "Lite drewno dębowe, niska bryła, bez zagłówka",
