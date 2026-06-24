@@ -15,6 +15,8 @@ type CreateOrderInput = {
   shippingAddress: Address;
   promoCodeId?: string | null;
   promoDiscount?: number;
+  currency: "pln" | "eur";
+  fxRate: number | null;
 };
 
 export async function createOrder({
@@ -25,6 +27,8 @@ export async function createOrder({
   shippingAddress,
   promoCodeId,
   promoDiscount,
+  currency,
+  fxRate,
 }: CreateOrderInput) {
   // Service role — pomijamy RLS, walidacja jest w API route (ceny, stock, auth)
   const supabase = await createAdminClient();
@@ -38,6 +42,8 @@ export async function createOrder({
       shipping_address: shippingAddress as unknown as Record<string, unknown>,
       promo_code_id: promoCodeId ?? null,
       promo_discount: promoDiscount ?? 0,
+      currency,
+      fx_rate: fxRate,
     } as never)
     .select()
     .single();
