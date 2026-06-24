@@ -8,7 +8,8 @@ import { useCart, cartItemKey } from "@/app/_context/CartContext";
 import { formatVariantLabel } from "@/app/_lib/variants";
 import { localizeHref } from "@/app/_lib/i18n";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
-import { formatPrice } from "@/app/_lib/format";
+import { formatMoney } from "@/app/_lib/money";
+import { useEurRate } from "@/app/_lib/rate-context";
 import type { Address } from "@/app/_lib/types";
 
 export default function CheckoutForm({
@@ -24,6 +25,7 @@ export default function CheckoutForm({
 }) {
   const router = useRouter();
   const locale = useClientLocale();
+  const rate = useEurRate();
   const de = locale === "de";
   const { items, total, count, appliedPromo } = useCart();
 
@@ -352,11 +354,11 @@ export default function CheckoutForm({
                       </p>
                     )}
                     <p className="text-xs text-[var(--muted)]">
-                      {item.quantity} × {formatPrice(item.price, locale)}
+                      {item.quantity} × {formatMoney(item.price, locale, rate)}
                     </p>
                   </div>
                   <p className="text-sm font-semibold text-[var(--fg)] whitespace-nowrap">
-                    {formatPrice(item.price * item.quantity, locale)}
+                    {formatMoney(item.price * item.quantity, locale, rate)}
                   </p>
                 </div>
               );
@@ -366,12 +368,12 @@ export default function CheckoutForm({
           <div className="border-t border-[var(--border)] pt-4 flex flex-col gap-2 text-sm">
             <div className="flex justify-between text-[var(--muted)]">
               <span>{c.products}</span>
-              <span>{formatPrice(total, locale)}</span>
+              <span>{formatMoney(total, locale, rate)}</span>
             </div>
             {appliedPromo && discount > 0 && (
               <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
                 <span className="font-mono">{appliedPromo.code}</span>
-                <span>−{formatPrice(discount, locale)}</span>
+                <span>−{formatMoney(discount, locale, rate)}</span>
               </div>
             )}
             <div className="flex justify-between items-start text-[var(--muted)] gap-3">
@@ -384,7 +386,7 @@ export default function CheckoutForm({
             </div>
             <div className="border-t border-[var(--border)] pt-2 flex justify-between font-bold text-base text-[var(--fg)]">
               <span>{c.total}</span>
-              <span>{formatPrice(grandTotal, locale)}</span>
+              <span>{formatMoney(grandTotal, locale, rate)}</span>
             </div>
           </div>
 

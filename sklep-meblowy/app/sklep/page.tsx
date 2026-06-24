@@ -11,6 +11,7 @@ import { getCollection, getAllCollections } from "@/app/_lib/collections";
 import { localizeCollection } from "@/app/_lib/localize";
 import { getUserWishlistIds } from "@/app/_lib/wishlist";
 import { getLocale } from "@/app/_lib/i18n-server";
+import { getEurRate } from "@/app/_lib/store-settings";
 import { localizePath } from "@/app/_lib/i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { alternatesFor } from "@/app/_lib/sitemap-i18n";
@@ -112,9 +113,10 @@ export default async function SklepPage({
   ]);
 
   // Batch pobrania ocen — jedno zapytanie dla całej strony list.
-  const [ratings, wishlistIds] = await Promise.all([
+  const [ratings, wishlistIds, rate] = await Promise.all([
     getRatingsForProducts(products.map((p) => p.id)),
     getUserWishlistIds(),
+    getEurRate(),
   ]);
   const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
 
@@ -203,6 +205,7 @@ export default async function SklepPage({
               categoryLabel={categoryLabels.get(product.category)}
               isInWishlist={wishlistIds.has(product.id)}
               locale={locale}
+              rate={rate}
             />
           ))}
         </div>

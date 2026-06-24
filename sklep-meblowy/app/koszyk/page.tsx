@@ -9,11 +9,13 @@ import { applyPromoCodeAction, getCartCrossSellAction } from "./actions";
 import ProductCard from "@/app/_components/ui/ProductCard";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
-import { formatPrice } from "@/app/_lib/format";
+import { formatMoney } from "@/app/_lib/money";
+import { useEurRate } from "@/app/_lib/rate-context";
 import type { Product } from "@/app/_lib/types";
 
 export default function KoszykPage() {
   const locale = useClientLocale();
+  const rate = useEurRate();
   const t = getDictionary(locale);
   const {
     items,
@@ -200,7 +202,7 @@ export default function KoszykPage() {
 
                     <div className="flex items-center gap-6">
                       <p className="font-sans font-bold text-[var(--fg)]">
-                        {formatPrice(item.price * item.quantity, locale)}
+                        {formatMoney(item.price * item.quantity, locale, rate)}
                       </p>
                       <button
                         onClick={() => remove(item.id, item.variantValues)}
@@ -258,12 +260,12 @@ export default function KoszykPage() {
             <div className="flex flex-col gap-3 text-sm font-sans">
               <div className="flex justify-between text-[var(--muted)]">
                 <span>{t.cart.productsCount} ({count} {t.cart.pieces})</span>
-                <span>{formatPrice(total, locale)}</span>
+                <span>{formatMoney(total, locale, rate)}</span>
               </div>
               {appliedPromo && discount > 0 && (
                 <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
                   <span>{t.cart.discount} ({appliedPromo.code})</span>
-                  <span>−{formatPrice(discount, locale)}</span>
+                  <span>−{formatMoney(discount, locale, rate)}</span>
                 </div>
               )}
               <div className="flex justify-between items-start text-[var(--muted)] gap-3">
@@ -278,7 +280,7 @@ export default function KoszykPage() {
               </div>
               <div className="border-t border-[var(--border)] pt-3 flex justify-between font-bold text-base text-[var(--fg)]">
                 <span>{t.cart.total}</span>
-                <span>{formatPrice(grandTotal, locale)}</span>
+                <span>{formatMoney(grandTotal, locale, rate)}</span>
               </div>
             </div>
 
@@ -324,6 +326,7 @@ export default function KoszykPage() {
                 isInWishlist={crossSellWishlist.has(p.id)}
                 categoryLabel={crossSellLabels[p.category]}
                 locale={locale}
+                rate={rate}
               />
             ))}
           </div>

@@ -25,6 +25,7 @@ import ProductDescriptionSections from "@/app/_components/ui/ProductDescriptionS
 import { COMPANY } from "@/app/_lib/company";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { localizePath, localizeHref } from "@/app/_lib/i18n";
+import { getEurRate } from "@/app/_lib/store-settings";
 import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import type { Product } from "@/app/_lib/types";
@@ -87,7 +88,7 @@ export default async function ProduktPage({ params }: Props) {
   const product = await getProduct(id, locale);
   if (!product) notFound();
 
-  const [related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell, wishlistIds] =
+  const [related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell, wishlistIds, rate] =
     await Promise.all([
       getRelatedProducts(product.id, product.category, 4, locale),
       getProductRating(product.id),
@@ -97,6 +98,7 @@ export default async function ProduktPage({ params }: Props) {
       getAllCategories(locale),
       getCrossSellProducts([product.category], [product.id], 4, locale),
       getUserWishlistIds(),
+      getEurRate(),
     ]);
 
   // Etykieta cross-sell pochodzi z LABELA pierwszej cross_sell_categories tej
@@ -310,7 +312,7 @@ export default async function ProduktPage({ params }: Props) {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {crossSell.map((p) => (
-              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} locale={locale} />
+              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} locale={locale} rate={rate} />
             ))}
           </div>
         </section>
@@ -334,7 +336,7 @@ export default async function ProduktPage({ params }: Props) {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {collectionSiblings.map((p) => (
-              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} locale={locale} />
+              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} locale={locale} rate={rate} />
             ))}
           </div>
         </section>
@@ -405,7 +407,7 @@ export default async function ProduktPage({ params }: Props) {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {related.map((p) => (
-              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} locale={locale} />
+              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} locale={locale} rate={rate} />
             ))}
           </div>
         </section>
