@@ -9,6 +9,8 @@ import { formatMoney } from "@/app/_lib/money";
 import { useEurRate } from "@/app/_lib/rate-context";
 import ImageGallery from "./ImageGallery";
 import ProductActions from "./ProductActions";
+import SizeSelector from "./SizeSelector";
+import type { SizeOption } from "@/app/_lib/size-groups";
 import StarRating from "./StarRating";
 import InquiryModal from "./InquiryModal";
 
@@ -25,6 +27,7 @@ export default function ProductMainSection({
   categoryLabel,
   rating,
   specifications,
+  sizeOptions,
 }: {
   product: Product;
   categoryLabel: string | null;
@@ -32,6 +35,7 @@ export default function ProductMainSection({
   // Cechy produktu w sekcji "Specyfikacja" — Wymiary, Waga, Materiał, etc.
   // plus dodatkowe features z importu. Renderowane w lewej kolumnie pod galerią.
   specifications: { label: string; value: string }[];
+  sizeOptions: SizeOption[];
 }) {
   const locale = useClientLocale();
   const rate = useEurRate();
@@ -104,6 +108,8 @@ export default function ProductMainSection({
             {formatMoney(currentPrice, locale, rate)}
           </p>
         </div>
+
+        <SizeSelector options={sizeOptions} />
 
         <ProductActions
           product={product}

@@ -5,6 +5,7 @@ import {
   getProduct,
   getRelatedProducts,
   getCrossSellProducts,
+  getSizeSiblings,
 } from "@/app/_lib/products";
 import { getCategoryLabel, getAllCategories } from "@/app/_lib/categories";
 import { getCollection, getCollectionSiblings } from "@/app/_lib/collections";
@@ -29,6 +30,7 @@ import { getEurRate } from "@/app/_lib/store-settings";
 import { convertToEur } from "@/app/_lib/money";
 import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
+import { buildSizeOptions } from "@/app/_lib/size-groups";
 import type { Product } from "@/app/_lib/types";
 
 type Props = { params: Promise<{ id: string }> };
@@ -88,6 +90,12 @@ export default async function ProduktPage({ params }: Props) {
   const t = getDictionary(locale);
   const product = await getProduct(id, locale);
   if (!product) notFound();
+
+  // Selektor rozmiaru: rodzeństwo z tym samym size_group (osobne aukcje per rozmiar).
+  const sizeSiblings = product.size_group
+    ? await getSizeSiblings(product.size_group, locale)
+    : [];
+  const sizeOptions = buildSizeOptions(sizeSiblings, product.id);
 
   const [related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell, wishlistIds, rate] =
     await Promise.all([
@@ -238,6 +246,7 @@ export default async function ProduktPage({ params }: Props) {
         categoryLabel={categoryLabel ?? null}
         rating={rating}
         specifications={details}
+        sizeOptions={sizeOptions}
       />
 
       {/* Sekcja: opis produktu.
