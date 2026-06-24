@@ -23,6 +23,8 @@ export type NewProductPayload = {
   collection_id: null;
   is_active: boolean;
   needs_translation: boolean;
+  sale_price: null;
+  omnibus_price: null;
 };
 
 export function buildNewProductPayload(input: {
@@ -73,6 +75,8 @@ export function buildNewProductPayload(input: {
       collection_id: null,
       is_active: true,
       needs_translation: true,
+      sale_price: null,
+      omnibus_price: null,
     },
   };
 }

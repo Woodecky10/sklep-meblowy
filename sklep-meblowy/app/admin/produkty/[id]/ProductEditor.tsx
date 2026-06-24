@@ -183,6 +183,25 @@ export default function ProductEditor({
             />
           </Field>
 
+          <Field
+            label="Cena promocyjna (zł)"
+            hint={
+              hasVariants(product)
+                ? "Produkt ma warianty — ustaw promocję per kombinacja w sekcji Warianty."
+                : "Zostaw puste = brak promocji. Musi być niższa od ceny regularnej."
+            }
+          >
+            <input
+              name="sale_price"
+              type="number"
+              step="0.01"
+              min="0"
+              defaultValue={product.sale_price ?? ""}
+              className={inputClass}
+              disabled={hasVariants(product)}
+            />
+          </Field>
+
           <Field label="Kategoria" required>
             <select name="category" defaultValue={product.category} required className={inputClass}>
               {categories.map((c) => (

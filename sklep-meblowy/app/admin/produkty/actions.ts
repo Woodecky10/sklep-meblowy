@@ -6,6 +6,7 @@ import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
 import { validateImageUpload } from "@/app/_lib/image-upload";
 import { buildNewProductPayload } from "@/app/_lib/new-product";
+import { recordPriceHistory } from "@/app/_lib/price-history";
 import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-html";
 import type {
   ActionResult,
@@ -129,6 +130,14 @@ export async function updateProductBasics(
   const price = parseNumber(formData.get("price"));
   if (price === null || price < 0) return { ok: false, error: "Cena musi być nieujemna" };
 
+  // Cena promocyjna (Omnibus). Puste = brak. Jeśli ustawiona, musi być < cena regularna.
+  const salePriceRaw = parseNumber(formData.get("sale_price"));
+  if (salePriceRaw !== null) {
+    if (salePriceRaw < 0) return { ok: false, error: "Cena promocyjna nie może być ujemna" };
+    if (salePriceRaw >= price)
+      return { ok: false, error: "Cena promocyjna musi być niższa od ceny regularnej" };
+  }
+
   const category = sanitize(formData.get("category"), 100);
   if (!category) return { ok: false, error: "Kategoria jest wymagana" };
 
@@ -158,6 +167,7 @@ export async function updateProductBasics(
     warranty: emptyToNull(sanitize(formData.get("warranty"), 100)),
     size_group: emptyToNull(sanitize(formData.get("size_group"), 100)),
     size_label: emptyToNull(sanitize(formData.get("size_label"), 100)),
+    sale_price: salePriceRaw,
   };
 
   const supabase = await createAdminClient();
@@ -168,6 +178,7 @@ export async function updateProductBasics(
 
   if (error) return { ok: false, error: error.message };
 
+  await recordPriceHistory(id);
   revalidatePath(`/admin/produkty/${id}`);
   revalidatePath(`/produkt/${id}`);
   revalidatePath("/sklep");
@@ -243,6 +254,15 @@ export async function updateProductVariants(
       if (c.images !== undefined && !Array.isArray(c.images)) {
         return { ok: false, error: "Zdjęcia kombinacji muszą być tablicą" };
       }
+      if (c.sale_price !== undefined && c.sale_price !== null) {
+        if (typeof c.sale_price !== "number" || c.sale_price < 0) {
+          return { ok: false, error: "Cena promocyjna kombinacji musi być liczbą ≥ 0" };
+        }
+        // regularna kombinacji = price bazowa NIE jest tu znana z formularza wariantów;
+        // walidujemy względem modyfikatora: sale musi być < (price_modifier-skorygowana
+        // cena). Pełną regularną zna recordPriceHistory; tu pilnujemy tylko nieujemności
+        // i porównania z modyfikatorem nie robimy (brak ceny bazowej w tym payloadzie).
+      }
     }
   }
 
@@ -254,6 +274,7 @@ export async function updateProductVariants(
 
   if (error) return { ok: false, error: error.message };
 
+  await recordPriceHistory(productId);
   revalidatePath(`/admin/produkty/${productId}`);
   revalidatePath(`/produkt/${productId}`);
   revalidatePath("/sklep");
@@ -574,6 +595,7 @@ export async function createProduct(
     };
   }
 
+  await recordPriceHistory((data as { id: string }).id);
   revalidatePath("/admin/produkty");
   revalidatePath("/sklep");
   return { ok: true, productId: (data as { id: string }).id };

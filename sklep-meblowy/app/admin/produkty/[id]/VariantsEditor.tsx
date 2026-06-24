@@ -379,6 +379,9 @@ export default function VariantsEditor({
                   onPriceModifierChange={(price_modifier) =>
                     patchCombination(i, { price_modifier })
                   }
+                  onSalePriceChange={(sale_price) =>
+                    patchCombination(i, sale_price === null ? { sale_price: undefined } : { sale_price })
+                  }
                   onUpload={(file) => uploadComboImage(i, file)}
                   onAddExisting={(url) => addExistingImage(i, url)}
                   onMoveImage={(imgIdx, dir) => moveComboImage(i, imgIdx, dir)}
@@ -513,6 +516,7 @@ function CombinationRow({
   allVariantImages,
   onStockChange,
   onPriceModifierChange,
+  onSalePriceChange,
   onUpload,
   onAddExisting,
   onMoveImage,
@@ -525,6 +529,7 @@ function CombinationRow({
   allVariantImages: string[];
   onStockChange: (stock: number) => void;
   onPriceModifierChange: (mod: number) => void;
+  onSalePriceChange: (v: number | null) => void;
   onUpload: (file: File) => void;
   onAddExisting: (url: string) => void;
   onMoveImage: (imgIdx: number, dir: -1 | 1) => void;
@@ -545,7 +550,7 @@ function CombinationRow({
         {label}
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Field label="Stan magazynowy">
           <input
             type="number"
@@ -562,6 +567,18 @@ function CombinationRow({
             step="0.01"
             value={combo.price_modifier ?? 0}
             onChange={(e) => onPriceModifierChange(Number(e.target.value) || 0)}
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Cena promocyjna (zł)" hint="Puste = brak. < regularnej.">
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={combo.sale_price ?? ""}
+            onChange={(e) =>
+              onSalePriceChange(e.target.value === "" ? null : Number(e.target.value))
+            }
             className={inputClass}
           />
         </Field>
