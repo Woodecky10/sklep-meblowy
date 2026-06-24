@@ -14,7 +14,10 @@ import type {
   ProductVariants,
 } from "@/app/_lib/types";
 
-export type { ActionResult };
+// Uwaga: NIE re-eksportujemy tu ActionResult. To plik "use server" — pod
+// Turbopackiem `export type { X }` bywa kompilowany do runtime'owego
+// `export { X }` bez bindingu → "ReferenceError: ActionResult is not defined"
+// przy ewaluacji modułu akcji. Konsumenci importują typ z @/app/_lib/types.
 
 const STORAGE_BUCKET = "products";
 

@@ -7,9 +7,8 @@ import {
   updateProductBasics,
   updateProductImages,
   uploadProductImage,
-  type ActionResult,
 } from "../actions";
-import type { Product } from "@/app/_lib/types";
+import type { Product, ActionResult } from "@/app/_lib/types";
 import type { CategoryDef } from "@/app/_lib/categories";
 import { hasVariants } from "@/app/_lib/variants";
 import { Field, IconBtn, compressIfNeeded, inputClass, type Toast } from "./_shared";
