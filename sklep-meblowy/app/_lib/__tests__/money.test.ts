@@ -5,6 +5,7 @@ import {
   formatMoney,
   formatOrderAmount,
 } from "@/app/_lib/money";
+import { formatPrice } from "@/app/_lib/format";
 
 describe("convertToEur — pełne euro w górę", () => {
   it("zaokrągla w górę", () => {
@@ -38,9 +39,10 @@ describe("formatMoney — cena katalogowa (PLN w DB)", () => {
     expect(formatMoney(2199, "de", 0.23)).toBe("506 €");
   });
   it("pl: bez konwersji, zł (zachowanie formatPrice)", () => {
-    // Grupowanie tysięcy zależy od danych ICU w runtimie — używamy faktycznego
-    // wyjścia formatPrice zamiast dosłownego "2 199 zł"
-    expect(formatMoney(2199, "pl", 0.23)).toBe(`${(2199).toLocaleString("pl-PL")} zł`);
+    expect(formatMoney(2199, "pl", 0.23)).toBe(formatPrice(2199, "pl"));
+  });
+  it("de: wartość bez reszty", () => {
+    expect(formatMoney(1000, "de", 0.2)).toBe("200 €");
   });
 });
 
@@ -49,8 +51,6 @@ describe("formatOrderAmount — kwota w walucie zamówienia", () => {
     expect(formatOrderAmount(506, "eur")).toBe("506 €");
   });
   it("pln: zł, grupowanie pl-PL", () => {
-    // Grupowanie tysięcy zależy od danych ICU w runtimie — używamy faktycznego
-    // wyjścia formatPrice zamiast dosłownego "2 199 zł"
-    expect(formatOrderAmount(2199, "pln")).toBe(`${(2199).toLocaleString("pl-PL")} zł`);
+    expect(formatOrderAmount(2199, "pln")).toBe(formatPrice(2199, "pl"));
   });
 });
