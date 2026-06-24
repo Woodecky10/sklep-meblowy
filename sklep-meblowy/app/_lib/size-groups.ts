@@ -9,6 +9,8 @@ type SizeSibling = { id: string; size_label: string | null; name: string };
 // Buduje opcje selektora rozmiaru z rodzeństwa (produktów z tym samym size_group).
 // Etykieta = size_label (po trim) lub nazwa produktu jako fallback.
 // Sortowanie naturalne po etykiecie (numeric) → "140×200" < "160×200" < "180×200".
+// Locale przypięte do "pl" (nie default runtime'u) — sort deterministyczny po
+// stronie serwera niezależnie od locale OS/Node.
 // Zwraca [] gdy < 2 pozycji — jedna aukcja nie potrzebuje selektora.
 export function buildSizeOptions(
   siblings: SizeSibling[],
@@ -20,7 +22,7 @@ export function buildSizeOptions(
     current: s.id === currentId,
   }));
   options.sort((a, b) =>
-    a.label.localeCompare(b.label, undefined, { numeric: true })
+    a.label.localeCompare(b.label, "pl", { numeric: true })
   );
   return options.length >= 2 ? options : [];
 }
