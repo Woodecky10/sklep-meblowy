@@ -6,7 +6,6 @@ import {
   getVariantImages,
   getVariantPrice,
   getVariantEffectivePrice,
-  getVariantSalePrice,
   getVariantOmnibus,
   isVariantOnSale,
 } from "@/app/_lib/variants";

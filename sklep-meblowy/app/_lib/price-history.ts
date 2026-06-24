@@ -58,9 +58,8 @@ export async function recordPriceHistory(productId: string): Promise<void> {
       const k = variantKey(c.values);
       if (!omniByKey.has(k)) return c;
       const v = omniByKey.get(k);
-      // number → ustaw; null → wyczyść (pomijamy pole)
-      const { omnibus_price: _drop, ...rest } = c;
-      return v == null ? rest : { ...rest, omnibus_price: v };
+      // number → ustaw; null → wyczyść (undefined znika przy serializacji JSON do kolumny).
+      return v == null ? { ...c, omnibus_price: undefined } : { ...c, omnibus_price: v };
     });
     update.variants = { ...variants, combinations: nextCombos };
   }

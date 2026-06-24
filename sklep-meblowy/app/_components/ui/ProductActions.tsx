@@ -4,7 +4,6 @@ import type { Product } from "@/app/_lib/types";
 import {
   hasVariants,
   isVariantSelectionComplete,
-  getVariantPrice,
   getVariantEffectivePrice,
 } from "@/app/_lib/variants";
 import VariantSelector from "./VariantSelector";
