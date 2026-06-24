@@ -110,7 +110,6 @@ export type Product = {
   // w DescriptionSectionsEditor — sync BL ich nie ustawia.
   description_sections: ProductDescriptionSection[];
   variants: ProductVariants | null;
-  baselinker_id: string | null;
   collection_id: string | null;
   // Widoczność w sklepie (RLS). false = ukryty. deactivation_source: kto ukrył.
   is_active: boolean;
@@ -142,7 +141,7 @@ export type Address = {
   city: string;
   postal_code: string;
   country: string;
-  // Imię i nazwisko adresata (potrzebne dla BaseLinker / kuriera).
+  // Imię i nazwisko adresata (potrzebne dla wysyłki / przewoźnika).
   // Optional, bo stare zamówienia w DB go nie mają.
   fullname?: string;
   // Telefon kontaktowy (opcjonalny).

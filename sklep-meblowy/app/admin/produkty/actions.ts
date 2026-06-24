@@ -265,12 +265,8 @@ export async function updateProductVariants(
 // są CASCADE, inquiries SET NULL — usuną się automatycznie.
 //
 // Storage cleanup: tylko URL-e w naszym bucket "products" są usuwane
-// fizycznie. URL-e zewnętrzne (BaseLinker, Unsplash) zostają w sieci
+// fizycznie. URL-e zewnętrzne (Unsplash itp.) zostają w sieci
 // — nie nasze, nie nasz problem. Czyścimy też zdjęcia variantów.
-//
-// UWAGA: nie usuwa produktu z BaseLinkera. BL to osobne źródło prawdy —
-// produkt usuwa się tam niezależnie, w panelu BL. Tu czyścimy tylko
-// kopię w naszej bazie.
 export async function deleteProduct(formData: FormData): Promise<ActionResult> {
   await requireAdmin();
 
@@ -349,7 +345,6 @@ export async function deleteProduct(formData: FormData): Promise<ActionResult> {
 // setProductActive — ręczne ukrycie/przywrócenie produktu
 // ============================================================
 // Ukrycie → is_active=false, deactivation_source='manual'
-// (sync BaseLinker NIE reaktywuje produktów ukrytych ręcznie).
 // Przywrócenie → is_active=true, deactivation_source=null.
 export async function setProductActive(
   productId: string,
@@ -545,7 +540,7 @@ export async function saveProductDe(
 }
 
 // ============================================================
-// Tworzenie nowego produktu (natywne — bez BaseLinkera)
+// Tworzenie nowego produktu (natywne)
 // ============================================================
 // Minimalny szkic (nazwa/cena/kategoria). Resztę admin uzupełnia w edytorze
 // /admin/produkty/[id]. Zwraca productId do redirectu po stronie klienta.

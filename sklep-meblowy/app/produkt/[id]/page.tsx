@@ -175,7 +175,7 @@ export default async function ProduktPage({ params }: Props) {
     name: product.name,
     description: plainDescription,
     image: product.images ?? [],
-    sku: product.baselinker_id ?? product.id,
+    sku: product.id,
     brand: {
       "@type": "Brand",
       name: COMPANY.brandName,

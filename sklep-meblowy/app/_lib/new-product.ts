@@ -21,7 +21,6 @@ export type NewProductPayload = {
   delivery_time: null;
   warranty: null;
   collection_id: null;
-  baselinker_id: null;
   is_active: boolean;
   needs_translation: boolean;
 };
@@ -72,7 +71,6 @@ export function buildNewProductPayload(input: {
       delivery_time: null,
       warranty: null,
       collection_id: null,
-      baselinker_id: null,
       is_active: true,
       needs_translation: true,
     },
