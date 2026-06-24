@@ -4,7 +4,7 @@ import { requireAdmin } from "@/app/_lib/admin";
 import { getOrderById, getProfilesByIds } from "@/app/_lib/orders";
 import { orderCustomerDisplay } from "@/app/_lib/admin-orders";
 import { ADMIN_STATUS_LABELS, nextStatuses } from "@/app/_lib/order-status";
-import { formatPrice } from "@/app/_lib/format";
+import { formatOrderAmount } from "@/app/_lib/money";
 import { formatVariantLabel } from "@/app/_lib/variants";
 import { Card } from "@/app/admin/_shared";
 import OrderControls from "./OrderControls";
@@ -95,11 +95,11 @@ export default async function AdminOrderDetailPage({
                       </p>
                     )}
                     <p className="text-sm text-[var(--muted)] mt-1">
-                      {item.quantity} × {formatPrice(Number(item.price), "pl")}
+                      {item.quantity} × {formatOrderAmount(Number(item.price), order.currency)}
                     </p>
                   </div>
                   <p className="font-semibold text-[var(--fg)] whitespace-nowrap">
-                    {formatPrice(Number(item.price) * item.quantity, "pl")}
+                    {formatOrderAmount(Number(item.price) * item.quantity, order.currency)}
                   </p>
                 </div>
               ))}
@@ -108,7 +108,7 @@ export default async function AdminOrderDetailPage({
             <dl className="border-t border-[var(--border)] mt-4 pt-4 flex flex-col gap-2 text-sm">
               <div className="flex justify-between text-[var(--muted)]">
                 <dt>Produkty</dt>
-                <dd>{formatPrice(subtotal, "pl")}</dd>
+                <dd>{formatOrderAmount(subtotal, order.currency)}</dd>
               </div>
               {promoDiscount > 0 && (
                 <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
@@ -118,12 +118,12 @@ export default async function AdminOrderDetailPage({
                       <span className="ml-1 font-mono text-xs">({order.promo_code.code})</span>
                     )}
                   </dt>
-                  <dd>−{formatPrice(promoDiscount, "pl")}</dd>
+                  <dd>−{formatOrderAmount(promoDiscount, order.currency)}</dd>
                 </div>
               )}
               <div className="flex justify-between border-t border-[var(--border)] pt-2 font-bold text-base text-[var(--fg)]">
                 <dt>Zapłacono</dt>
-                <dd>{formatPrice(Number(order.total), "pl")}</dd>
+                <dd>{formatOrderAmount(Number(order.total), order.currency)}</dd>
               </div>
             </dl>
           </Card>

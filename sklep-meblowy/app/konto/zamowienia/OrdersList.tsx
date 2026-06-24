@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { localizeHref } from "@/app/_lib/i18n";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
+import { formatOrderAmount } from "@/app/_lib/money";
 import type { Order, OrderItem, OrderStatus } from "@/app/_lib/types";
 
 const STATUS_LABELS: Record<OrderStatus, { label: string; labelDe: string; className: string }> = {
@@ -145,7 +146,7 @@ export default function OrdersList({
               </span>
 
               <p className="font-display text-lg font-bold text-[var(--fg)] whitespace-nowrap">
-                {Number(order.total).toLocaleString(locale)} zł
+                {formatOrderAmount(Number(order.total), order.currency)}
               </p>
             </Link>
           );
