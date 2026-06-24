@@ -18,7 +18,8 @@ export const getEurRate = cache(async (): Promise<number> => {
       .single();
     const rate = data ? Number((data as { eur_rate: number }).eur_rate) : NaN;
     return Number.isFinite(rate) && rate > 0 ? rate : DEFAULT_EUR_RATE;
-  } catch {
+  } catch (err) {
+    console.error("[store-settings] getEurRate failed, using DEFAULT_EUR_RATE", err);
     return DEFAULT_EUR_RATE;
   }
 });
