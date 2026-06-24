@@ -1,5 +1,5 @@
 // ============================================================
-// Sanitize HTML opisu produktu (z BaseLinkera lub admina)
+// Sanitize HTML opisu produktu
 // ============================================================
 // Regex-based whitelist sanitizer — bez external deps (zero jsdom,
 // zero @exodus/bytes ESM mismatch w runtime Vercela).
@@ -7,7 +7,7 @@
 // Whitelist tagów odpowiednich dla opisów mebli — strukturalne paragrafy,
 // listy, podkreślenia, nagłówki H2-H4 i linki. Bez img/video/script/iframe.
 //
-// Source produktu jest zaufany (admin lub BL → sklep), więc nie potrzebujemy
+// Source produktu jest zaufany (admin → sklep), więc nie potrzebujemy
 // pełnej HTML5 spec compliance. Wystarczy whitelist + block javascript:.
 
 import type { ProductDescriptionSection } from "@/app/_lib/types";
@@ -45,10 +45,9 @@ const ALLOWED_ATTRS_PER_TAG: Record<string, Set<string>> = {
   span: new Set(["style"]),
 };
 
-// Domeny które wycinamy z linków w opisie BL — sprzedaż na Allegro idzie
-// przez BL, więc w opisach z BL regularnie pojawiają się linki "Zobacz
-// inne aukcje" i podobne CTA niespójne ze sklepem Mollien.
-// Strategia: zachowaj tekst linku, usuń sam tag <a>.
+// Domeny które wycinamy z linków w opisie — w opisach produktów regularnie
+// pojawiają się linki "Zobacz inne aukcje" i podobne CTA niespójne ze sklepem
+// Mollien. Strategia: zachowaj tekst linku, usuń sam tag <a>.
 const BLOCKED_LINK_DOMAINS = [
   "allegro.pl",
   "allegrolokalnie.pl",

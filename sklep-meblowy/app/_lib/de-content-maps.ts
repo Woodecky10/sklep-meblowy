@@ -1,7 +1,7 @@
 // Ręczne mapy tłumaczeń DE dla treści z DB, która NIE ma własnych kolumn `_de`
-// (kategorie/grupy, wolnotekstowe pola produktu, cechy BL, warianty). DeepL
-// został usunięty (tłumaczenia ręczne), a te wartości pochodzą z BaseLinkera /
-// panelu admina i są skończonym, znanym zbiorem dla bieżącego katalogu.
+// (kategorie/grupy, wolnotekstowe pola produktu, cechy produktu, warianty). DeepL
+// został usunięty (tłumaczenia ręczne), a te wartości pochodzą z panelu admina
+// i są skończonym, znanym zbiorem dla bieżącego katalogu.
 //
 // Wzorzec użycia: `MAPA[wartośćPL] ?? wartośćPL` — nieznane wartości (kody tkanin
 // typu "MANILA 01", wymiary "180x200", nazwy własne) przechodzą bez zmian.
@@ -64,7 +64,7 @@ export const WARRANTY_DE: Record<string, string> = {
   "5 lat": "5 Jahre",
 };
 
-// ── Cechy produktu (BL features): klucze i (tłumaczalne) wartości ──
+// ── Cechy produktu: klucze i (tłumaczalne) wartości ──
 export const FEATURE_KEY_DE: Record<string, string> = {
   "Głębokość mebla": "Möbeltiefe",
   Kolekcja: "Kollektion",

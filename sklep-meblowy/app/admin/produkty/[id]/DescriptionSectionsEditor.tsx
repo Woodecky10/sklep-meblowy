@@ -12,12 +12,12 @@ import RichTextEditor from "./RichTextEditor";
 type SectionRow = { id: string; data: ProductDescriptionSection };
 
 // Edytor sekcji opisu produktu:
-// - Sekcje text (z BL) są read-only — admin widzi pierwsze 80 znaków preview
+// - Sekcje text (z importu) są read-only — admin widzi pierwsze 80 znaków preview
 // - Sekcje image (admin) — pełna edycja: alt, caption, usuń, move up/down
 // - Między każdą parą sekcji przycisk "+ Dodaj zdjęcie" wstawia image section
 //
 // Wszystkie sekcje opisu (tekst i obrazy) są w pełni zarządzane tutaj,
-// ręcznie przez admina — sync BL ich nie dotyka (od rewizji 2026-06-09).
+// ręcznie przez admina.
 export default function DescriptionSectionsEditor({
   productId,
   initial,
@@ -153,13 +153,11 @@ export default function DescriptionSectionsEditor({
           Sekcje opisu produktu
         </h2>
         <p className="text-sm text-[var(--muted)] mt-1 max-w-2xl leading-relaxed">
-          Wszystkie sekcje opisu są zarządzane <strong>tutaj</strong> — sync
-          z BaseLinkerem ich nie zmienia ani nie nadpisuje.
-          Sekcje zaimportowane kiedyś z BL możesz <strong>nadpisać</strong>
+          Wszystkie sekcje opisu są zarządzane <strong>tutaj</strong>.
+          Sekcje pochodzące z dawnego importu możesz <strong>nadpisać</strong>
           (przycisk „Edytuj override”) albo ukryć.
           <br />
-          Nowe treści dodajesz przyciskami „+ Własna sekcja” (tekst) i
-          „+ Zdjęcie” — wszystkie przeżywają kolejne sync z BL.
+          Nowe treści dodajesz przyciskami „+ Własna sekcja” (tekst) i „+ Zdjęcie”.
         </p>
       </div>
 
@@ -193,8 +191,7 @@ export default function DescriptionSectionsEditor({
                     // Trzymamy explicit boolean (true/false), nie undefined.
                     // Bo gdy admin un-hide (true → false), merge logic
                     // potrzebuje wiedzieć że admin nadal "ma kontrolę" nad
-                    // sekcją — żeby nie dropować jej gdy BL przestaje
-                    // dawać. Patrz override check w baselinker-sync.ts.
+                    // sekcją — żeby nie dropować jej przy kolejnych zmianach.
                     hidden: v,
                   } as Partial<ProductDescriptionSection>)
                 }
@@ -232,8 +229,7 @@ export default function DescriptionSectionsEditor({
         {sections.length === 0 && (
           <p className="text-sm text-[var(--muted)] italic py-6 text-center">
             Brak sekcji opisu. Dodaj własną sekcję tekstową lub zdjęcie
-            przyciskiem powyżej — opisy są zarządzane tutaj, sync z BL ich
-            nie tworzy.
+            przyciskiem powyżej.
           </p>
         )}
       </div>
@@ -275,19 +271,19 @@ function TextSectionRow({
   onAdminBodyChange: (v: string) => void;
   onToggleHidden: (v: boolean) => void;
   // Dla admin_custom sekcji edytujemy title/body bezpośrednio (nie przez
-  // override) — bo nie ma BL truth. Dla BL sekcji te callbacki nie są
-  // używane.
+  // override) — bo nie ma źródłowej treści do nadpisania. Dla sekcji z importu
+  // te callbacki nie są używane.
   onTitleChange: (v: string) => void;
   onBodyChange: (v: string) => void;
-  // onRemove obecne tylko dla admin_custom sekcji — sekcji z BL nie można
-  // usunąć (sync je odtworzy). Można je tylko ukryć (hidden=true).
+  // onRemove obecne tylko dla admin_custom sekcji — sekcji z importu nie można
+  // usunąć (istnieją trwale). Można je tylko ukryć (hidden=true).
   onRemove?: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
 }) {
   // Override = admin coś realnie ustawił. Pomijamy whitespace-only stringi
   // (puste / same spacje nie są realnym override). hidden=true liczy się jako
-  // "admin tknął" — patrz onToggleHidden i merge logic w baselinker-sync.ts.
+  // "admin tknął" — patrz onToggleHidden i merge logic.
   const hasTitleOverride = (section.admin_title?.trim().length ?? 0) > 0;
   const hasBodyOverride = (section.admin_body?.trim().length ?? 0) > 0;
   const hasOverride = hasTitleOverride || hasBodyOverride || section.hidden === true;
@@ -366,7 +362,7 @@ function TextSectionRow({
           </p>
           <div className="flex items-center gap-3 mt-2 flex-wrap">
             <p className="text-[10px] font-sans uppercase tracking-widest text-[var(--muted)]">
-              {hasOverride ? "Nadpisana przez admina" : "Z BaseLinkera (import) — edytuj przez override"}
+              {hasOverride ? "Nadpisana przez admina" : "Z importu — edytuj przez override"}
             </p>
             <button
               type="button"
@@ -395,7 +391,7 @@ function TextSectionRow({
         <div className="border-t border-[var(--border)] pt-3 flex flex-col gap-3">
           <div>
             <label className="block text-[10px] font-sans uppercase tracking-widest text-[var(--muted)] mb-1">
-              Nadpisz tytuł (zostaw puste = z BL)
+              Nadpisz tytuł (zostaw puste = z importu)
             </label>
             <input
               type="text"
@@ -408,13 +404,13 @@ function TextSectionRow({
           </div>
           <div>
             <label className="block text-[10px] font-sans uppercase tracking-widest text-[var(--muted)] mb-1">
-              Nadpisz treść (zostaw puste = z BL).
+              Nadpisz treść (zostaw puste = z importu).
             </label>
             <RichTextEditor
               value={section.admin_body ?? ""}
               onChange={onAdminBodyChange}
               ariaLabel="Nadpisz treść sekcji"
-              placeholder={section.body.slice(0, 80) || "Wpisz treść, by nadpisać import z BL"}
+              placeholder={section.body.slice(0, 80) || "Wpisz treść, by nadpisać import"}
             />
           </div>
           <label className="flex items-center gap-2 text-xs text-[var(--fg)] cursor-pointer">
@@ -501,8 +497,7 @@ function ImageSectionRow({
 }
 
 // Inline editable text section (admin custom) — admin pisze title i body
-// bezpośrednio, bez override panel. Sekcja jest niezależna od BL i przeżywa
-// kolejne sync.
+// bezpośrednio, bez override panel. Sekcja jest niezależna od importu.
 function CustomTextSectionRow({
   section,
   onTitleChange,
@@ -527,7 +522,7 @@ function CustomTextSectionRow({
       </div>
       <div className="flex-1 min-w-0 flex flex-col gap-2">
         <p className="text-[10px] font-sans uppercase tracking-widest text-[var(--color-gold)]">
-          Własna sekcja (twoja) — przeżyje sync z BL
+          Własna sekcja (twoja)
         </p>
         <input
           type="text"

@@ -28,7 +28,7 @@ export type ProductVariant = {
 
 // Override-y wyświetlanych nazw — admin może zmienić "Wariant" → "Kolor"
 // i "01 beż drewniany stelaż" → "Beż drewniany". Zapisane oddzielnie żeby
-// sync z BL nie nadpisał ich (BL przy każdym sync zwraca surowe nazwy).
+// kolejny import nie nadpisał ich (import zwraca surowe nazwy).
 export type ProductVariantOverrides = {
   // np. {"Wariant": "Kolor"}
   option_names?: Record<string, string>;
@@ -42,9 +42,9 @@ export type ProductVariants = {
   overrides?: ProductVariantOverrides;
 };
 
-// Cecha produktu z BL — wszystko co admin wrzuca w "Cechy produktu" w BL
+// Cecha produktu — wszystko co admin wrzuca w "Cechy produktu"
 // trafia tutaj jako para {key, value}. Array (nie obiekt) żeby zachować
-// kolejność z BL — admin może świadomie ustawić kolejność wyświetlania.
+// kolejność — admin może świadomie ustawić kolejność wyświetlania.
 export type ProductFeature = {
   key: string;
   value: string;
@@ -53,11 +53,11 @@ export type ProductFeature = {
 // Sekcja opisu produktu — IKEA-style akordeony na karcie produktu.
 // Discriminated union: text lub image (oba zarządzane ręcznie w panelu).
 // Sekcje opisu są zarządzane ręcznie przez admina w /admin/produkty/[id]
-// (DescriptionSectionsEditor) — sync BL ich nie ustawia (od rewizji 2026-06-09).
+// (DescriptionSectionsEditor).
 export type ProductDescriptionSectionText = {
   kind: "text";
   // title + body wpisane przez admina (gdy admin_custom=true) lub
-  // zaimportowane historycznie — w każdym razie niezależne od BL sync.
+  // zaimportowane historycznie — zarządzane ręcznie.
   title: string;
   body: string;
   // Per-product admin overrides (ukrycie sekcji itp.).
@@ -68,11 +68,10 @@ export type ProductDescriptionSectionText = {
   admin_title?: string;
   admin_body?: string;
   hidden?: boolean;
-  // Sekcja dodana przez admina (NIE pochodzi z BL). Merge logic NIE
-  // próbuje match-ować jej do żadnego pola BL — istnieje niezależnie,
-  // przeżywa sync analogicznie do image sekcji. Title/body są edytowalne
-  // bezpośrednio (nie przez admin_title/admin_body), bo nie ma "BL truth"
-  // do nadpisania.
+  // Sekcja dodana przez admina (własna, nie z importu). Merge logic NIE
+  // próbuje match-ować jej do żadnych pól importu — istnieje niezależnie,
+  // analogicznie do sekcji image. Title/body są edytowalne
+  // bezpośrednio (nie przez admin_title/admin_body).
   admin_custom?: boolean;
 };
 
@@ -102,12 +101,12 @@ export type Product = {
   construction: string | null;
   delivery_time: string | null;
   warranty: string | null;
-  // Pełen zestaw cech z BL — duplikuje też te które mają dedykowane
+  // Pełen zestaw cech produktu — duplikuje też te które mają dedykowane
   // kolumny (kolor, materiał itd.) dla wygody wyświetlania. Pusta tablica
-  // gdy produkt nie ma żadnych cech w BL.
+  // gdy produkt nie ma żadnych cech.
   features: ProductFeature[];
   // Sekcje opisu (IKEA-style akordeony). Zarządzane ręcznie przez admina
-  // w DescriptionSectionsEditor — sync BL ich nie ustawia.
+  // w DescriptionSectionsEditor.
   description_sections: ProductDescriptionSection[];
   variants: ProductVariants | null;
   collection_id: string | null;

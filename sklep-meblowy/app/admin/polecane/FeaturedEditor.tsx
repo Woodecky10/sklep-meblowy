@@ -179,7 +179,7 @@ function AddForm({
     return (
       <div className="p-4 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-sm text-[var(--muted)]">
         Wszystkie istniejące produkty są już w polecanych. Żeby dodać kolejny, najpierw
-        zsynchronizuj nowy produkt z BaseLinkera (Admin → BaseLinker).
+        dodaj nowy produkt (Admin → Produkty → Nowy produkt).
       </div>
     );
   }
