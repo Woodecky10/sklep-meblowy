@@ -153,6 +153,22 @@ export async function updateProductBasics(
   // UWAGA: pole `description` celowo pomijane w updates — opis nie jest
   // synchronizowany z importem (mapBlToProduct go nie ustawia). Opis edytuje się
   // przez sekcje w DescriptionSectionsEditor, nie przez to pole.
+  const supabase = await createAdminClient();
+
+  // Defense-in-depth: ignoruj product-level sale_price gdy produkt ma warianty.
+  // UI wyłącza to pole dla produktów z wariantami, ale crafted POST mógłby go ustawić
+  // → karta by reklamowała obniżkę, której checkout nie honoruje (variant promo ≠
+  // product-level promo). Dla variant-produktów bezwarunkowo null.
+  const { data: existing } = await supabase
+    .from("products")
+    .select("variants")
+    .eq("id", id)
+    .maybeSingle();
+  const productHasVariants =
+    !!(existing as { variants?: { combinations?: unknown[] } } | null)
+      ?.variants?.combinations?.length;
+  const salePriceToSave = productHasVariants ? null : salePriceRaw;
+
   const updates: Record<string, unknown> = {
     name,
     price,
@@ -167,10 +183,9 @@ export async function updateProductBasics(
     warranty: emptyToNull(sanitize(formData.get("warranty"), 100)),
     size_group: emptyToNull(sanitize(formData.get("size_group"), 100)),
     size_label: emptyToNull(sanitize(formData.get("size_label"), 100)),
-    sale_price: salePriceRaw,
+    sale_price: salePriceToSave,
   };
 
-  const supabase = await createAdminClient();
   const { error } = await supabase
     .from("products")
     .update(updates as never)
