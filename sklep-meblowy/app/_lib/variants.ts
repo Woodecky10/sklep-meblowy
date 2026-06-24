@@ -1,6 +1,7 @@
 import type { Product, ProductVariant } from "./types";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "./de-content-maps";
+import { effectivePrice, isOnSale } from "./pricing";
 
 // Czy produkt ma warianty (i przynajmniej jedną opcję)?
 export function hasVariants(product: Product): boolean {
@@ -133,5 +134,56 @@ export function getValueDisplayLabel(
 ): string {
   return (
     product.variants?.overrides?.value_labels?.[optionName]?.[value] ?? value
+  );
+}
+
+// Deterministyczny klucz kombinacji (nazwy opcji posortowane). Współdzielony
+// z VariantsEditor i price-history, żeby kluczowanie było spójne.
+export function variantKey(values: Record<string, string>): string {
+  return Object.entries(values)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${v}`)
+    .join("|");
+}
+
+// Cena promocyjna wybranej jednostki (kombinacja lub poziom produktu).
+export function getVariantSalePrice(
+  product: Product,
+  selectedValues: Record<string, string>
+): number | null {
+  if (!hasVariants(product)) return product.sale_price ?? null;
+  const variant = findVariant(product, selectedValues);
+  return variant?.sale_price ?? null;
+}
+
+// Najniższa cena z 30 dni dla wybranej jednostki (zdenormalizowana).
+export function getVariantOmnibus(
+  product: Product,
+  selectedValues: Record<string, string>
+): number | null {
+  if (!hasVariants(product)) return product.omnibus_price ?? null;
+  const variant = findVariant(product, selectedValues);
+  return variant?.omnibus_price ?? null;
+}
+
+// Czy wybrana jednostka jest w promocji (sale < regularna).
+export function isVariantOnSale(
+  product: Product,
+  selectedValues: Record<string, string>
+): boolean {
+  return isOnSale(
+    getVariantPrice(product, selectedValues),
+    getVariantSalePrice(product, selectedValues)
+  );
+}
+
+// Cena efektywna wybranej jednostki (promocyjna gdy w promocji, inaczej regularna).
+export function getVariantEffectivePrice(
+  product: Product,
+  selectedValues: Record<string, string>
+): number {
+  return effectivePrice(
+    getVariantPrice(product, selectedValues),
+    getVariantSalePrice(product, selectedValues)
   );
 }

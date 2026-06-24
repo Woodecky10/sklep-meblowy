@@ -15,20 +15,11 @@ import {
   inputClass,
   type Toast,
 } from "./_shared";
-import { formatVariantLabel } from "@/app/_lib/variants";
+import { formatVariantLabel, variantKey } from "@/app/_lib/variants";
 
 // ============================================================
-// Pomocnicze: klucz kombinacji + cartesian product + rebuild
+// Pomocnicze: cartesian product + rebuild
 // ============================================================
-
-// Deterministyczny klucz dla mapy: nazwy opcji posortowane,
-// żeby kolejność wstawiania nie zmieniała klucza.
-function variantKey(values: Record<string, string>): string {
-  return Object.entries(values)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => `${k}=${v}`)
-    .join("|");
-}
 
 // Wszystkie kombinacje opcji (cartesian product).
 function cartesianProduct(
