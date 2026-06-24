@@ -48,17 +48,6 @@ function parseInteger(input: unknown, fallback = 0): number {
   return fallback;
 }
 
-function parseOptionalBigInt(input: unknown): number | null {
-  if (input === undefined || input === null) return null;
-  if (typeof input === "string") {
-    const trimmed = input.trim();
-    if (trimmed === "") return null;
-    const n = Number(trimmed);
-    return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;
-  }
-  return null;
-}
-
 // ============================================================
 // CATEGORY GROUPS — grupy top-level (np. Salon, Sypialnia)
 // ============================================================
@@ -161,7 +150,6 @@ export async function createCategory(formData: FormData): Promise<ActionResult> 
   if (!slug) return { ok: false, error: "Nie udało się wygenerować sluga" };
 
   const labelDe = sanitizeOptionalLabel(formData.get("label_de"));
-  const baselinkerCategoryId = parseOptionalBigInt(formData.get("baselinker_category_id"));
   const sortOrder = parseInteger(formData.get("sort_order"));
   const crossSellCategories = formData
     .getAll("cross_sell_categories")
@@ -176,7 +164,6 @@ export async function createCategory(formData: FormData): Promise<ActionResult> 
       label,
       label_de: labelDe,
       group_id: groupId,
-      baselinker_category_id: baselinkerCategoryId,
       cross_sell_categories: crossSellCategories,
       sort_order: sortOrder,
     } as never);
@@ -203,7 +190,6 @@ export async function updateCategory(formData: FormData): Promise<ActionResult> 
   if (!groupId) return { ok: false, error: "Wybierz grupę" };
 
   const labelDe = sanitizeOptionalLabel(formData.get("label_de"));
-  const baselinkerCategoryId = parseOptionalBigInt(formData.get("baselinker_category_id"));
   const sortOrder = parseInteger(formData.get("sort_order"));
   const active = formData.get("active") === "1";
   const crossSellCategories = formData
@@ -218,7 +204,6 @@ export async function updateCategory(formData: FormData): Promise<ActionResult> 
       label,
       label_de: labelDe,
       group_id: groupId,
-      baselinker_category_id: baselinkerCategoryId,
       cross_sell_categories: crossSellCategories,
       sort_order: sortOrder,
       active,

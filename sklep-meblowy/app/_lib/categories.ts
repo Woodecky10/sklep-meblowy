@@ -57,7 +57,6 @@ export type CategoryDef = {
   label_de: string | null;
   group_id: string;
   group_slug: string;
-  baselinkerCategoryId: number | null;
   // Slugi kategorii do cross-sell (np. dla "lozko-tapicerowane" może być
   // ["materace"] — wtedy w koszyku z łóżkiem polecamy materace).
   crossSellCategories: string[];
@@ -122,7 +121,6 @@ const fetchCategoriesData = unstable_cache(
         label: string;
         label_de: string | null;
         group_id: string;
-        baselinker_category_id: number | null;
         cross_sell_categories: string[] | null;
         sort_order: number;
         active: boolean;
@@ -134,7 +132,6 @@ const fetchCategoriesData = unstable_cache(
         label_de: c.label_de ?? null,
         group_id: c.group_id,
         group_slug: c.group?.slug ?? "",
-        baselinkerCategoryId: c.baselinker_category_id,
         crossSellCategories: c.cross_sell_categories ?? [],
         sort_order: c.sort_order,
         active: c.active,
@@ -228,13 +225,6 @@ export async function getCategoriesBySection(
   return data.categories
     .filter((c) => c.active && c.group_slug === sectionSlug)
     .map((c) => deCat(c, locale));
-}
-
-export async function getCategoryByBaselinkerId(
-  blCategoryId: number
-): Promise<CategoryDef | undefined> {
-  const data = await getData();
-  return data.categories.find((c) => c.baselinkerCategoryId === blCategoryId);
 }
 
 export async function isCategorySlug(
