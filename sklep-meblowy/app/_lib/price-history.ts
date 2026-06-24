@@ -49,15 +49,6 @@ export async function recordPriceHistory(productId: string): Promise<void> {
   const plan = computePriceUpdates(units, history, now);
   if (plan.inserts.length === 0) return;
 
-  await supabase.from("price_history").insert(
-    plan.inserts.map((i) => ({
-      product_id: productId,
-      variant_key: i.variant_key,
-      effective_price: i.effective_price,
-      recorded_at: now,
-    })) as never
-  );
-
   // Denormalizacja omnibus na produkt/kombinacje.
   const omniByKey = new Map(plan.omnibus.map((o) => [o.variant_key, o.value]));
   const update: Record<string, unknown> = {};
@@ -73,7 +64,24 @@ export async function recordPriceHistory(productId: string): Promise<void> {
     });
     update.variants = { ...variants, combinations: nextCombos };
   }
+
+  // Denormalizacja omnibus PRZED insertem historii — retry jest samonaprawialny
+  // (insert-ok/update-fail przy odwrotnej kolejności zostawiałby omnibus trwale stary).
   if (Object.keys(update).length > 0) {
-    await supabase.from("products").update(update as never).eq("id", productId);
+    const { error: updErr } = await supabase
+      .from("products")
+      .update(update as never)
+      .eq("id", productId);
+    if (updErr) throw new Error(`omnibus update failed: ${updErr.message}`);
   }
+
+  const { error: insErr } = await supabase.from("price_history").insert(
+    plan.inserts.map((i) => ({
+      product_id: productId,
+      variant_key: i.variant_key,
+      effective_price: i.effective_price,
+      recorded_at: now,
+    })) as never
+  );
+  if (insErr) throw new Error(`price_history insert failed: ${insErr.message}`);
 }
