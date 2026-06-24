@@ -1,4 +1,5 @@
-import Link from "next/link";
+import LocalizedLink from "@/app/_components/ui/LocalizedLink";
+import { localizePath } from "@/app/_lib/i18n";
 import { redirect } from "next/navigation";
 import { createClient } from "@/app/_lib/supabase/server";
 import { signOut } from "@/app/_lib/auth-actions";
@@ -14,10 +15,10 @@ export default async function AccountLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/logowanie");
-
   const locale = await getLocale();
   const de = locale === "de";
+
+  if (!user) redirect(localizePath("/logowanie", locale));
   const c = de
     ? {
         account: "Mein Konto",
@@ -69,11 +70,11 @@ export default async function AccountLayout({
 
 function SideLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link
+    <LocalizedLink
       href={href}
       className="block px-4 py-3 rounded-xl font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:bg-[var(--card-bg)] hover:text-[var(--color-gold)] transition-colors whitespace-nowrap"
     >
       {children}
-    </Link>
+    </LocalizedLink>
   );
 }

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import { redirect } from "next/navigation";
 import { createClient } from "@/app/_lib/supabase/server";
+import { localizePath } from "@/app/_lib/i18n";
 import { getLocale } from "@/app/_lib/i18n-server";
 import ResetForm from "./ResetForm";
 
@@ -13,7 +14,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function ResetHaslaPage() {
-  const de = (await getLocale()) === "de";
+  const locale = await getLocale();
+  const de = locale === "de";
   const supabase = await createClient();
   const {
     data: { user },
@@ -22,7 +24,7 @@ export default async function ResetHaslaPage() {
   // Strona ma sens tylko gdy user kliknął w link recovery —
   // /auth/confirm w międzyczasie utworzył sesję. Bez sesji odsyłamy
   // do formularza wysłania linku.
-  if (!user) redirect("/zapomnialem-hasla");
+  if (!user) redirect(localizePath("/zapomnialem-hasla", locale));
 
   const c = de
     ? {
@@ -63,12 +65,12 @@ export default async function ResetHaslaPage() {
 
       <p className="mt-8 text-center text-sm text-[var(--muted)]">
         {de ? "Lieber zurück?" : "Wolisz wrócić?"}{" "}
-        <Link
+        <LocalizedLink
           href="/logowanie"
           className="text-[var(--color-gold)] font-semibold hover:underline"
         >
           {c.login}
-        </Link>
+        </LocalizedLink>
       </p>
     </div>
   );

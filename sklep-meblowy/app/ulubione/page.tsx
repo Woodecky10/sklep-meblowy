@@ -5,6 +5,7 @@ import { createClient } from "@/app/_lib/supabase/server";
 import { getWishlistProducts, getUserWishlistIds } from "@/app/_lib/wishlist";
 import { getCategories } from "@/app/_lib/categories";
 import { getLocale } from "@/app/_lib/i18n-server";
+import { localizeHref, localizePath } from "@/app/_lib/i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import ProductCard from "@/app/_components/ui/ProductCard";
 
@@ -18,9 +19,12 @@ export default async function WishlistPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/logowanie?next=/ulubione");
-
   const locale = await getLocale();
+  if (!user)
+    redirect(
+      localizeHref("/logowanie?next=" + localizePath("/ulubione", locale), locale),
+    );
+
   const t = getDictionary(locale);
   const [products, wishlistIds, categories] = await Promise.all([
     getWishlistProducts(locale),

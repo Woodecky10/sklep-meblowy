@@ -44,7 +44,14 @@ export async function toggleWishlist(
       .eq("user_id", user.id)
       .eq("product_id", productId);
     if (error) {
-      return { ok: false, error: "db_error", message: error.message };
+      console.error(error.message);
+      return {
+        ok: false,
+        error: "db_error",
+        message: de
+          ? "Aktion fehlgeschlagen. Bitte versuchen Sie es erneut."
+          : "Nie udało się wykonać akcji. Spróbuj ponownie.",
+      };
     }
     revalidatePath("/ulubione");
     revalidatePath("/", "layout");
@@ -54,7 +61,14 @@ export async function toggleWishlist(
       .from("wishlists")
       .insert({ user_id: user.id, product_id: productId } as never);
     if (error) {
-      return { ok: false, error: "db_error", message: error.message };
+      console.error(error.message);
+      return {
+        ok: false,
+        error: "db_error",
+        message: de
+          ? "Aktion fehlgeschlagen. Bitte versuchen Sie es erneut."
+          : "Nie udało się wykonać akcji. Spróbuj ponownie.",
+      };
     }
     revalidatePath("/ulubione");
     revalidatePath("/", "layout");

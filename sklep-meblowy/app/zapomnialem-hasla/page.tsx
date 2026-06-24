@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import { redirect } from "next/navigation";
 import { createClient } from "@/app/_lib/supabase/server";
 import { getLocale } from "@/app/_lib/i18n-server";
+import { localizePath } from "@/app/_lib/i18n";
 import RequestResetForm from "./RequestResetForm";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -20,7 +21,7 @@ export default async function ZapomnialemHaslaPage() {
   } = await supabase.auth.getUser();
 
   // Zalogowany user nie potrzebuje resetu — przekieruj na konto
-  if (user) redirect("/konto");
+  if (user) redirect(localizePath("/konto", de ? "de" : "pl"));
 
   const c = de
     ? {
@@ -58,12 +59,12 @@ export default async function ZapomnialemHaslaPage() {
 
       <p className="mt-8 text-center text-sm text-[var(--muted)]">
         {c.remember}{" "}
-        <Link
+        <LocalizedLink
           href="/logowanie"
           className="text-[var(--color-gold)] font-semibold hover:underline"
         >
           {c.login}
-        </Link>
+        </LocalizedLink>
       </p>
     </div>
   );

@@ -205,7 +205,7 @@ export default function CheckoutForm({
         <div className="lg:col-span-3 -mt-4 mb-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl px-5 py-3 text-sm text-[var(--muted)] flex flex-wrap items-center gap-2">
           <span>{c.haveAccount}</span>
           <Link
-            href="/logowanie"
+            href={localizeHref("/logowanie", locale)}
             className="text-[var(--color-gold)] font-semibold hover:underline"
           >
             {c.login}
@@ -286,7 +286,7 @@ export default function CheckoutForm({
           <span className="leading-relaxed">
             {c.agreePrefix}{" "}
             <Link
-              href="/regulamin"
+              href={localizeHref("/regulamin", locale)}
               target="_blank"
               className="text-[var(--color-gold-text)] underline hover:opacity-80"
             >
@@ -294,7 +294,7 @@ export default function CheckoutForm({
             </Link>{" "}
             {c.and}{" "}
             <Link
-              href="/prywatnosc"
+              href={localizeHref("/prywatnosc", locale)}
               target="_blank"
               className="text-[var(--color-gold-text)] underline hover:opacity-80"
             >
@@ -313,7 +313,7 @@ export default function CheckoutForm({
         </button>
 
         <Link
-          href="/koszyk"
+          href={localizeHref("/koszyk", locale)}
           className="text-center text-xs font-sans text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors uppercase tracking-widest"
         >
           {c.backToCart}

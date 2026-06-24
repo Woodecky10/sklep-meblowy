@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
+import { localizeHref } from "@/app/_lib/i18n";
 
 // Kategorie cookies zgodne z dobrą praktyką RODO:
 // - necessary: zawsze włączone, niezbędne do działania sklepu (sesja, koszyk)
@@ -64,7 +65,8 @@ export default function CookieBanner() {
   const [showDetails, setShowDetails] = useState(false);
   const [analytics, setAnalytics] = useState(false);
   const [marketing, setMarketing] = useState(false);
-  const t = getDictionary(useClientLocale());
+  const locale = useClientLocale();
+  const t = getDictionary(locale);
 
   // saveConsent emituje "cookie-consent" → consentDecided=true → baner znika.
   function acceptAll() {
@@ -92,7 +94,7 @@ export default function CookieBanner() {
             <p className="text-sm text-[var(--muted)] leading-relaxed">
               {t.cookies.body}{" "}
               <Link
-                href="/prywatnosc"
+                href={localizeHref("/prywatnosc", locale)}
                 className="underline text-[var(--color-gold-text)] hover:opacity-80"
               >
                 {t.cookies.privacyLink}
