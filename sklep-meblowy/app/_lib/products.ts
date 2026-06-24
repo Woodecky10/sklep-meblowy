@@ -251,6 +251,24 @@ export async function getRelatedProducts(
   return ((data ?? []) as Product[]).map((p) => localizeProduct(p, locale));
 }
 
+// ============================================================
+// Rodzeństwo rozmiarowe — produkty z tym samym size_group
+// ============================================================
+// Używane przez selektor rozmiaru na karcie produktu. Anon client (createClient)
+// respektuje RLS is_active, więc ukryte produkty nie pojawią się w selektorze.
+// Zawiera też bieżący produkt — buildSizeOptions (size-groups.ts) go oznacza.
+export async function getSizeSiblings(
+  sizeGroup: string,
+  locale: Locale = DEFAULT_LOCALE
+): Promise<Product[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("products")
+    .select("*")
+    .eq("size_group", sizeGroup);
+  return ((data ?? []) as Product[]).map((p) => localizeProduct(p, locale));
+}
+
 // Pobiera unikalne wartości color/material z CAŁEJ bazy produktów — użyte
 // do budowania filtrów na /sklep.
 //
