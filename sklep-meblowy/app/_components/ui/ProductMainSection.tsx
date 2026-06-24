@@ -29,7 +29,7 @@ export default function ProductMainSection({
   categoryLabel: string | null;
   rating: ProductRating;
   // Cechy produktu w sekcji "Specyfikacja" — Wymiary, Waga, Materiał, etc.
-  // plus dodatkowe features z BL. Renderowane w lewej kolumnie pod galerią.
+  // plus dodatkowe features z importu. Renderowane w lewej kolumnie pod galerią.
   specifications: { label: string; value: string }[];
 }) {
   const locale = useClientLocale();

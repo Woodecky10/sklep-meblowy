@@ -105,7 +105,7 @@ export async function getOrderById(orderId: string) {
   return data as unknown as Order & { items: OrderItem[] };
 }
 
-// Przepnij status z BL (sync statusów). CAS na odczytanym statusie — nie
+// Przepnij status z importu (sync statusów). CAS na odczytanym statusie — nie
 // nadpisujemy równoległej zmiany (np. webhook pending→paid). Zwraca true gdy
 // faktycznie zmienił.
 export async function applyBlStatus(

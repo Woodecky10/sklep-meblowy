@@ -81,7 +81,7 @@ export default function DescriptionSectionsEditor({
 
   // Wstawia nową pustą custom text sekcję (admin może edytować inline).
   // admin_custom=true sprawia że merge logic NIE próbuje match-ować jej
-  // do BL — sekcja przeżywa kolejne sync.
+  // do sekcji z importu — sekcja przeżywa kolejne sync.
   function insertCustomTextAt(insertIdx: number) {
     const newText: ProductDescriptionSection = {
       kind: "text",
@@ -292,7 +292,7 @@ function TextSectionRow({
   // wszystkie pola od razu. Inaczej trzeba kliknąć "Edytuj override".
   // UWAGA: hook musi być PRZED wczesnym returnem admin_custom — sekcje są
   // renderowane z key={idx}, więc ta sama instancja komponentu może przejść
-  // z BL-sekcji na custom (np. po wstawieniu sekcji wyżej) i odwrotnie;
+  // z sekcji z importu na custom (np. po wstawieniu sekcji wyżej) i odwrotnie;
   // hook za returnem = "Rendered fewer/more hooks" crash.
   const [expanded, setExpanded] = useState(hasOverride);
 

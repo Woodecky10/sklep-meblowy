@@ -399,7 +399,7 @@ export default function ProductEditor({
       />
 
       {/* ============================================================
-          Sekcja: Edytor sekcji opisu (BL text + admin images)
+          Sekcja: Edytor sekcji opisu (z importu + admin images)
           ============================================================ */}
       <DescriptionSectionsEditor
         productId={product.id}

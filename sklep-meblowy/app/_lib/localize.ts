@@ -54,7 +54,7 @@ export function localizeProduct<T extends ProductLocalizable>(
 ): T {
   if (locale !== "de") return row;
   const sectionsDe = row.description_sections_de;
-  // Cechy BL: tłumaczymy klucz i (jeśli znana) wartość; nieznane (kody, liczby,
+  // Cechy z importu: tłumaczymy klucz i (jeśli znana) wartość; nieznane (kody, liczby,
   // wymiary, nazwy własne) przechodzą bez zmian.
   const featuresDe: ProductFeature[] | undefined = Array.isArray(row.features)
     ? row.features.map((f) => ({

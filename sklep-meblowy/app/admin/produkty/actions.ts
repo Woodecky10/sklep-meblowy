@@ -99,7 +99,7 @@ async function deleteStorageImage(url: string | null): Promise<void> {
 }
 
 // Usuń zdjęcie ze storage — tylko jeśli URL należy do naszego bucketa.
-// URL-e zewnętrzne (Unsplash, BL) ignorujemy (no-op).
+// URL-e zewnętrzne (Unsplash, z importu) ignorujemy (no-op).
 export async function deleteProductImage(url: string): Promise<ActionResult> {
   await requireAdmin();
   if (!url) return { ok: false, error: "Brak URL" };
@@ -140,7 +140,7 @@ export async function updateProductBasics(
   }
 
   // UWAGA: pole `description` celowo pomijane w updates — opis nie jest
-  // synchronizowany z BL (mapBlToProduct go nie ustawia). Opis edytuje się
+  // synchronizowany z importem (mapBlToProduct go nie ustawia). Opis edytuje się
   // przez sekcje w DescriptionSectionsEditor, nie przez to pole.
   const updates: Record<string, unknown> = {
     name,
@@ -374,7 +374,7 @@ export async function setProductActive(
 // updateProductDescriptionSections — zapisuje sekcje opisu
 // ============================================================
 // Admin może dodawać/usuwać/przesuwać image sekcje między text sekcjami
-// (które przychodzą z BL i są read-only z poziomu sklepu).
+// (które przychodzą z importu i są read-only z poziomu sklepu).
 // Walidacja: każda sekcja musi mieć poprawne pola dla swojego kind.
 export async function updateProductDescriptionSections(
   productId: string,

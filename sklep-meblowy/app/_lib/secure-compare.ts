@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 
 // Stałoczasowe porównanie sekretów — broni przed timing side-channel przy
-// weryfikacji kluczy crona / syncu BL (audyt 2026-06-11 LOW). Naiwne === na
+// weryfikacji kluczy crona / syncu zewnętrznego (audyt 2026-06-11 LOW). Naiwne === na
 // stringach kończy porównanie na pierwszej różniącej się bajtce, co teoretycznie
 // pozwala odgadywać sekret bajt po bajcie po czasie odpowiedzi.
 //
