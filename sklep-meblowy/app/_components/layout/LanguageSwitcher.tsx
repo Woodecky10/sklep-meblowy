@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { LOCALES, stripLocale, localizePath, type Locale } from "@/app/_lib/i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
@@ -34,12 +33,18 @@ export default function LanguageSwitcher({ className = "" }: { className?: strin
                 {LABELS[loc]}
               </span>
             ) : (
-              <Link
+              // Natywny <a> (pełny reload), NIE next/link. Locale niesie nagłówek
+              // x-locale (z proxy wg prefiksu URL), a chrome (TopBar/Navbar/Footer)
+              // jest serwerowy w root layoucie — App Router NIE re-renderuje layoutu
+              // przy soft-nav, więc <Link> tłumaczyłby tylko stronę, a chrome zostawał
+              // w starym języku do refreshu. Pełna nawigacja re-renderuje całe drzewo
+              // serwerowo z nowym locale. NIE zamieniać z powrotem na <Link>.
+              <a
                 href={href}
                 className="opacity-70 hover:opacity-100 hover:text-[var(--color-gold)] transition-colors"
               >
                 {LABELS[loc]}
-              </Link>
+              </a>
             )}
           </span>
         );
