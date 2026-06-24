@@ -91,14 +91,10 @@ export default async function ProduktPage({ params }: Props) {
   const product = await getProduct(id, locale);
   if (!product) notFound();
 
-  // Selektor rozmiaru: rodzeństwo z tym samym size_group (osobne aukcje per rozmiar).
-  const sizeSiblings = product.size_group
-    ? await getSizeSiblings(product.size_group, locale)
-    : [];
-  const sizeOptions = buildSizeOptions(sizeSiblings, product.id);
-
-  const [related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell, wishlistIds, rate] =
+  const [sizeSiblings, related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell, wishlistIds, rate] =
     await Promise.all([
+      // Selektor rozmiaru: rodzeństwo z tym samym size_group (osobne aukcje per rozmiar).
+      product.size_group ? getSizeSiblings(product.size_group, locale) : Promise.resolve([]),
       getRelatedProducts(product.id, product.category, 4, locale),
       getProductRating(product.id),
       getReviewsForProduct(product.id, 50, locale),
@@ -109,6 +105,7 @@ export default async function ProduktPage({ params }: Props) {
       getUserWishlistIds(),
       getEurRate(),
     ]);
+  const sizeOptions = buildSizeOptions(sizeSiblings, product.id);
 
   // Etykieta cross-sell pochodzi z LABELA pierwszej cross_sell_categories tej
   // kategorii — np. dla łóżek pokaże "Polecane materace".
