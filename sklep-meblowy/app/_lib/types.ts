@@ -163,6 +163,8 @@ export type Order = {
   guest_email: string | null;
   status: OrderStatus;
   total: number;
+  currency: "pln" | "eur";
+  fx_rate: number | null;
   shipping_address: Address;
   stripe_payment_intent: string | null;
   promo_code_id: string | null;
