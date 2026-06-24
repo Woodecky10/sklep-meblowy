@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { COMPANY, formatFullAddress, isFilled } from "@/app/_lib/company";
+import { localizeHref } from "@/app/_lib/i18n";
 import { getLocale } from "@/app/_lib/i18n-server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -386,7 +387,7 @@ export default async function RegulaminPage() {
           {c.s5_3Before}
           <strong>{c.s5_3Strong}</strong>
           {c.s5_3Mid}
-          <a href="/dostawa">{c.s5_3Link}</a>
+          <a href={localizeHref("/dostawa", locale)}>{c.s5_3Link}</a>
           {c.s5_3After}
         </li>
         <li>{c.s5_4}</li>
@@ -402,7 +403,7 @@ export default async function RegulaminPage() {
         </li>
         <li>
           {c.s6_3Before}
-          <a href="/zwroty">{c.s6_3Link}</a>
+          <a href={localizeHref("/zwroty", locale)}>{c.s6_3Link}</a>
           {c.s6_3After}
         </li>
         <li>{c.s6_4}</li>
@@ -447,7 +448,7 @@ export default async function RegulaminPage() {
       <h2>{c.s9}</h2>
       <p>
         {c.s9Before}
-        <a href="/prywatnosc">{c.s9Link}</a>
+        <a href={localizeHref("/prywatnosc", locale)}>{c.s9Link}</a>
         {c.s9After}
       </p>
 

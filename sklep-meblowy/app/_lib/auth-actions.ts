@@ -7,6 +7,7 @@ import { createClient } from "./supabase/server";
 import { linkGuestOrders } from "./link-guest-orders";
 import { isAdmin } from "./admin";
 import { getLocale } from "@/app/_lib/i18n-server";
+import { localizePath, localizeHref } from "./i18n";
 
 export type AuthState = { error?: string; info?: string } | null;
 
@@ -51,7 +52,7 @@ export async function signIn(_state: AuthState, formData: FormData): Promise<Aut
   }
 
   revalidatePath("/", "layout");
-  redirect(isAdmin(user) ? "/admin" : "/konto");
+  redirect(isAdmin(user) ? "/admin" : localizePath("/konto", de ? "de" : "pl"));
 }
 
 export async function signUp(_state: AuthState, formData: FormData): Promise<AuthState> {
@@ -74,7 +75,7 @@ export async function signUp(_state: AuthState, formData: FormData): Promise<Aut
     password,
     options: {
       data: { full_name: fullName },
-      emailRedirectTo: `${origin}/auth/confirm?next=/konto`,
+      emailRedirectTo: `${origin}/auth/confirm?next=${localizePath("/konto", de ? "de" : "pl")}`,
     },
   });
 
@@ -82,13 +83,15 @@ export async function signUp(_state: AuthState, formData: FormData): Promise<Aut
     if (error.message.toLowerCase().includes("already") || error.message.toLowerCase().includes("registered")) {
       return { error: tr("Ten email jest już zarejestrowany", "Diese E-Mail ist bereits registriert") };
     }
-    return { error: error.message };
+    console.error(error.message);
+    return { error: tr("Rejestracja nie powiodła się. Spróbuj ponownie.", "Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut.") };
   }
 
   return { info: tr("Sprawdź skrzynkę — wysłaliśmy link potwierdzający rejestrację.", "Bitte prüfen Sie Ihr Postfach — wir haben Ihnen einen Bestätigungslink gesendet.") };
 }
 
 export async function signInWithGoogle() {
+  const locale = await getLocale();
   const headerList = await headers();
   const origin = getOrigin(headerList);
 
@@ -96,12 +99,12 @@ export async function signInWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${origin}/auth/callback?next=/konto`,
+      redirectTo: `${origin}/auth/callback?next=${localizePath("/konto", locale)}`,
     },
   });
 
   if (error || !data.url) {
-    redirect("/logowanie?error=oauth");
+    redirect(localizeHref("/logowanie?error=oauth", locale));
   }
 
   redirect(data.url);
@@ -111,7 +114,8 @@ export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
-  redirect("/");
+  const locale = await getLocale();
+  redirect(localizePath("/", locale));
 }
 
 // ============================================================
@@ -137,7 +141,7 @@ export async function requestPasswordReset(
   // Z kontekstu bezpieczeństwa NIE ujawniamy czy email istnieje w bazie —
   // zawsze zwracamy ten sam komunikat (info), niezależnie od wyniku.
   await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/confirm?next=/reset-hasla`,
+    redirectTo: `${origin}/auth/confirm?next=${localizePath("/reset-hasla", de ? "de" : "pl")}`,
   });
 
   return {
@@ -177,7 +181,10 @@ export async function updatePassword(
   }
 
   const { error } = await supabase.auth.updateUser({ password });
-  if (error) return { error: error.message };
+  if (error) {
+    console.error(error.message);
+    return { error: tr("Nie udało się zmienić hasła. Spróbuj ponownie.", "Das Passwort konnte nicht geändert werden. Bitte versuchen Sie es erneut.") };
+  }
 
   revalidatePath("/", "layout");
   redirect(isAdmin(user) ? "/admin" : "/konto");

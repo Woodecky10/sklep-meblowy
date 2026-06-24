@@ -24,7 +24,7 @@ import { sanitizeProductHtml } from "@/app/_lib/product-html";
 import ProductDescriptionSections from "@/app/_components/ui/ProductDescriptionSections";
 import { COMPANY } from "@/app/_lib/company";
 import { getLocale } from "@/app/_lib/i18n-server";
-import { localizePath } from "@/app/_lib/i18n";
+import { localizePath, localizeHref } from "@/app/_lib/i18n";
 import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import type { Product } from "@/app/_lib/types";
@@ -378,7 +378,7 @@ export default async function ProduktPage({ params }: Props) {
                 {reviewStatus.reason === "not_logged_in" ? (
                   <>
                     {t.product.reviewGuardLoggedOut}{" "}
-                    <a href="/logowanie" className="text-[var(--color-gold)] underline">
+                    <a href={localizeHref("/logowanie", locale)} className="text-[var(--color-gold)] underline">
                       {t.product.reviewGuardLogin}
                     </a>
                     {t.product.reviewGuardLoggedOutSuffix}
