@@ -3,6 +3,10 @@
 // po stronie DB przez FK products.category → categories.slug.
 export type Category = string;
 
+export type ActionResult =
+  | { ok: true; message?: string; data?: unknown }
+  | { ok: false; error: string };
+
 export type ProductDimensions = {
   width: number;
   depth: number;

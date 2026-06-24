@@ -3,10 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
-
-export type ActionResult =
-  | { ok: true; message?: string; data?: unknown }
-  | { ok: false; error: string };
+import type { ActionResult } from "@/app/_lib/types";
 
 // Zapis globalnego kursu PLN->EUR. Walidacja > 0. Po zapisie revaliduje layout,
 // bo ceny EUR są renderowane wszędzie (seed kursu w root layout).
