@@ -1,7 +1,7 @@
 // Logika routingu eventów Stripe — czysta, testowalna osobno od route handlera.
 
 // Czy dany event Stripe oznacza, że zamówienie jest FAKTYCZNIE opłacone i można
-// je rozliczyć (markOrderPaid + push do BL)?
+// je rozliczyć (markOrderPaid)?
 //
 // Pułapka: dla metod z opóźnionym powiadomieniem (Przelewy24, część BLIK)
 // `checkout.session.completed` przychodzi JUŻ po potwierdzeniu w bramce, ale z

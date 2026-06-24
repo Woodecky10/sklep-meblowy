@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getPendingTranslationCount } from "@/app/_lib/translations";
 
 const CARDS = [
   { href: "/admin/zamowienia", title: "Zamówienia", cta: "Zarządzaj zamówieniami" },
@@ -12,7 +13,8 @@ const CARDS = [
   { href: "/admin/zapytania", title: "Zapytania klientów", cta: "Otwórz skrzynkę" },
 ];
 
-export default function AdminDashboardPage() {
+export default async function AdminDashboardPage() {
+  const pendingTranslations = await getPendingTranslationCount();
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -23,6 +25,22 @@ export default function AdminDashboardPage() {
           Pulpit
         </h1>
       </div>
+
+      {pendingTranslations > 0 && (
+        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5">
+          <p className="text-sm text-[var(--fg)]">
+            Czeka na tłumaczenie DE:{" "}
+            <strong className="text-amber-700 dark:text-amber-300">
+              {pendingTranslations}{" "}
+              {pendingTranslations === 1 ? "produkt" : "produktów"}
+            </strong>{" "}
+            —{" "}
+            <Link href="/admin/produkty" className="text-[var(--color-gold)] underline">
+              przejdź do produktów
+            </Link>
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {CARDS.map((card) => (

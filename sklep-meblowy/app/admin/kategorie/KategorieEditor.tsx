@@ -177,9 +177,6 @@ export default function KategorieEditor({
                               <p className="text-xs text-[var(--muted)] truncate">
                                 <code>{cat.slug}</code> · {productCount}{" "}
                                 {productCount === 1 ? "produkt" : "produktów"}
-                                {cat.baselinkerCategoryId !== null && (
-                                  <> · BL: {cat.baselinkerCategoryId}</>
-                                )}
                               </p>
                             </div>
                             <div className="flex gap-2 shrink-0">
@@ -458,20 +455,6 @@ function CategoryForm({
             />
           </Field>
         )}
-
-        <Field
-          label="ID kategorii w BaseLinker"
-          hint="Opcjonalne. Sprawdź ID w panelu BL → Magazyn → Kategorie. Bez tego sync produktów BL pominie tę kategorię."
-        >
-          <input
-            type="number"
-            name="baselinker_category_id"
-            defaultValue={initial?.baselinkerCategoryId ?? ""}
-            min={1}
-            placeholder="np. 7489757"
-            className="w-full px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
-          />
-        </Field>
 
         <Field label="Kolejność" hint="Mniejsze na początku">
           <input

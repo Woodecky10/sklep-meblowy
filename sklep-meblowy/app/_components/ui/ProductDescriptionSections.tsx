@@ -10,7 +10,7 @@ import type { ProductDescriptionSection } from "@/app/_lib/types";
 // nie wpadało w SSR-of-client-component bundle na Vercelu. Lokalny build
 // wybacza ten ESM/CJS mismatch, runtime Vercela nie.
 
-// Opis produktu na karcie — kombinacja text (akordeony z BL) i image
+// Opis produktu na karcie — kombinacja text (akordeony z importu) i image
 // (kontekstowe zdjęcia wstawione przez admina między text sekcjami).
 //
 // Text sekcje są domyślnie ZWINIĘTE (oprócz pierwszej) — akordeony.

@@ -4,7 +4,7 @@ import { buildNewProductPayload } from "@/app/_lib/new-product";
 const valid = { name: "Sofa Mollien", price: "1999.99", category: "sofy" };
 
 describe("buildNewProductPayload", () => {
-  it("happy path: payload z domyślnymi (needs_translation=true, baselinker_id=null, stock=0, is_active=true)", () => {
+  it("happy path: payload z domyślnymi (needs_translation=true, stock=0, is_active=true)", () => {
     const r = buildNewProductPayload(valid);
     expect(r.ok).toBe(true);
     if (r.ok) {
@@ -12,7 +12,6 @@ describe("buildNewProductPayload", () => {
       expect(r.payload.price).toBe(1999.99);
       expect(r.payload.category).toBe("sofy");
       expect(r.payload.needs_translation).toBe(true);
-      expect(r.payload.baselinker_id).toBeNull();
       expect(r.payload.stock).toBe(0);
       expect(r.payload.is_active).toBe(true);
       expect(r.payload.images).toEqual([]);
