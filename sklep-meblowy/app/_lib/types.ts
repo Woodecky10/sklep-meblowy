@@ -27,6 +27,9 @@ export type ProductVariant = {
   values: Record<string, string>;
   stock: number;
   price_modifier?: number;
+  // Omnibus (migracja 36): cena promocyjna i najniższa-z-30-dni per kombinacja.
+  sale_price?: number;
+  omnibus_price?: number;
   images?: string[];
 };
 
@@ -120,6 +123,9 @@ export type Product = {
   // rodzeństwo z tym samym size_group. Pass-through PL/DE (brak kolumn _de).
   size_group: string | null;
   size_label: string | null;
+  // Omnibus (migracja 36) — poziom produktu (dla produktów bez wariantów).
+  sale_price: number | null;
+  omnibus_price: number | null;
   // Widoczność w sklepie (RLS). false = ukryty. deactivation_source: kto ukrył.
   is_active: boolean;
   deactivation_source: "auto" | "manual" | null;
