@@ -153,6 +153,8 @@ export async function updateProductBasics(
     construction: emptyToNull(sanitize(formData.get("construction"), 1000)),
     delivery_time: emptyToNull(sanitize(formData.get("delivery_time"), 100)),
     warranty: emptyToNull(sanitize(formData.get("warranty"), 100)),
+    size_group: emptyToNull(sanitize(formData.get("size_group"), 100)),
+    size_label: emptyToNull(sanitize(formData.get("size_label"), 100)),
   };
 
   const supabase = await createAdminClient();

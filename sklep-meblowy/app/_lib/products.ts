@@ -1,4 +1,4 @@
-import { createClient } from "./supabase/server";
+import { createClient, createAdminClient } from "./supabase/server";
 import { getCategories } from "./categories";
 import { buildSearchOrFilter } from "./search-filter";
 import { localizeProduct, buildLocalizedFacets } from "./localize";
@@ -267,6 +267,21 @@ export async function getSizeSiblings(
     .select("*")
     .eq("size_group", sizeGroup);
   return ((data ?? []) as Product[]).map((p) => localizeProduct(p, locale));
+}
+
+// Distinct klucze size_group (do podpowiedzi/datalist w adminie). Admin client —
+// pokazujemy też klucze produktów nieaktywnych, żeby admin trafił w istniejący klucz.
+export async function getSizeGroupKeys(): Promise<string[]> {
+  const supabase = await createAdminClient();
+  const { data } = await supabase
+    .from("products")
+    .select("size_group")
+    .not("size_group", "is", null);
+  const keys = new Set<string>();
+  for (const r of (data ?? []) as { size_group: string | null }[]) {
+    if (r.size_group) keys.add(r.size_group);
+  }
+  return Array.from(keys).sort((a, b) => a.localeCompare(b));
 }
 
 // Pobiera unikalne wartości color/material z CAŁEJ bazy produktów — użyte
