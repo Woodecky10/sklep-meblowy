@@ -13,6 +13,7 @@ import {
 import type { Address, Product } from "@/app/_lib/types";
 import { getEurRate } from "@/app/_lib/store-settings";
 import { convertToEur } from "@/app/_lib/money";
+import { effectivePrice } from "@/app/_lib/pricing";
 
 // stripe v22 re-eksportuje SessionCreateParams jako alias typu (bez
 // wewnętrznego namespace), więc .LineItem nie istnieje — indeksujemy typ.
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest) {
     const productIds = body.items.map((i) => i.id);
     const { data: products, error: prodErr } = await supabase
       .from("products")
-      .select("id, name, price, stock, images, variants")
+      .select("id, name, price, sale_price, stock, images, variants")
       .in("id", productIds);
 
     if (prodErr || !products) {
@@ -155,7 +156,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      let unitPrice = Number(product.price);
+      let unitPrice = effectivePrice(Number(product.price), product.sale_price);
       let variantValues: Record<string, string> | null = null;
 
       // Meble robione na zamówienie — walidujemy tylko kompletność wyboru
@@ -187,7 +188,8 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
-        unitPrice += variant.price_modifier ?? 0;
+        const regular = Number(product.price) + (variant.price_modifier ?? 0);
+        unitPrice = effectivePrice(regular, variant.sale_price);
         variantValues = item.variantValues;
       }
 
