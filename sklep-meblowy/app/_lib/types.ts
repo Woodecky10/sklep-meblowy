@@ -114,6 +114,12 @@ export type Product = {
   description_sections: ProductDescriptionSection[];
   variants: ProductVariants | null;
   collection_id: string | null;
+  // Grupa rozmiarów (migracja 35) — łączy osobne produkty tego samego mebla
+  // w różnych rozmiarach. size_group: wspólny klucz; size_label: etykieta tego
+  // rozmiaru ("140×200 cm"). Selektor rozmiaru na karcie produktu pokazuje
+  // rodzeństwo z tym samym size_group. Pass-through PL/DE (brak kolumn _de).
+  size_group: string | null;
+  size_label: string | null;
   // Widoczność w sklepie (RLS). false = ukryty. deactivation_source: kto ukrył.
   is_active: boolean;
   deactivation_source: "auto" | "manual" | null;
