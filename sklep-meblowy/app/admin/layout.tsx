@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { href: "/admin/kafelki", label: "Kafelki", icon: TilesIcon },
   { href: "/admin/kategorie", label: "Kategorie", icon: CategoriesIcon },
   { href: "/admin/kolekcje", label: "Kolekcje", icon: CollectionsIcon },
+  { href: "/admin/tkaniny", label: "Tkaniny", icon: FabricsIcon },
   { href: "/admin/kody-rabatowe", label: "Kody rabatowe", icon: TicketIcon },
   { href: "/admin/zapytania", label: "Zapytania", icon: InboxIcon },
 ];
@@ -172,6 +173,16 @@ function OrdersIcon() {
     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
       <path d="M6 2h9l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" />
       <path d="M14 2v6h6M9 13h6M9 17h6" />
+    </svg>
+  );
+}
+
+function FabricsIcon() {
+  return (
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <path d="M3 6c3 2 6 2 9 0s6-2 9 0" />
+      <path d="M3 12c3 2 6 2 9 0s6-2 9 0" />
+      <path d="M3 18c3 2 6 2 9 0s6-2 9 0" />
     </svg>
   );
 }
