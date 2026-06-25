@@ -84,7 +84,7 @@ export default async function RegulaminPage() {
         s4_1:
           "Alle im Shop angegebenen Produktpreise sind Bruttopreise (inklusive Mehrwertsteuer) und werden in polnischen Złoty (PLN) angegeben.",
         s4_2:
-          "Der Produktpreis enthält keine Lieferkosten, die zum Bestellpreis hinzugerechnet und dem Kunden vor Aufgabe der Bestellung angezeigt werden.",
+          "Der Produktpreis enthält keine Lieferkosten. Aufgrund des sperrigen Charakters der Möbel werden die Lieferkosten individuell nach Aufgabe der Bestellung festgelegt (siehe § 5) und bedürfen der Zustimmung des Kunden.",
         s4_3Intro:
           "Der Kunde kann eine der im Shop verfügbaren Zahlungsmethoden wählen:",
         s4_3a: "Online-Zahlung mit Zahlungskarte,",
@@ -92,6 +92,8 @@ export default async function RegulaminPage() {
         s4_3c: "Sofortüberweisung (Przelewy24).",
         s4_4:
           "Der Verkäufer stellt einen Kassenbon oder – auf in der Bestellung gemeldeten Wunsch des Kunden – eine Mehrwertsteuerrechnung aus.",
+        s4_5:
+          "Zahlungsdienstleister im Shop ist Przelewy24 (PayPro SA). Betreiber der Kartenzahlungen ist PayPro SA Agent Rozliczeniowy, ul. Pastelowa 8, 60-198 Poznań, eingetragen im Unternehmerregister des Landesgerichtsregisters (KRS) unter der Nummer KRS 0000347935, NIP 7792369887, REGON 301345068.",
 
         s5: "§ 5. Bestellabwicklung und Lieferung",
         s5_1:
@@ -101,7 +103,7 @@ export default async function RegulaminPage() {
         s5_3Before: "Die Lieferkosten werden ",
         s5_3Strong: "individuell",
         s5_3Mid:
-          " nach Aufgabe der Bestellung festgelegt – sie hängen vom Gewicht, den Abmessungen des Produkts und dem Lieferort ab. Der Verkäufer kontaktiert den Kunden vor dem Versand telefonisch oder per E-Mail mit einem Kostenvoranschlag für die Lieferung. Einzelheiten finden Sie im Bereich ",
+          " nach Aufgabe der Bestellung festgelegt – sie hängen vom Gewicht, den Abmessungen des Produkts und dem Lieferort ab. Der Verkäufer kontaktiert den Kunden vor dem Versand telefonisch oder per E-Mail mit einem Kostenvoranschlag für die Lieferung. Der Kostenvoranschlag bedarf der Zustimmung des Kunden; verweigert er diese, kann er die Bestellung kostenfrei stornieren. Einzelheiten finden Sie im Bereich ",
         s5_3Link: "Versand und Zahlung",
         s5_3After: ".",
         s5_4:
@@ -211,13 +213,15 @@ export default async function RegulaminPage() {
         s4_1:
           "Wszystkie ceny Produktów podane w Sklepie są cenami brutto (zawierają podatek VAT) i są wyrażone w złotych polskich (PLN).",
         s4_2:
-          "Cena Produktu nie zawiera kosztów dostawy, które są doliczane do ceny zamówienia i wyświetlane Klientowi przed złożeniem zamówienia.",
+          "Cena Produktu nie zawiera kosztów dostawy. Z uwagi na wielkogabarytowy charakter mebli koszt dostawy ustalany jest indywidualnie po złożeniu zamówienia (zob. § 5) i wymaga akceptacji Klienta.",
         s4_3Intro: "Klient może wybrać jedną z dostępnych w Sklepie form płatności:",
         s4_3a: "płatność online kartą płatniczą,",
         s4_3b: "BLIK,",
         s4_3c: "szybki przelew (Przelewy24).",
         s4_4:
           "Sprzedawca wystawia paragon fiskalny lub – na życzenie Klienta zgłoszone w zamówieniu – fakturę VAT.",
+        s4_5:
+          "Operatorem płatności w Sklepie jest Przelewy24 (PayPro SA). Operatorem kart płatniczych jest PayPro SA Agent Rozliczeniowy, ul. Pastelowa 8, 60-198 Poznań, wpisany do Rejestru Przedsiębiorców Krajowego Rejestru Sądowego prowadzonego przez Sąd Rejonowy Poznań – Nowe Miasto i Wilda w Poznaniu, VIII Wydział Gospodarczy Krajowego Rejestru Sądowego pod numerem KRS 0000347935, NIP 7792369887, REGON 301345068.",
 
         s5: "§ 5. Realizacja zamówienia i dostawa",
         s5_1:
@@ -227,7 +231,7 @@ export default async function RegulaminPage() {
         s5_3Before: "Koszt dostawy ustalany jest ",
         s5_3Strong: "indywidualnie",
         s5_3Mid:
-          " po złożeniu zamówienia – zależy od wagi, gabarytów Produktu oraz miejsca dostawy. Sprzedawca skontaktuje się z Klientem telefonicznie lub mailowo z wyceną dostawy przed wysyłką. Szczegóły dostępne są w zakładce ",
+          " po złożeniu zamówienia – zależy od wagi, gabarytów Produktu oraz miejsca dostawy. Sprzedawca skontaktuje się z Klientem telefonicznie lub mailowo z wyceną dostawy przed wysyłką. Wycena wymaga akceptacji Klienta; w razie jej braku Klient może bezpłatnie zrezygnować z zamówienia. Szczegóły dostępne są w zakładce ",
         s5_3Link: "Dostawa i płatności",
         s5_3After: ".",
         s5_4:
@@ -377,6 +381,7 @@ export default async function RegulaminPage() {
           </ul>
         </li>
         <li>{c.s4_4}</li>
+        <li>{c.s4_5}</li>
       </ol>
 
       <h2>{c.s5}</h2>
