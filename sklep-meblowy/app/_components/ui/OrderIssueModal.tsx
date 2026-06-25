@@ -171,11 +171,11 @@ export default function OrderIssueModal({
                     <ul className="grid grid-cols-4 gap-2">
                       {photos.map((url, i) => (
                         <li key={url} className="relative aspect-square rounded-lg overflow-hidden border border-[var(--border)]">
-                          <Image src={url} alt={`Zdjęcie ${i + 1}`} fill sizes="100px" className="object-cover" />
+                          <Image src={url} alt={`${t.orderIssue.photoAlt} ${i + 1}`} fill sizes="100px" className="object-cover" />
                           <button
                             type="button"
                             onClick={() => setPhotos((prev) => prev.filter((u) => u !== url))}
-                            aria-label="Usuń zdjęcie"
+                            aria-label={t.orderIssue.removePhoto}
                             className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center rounded-full bg-black/60 text-white text-xs"
                           >
                             ×
@@ -243,7 +243,7 @@ function Field({
     <label className="flex flex-col gap-1.5">
       <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
         {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
+        {required && <span className="text-red-500 ml-1" aria-hidden="true">*</span>}
       </span>
       {children}
       {hint && <span className="text-xs text-[var(--muted)]">{hint}</span>}

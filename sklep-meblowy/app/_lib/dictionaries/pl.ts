@@ -256,6 +256,8 @@ export type PlShape = {
     photosHint: string;
     addPhoto: string;
     uploading: string;
+    photoAlt: string;
+    removePhoto: string;
     sentTitle: string;
     submit: string;
     submitting: string;
@@ -542,6 +544,8 @@ export const pl = {
     photosHint: "Zdjęcie uszkodzenia bardzo przyspiesza rozpatrzenie.",
     addPhoto: "+ Dodaj zdjęcie",
     uploading: "Wgrywam...",
+    photoAlt: "Zdjęcie",
+    removePhoto: "Usuń zdjęcie",
     sentTitle: "Zgłoszenie wysłane ✓",
     submit: "Wyślij zgłoszenie",
     submitting: "Wysyłam...",

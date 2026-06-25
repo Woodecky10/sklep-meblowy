@@ -269,6 +269,8 @@ export const de: DeepPartial<PlShape> = {
     photosHint: "Ein Foto des Schadens beschleunigt die Bearbeitung erheblich.",
     addPhoto: "+ Foto hinzufügen",
     uploading: "Wird hochgeladen...",
+    photoAlt: "Foto",
+    removePhoto: "Foto entfernen",
     sentTitle: "Meldung gesendet ✓",
     submit: "Meldung senden",
     submitting: "Wird gesendet...",
