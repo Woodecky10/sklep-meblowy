@@ -65,6 +65,14 @@ export type OrderIssueValidation =
     }
   | { ok: false; error: "category" | "message" | "photos" };
 
+// Czy URL zdjęcia pochodzi z naszego Storage (anti-injection w zgłoszeniach).
+// supabaseUrl = NEXT_PUBLIC_SUPABASE_URL (przekazywane przez wołającego server-side).
+export function isOwnIssuePhotoUrl(url: string, supabaseUrl: string): boolean {
+  if (!supabaseUrl) return false;
+  const prefix = `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/products/order-issues/`;
+  return typeof url === "string" && url.startsWith(prefix);
+}
+
 // Czysta walidacja payloadu zgłoszenia (używana przez submitOrderIssue + testy).
 export function validateOrderIssueInput(input: OrderIssueInput): OrderIssueValidation {
   if (!ORDER_ISSUE_CATEGORIES.includes(input.category as OrderIssueCategory)) {

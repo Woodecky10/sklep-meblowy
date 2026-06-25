@@ -4,6 +4,7 @@ import {
   orderIssueCategoryLabel,
   orderItemLabel,
   validateOrderIssueInput,
+  isOwnIssuePhotoUrl,
 } from "../order-issues";
 
 describe("orderIssueCategoryLabel", () => {
@@ -46,5 +47,21 @@ describe("validateOrderIssueInput", () => {
   it("przyjmuje poprawne i trimuje/normalizuje", () => {
     const res = validateOrderIssueInput({ category: "damage", message: "  zepsute rogi  ", photos: ["u1"], orderItemId: "" });
     expect(res).toEqual({ ok: true, value: { category: "damage", message: "zepsute rogi", photos: ["u1"], orderItemId: null } });
+  });
+});
+
+describe("isOwnIssuePhotoUrl", () => {
+  const base = "https://abc.supabase.co";
+  it("akceptuje URL z naszego prefiksu order-issues", () => {
+    expect(isOwnIssuePhotoUrl(`${base}/storage/v1/object/public/products/order-issues/x.jpg`, base)).toBe(true);
+  });
+  it("odrzuca obcy host", () => {
+    expect(isOwnIssuePhotoUrl("https://evil.com/x.jpg", base)).toBe(false);
+  });
+  it("odrzuca nasz storage ale spoza order-issues", () => {
+    expect(isOwnIssuePhotoUrl(`${base}/storage/v1/object/public/products/inne.jpg`, base)).toBe(false);
+  });
+  it("odrzuca gdy brak supabaseUrl", () => {
+    expect(isOwnIssuePhotoUrl(`${base}/storage/v1/object/public/products/order-issues/x.jpg`, "")).toBe(false);
   });
 });

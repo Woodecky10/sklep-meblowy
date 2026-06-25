@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient, createAdminClient } from "@/app/_lib/supabase/server";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { validateImageUpload } from "@/app/_lib/image-upload";
-import { validateOrderIssueInput } from "@/app/_lib/order-issues";
+import { validateOrderIssueInput, isOwnIssuePhotoUrl } from "@/app/_lib/order-issues";
 
 export type CancelOrderResult =
   | { ok: true; message: string }
@@ -164,6 +164,11 @@ export async function submitOrderIssue(formData: FormData): Promise<SubmitOrderI
           ? tr("Opis jest za krótki (min 5 znaków)", "Die Beschreibung ist zu kurz (mind. 5 Zeichen)")
           : tr("Maksymalnie 5 zdjęć", "Maximal 5 Fotos");
     return { ok: false, error: msg };
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  if (!v.value.photos.every((p) => isOwnIssuePhotoUrl(p, supabaseUrl))) {
+    return { ok: false, error: tr("Nieprawidłowe zdjęcie", "Ungültiges Foto") };
   }
 
   const admin = await createAdminClient();
