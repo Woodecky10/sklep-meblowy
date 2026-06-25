@@ -143,6 +143,16 @@ export type Collection = {
   updated_at: string;
 };
 
+// Katalog tkanin (migracja 37) — reużywalny zbiór nazw używanych jako wartości
+// opcji wariantu „Tkanina". name_de null → na /de fallback do name.
+export type Fabric = {
+  id: string;
+  name: string;
+  name_de: string | null;
+  sort_order: number;
+  created_at: string;
+};
+
 export type Profile = {
   id: string;
   email: string;
