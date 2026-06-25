@@ -14,6 +14,8 @@ import { getLocale } from "./_lib/i18n-server";
 import { getDictionary } from "./_lib/dictionaries";
 import { getEurRate } from "@/app/_lib/store-settings";
 import { RateProvider } from "@/app/_lib/rate-context";
+import { getFabricDeMap } from "@/app/_lib/fabrics";
+import { FabricLabelProvider } from "@/app/_lib/fabric-context";
 
 const inter = Inter({
   subsets: ["latin", "latin-ext"],
@@ -67,6 +69,7 @@ export default async function RootLayout({
 }) {
   const locale = await getLocale();
   const eurRate = await getEurRate();
+  const fabricMap = await getFabricDeMap();
   return (
     <html
       lang={locale}
@@ -76,16 +79,18 @@ export default async function RootLayout({
       <body className="min-h-screen flex flex-col antialiased">
         <ThemeProvider>
           <RateProvider rate={eurRate}>
-            <CartProvider>
-              <ToastProvider>
-                <TopBar />
-                <Navbar />
-                <main className="flex-1">{children}</main>
-                <Footer />
-                <CookieBanner />
-                <CartToast />
-              </ToastProvider>
-            </CartProvider>
+            <FabricLabelProvider map={fabricMap}>
+              <CartProvider>
+                <ToastProvider>
+                  <TopBar />
+                  <Navbar />
+                  <main className="flex-1">{children}</main>
+                  <Footer />
+                  <CookieBanner />
+                  <CartToast />
+                </ToastProvider>
+              </CartProvider>
+            </FabricLabelProvider>
           </RateProvider>
         </ThemeProvider>
       </body>

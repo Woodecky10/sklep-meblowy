@@ -14,6 +14,7 @@ import type { Address, Product } from "@/app/_lib/types";
 import { getEurRate } from "@/app/_lib/store-settings";
 import { convertToEur } from "@/app/_lib/money";
 import { effectivePrice } from "@/app/_lib/pricing";
+import { getFabricDeMap } from "@/app/_lib/fabrics";
 
 // stripe v22 re-eksportuje SessionCreateParams jako alias typu (bez
 // wewnętrznego namespace), więc .LineItem nie istnieje — indeksujemy typ.
@@ -53,6 +54,7 @@ export async function POST(request: NextRequest) {
     const rate = isDe ? await getEurRate() : 1;
     const currency: "pln" | "eur" = isDe ? "eur" : "pln";
     const toCharge = (pln: number) => (isDe ? convertToEur(pln, rate) : pln);
+    const fabricMap = isDe ? await getFabricDeMap() : {};
 
     if (!body.items?.length) {
       return NextResponse.json(
@@ -210,7 +212,7 @@ export async function POST(request: NextRequest) {
           product_data: {
             name:
               product.name +
-              (variantValues ? ` — ${formatVariantLabel(variantValues)}` : ""),
+              (variantValues ? ` — ${formatVariantLabel(variantValues, locale, fabricMap)}` : ""),
             images: product.images?.length ? [product.images[0]] : undefined,
           },
         },

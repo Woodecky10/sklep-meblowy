@@ -104,6 +104,7 @@ export const VARIANT_OPTION_DE: Record<string, string> = {
   STRONA: "SEITE",
   "STRONA MEBLA": "SEITE DES MÖBELS",
   Strona: "Seite",
+  Tkanina: "Stoff",
   TKANINA: "STOFF",
   Wariant: "Variante",
 };

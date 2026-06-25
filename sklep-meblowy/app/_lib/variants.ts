@@ -87,17 +87,27 @@ export function isOptionValueAvailable(
   });
 }
 
-// Krótka, czytelna etykieta wybranych wartości — np. "Strona: Lewa, Kolor: Beżowy".
-// Na DE tłumaczy nazwę opcji i (znaną) wartość; kody/wymiary przechodzą bez zmian.
+// Stała nazwa opcji wariantu reprezentującej tkaninę. Musi być zdefiniowana przed
+// formatVariantLabel, który jej używa do specjalnej obsługi mapy PL→DE.
+export const FABRIC_OPTION_NAME = "Tkanina";
+
+// Krótka etykieta wybranych wartości — np. "Strona: Lewa, Tkanina: Sawana 21".
+// Na DE: nazwy opcji + (kolory/strony) ze statycznej mapy; wartość opcji „Tkanina"
+// z fabricMap (katalog) gdy podana, inaczej fallback do statycznej mapy / PL.
 export function formatVariantLabel(
   values: Record<string, string>,
-  locale: Locale = DEFAULT_LOCALE
+  locale: Locale = DEFAULT_LOCALE,
+  fabricMap: Record<string, string> = {}
 ): string {
   const de = locale === "de";
   return Object.entries(values)
     .map(([k, v]) => {
       const key = de ? mapDe(VARIANT_OPTION_DE, k) ?? k : k;
-      const val = de ? mapDe(VARIANT_VALUE_DE, v) ?? v : v;
+      let val = v;
+      if (de) {
+        if (k === FABRIC_OPTION_NAME && fabricMap[v]) val = fabricMap[v];
+        else val = mapDe(VARIANT_VALUE_DE, v) ?? v;
+      }
       return `${key}: ${val}`;
     })
     .join(", ");
@@ -220,10 +230,6 @@ export function rebuildCombinations(
 }
 
 // ── Tkaniny (katalog) ──
-
-// Stała nazwa opcji wariantu reprezentującej tkaninę. Nazwa DE tej opcji
-// ("Tkanina"/"TKANINA" → "Stoff"/"STOFF") jest już w VARIANT_OPTION_DE.
-export const FABRIC_OPTION_NAME = "Tkanina";
 
 // Ustawia (lub tworzy/usuwa) opcję „Tkanina" z podanym zbiorem nazw i przelicza
 // kombinacje przez rebuildCombinations (ta sama logika co edytor). Pozostałe

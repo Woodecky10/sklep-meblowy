@@ -11,11 +11,13 @@ import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { formatMoney } from "@/app/_lib/money";
 import { useEurRate } from "@/app/_lib/rate-context";
+import { useFabricLabels } from "@/app/_lib/fabric-context";
 import type { Product } from "@/app/_lib/types";
 
 export default function KoszykPage() {
   const locale = useClientLocale();
   const rate = useEurRate();
+  const fabricMap = useFabricLabels();
   const t = getDictionary(locale);
   const {
     items,
@@ -170,7 +172,7 @@ export default function KoszykPage() {
                   </LocalizedLink>
                   {item.variantValues && (
                     <p className="text-xs text-[var(--muted)] mb-3">
-                      {formatVariantLabel(item.variantValues, locale)}
+                      {formatVariantLabel(item.variantValues, locale, fabricMap)}
                     </p>
                   )}
 

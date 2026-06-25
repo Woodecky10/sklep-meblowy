@@ -4,6 +4,8 @@ import type { Product, ProductVariants } from "@/app/_lib/types";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "@/app/_lib/de-content-maps";
 import type { Locale } from "@/app/_lib/i18n";
+import { useFabricLabels } from "@/app/_lib/fabric-context";
+import { FABRIC_OPTION_NAME } from "@/app/_lib/variants";
 
 type Props = {
   variants: ProductVariants;
@@ -23,10 +25,13 @@ function getValueLabel(
   p: Product | undefined,
   optionName: string,
   value: string,
-  locale: Locale
+  locale: Locale,
+  fabricMap: Record<string, string>
 ): string {
   const raw = p?.variants?.overrides?.value_labels?.[optionName]?.[value] ?? value;
-  return locale === "de" ? mapDe(VARIANT_VALUE_DE, raw) ?? raw : raw;
+  if (locale !== "de") return raw;
+  if (optionName === FABRIC_OPTION_NAME && fabricMap[raw]) return fabricMap[raw];
+  return mapDe(VARIANT_VALUE_DE, raw) ?? raw;
 }
 
 export default function VariantSelector({
@@ -36,6 +41,7 @@ export default function VariantSelector({
   product,
 }: Props) {
   const locale = useClientLocale();
+  const fabricMap = useFabricLabels();
   function pick(name: string, value: string) {
     onChange({ ...selected, [name]: value });
   }
@@ -51,7 +57,7 @@ export default function VariantSelector({
               {displayName}:{" "}
               <span className="text-[var(--fg)] normal-case tracking-normal font-semibold">
                 {current ? (
-                  getValueLabel(product, option.name, current, locale)
+                  getValueLabel(product, option.name, current, locale, fabricMap)
                 ) : (
                   <span className="text-[var(--muted)]">{locale === "de" ? "wählen" : "wybierz"}</span>
                 )}
@@ -60,7 +66,7 @@ export default function VariantSelector({
             <div className="flex flex-wrap gap-2">
               {option.values.map((v) => {
                 const isActive = current === v;
-                const label = getValueLabel(product, option.name, v, locale);
+                const label = getValueLabel(product, option.name, v, locale, fabricMap);
                 return (
                   <button
                     key={v}

@@ -4,6 +4,7 @@ import {
   applyFabricSelection,
   buildFabricDeMap,
 } from "../variants";
+import { formatVariantLabel } from "../variants";
 import type { ProductOption, ProductVariant } from "../types";
 
 describe("applyFabricSelection", () => {
@@ -55,5 +56,23 @@ describe("buildFabricDeMap", () => {
       { name: "Monolith 09", name_de: "  " },
     ]);
     expect(map).toEqual({ "Sawana 21": "Savanne 21" });
+  });
+});
+
+describe("formatVariantLabel z mapą tkanin", () => {
+  it("na DE tłumaczy wartość opcji Tkanina przez fabricMap", () => {
+    const label = formatVariantLabel(
+      { Tkanina: "Sawana 21", Strona: "Lewa" },
+      "de",
+      { "Sawana 21": "Savanne 21" }
+    );
+    // opcja Tkanina→Stoff (VARIANT_OPTION_DE), wartość z fabricMap; Strona/Lewa ze statycznej mapy
+    expect(label).toContain("Stoff: Savanne 21");
+    expect(label).toContain("Seite: Links");
+  });
+
+  it("bez mapy / na PL wartość tkaniny bez zmian", () => {
+    expect(formatVariantLabel({ Tkanina: "Sawana 21" }, "pl")).toBe("Tkanina: Sawana 21");
+    expect(formatVariantLabel({ Tkanina: "Sawana 21" }, "de")).toContain("Sawana 21");
   });
 });

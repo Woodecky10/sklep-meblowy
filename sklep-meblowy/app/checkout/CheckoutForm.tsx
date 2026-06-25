@@ -10,6 +10,7 @@ import { localizeHref } from "@/app/_lib/i18n";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { formatMoney } from "@/app/_lib/money";
 import { useEurRate } from "@/app/_lib/rate-context";
+import { useFabricLabels } from "@/app/_lib/fabric-context";
 import type { Address } from "@/app/_lib/types";
 
 export default function CheckoutForm({
@@ -26,6 +27,7 @@ export default function CheckoutForm({
   const router = useRouter();
   const locale = useClientLocale();
   const rate = useEurRate();
+  const fabricMap = useFabricLabels();
   const de = locale === "de";
   const { items, total, count, appliedPromo } = useCart();
 
@@ -350,7 +352,7 @@ export default function CheckoutForm({
                     </p>
                     {item.variantValues && (
                       <p className="text-[11px] text-[var(--muted)] truncate">
-                        {formatVariantLabel(item.variantValues, locale)}
+                        {formatVariantLabel(item.variantValues, locale, fabricMap)}
                       </p>
                     )}
                     <p className="text-xs text-[var(--muted)]">
