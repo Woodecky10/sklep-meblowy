@@ -141,6 +141,8 @@ export async function submitOrderIssue(formData: FormData): Promise<SubmitOrderI
   if (!user) return { ok: false, error: tr("Musisz być zalogowany", "Sie müssen angemeldet sein") };
 
   const orderId = String(formData.get("order_id") ?? "").trim();
+  if (!orderId) return { ok: false, error: tr("Nieprawidłowe zamówienie", "Ungültige Bestellung") };
+
   const category = String(formData.get("category") ?? "").trim();
   const message = String(formData.get("message") ?? "");
   const orderItemId = String(formData.get("order_item_id") ?? "").trim() || null;
@@ -196,7 +198,7 @@ export async function submitOrderIssue(formData: FormData): Promise<SubmitOrderI
     .maybeSingle();
 
   const { error } = await admin.from("order_issues").insert({
-    order_id: orderId,
+    order_id: (order as { id: string }).id,
     order_item_id: v.value.orderItemId,
     category: v.value.category,
     message: v.value.message,
