@@ -218,3 +218,43 @@ export function rebuildCombinations(
     return { values, stock: 0, price_modifier: 0 };
   });
 }
+
+// ── Tkaniny (katalog) ──
+
+// Stała nazwa opcji wariantu reprezentującej tkaninę. Nazwa DE tej opcji
+// ("Tkanina"/"TKANINA" → "Stoff"/"STOFF") jest już w VARIANT_OPTION_DE.
+export const FABRIC_OPTION_NAME = "Tkanina";
+
+// Ustawia (lub tworzy/usuwa) opcję „Tkanina" z podanym zbiorem nazw i przelicza
+// kombinacje przez rebuildCombinations (ta sama logika co edytor). Pozostałe
+// opcje bez zmian. Pusty wybór → usuwa opcję „Tkanina".
+export function applyFabricSelection(
+  options: ProductOption[],
+  combinations: ProductVariant[],
+  selectedFabricNames: string[]
+): { options: ProductOption[]; combinations: ProductVariant[] } {
+  let nextOptions: ProductOption[];
+  if (selectedFabricNames.length === 0) {
+    nextOptions = options.filter((o) => o.name !== FABRIC_OPTION_NAME);
+  } else if (options.some((o) => o.name === FABRIC_OPTION_NAME)) {
+    nextOptions = options.map((o) =>
+      o.name === FABRIC_OPTION_NAME ? { ...o, values: selectedFabricNames } : o
+    );
+  } else {
+    nextOptions = [...options, { name: FABRIC_OPTION_NAME, values: selectedFabricNames }];
+  }
+  return { options: nextOptions, combinations: rebuildCombinations(nextOptions, combinations) };
+}
+
+// Buduje mapę PL→DE nazw tkanin (pomija puste name_de). Czysta — testowalna bez
+// DB; serwerowy getFabricDeMap (fabrics.ts) ją opakowuje danymi z tabeli fabrics.
+export function buildFabricDeMap(
+  fabrics: { name: string; name_de: string | null }[]
+): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const f of fabrics) {
+    const de = f.name_de?.trim();
+    if (de) map[f.name] = de;
+  }
+  return map;
+}
