@@ -51,8 +51,11 @@ Nowa tabela `public.fabrics`:
 | sort_order  | int           | `default 0`; kolejność na liście wyboru            |
 | created_at  | timestamptz   | `default now()`                                    |
 
-- RLS **public-read** (storefront potrzebuje mapy PL→DE do renderu wartości tkanin),
-  **admin-write** — wzorzec dokładnie jak `collections`.
+- RLS **admin-only** (polityka `for all` dla roli admin). UWAGA — odejście od pierwotnego
+  pomysłu „public-read": storefront NIE czyta tabeli bezpośrednio. Mapa PL→DE jest
+  budowana server-side przez `getFabricDeMap()` (`createAdminClient` = service role,
+  omija RLS) i seedowana do kontekstu w root layout. Dlatego public-read jest zbędny i
+  świadomie pominięty (bezpieczniej). NIE dodawać polityki anon-read „dla porządku".
 - Migracja: `supabase/migrations/37_fabrics.sql` (idempotentna; `create table if not exists`,
   policies, indeks na `sort_order`). Człowiek odpala w Supabase po wdrożeniu kodu.
 - `name` jest jednocześnie wartością zapisywaną w wariancie
