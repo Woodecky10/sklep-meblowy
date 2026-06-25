@@ -10,6 +10,8 @@ import type { Order, OrderItem } from "@/app/_lib/types";
 import ReorderButton from "@/app/_components/ui/ReorderButton";
 import CancelOrderButton from "../CancelOrderButton";
 import { deliveryView } from "@/app/_lib/delivery";
+import OrderIssueModal from "@/app/_components/ui/OrderIssueModal";
+import { orderItemLabel } from "@/app/_lib/order-issues";
 
 export async function generateMetadata() {
   const locale = await getLocale();
@@ -59,6 +61,8 @@ export default async function OrderDetailPage({
         likedTitle: "Hat es gefallen?",
         likedDesc:
           "Sie können dieselbe Bestellung erneut aufgeben — alle Positionen (mit den gewählten Varianten) landen sofort im Warenkorb. Die Preise werden auf die aktuellen aktualisiert.",
+        issueHeading: "Stimmt etwas mit der Bestellung nicht?",
+        issueDesc: "Melden Sie ein Problem — wir melden uns und helfen bei der Lösung.",
         priceLocale: "de-DE",
       }
     : {
@@ -80,6 +84,8 @@ export default async function OrderDetailPage({
         likedTitle: "Spodobało się?",
         likedDesc:
           "Możesz złożyć identyczne zamówienie ponownie — wszystkie pozycje (z wybranymi wariantami) trafią od razu do koszyka. Ceny zostaną zaktualizowane do aktualnych.",
+        issueHeading: "Coś nie tak z zamówieniem?",
+        issueDesc: "Zgłoś problem — odezwiemy się i pomożemy go rozwiązać.",
         priceLocale: "pl-PL",
       };
   const supabase = await createClient();
@@ -113,6 +119,16 @@ export default async function OrderDetailPage({
   // total = subtotal - promo_discount + shipping  =>  shipping = total - subtotal + promo_discount
   const shipping = Number(order.total) - subtotal + promoDiscount;
   const delivery = deliveryView(order);
+
+  const canReportIssue = ["paid", "processing", "shipped", "delivered"].includes(order.status);
+  const issueItems = (order.items ?? []).map((it) => ({
+    id: it.id,
+    label: orderItemLabel(
+      (it.product ? localizeProduct(it.product, locale) : null)?.name ?? c.product,
+      it.variant_values ?? null,
+      locale
+    ),
+  }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -309,6 +325,16 @@ export default async function OrderDetailPage({
             {c.likedDesc}
           </p>
           <ReorderButton items={order.items ?? []} />
+        </div>
+      )}
+
+      {canReportIssue && (
+        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8">
+          <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-1">
+            {c.issueHeading}
+          </h3>
+          <p className="text-sm text-[var(--muted)] mb-5">{c.issueDesc}</p>
+          <OrderIssueModal orderId={order.id} items={issueItems} />
         </div>
       )}
     </div>
