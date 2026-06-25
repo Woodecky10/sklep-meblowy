@@ -295,5 +295,6 @@ export const de: DeepPartial<PlShape> = {
     tagline:
       "Wir schaffen Räume, in denen man leben möchte. Möbel von höchster Qualität, mit Liebe zum Detail.",
     rightsReserved: "Alle Rechte vorbehalten.",
+    securePayments: "Sichere Zahlungen",
   },
 };
