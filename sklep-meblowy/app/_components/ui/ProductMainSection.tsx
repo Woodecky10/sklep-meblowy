@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import type { Product, ProductRating } from "@/app/_lib/types";
@@ -19,6 +19,7 @@ import SizeSelector from "./SizeSelector";
 import type { SizeOption } from "@/app/_lib/size-groups";
 import StarRating from "./StarRating";
 import InquiryModal from "./InquiryModal";
+import LocalizedLink from "./LocalizedLink";
 
 // Client wrapper łączący galerię i akcje, żeby wybór wariantu mógł
 // jednocześnie zmieniać zdjęcia (galeria) i cenę / przycisk dodaj-do-koszyka
@@ -161,6 +162,12 @@ export default function ProductMainSection({
             <strong className="text-[var(--fg)]">
               {product.delivery_time || t.product.deliveryTimeDefault}
             </strong>
+          </p>
+          <p>
+            ✓ {t.product.deliveryCostNote}{" "}
+            <LocalizedLink href="/dostawa" className="text-[var(--color-gold)] hover:underline">
+              {t.product.deliveryCostLink}
+            </LocalizedLink>
           </p>
         </div>
       </div>

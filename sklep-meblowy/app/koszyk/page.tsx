@@ -280,6 +280,12 @@ export default function KoszykPage() {
                   </span>
                 </span>
               </div>
+              <p className="text-xs text-[var(--muted)] leading-snug">
+                {t.cart.deliveryNotice}{" "}
+                <LocalizedLink href="/dostawa" className="text-[var(--color-gold)] hover:underline">
+                  {t.cart.deliveryNoticeLink}
+                </LocalizedLink>
+              </p>
               <div className="border-t border-[var(--border)] pt-3 flex justify-between font-bold text-base text-[var(--fg)]">
                 <span>{t.cart.total}</span>
                 <span>{formatMoney(grandTotal, locale, rate)}</span>

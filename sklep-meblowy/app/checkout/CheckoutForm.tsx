@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import Image from "next/image";
 import { useCart, cartItemKey } from "@/app/_context/CartContext";
 import { formatVariantLabel } from "@/app/_lib/variants";
@@ -58,6 +59,9 @@ export default function CheckoutForm({
         shippingFrom: "ab 99 zł",
         shippingNote:
           "den genauen Preis nennen wir Ihnen nach der Bestellung telefonisch oder per E-Mail",
+        shippingNotice:
+          "Der angezeigte Betrag enthält keine Versandkosten. Wir legen sie nach der Bestellung individuell fest; sie bedürfen Ihrer Zustimmung (kostenfreier Rücktritt möglich).",
+        shippingNoticeLink: "Wie wir die Versandkosten berechnen",
         total: "Gesamt",
         payment: "🔒 Zahlung über Stripe (Karte, BLIK, Przelewy24)",
         ssl: "✓ SSL-Verschlüsselung",
@@ -89,6 +93,9 @@ export default function CheckoutForm({
         shippingFrom: "od 99 zł",
         shippingNote:
           "dokładną wycenę podajemy telefonicznie lub mailowo po zamówieniu",
+        shippingNotice:
+          "Podana kwota nie zawiera kosztu dostawy. Ustalamy go indywidualnie po zamówieniu i wymaga Twojej akceptacji (możesz bezpłatnie zrezygnować).",
+        shippingNoticeLink: "Jak liczymy koszt dostawy",
         total: "Razem",
         payment: "🔒 Płatność Stripe (karta, BLIK, Przelewy24)",
         ssl: "✓ Szyfrowanie SSL",
@@ -386,6 +393,12 @@ export default function CheckoutForm({
                 <span className="text-[var(--muted)]">{c.shippingNote}</span>
               </span>
             </div>
+            <p className="text-xs text-[var(--muted)] leading-snug pt-1">
+              {c.shippingNotice}{" "}
+              <LocalizedLink href="/dostawa" className="text-[var(--color-gold)] hover:underline">
+                {c.shippingNoticeLink}
+              </LocalizedLink>
+            </p>
             <div className="border-t border-[var(--border)] pt-2 flex justify-between font-bold text-base text-[var(--fg)]">
               <span>{c.total}</span>
               <span>{formatMoney(grandTotal, locale, rate)}</span>

@@ -74,6 +74,8 @@ export type PlShape = {
     warranty: string;
     deliveryTimeLabel: string;
     deliveryTimeDefault: string;
+    deliveryCostNote: string;
+    deliveryCostLink: string;
     reviewOne: string;
     reviewFew: string;
     reviewMany: string;
@@ -113,6 +115,8 @@ export type PlShape = {
     delivery: string;
     deliveryFrom: string;
     deliveryHint: string;
+    deliveryNotice: string;
+    deliveryNoticeLink: string;
     trustPayment: string;
     trustReturns: string;
     trustWarranty: string;
@@ -356,6 +360,8 @@ export const pl = {
     warranty: "Gwarancja 2 lata",
     deliveryTimeLabel: "Czas dostawy:",
     deliveryTimeDefault: "14–21 dni roboczych",
+    deliveryCostNote: "Koszt dostawy ustalany indywidualnie (transport meblowy)",
+    deliveryCostLink: "Szczegóły dostawy",
     reviewOne: "opinia",
     reviewFew: "opinie",
     reviewMany: "opinii",
@@ -398,6 +404,9 @@ export const pl = {
     deliveryFrom: "od 99 zł",
     deliveryHint:
       "dokładną wycenę podajemy telefonicznie lub mailowo po zamówieniu",
+    deliveryNotice:
+      "Podana kwota nie zawiera kosztu dostawy. Meble wysyłamy firmą transportową — koszt ustalamy indywidualnie po złożeniu zamówienia i wymaga Twojej akceptacji (możesz bezpłatnie zrezygnować).",
+    deliveryNoticeLink: "Jak liczymy koszt dostawy",
     trustPayment: "Bezpieczna płatność Stripe",
     trustReturns: "Zwrot do 30 dni",
     trustWarranty: "Gwarancja 2 lata",

@@ -80,6 +80,8 @@ export const de: DeepPartial<PlShape> = {
     warranty: "2 Jahre Garantie",
     deliveryTimeLabel: "Lieferzeit:",
     deliveryTimeDefault: "14–21 Werktage",
+    deliveryCostNote: "Versandkosten individuell festgelegt (Möbeltransport)",
+    deliveryCostLink: "Versanddetails",
     reviewOne: "Bewertung",
     reviewFew: "Bewertungen",
     reviewMany: "Bewertungen",
@@ -123,6 +125,9 @@ export const de: DeepPartial<PlShape> = {
     deliveryFrom: "ab 99 zł",
     deliveryHint:
       "den genauen Preis nennen wir telefonisch oder per E-Mail nach der Bestellung",
+    deliveryNotice:
+      "Der angezeigte Betrag enthält keine Versandkosten. Möbel versenden wir per Spedition — die Kosten legen wir nach der Bestellung individuell fest; sie bedürfen Ihrer Zustimmung (kostenfreier Rücktritt möglich).",
+    deliveryNoticeLink: "Wie wir die Versandkosten berechnen",
     trustPayment: "Sichere Zahlung mit Stripe",
     trustReturns: "Rückgabe innerhalb von 30 Tagen",
     trustWarranty: "2 Jahre Garantie",
