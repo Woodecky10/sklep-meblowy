@@ -31,6 +31,7 @@ import { convertToEur } from "@/app/_lib/money";
 import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { buildSizeOptions } from "@/app/_lib/size-groups";
+import { effectivePrice } from "@/app/_lib/pricing";
 import type { Product } from "@/app/_lib/types";
 
 type Props = { params: Promise<{ id: string }> };
@@ -177,6 +178,11 @@ export default async function ProduktPage({ params }: Props) {
   // Plain text description (bez HTML tagów) wymagany przez Google.
   const plainDescription = stripHtml(productPlainDescription(product)).slice(0, 5000);
   const productUrl = `https://${COMPANY.domain}/produkt/${product.id}`;
+  // Cena w danych strukturalnych = cena EFEKTYWNA (promocyjna gdy obniżka), żeby
+  // zgadzała się z ceną widoczną na stronie — inaczej Google (Merchant/rich
+  // snippets) zgłasza rozjazd "structured data ≠ visible price". Dla produktów
+  // z wariantami sale_price jest null (defense-in-depth), więc = product.price.
+  const jsonLdPrice = effectivePrice(product.price, product.sale_price);
   const jsonLd: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -192,7 +198,7 @@ export default async function ProduktPage({ params }: Props) {
       "@type": "Offer",
       url: productUrl,
       priceCurrency: locale === "de" ? "EUR" : "PLN",
-      price: (locale === "de" ? convertToEur(product.price, rate) : product.price).toFixed(2),
+      price: (locale === "de" ? convertToEur(jsonLdPrice, rate) : jsonLdPrice).toFixed(2),
       // Meble robione na zamówienie — zawsze "dostępne".
       availability: "https://schema.org/InStock",
       itemCondition: "https://schema.org/NewCondition",
