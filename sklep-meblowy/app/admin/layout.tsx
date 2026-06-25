@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { requireAdmin } from "@/app/_lib/admin";
 import { signOut } from "@/app/_lib/auth-actions";
+import { getNewOrderIssuesCount } from "@/app/_lib/order-issues-data";
 
 export const metadata: Metadata = {
   title: "Panel admina",
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
   { href: "/admin/tkaniny", label: "Tkaniny", icon: FabricsIcon },
   { href: "/admin/kody-rabatowe", label: "Kody rabatowe", icon: TicketIcon },
   { href: "/admin/zapytania", label: "Zapytania", icon: InboxIcon },
+  { href: "/admin/reklamacje", label: "Reklamacje", icon: ComplaintsIcon },
 ];
 
 export default async function AdminLayout({
@@ -28,6 +30,7 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const user = await requireAdmin();
+  const newIssues = await getNewOrderIssuesCount();
 
   return (
     <div className="min-h-screen flex bg-[var(--bg)]">
@@ -53,7 +56,12 @@ export default async function AdminLayout({
               className="flex items-center gap-3 px-6 py-3 text-sm font-sans text-[var(--fg)] hover:bg-[var(--bg)] hover:text-[var(--color-gold)] transition-colors"
             >
               <item.icon />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {item.href === "/admin/reklamacje" && newIssues > 0 && (
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-[var(--color-gold)] text-[var(--color-navy)]">
+                  {newIssues}
+                </span>
+              )}
             </Link>
           ))}
         </nav>
@@ -183,6 +191,15 @@ function FabricsIcon() {
       <path d="M3 6c3 2 6 2 9 0s6-2 9 0" />
       <path d="M3 12c3 2 6 2 9 0s6-2 9 0" />
       <path d="M3 18c3 2 6 2 9 0s6-2 9 0" />
+    </svg>
+  );
+}
+
+function ComplaintsIcon() {
+  return (
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <path d="M12 9v4M12 17h.01" />
     </svg>
   );
 }
