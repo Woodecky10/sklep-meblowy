@@ -92,37 +92,14 @@ export default async function Footer() {
         </div>
       </div>
 
-      <div className="border-t border-white/10 py-6 px-6 flex flex-col items-center gap-3">
-        <div className="flex items-center gap-2.5 flex-wrap justify-center">
-          <span className="text-[10px] uppercase tracking-widest text-white/50">
-            {t.footer.securePayments}
-          </span>
-          {([
-            ["przelewy24", "Przelewy24", 84],
-            ["visa", "Visa", 60],
-            ["mastercard", "Mastercard", 84],
-            ["blik", "BLIK", 60],
-          ] as const).map(([file, label, w]) => (
-            <span key={file} className="bg-white rounded px-1.5 py-1 inline-flex items-center">
-              <Image
-                src={`/payments/${file}.svg`}
-                alt={label}
-                width={w}
-                height={24}
-                className="h-5 w-auto"
-              />
-            </span>
-          ))}
-        </div>
-        <p className="text-center text-xs text-white/70">
-          © {new Date().getFullYear()} {COMPANY.brandName}. {t.footer.rightsReserved}
-          {isFilled(COMPANY.nip) && (
-            <>
-              {" "}
-              | NIP: {COMPANY.nip}
-            </>
-          )}
-        </p>
+      <div className="border-t border-white/10 py-6 text-center text-xs text-white/70 px-6">
+        © {new Date().getFullYear()} {COMPANY.brandName}. {t.footer.rightsReserved}
+        {isFilled(COMPANY.nip) && (
+          <>
+            {" "}
+            | NIP: {COMPANY.nip}
+          </>
+        )}
       </div>
     </footer>
   );

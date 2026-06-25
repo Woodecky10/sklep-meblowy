@@ -280,7 +280,6 @@ export type PlShape = {
     privacy: string;
     tagline: string;
     rightsReserved: string;
-    securePayments: string;
   };
 };
 
@@ -575,6 +574,5 @@ export const pl = {
     tagline:
       "Tworzymy przestrzenie, w których chce się żyć. Meble najwyższej jakości, z pasją do detalu.",
     rightsReserved: "Wszelkie prawa zastrzeżone.",
-    securePayments: "Bezpieczne płatności",
   },
 } as const;
