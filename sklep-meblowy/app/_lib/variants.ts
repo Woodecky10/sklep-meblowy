@@ -1,4 +1,4 @@
-import type { Product, ProductVariant } from "./types";
+import type { Product, ProductOption, ProductVariant } from "./types";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "./de-content-maps";
 import { effectivePrice, isOnSale } from "./pricing";
@@ -186,4 +186,35 @@ export function getVariantEffectivePrice(
     getVariantPrice(product, selectedValues),
     getVariantSalePrice(product, selectedValues)
   );
+}
+
+// ── Generowanie kombinacji wariantów (współdzielone z VariantsEditor + applyFabricSelection) ──
+
+// Wszystkie kombinacje opcji (iloczyn kartezjański). Pomija opcje bez nazwy/wartości.
+export function cartesianProduct(
+  options: ProductOption[]
+): Array<Record<string, string>> {
+  const valid = options.filter((o) => o.name.trim() && o.values.length > 0);
+  if (valid.length === 0) return [];
+  return valid.reduce<Array<Record<string, string>>>(
+    (acc, opt) =>
+      acc.flatMap((prev) => opt.values.map((v) => ({ ...prev, [opt.name]: v }))),
+    [{}]
+  );
+}
+
+// Po zmianie opcji przelicz kombinacje, zachowując stock/price/images/sale dla
+// kombinacji których klucz dalej istnieje. Nowe → stock 0, price_modifier 0.
+export function rebuildCombinations(
+  options: ProductOption[],
+  oldCombinations: ProductVariant[]
+): ProductVariant[] {
+  const oldMap = new Map<string, ProductVariant>(
+    oldCombinations.map((c) => [variantKey(c.values), c])
+  );
+  return cartesianProduct(options).map((values) => {
+    const prev = oldMap.get(variantKey(values));
+    if (prev) return { ...prev, values };
+    return { values, stock: 0, price_modifier: 0 };
+  });
 }

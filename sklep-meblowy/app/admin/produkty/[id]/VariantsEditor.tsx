@@ -15,43 +15,11 @@ import {
   inputClass,
   type Toast,
 } from "./_shared";
-import { formatVariantLabel, variantKey } from "@/app/_lib/variants";
-
-// ============================================================
-// Pomocnicze: cartesian product + rebuild
-// ============================================================
-
-// Wszystkie kombinacje opcji (cartesian product).
-function cartesianProduct(
-  options: ProductOption[]
-): Array<Record<string, string>> {
-  const valid = options.filter((o) => o.name.trim() && o.values.length > 0);
-  if (valid.length === 0) return [];
-  return valid.reduce<Array<Record<string, string>>>(
-    (acc, opt) =>
-      acc.flatMap((prev) =>
-        opt.values.map((v) => ({ ...prev, [opt.name]: v }))
-      ),
-    [{}]
-  );
-}
-
-// Po zmianie opcji rebuild listę kombinacji, zachowując stock / price /
-// images dla kombinacji których klucz dalej istnieje. Nowe kombinacje
-// dostają stock 0, price_modifier 0.
-function rebuildCombinations(
-  options: ProductOption[],
-  oldCombinations: ProductVariant[]
-): ProductVariant[] {
-  const oldMap = new Map<string, ProductVariant>(
-    oldCombinations.map((c) => [variantKey(c.values), c])
-  );
-  return cartesianProduct(options).map((values) => {
-    const prev = oldMap.get(variantKey(values));
-    if (prev) return { ...prev, values };
-    return { values, stock: 0, price_modifier: 0 };
-  });
-}
+import {
+  formatVariantLabel,
+  variantKey,
+  rebuildCombinations,
+} from "@/app/_lib/variants";
 
 // ============================================================
 // Komponent
