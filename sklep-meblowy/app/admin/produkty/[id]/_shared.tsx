@@ -1,5 +1,7 @@
 "use client";
 
+export { compressIfNeeded } from "@/app/_lib/image-compress";
+
 // Shared helpers dla ProductEditor i VariantsEditor.
 
 export const inputClass =
@@ -60,22 +62,3 @@ export function IconBtn({
   );
 }
 
-// Kompresja zdjęcia jeśli >800 KB (wzór z SliderEditor).
-// Web worker w tle, nie blokuje UI. Fallback: zwraca oryginał gdy padło.
-export async function compressIfNeeded(file: File): Promise<File> {
-  if (file.size < 800 * 1024) return file;
-  try {
-    const imageCompression = (await import("browser-image-compression")).default;
-    const compressed = await imageCompression(file, {
-      maxSizeMB: 1,
-      maxWidthOrHeight: 2400,
-      useWebWorker: true,
-      fileType: file.type === "image/png" ? "image/jpeg" : file.type,
-      initialQuality: 0.82,
-    });
-    return compressed;
-  } catch (err) {
-    console.error("Kompresja nieudana:", err);
-    return file;
-  }
-}

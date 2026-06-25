@@ -241,6 +241,27 @@ export type PlShape = {
     cancel: string;
     privacyNote: string;
   };
+  orderIssue: {
+    triggerButton: string;
+    dialogAria: string;
+    eyebrow: string;
+    heading: string;
+    categoryLabel: string;
+    itemLabel: string;
+    wholeOrder: string;
+    messageLabel: string;
+    messageHint: string;
+    messagePlaceholder: string;
+    photosLabel: string;
+    photosHint: string;
+    addPhoto: string;
+    uploading: string;
+    sentTitle: string;
+    submit: string;
+    submitting: string;
+    cancel: string;
+    privacyNote: string;
+  };
   footer: {
     information: string;
     about: string;
@@ -505,6 +526,27 @@ export const pl = {
     submitting: "Wysyłam...",
     cancel: "Anuluj",
     privacyNote: "Twoje dane będą wykorzystane wyłącznie do odpowiedzi na to zapytanie.",
+  },
+  orderIssue: {
+    triggerButton: "Zgłoś problem",
+    dialogAria: "Zgłoszenie problemu z zamówieniem",
+    eyebrow: "Reklamacja",
+    heading: "Zgłoś problem z zamówieniem",
+    categoryLabel: "Czego dotyczy problem?",
+    itemLabel: "Której pozycji dotyczy?",
+    wholeOrder: "Całe zamówienie",
+    messageLabel: "Opis problemu",
+    messageHint: "Opisz krótko co się stało.",
+    messagePlaceholder: "Narożnik dotarł z uszkodzonym rogiem — załączam zdjęcia.",
+    photosLabel: "Zdjęcia (opcjonalnie, max 5)",
+    photosHint: "Zdjęcie uszkodzenia bardzo przyspiesza rozpatrzenie.",
+    addPhoto: "+ Dodaj zdjęcie",
+    uploading: "Wgrywam...",
+    sentTitle: "Zgłoszenie wysłane ✓",
+    submit: "Wyślij zgłoszenie",
+    submitting: "Wysyłam...",
+    cancel: "Anuluj",
+    privacyNote: "Twoje dane i zdjęcia wykorzystamy wyłącznie do rozpatrzenia tego zgłoszenia.",
   },
   footer: {
     information: "Informacje",
