@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "@/app/_lib/admin";
 import { getProduct, getSizeGroupKeys } from "@/app/_lib/products";
 import { getAllCategories } from "@/app/_lib/categories";
+import { getAllFabrics } from "@/app/_lib/fabrics";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import ProductEditor from "./ProductEditor";
 import type { ProductDeFields } from "./TranslationEditor";
@@ -16,11 +17,12 @@ export default async function AdminProductEditPage({
 }) {
   await requireAdmin();
   const { id } = await params;
-  const [product, categories, de, sizeGroupKeys] = await Promise.all([
+  const [product, categories, de, sizeGroupKeys, fabrics] = await Promise.all([
     getProduct(id),
     getAllCategories(),
     getProductDe(id),
     getSizeGroupKeys(),
+    getAllFabrics(),
   ]);
   if (!product) notFound();
 
@@ -30,6 +32,7 @@ export default async function AdminProductEditPage({
       categories={categories}
       de={de}
       sizeGroupKeys={sizeGroupKeys}
+      fabrics={fabrics}
     />
   );
 }

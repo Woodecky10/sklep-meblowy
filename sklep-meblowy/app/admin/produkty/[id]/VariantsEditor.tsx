@@ -7,6 +7,7 @@ import type {
   ProductOption,
   ProductVariant,
   ProductVariants,
+  Fabric,
 } from "@/app/_lib/types";
 import {
   Field,
@@ -19,6 +20,8 @@ import {
   formatVariantLabel,
   variantKey,
   rebuildCombinations,
+  applyFabricSelection,
+  FABRIC_OPTION_NAME,
 } from "@/app/_lib/variants";
 
 // ============================================================
@@ -28,16 +31,19 @@ import {
 export default function VariantsEditor({
   productId,
   initial,
+  fabrics,
   onToast,
 }: {
   productId: string;
   initial: ProductVariants | null;
+  fabrics: Fabric[];
   onToast: (t: Toast) => void;
 }) {
   const [variants, setVariants] = useState<ProductVariants | null>(initial);
   const [saving, startSaveTransition] = useTransition();
   // Klucze kombinacji w trakcie uploadu zdjęcia (żeby zablokować ich button)
   const [uploadingKeys, setUploadingKeys] = useState<Set<string>>(new Set());
+  const [fabricPickerOpen, setFabricPickerOpen] = useState(false);
 
   const dirty = useMemo(
     () => JSON.stringify(variants) !== JSON.stringify(initial),
@@ -115,6 +121,14 @@ export default function VariantsEditor({
       options: nextOptions,
       combinations: rebuildCombinations(nextOptions, variants.combinations),
     });
+  }
+
+  // Zastosuj zaznaczone tkaniny z katalogu → ustaw opcję „Tkanina" + przelicz kombinacje.
+  function applyFabrics(selectedNames: string[]) {
+    const base = variants ?? { options: [], combinations: [] };
+    const next = applyFabricSelection(base.options, base.combinations, selectedNames);
+    setVariants(next.options.length === 0 ? null : { ...base, ...next });
+    setFabricPickerOpen(false);
   }
 
   // ============================================================
@@ -258,13 +272,25 @@ export default function VariantsEditor({
             Produkt nie ma wariantów. Stock jest zarządzany w polu &bdquo;Stan magazynowy&rdquo; wyżej.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={enableVariants}
-          className="self-start px-5 py-2.5 border border-[var(--color-gold)] text-[var(--color-gold)] font-sans font-semibold text-xs uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
-        >
-          + Dodaj warianty
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={enableVariants}
+            className="px-5 py-2.5 border border-[var(--color-gold)] text-[var(--color-gold)] font-sans font-semibold text-xs uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
+          >
+            + Dodaj warianty
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setVariants({ options: [], combinations: [] });
+              setFabricPickerOpen(true);
+            }}
+            className="px-5 py-2.5 border border-[var(--color-gold)] text-[var(--color-gold)] font-sans font-semibold text-xs uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
+          >
+            + Dodaj tkaniny z katalogu
+          </button>
+        </div>
       </section>
     );
   }
@@ -319,6 +345,13 @@ export default function VariantsEditor({
           className="self-start px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
         >
           + Dodaj opcję
+        </button>
+        <button
+          type="button"
+          onClick={() => setFabricPickerOpen(true)}
+          className="self-start px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
+        >
+          Wybierz z katalogu tkanin
         </button>
       </div>
 
@@ -377,6 +410,17 @@ export default function VariantsEditor({
           {saving ? "Zapisuję..." : "Zapisz warianty"}
         </button>
       </div>
+
+      {fabricPickerOpen && (
+        <FabricPicker
+          fabrics={fabrics}
+          initiallySelected={
+            variants?.options.find((o) => o.name === FABRIC_OPTION_NAME)?.values ?? []
+          }
+          onCancel={() => setFabricPickerOpen(false)}
+          onApply={applyFabrics}
+        />
+      )}
     </section>
   );
 }
@@ -668,5 +712,118 @@ function CombinationRow({
         )}
       </div>
     </li>
+  );
+}
+
+function FabricPicker({
+  fabrics,
+  initiallySelected,
+  onApply,
+  onCancel,
+}: {
+  fabrics: Fabric[];
+  initiallySelected: string[];
+  onApply: (selectedNames: string[]) => void;
+  onCancel: () => void;
+}) {
+  const [selected, setSelected] = useState<string[]>(initiallySelected);
+  const [search, setSearch] = useState("");
+
+  // Nazwy obecne w produkcie, ale spoza katalogu — pokaż jako zaznaczone „spoza
+  // katalogu", żeby ich nie zgubić przy zapisie.
+  const catalogNames = new Set(fabrics.map((f) => f.name));
+  const orphanNames = initiallySelected.filter((n) => !catalogNames.has(n));
+
+  function toggle(name: string) {
+    setSelected((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
+    );
+  }
+
+  const filtered = search.trim()
+    ? fabrics.filter((f) => f.name.toLowerCase().includes(search.trim().toLowerCase()))
+    : fabrics;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl max-w-lg w-full max-h-[80vh] flex flex-col p-6 gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="font-display text-lg font-semibold text-[var(--fg)]">
+            Wybierz tkaniny ({selected.length})
+          </h3>
+          <input
+            type="text"
+            placeholder="Szukaj…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className={`${inputClass} max-w-[10rem]`}
+          />
+        </div>
+
+        {fabrics.length === 0 ? (
+          <p className="text-sm text-[var(--muted)] italic py-6 text-center">
+            Brak tkanin w katalogu. Dodaj je w &bdquo;Tkaniny&rdquo; (menu admina).
+          </p>
+        ) : (
+          <ul className="flex-1 overflow-y-auto border border-[var(--border)] rounded-xl divide-y divide-[var(--border)]">
+            {orphanNames.map((n) => (
+              <li key={`orphan-${n}`}>
+                <label className="flex items-center gap-3 p-2 cursor-pointer bg-amber-50 dark:bg-amber-950/30">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(n)}
+                    onChange={() => toggle(n)}
+                    className="h-4 w-4 accent-[var(--color-gold)]"
+                  />
+                  <span className="text-sm text-[var(--fg)]">{n}</span>
+                  <span className="text-[10px] font-sans uppercase tracking-widest text-amber-600 dark:text-amber-400 ml-auto">
+                    spoza katalogu
+                  </span>
+                </label>
+              </li>
+            ))}
+            {filtered.length === 0 && (
+              <li className="p-4 text-xs text-[var(--muted)] italic">Brak dopasowań</li>
+            )}
+            {filtered.map((f) => {
+              const active = selected.includes(f.name);
+              return (
+                <li key={f.id}>
+                  <label className={`flex items-center gap-3 p-2 cursor-pointer transition-colors ${active ? "bg-[var(--color-gold)]/10" : "hover:bg-[var(--bg)]"}`}>
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      onChange={() => toggle(f.name)}
+                      className="h-4 w-4 accent-[var(--color-gold)]"
+                    />
+                    <span className="text-sm text-[var(--fg)]">{f.name}</span>
+                    {f.name_de && (
+                      <span className="text-[10px] text-[var(--muted)] ml-auto">DE: {f.name_de}</span>
+                    )}
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <div className="flex gap-2 justify-end pt-2 border-t border-[var(--border)]">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-5 py-2.5 border border-[var(--border)] text-[var(--fg)] font-sans text-sm uppercase tracking-widest rounded-full hover:border-[var(--color-gold)] transition-colors"
+          >
+            Anuluj
+          </button>
+          <button
+            type="button"
+            onClick={() => onApply(selected)}
+            className="px-5 py-2.5 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
+          >
+            Zastosuj ({selected.length})
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -8,7 +8,7 @@ import {
   updateProductImages,
   uploadProductImage,
 } from "../actions";
-import type { Product, ActionResult } from "@/app/_lib/types";
+import type { Product, ActionResult, Fabric } from "@/app/_lib/types";
 import type { CategoryDef } from "@/app/_lib/categories";
 import { hasVariants } from "@/app/_lib/variants";
 import { Field, IconBtn, compressIfNeeded, inputClass, type Toast } from "./_shared";
@@ -22,11 +22,13 @@ export default function ProductEditor({
   categories,
   de,
   sizeGroupKeys,
+  fabrics,
 }: {
   product: Product;
   categories: CategoryDef[];
   de: ProductDeFields;
   sizeGroupKeys: string[];
+  fabrics: Fabric[];
 }) {
   const [images, setImages] = useState<string[]>(product.images ?? []);
   // Baseline ostatnio zapisanej galerii — resetowany na zapisany payload po
@@ -437,7 +439,7 @@ export default function ProductEditor({
       {/* ============================================================
           Sekcja: Warianty (pełny editor)
           ============================================================ */}
-      <VariantsEditor productId={product.id} initial={product.variants} onToast={showToast} />
+      <VariantsEditor productId={product.id} initial={product.variants} fabrics={fabrics} onToast={showToast} />
 
       {/* ============================================================
           Sekcja: Pojedynczy opis (fallback gdy brak sekcji)
