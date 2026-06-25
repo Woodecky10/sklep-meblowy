@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import type { Product, ProductRating } from "@/app/_lib/types";
