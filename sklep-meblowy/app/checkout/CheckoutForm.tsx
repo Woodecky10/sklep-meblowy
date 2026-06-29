@@ -63,7 +63,7 @@ export default function CheckoutForm({
           "Der angezeigte Betrag enthält keine Versandkosten. Wir legen sie nach der Bestellung individuell fest; sie bedürfen Ihrer Zustimmung (kostenfreier Rücktritt möglich).",
         shippingNoticeLink: "Wie wir die Versandkosten berechnen",
         total: "Gesamt",
-        payment: "🔒 Zahlung über Stripe (Karte, BLIK, Przelewy24)",
+        payment: "🔒 Zahlung über Przelewy24 (Karte, BLIK, Überweisung)",
         ssl: "✓ SSL-Verschlüsselung",
         defaultCountry: "Polen",
       }
@@ -97,7 +97,7 @@ export default function CheckoutForm({
           "Podana kwota nie zawiera kosztu dostawy. Ustalamy go indywidualnie po zamówieniu i wymaga Twojej akceptacji (możesz bezpłatnie zrezygnować).",
         shippingNoticeLink: "Jak liczymy koszt dostawy",
         total: "Razem",
-        payment: "🔒 Płatność Stripe (karta, BLIK, Przelewy24)",
+        payment: "🔒 Płatność Przelewy24 (karta, BLIK, przelew)",
         ssl: "✓ Szyfrowanie SSL",
         defaultCountry: "Polska",
       };

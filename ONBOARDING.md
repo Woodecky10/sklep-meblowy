@@ -36,10 +36,10 @@ Klient na `/de` widzi i **płaci w EUR**; PL (`/`) bez zmian (PLN). Stały kurs 
 Operator płatności: **Przelewy24** (PayPro SA), direct REST API v1. Stripe został usunięty.
 
 **Przepływ:**
-1. Checkout rejestruje transakcję → `POST /api/p24/register` (Server Action `registerP24Transaction`) → otrzymuje `token`.
+1. Checkout (`POST /api/checkout`) rejestruje transakcję — wywołuje `registerTransaction()` z `app/_lib/p24.ts`, otrzymuje `token` i zwraca `{ url: trnRequestUrl(token) }` do klienta. Nie istnieje osobna trasa `/api/p24/register` ani Server Action `registerP24Transaction`.
 2. Klient przekierowany na `https://secure.przelewy24.pl/trnRequest/{token}` (lub sandbox) — wybiera metodę, płaci.
 3. P24 wysyła notyfikację `POST /api/p24/status` z `sign` CRC (podpis z `P24_CRC`). Endpoint weryfikuje kwotę przez `POST /api/v1/transaction/verify` i oznacza zamówienie `paid` + `payment_ref`.
-4. Klient wraca na `/zamowienie/sukces?id=…` — success jest agnostyczny (nie ufa returnowi, pokazuje status z DB).
+4. Klient wraca na `/checkout/success?order=<orderId>` (dla EUR: `/de/checkout/success?order=<orderId>`) — strona sukcesu jest agnostyczna (nie ufa returnowi, czyta status zamówienia z DB; pokazuje widok „opłacone" lub „w toku" zależnie od statusu).
 
 **Env (P24):**
 - `P24_MERCHANT_ID` / `P24_POS_ID` — z panelu PayPro
@@ -48,10 +48,10 @@ Operator płatności: **Przelewy24** (PayPro SA), direct REST API v1. Stripe zos
 - `P24_BASE_URL` — `https://sandbox.przelewy24.pl` (dev) / `https://secure.przelewy24.pl` (prod)
 
 **Migracje DB (expand-contract):**
-- **Migracja 39** (`39_p24_payment_ref.sql`) — dodaje kolumny `payment_ref` + `payment_provider` do `orders`. Już odpalona na prod.
+- **Migracja 39** (`39_p24_payment_ref.sql`) — dodaje kolumny `payment_ref` + `payment_provider` do `orders`. **NIE odpalona jeszcze** — uruchomić w Supabase SQL Editorze przy cutoverze P24 na produkcję.
 - **Migracja 40** (`40_drop_stripe_payment_intent.sql`) — usuwa legacy kolumnę `stripe_payment_intent`. **NIE odpalać teraz** — poczekaj ~30 dni po cutoverze (okno zwrotów Stripe). Po odpaleniu: usunąć `stripe_payment_intent` z `types.ts` i panelu admina (osobny commit).
 
-**Pliki kluczowe:** `app/_lib/p24.ts` (logika CRC/build/register/verify), `app/api/p24/register/route.ts`, `app/api/p24/status/route.ts` (notyfikacja/idempotencja), `app/api/p24/refund/route.ts`.
+**Pliki kluczowe:** `app/_lib/p24.ts` (konfiguracja, podpisy CRC, funkcje klienckie: `registerTransaction` / `verifyTransaction` / `refundTransaction`), `app/_lib/p24-events.ts` (walidacja podpisu notyfikacji), `app/api/checkout/route.ts` (rejestruje transakcję P24 w ramach tworzenia zamówienia), `app/api/p24/status/route.ts` (notyfikacja → weryfikacja → settle + idempotencja). Funkcja `refundTransaction` istnieje w `p24.ts`, ale nie jest jeszcze wpięta w żaden endpoint ani panel.
 
 **Sandbox:** panel + dane testowe → `https://sandbox.przelewy24.pl`. Ustaw `P24_BASE_URL=https://sandbox.przelewy24.pl` w `.env.local`.
 
@@ -76,11 +76,11 @@ Niezbędne env do dev (nazwy — wartości z Vercel/starego `.env.local`):
 > **Baza i storage są ZDALNE/współdzielone (Supabase).** Migracje (29–34) już wgrane, obrazy w storage. Nowy komp **nie robi setupu bazy** — wystarczy `.env.local` wskazujący na ten sam projekt Supabase. `.env.local` i `node_modules` są gitignored, więc nie przychodzą z klonem.
 
 ## Baza — migracje
-**Migracje 29–39 są ODPALONE** na produkcyjnym Supabase (29–32: 2026-06-23; 33+34: 2026-06-24; 35+36: 2026-06-25; 37+38: 2026-06-25; 39: do odpalenia po cutoverze P24). Wspólna baza → świeży klon nic nie re-uruchamia. Przyszłe migracje: kolejny numer w `supabase/migrations/`; odpala **człowiek** w Supabase SQL Editorze (agent NIE ma dostępu DDL).
-> Migracja **40** (`40_drop_stripe_payment_intent.sql`) jest w repo ale **NIE odpalać teraz** — patrz sekcja Płatności.
+**Migracje 29–38 są ODPALONE** na produkcyjnym Supabase (29–32: 2026-06-23; 33+34: 2026-06-24; 35+36: 2026-06-25; 37+38: 2026-06-25). Wspólna baza → świeży klon nic nie re-uruchamia. Przyszłe migracje: kolejny numer w `supabase/migrations/`; odpala **człowiek** w Supabase SQL Editorze (agent NIE ma dostępu DDL).
+> Migracja **39** (`39_p24_payment_ref.sql`) jest w repo ale **NIE odpalona** — uruchomić przy cutoverze P24 na produkcję. Migracja **40** (`40_drop_stripe_payment_intent.sql`) jest w repo ale **NIE odpalać teraz** — patrz sekcja Płatności.
 
 ## Bramki jakości (uruchamiać z `sklep-meblowy/`)
-`npx tsc --noEmit` (0 błędów) · `npm run lint` (0) · `npm test` (vitest — ~208 zielonych) · `npm run build` (Turbopack przechodzi).
+`npx tsc --noEmit` (0 błędów) · `npm run lint` (0) · `npm test` (vitest — 258 zielonych) · `npm run build` (Turbopack przechodzi).
 > Po przełączeniu gałęzi build/tsc potrafi pokazać „phantom" błędy ze stale cache `.next` (referencje do nieistniejących już tras). Jeśli tak — `rm -rf .next` i ponów.
 
 ## Push do origin

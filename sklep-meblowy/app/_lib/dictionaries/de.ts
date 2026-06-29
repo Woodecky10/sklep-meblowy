@@ -128,7 +128,7 @@ export const de: DeepPartial<PlShape> = {
     deliveryNotice:
       "Der angezeigte Betrag enthält keine Versandkosten. Möbel versenden wir per Spedition — die Kosten legen wir nach der Bestellung individuell fest; sie bedürfen Ihrer Zustimmung (kostenfreier Rücktritt möglich).",
     deliveryNoticeLink: "Wie wir die Versandkosten berechnen",
-    trustPayment: "Sichere Zahlung mit Stripe",
+    trustPayment: "Sichere Zahlung mit Przelewy24",
     trustReturns: "Rückgabe innerhalb von 30 Tagen",
     trustWarranty: "2 Jahre Garantie",
     crossSellEyebrow: "Passend zum Warenkorb",

@@ -408,7 +408,7 @@ export const pl = {
     deliveryNotice:
       "Podana kwota nie zawiera kosztu dostawy. Meble wysyłamy firmą transportową — koszt ustalamy indywidualnie po złożeniu zamówienia i wymaga Twojej akceptacji (możesz bezpłatnie zrezygnować).",
     deliveryNoticeLink: "Jak liczymy koszt dostawy",
-    trustPayment: "Bezpieczna płatność Stripe",
+    trustPayment: "Bezpieczna płatność Przelewy24",
     trustReturns: "Zwrot do 30 dni",
     trustWarranty: "Gwarancja 2 lata",
     crossSellEyebrow: "Polecane do koszyka",

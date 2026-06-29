@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
 
       // Ilość z klienta — twarda walidacja (int 1..99). Bez tego ujemne /
       // ułamkowe / absurdalne ilości tworzyły zamówienia-śmieci w DB
-      // (service role) zanim Stripe cokolwiek zwalidował.
+      // (service role) zanim cokolwiek zostało zwalidowane.
       if (
         !Number.isInteger(item.quantity) ||
         item.quantity < 1 ||
@@ -255,7 +255,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ url: trnRequestUrl(token) });
   } catch (err) {
     // Szczegóły tylko do logów serwera — surowe err.message wyciekało
-    // wewnętrzne detale (Stripe/Supabase) do klienta.
+    // wewnętrzne detale (Supabase/P24) do klienta.
     console.error("Checkout error:", err);
     return NextResponse.json(
       {
