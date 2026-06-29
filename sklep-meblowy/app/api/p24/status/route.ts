@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
   // Anulowane, a płatność doszła — ślad do ręcznej obsługi (jak w Stripe).
   if (ord.status === "cancelled") {
     console.error(`P24 status: płatność za ANULOWANE zamówienie ${orderId} — ręczna obsługa`);
-    await supabase
+    const { error: cancelTraceErr } = await supabase
       .from("orders")
       .update({
         payment_ref: String(n.orderId),
@@ -64,6 +64,15 @@ export async function POST(request: NextRequest) {
         admin_note: "płatność P24 doszła po anulowaniu — wymaga ręcznej obsługi (zwrot/przywrócenie)",
       } as never)
       .eq("id", orderId);
+    if (cancelTraceErr) {
+      // Bez payment_ref nie da się zidentyfikować transakcji do zwrotu — nie wolno
+      // zgubić śladu. 500 → P24 ponowi notyfikację (parytet z webhookiem Stripe).
+      console.error(
+        `P24 status: zapis śladu anulowanego-opłaconego ${orderId} nieudany:`,
+        cancelTraceErr.message
+      );
+      return NextResponse.json({ error: "DB error" }, { status: 500 });
+    }
     return NextResponse.json({ received: true });
   }
 
