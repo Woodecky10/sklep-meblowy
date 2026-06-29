@@ -71,7 +71,7 @@ export default function FilterBar({
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Click-outside zamyka dropdown
+  // Click-outside i Escape zamykają dropdown
   useEffect(() => {
     if (!openDropdown) return;
     function handleClick(e: MouseEvent) {
@@ -82,18 +82,15 @@ export default function FilterBar({
         setOpenDropdown(null);
       }
     }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [openDropdown]);
-
-  // Escape zamyka dropdown
-  useEffect(() => {
-    if (!openDropdown) return;
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpenDropdown(null);
     }
+    document.addEventListener("mousedown", handleClick);
     document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
   }, [openDropdown]);
 
   // Debounce na cenie — odpalanie nawigacji co 500 ms po ostatnim wpisaniu

@@ -215,7 +215,7 @@ function Field({
     <label className="flex flex-col gap-1.5">
       <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
         {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
+        {required && <span className="text-red-500 ml-1" aria-hidden="true">*</span>}
       </span>
       {children}
       {hint && <span className="text-xs text-[var(--muted)]">{hint}</span>}

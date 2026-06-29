@@ -58,8 +58,8 @@ export default async function HomePage() {
   const slides = (dbSlides.length > 0 ? dbSlides : [DEFAULT_FALLBACK_SLIDE]).map(
     (s) => localizeSlide(s, locale)
   );
-  const tiles = (dbTiles.length > 0 ? dbTiles : DEFAULT_FALLBACK_TILES).map((t) =>
-    localizeTile(t, locale)
+  const tiles = (dbTiles.length > 0 ? dbTiles : DEFAULT_FALLBACK_TILES).map((tile) =>
+    localizeTile(tile, locale)
   );
 
   return (

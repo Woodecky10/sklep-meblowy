@@ -63,6 +63,7 @@ export default async function ReviewList({ reviews }: { reviews: ProductReview[]
                   width="12"
                   height="12"
                   viewBox="0 0 24 24"
+                  aria-hidden
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2.5"

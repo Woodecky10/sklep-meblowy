@@ -42,8 +42,7 @@ export default function AddToCartButton({
   // czy produkt ma jakiekolwiek opcje. Jeśli tak, NIE pozwalamy na quick-add
   // (bo wpadłby do koszyka z variantValues=undefined, a checkout potem
   // odrzuci) — zamiast tego linkujemy do karty produktu gdzie klient wybierze.
-  const productHasVariants =
-    (product.variants?.options?.length ?? 0) > 0;
+  const productHasVariants = (product.variants?.options.length ?? 0) > 0;
   const disabled = !!needsVariant;
 
   function handleAdd() {

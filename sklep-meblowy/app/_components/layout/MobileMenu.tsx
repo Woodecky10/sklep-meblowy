@@ -57,7 +57,6 @@ export default function MobileMenu({
         <div className="absolute top-full left-0 right-0 bg-[var(--card-bg)] border-b border-[var(--border)] shadow-lg lg:hidden">
           <nav className="flex flex-col px-6 py-4 gap-3">
             {sections.map((section) => {
-              const cats = section.categories;
               const isOpen = openSection === section.slug;
               return (
                 <div key={section.slug}>
@@ -90,7 +89,7 @@ export default function MobileMenu({
                       >
                         {labels.allInSection} {section.label.toLowerCase()}
                       </LocalizedLink>
-                      {cats.map((c) => (
+                      {section.categories.map((c) => (
                         <LocalizedLink
                           key={c.slug}
                           href={`/sklep?kategoria=${c.slug}`}

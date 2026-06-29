@@ -183,6 +183,7 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
             {list.map((src, i) => (
               <button
                 key={i}
+                type="button"
                 onClick={() => setActive(i)}
                 aria-label={`${t.a11y.showImage} ${i + 1}`}
                 aria-current={i === active}
@@ -232,6 +233,7 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
           {list.length > 1 && (
             <>
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   setActive((i) => (i - 1 + list.length) % list.length);
@@ -244,6 +246,7 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
                 </svg>
               </button>
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   setActive((i) => (i + 1) % list.length);

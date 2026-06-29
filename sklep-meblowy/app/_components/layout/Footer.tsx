@@ -24,6 +24,14 @@ export default async function Footer() {
     [t.footer.privacy, "/prywatnosc"],
   ];
 
+  // Grupowanie kategorii pod sekcjami — jedna iteracja zamiast O(sekcje × kategorie).
+  const categoriesBySection = new Map<string, typeof categories>();
+  for (const c of categories) {
+    const arr = categoriesBySection.get(c.group_slug) ?? [];
+    arr.push(c);
+    categoriesBySection.set(c.group_slug, arr);
+  }
+
   return (
     <footer className="bg-[var(--color-navy)] text-white mt-24">
       <div className="max-w-7xl mx-auto px-6 py-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
@@ -60,9 +68,7 @@ export default async function Footer() {
               {section.label}
             </p>
             <ul className="space-y-3 text-sm text-white/70">
-              {categories
-                .filter((c) => c.group_slug === section.slug)
-                .map((c) => (
+              {(categoriesBySection.get(section.slug) ?? []).map((c) => (
                   <li key={c.slug}>
                     <LocalizedLink
                       href={`/sklep?kategoria=${c.slug}`}

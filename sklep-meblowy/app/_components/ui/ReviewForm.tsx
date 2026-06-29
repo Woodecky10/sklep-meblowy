@@ -17,6 +17,7 @@ export default function ReviewForm({
 }) {
   const router = useRouter();
   const de = useClientLocale() === "de";
+  const locale = de ? "de" : "pl";
   const c = de
     ? {
         editTitle: "Ihre Bewertung bearbeiten",
@@ -66,12 +67,12 @@ export default function ReviewForm({
     }
     setLoading(true);
     try {
-      const res = await fetch(`/api/reviews?locale=${de ? "de" : "pl"}`, {
+      const res = await fetch(`/api/reviews?locale=${locale}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productId, rating, comment }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? c.saveError);
       router.refresh();
     } catch (err) {
@@ -86,10 +87,10 @@ export default function ReviewForm({
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/reviews?productId=${productId}&locale=${de ? "de" : "pl"}`,
+        `/api/reviews?productId=${productId}&locale=${locale}`,
         { method: "DELETE" }
       );
-      const data = await res.json();
+      const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? c.deleteError);
       setRating(0);
       setComment("");

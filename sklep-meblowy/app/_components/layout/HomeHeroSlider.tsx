@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import LocalizedLink from "../ui/LocalizedLink";
 import Image from "next/image";
 import useEmblaCarousel from "embla-carousel-react";
@@ -54,12 +54,9 @@ export default function HomeHeroSlider({ slides }: { slides: HeroSlide[] }) {
 
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const scrollTo = useCallback(
-    (index: number) => emblaApi?.scrollTo(index),
-    [emblaApi]
-  );
-  const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
-  const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
+  const scrollTo = (index: number) => emblaApi?.scrollTo(index);
+  const scrollPrev = () => emblaApi?.scrollPrev();
+  const scrollNext = () => emblaApi?.scrollNext();
 
   useEffect(() => {
     if (!emblaApi) return;

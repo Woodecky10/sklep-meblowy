@@ -21,6 +21,10 @@ export type CookieConsent = {
 const STORAGE_KEY = "mollien.cookie-consent";
 const CONSENT_VERSION = 1;
 
+// Wspólny styl przycisków wtórnych (Dostosuj/Zapisz/tylko niezbędne).
+const secondaryBtnClass =
+  "px-5 py-2.5 text-sm font-sans font-semibold uppercase tracking-wider rounded-full border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--fg)] transition-colors";
+
 export function getConsent(): CookieConsent | null {
   if (typeof window === "undefined") return null;
   try {
@@ -128,25 +132,21 @@ export default function CookieBanner() {
           )}
 
           <div className="flex flex-wrap gap-2 justify-end">
-            {!showDetails && (
+            {showDetails ? (
+              <button onClick={saveCustom} className={secondaryBtnClass}>
+                {t.cookies.save}
+              </button>
+            ) : (
               <button
                 onClick={() => setShowDetails(true)}
-                className="px-5 py-2.5 text-sm font-sans font-semibold uppercase tracking-wider rounded-full border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--fg)] transition-colors"
+                className={secondaryBtnClass}
               >
                 {t.cookies.customize}
               </button>
             )}
-            {showDetails && (
-              <button
-                onClick={saveCustom}
-                className="px-5 py-2.5 text-sm font-sans font-semibold uppercase tracking-wider rounded-full border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--fg)] transition-colors"
-              >
-                {t.cookies.save}
-              </button>
-            )}
             <button
               onClick={rejectAll}
-              className="px-5 py-2.5 text-sm font-sans font-semibold uppercase tracking-wider rounded-full border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--fg)] transition-colors"
+              className={secondaryBtnClass}
             >
               {t.cookies.onlyNecessary}
             </button>
