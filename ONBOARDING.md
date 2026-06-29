@@ -3,12 +3,12 @@
 Przewodnik do podjęcia pracy nad projektem na nowym komputerze / w nowej sesji.
 
 ## Co to jest
-Sklep meblowy **Mollien** (meble na zamówienie). **Next.js 16** (App Router, Server Actions, Turbopack) + **Supabase** (Postgres + Auth + Storage) + **Stripe**. Aplikacja jest w podfolderze `sklep-meblowy/`. Repo: `Woodecky10/sklep-meblowy`, główny branch `main`. Produkcja: Vercel (auto-deploy z `origin/main`), domena www.mollien.pl. Dwujęzyczny: **PL** (korzeń) + **DE** (`/de`, ceny w EUR).
+Sklep meblowy **Mollien** (meble na zamówienie). **Next.js 16** (App Router, Server Actions, Turbopack) + **Supabase** (Postgres + Auth + Storage) + **Przelewy24** (PayPro, direct REST API v1). Aplikacja jest w podfolderze `sklep-meblowy/`. Repo: `Woodecky10/sklep-meblowy`, główny branch `main`. Produkcja: Vercel (auto-deploy z `origin/main`), domena www.mollien.pl. Dwujęzyczny: **PL** (korzeń) + **DE** (`/de`, ceny w EUR).
 
 > ⚠️ To NIE jest Next.js z treningu — wersja 16 ma breaking changes. Przed kodem Server Component/Action sprawdź `node_modules/next/dist/docs/`. `params`/`searchParams` to Promise. (Patrz `sklep-meblowy/AGENTS.md`.)
 
-## Stan repo (2026-06-24)
-`origin/main` = `73382b2`, **na produkcji** (Vercel auto-deployuje z `main`). Bramki na `main`: `tsc` 0 · `lint` 0 · **208 testów** (vitest) · `build` przechodzi (Turbopack).
+## Stan repo (2026-06-29)
+`origin/main` = `f7ea7b6`, **na produkcji** (Vercel auto-deployuje z `main`). Bramki na `main`: `tsc` 0 · `lint` 0 · **258 testów** (vitest) · `build` przechodzi (Turbopack).
 
 Ostatnio scalone:
 - **PR #41** — domknięcie wycieków PL na `/de` (redirecty/linki gubiły prefiks `/de`, komunikaty błędów po DE).
@@ -29,8 +29,33 @@ Decyzja właścicielki (2026-06-17): sklep przejął funkcje BaseLinkera natywni
 Pytania do właścicielki (faktury KSeF + wysyłka): `sklep-meblowy/docs/2026-06-18-rozpoznanie-faktury-wysylka.md`.
 
 ## Ceny EUR na /de (2026-06-24, PR #42)
-Klient na `/de` widzi i **płaci w EUR**; PL (`/`) bez zmian (PLN). Stały kurs PLN→EUR w tabeli `store_settings`, edytowalny w **`/admin/ustawienia`** (bez deploya). Konwersja `eur = ceil(pln × kurs)` tylko przy wyświetlaniu (`formatMoney`) i w checkoutcie; ceny w DB/koszyku zostają w PLN. Każde zamówienie zapisuje `orders.currency` + `fx_rate`; kwoty zamówień (konto/admin/sukces) formatowane wg **waluty zamówienia**, nie locale. Checkout DE: Stripe `currency:"eur"`, `locale:"de"`, `payment_method_types:["card","p24"]` (BLIK = PLN-only → wykluczony z DE; p24 wspiera EUR — potwierdzone w docs Stripe). Klucz: `app/_lib/money.ts`, `getEurRate` (`store-settings.ts`, cache+fallback), `RateProvider`/`useEurRate` (seed w root layoucie), `ProductCard` z **wymaganym** propem `rate`.
-> ⚠️ **GO-LIVE EUR (po stronie człowieka):** ustaw realny kurs w `/admin/ustawienia` (seed startowy `0.23`); zrób testową sesję EUR (card+p24) na `/de` — fix BLIK nie był weryfikowany na żywym Stripe.
+Klient na `/de` widzi i **płaci w EUR**; PL (`/`) bez zmian (PLN). Stały kurs PLN→EUR w tabeli `store_settings`, edytowalny w **`/admin/ustawienia`** (bez deploya). Konwersja `eur = ceil(pln × kurs)` tylko przy wyświetlaniu (`formatMoney`) i w checkoutcie; ceny w DB/koszyku zostają w PLN. Każde zamówienie zapisuje `orders.currency` + `fx_rate`; kwoty zamówień (konto/admin/sukces) formatowane wg **waluty zamówienia**, nie locale. Checkout DE: P24 `currency:"EUR"` (karta PL/DE), BLIK = PLN-only → wykluczony z DE. Klucz: `app/_lib/money.ts`, `getEurRate` (`store-settings.ts`, cache+fallback), `RateProvider`/`useEurRate` (seed w root layoucie), `ProductCard` z **wymaganym** propem `rate`.
+> ⚠️ **GO-LIVE EUR (po stronie człowieka):** ustaw realny kurs w `/admin/ustawienia` (seed startowy `0.23`); zrób testową sesję EUR (card) na `/de` w sandboxie P24.
+
+## Płatności — Przelewy24 / PayPro (2026-06-29, direct REST API v1)
+Operator płatności: **Przelewy24** (PayPro SA), direct REST API v1. Stripe został usunięty.
+
+**Przepływ:**
+1. Checkout rejestruje transakcję → `POST /api/p24/register` (Server Action `registerP24Transaction`) → otrzymuje `token`.
+2. Klient przekierowany na `https://secure.przelewy24.pl/trnRequest/{token}` (lub sandbox) — wybiera metodę, płaci.
+3. P24 wysyła notyfikację `POST /api/p24/status` z `sign` CRC (podpis z `P24_CRC`). Endpoint weryfikuje kwotę przez `POST /api/v1/transaction/verify` i oznacza zamówienie `paid` + `payment_ref`.
+4. Klient wraca na `/zamowienie/sukces?id=…` — success jest agnostyczny (nie ufa returnowi, pokazuje status z DB).
+
+**Env (P24):**
+- `P24_MERCHANT_ID` / `P24_POS_ID` — z panelu PayPro
+- `P24_API_KEY` — klucz REST API
+- `P24_CRC` — klucz do podpisów CRC (SHA384)
+- `P24_BASE_URL` — `https://sandbox.przelewy24.pl` (dev) / `https://secure.przelewy24.pl` (prod)
+
+**Migracje DB (expand-contract):**
+- **Migracja 39** (`39_p24_payment_ref.sql`) — dodaje kolumny `payment_ref` + `payment_provider` do `orders`. Już odpalona na prod.
+- **Migracja 40** (`40_drop_stripe_payment_intent.sql`) — usuwa legacy kolumnę `stripe_payment_intent`. **NIE odpalać teraz** — poczekaj ~30 dni po cutoverze (okno zwrotów Stripe). Po odpaleniu: usunąć `stripe_payment_intent` z `types.ts` i panelu admina (osobny commit).
+
+**Pliki kluczowe:** `app/_lib/p24.ts` (logika CRC/build/register/verify), `app/api/p24/register/route.ts`, `app/api/p24/status/route.ts` (notyfikacja/idempotencja), `app/api/p24/refund/route.ts`.
+
+**Sandbox:** panel + dane testowe → `https://sandbox.przelewy24.pl`. Ustaw `P24_BASE_URL=https://sandbox.przelewy24.pl` w `.env.local`.
+
+> ⚠️ **GO-LIVE P24 (po stronie człowieka):** wpisz realne klucze sandbox w `.env.local`; odpal migrację 39 na prod (jeśli jeszcze nie); wykonaj E2E checklist (karta PL/DE, BLIK, przelew, porzucona płatność, duplikat notyfikacji, podrobiony sign). Po ~30 dniach od cutoveru odpal migrację 40 i zrób cleanup commit.
 
 ## Edytor WYSIWYG opisów produktu (2026-06-22)
 Opisy produktu edytuje się w panelu pełnym edytorem WYSIWYG (**TipTap**) — bez ręcznego HTML. Komponent `app/admin/produkty/[id]/RichTextEditor.tsx` (TipTap, client-only, `immediatelyRender:false`), wpięty w sekcje opisu (PL custom, override, DE) oraz pojedyncze pole „Opis produktu"/„Opis (DE)". Pasek: cofnij/ponów, B/I/U/S, listy, cytat, H2–H4, wyrównanie, kolor, marker, link, obraz (upload przez `uploadProductImage` + `compressIfNeeded`).
@@ -46,12 +71,13 @@ npm install                           # node_modules NIE są w repo
 npm run dev
 ```
 Niezbędne env do dev (nazwy — wartości z Vercel/starego `.env.local`):
-`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_APP_URL`. Pełny szablon: `sklep-meblowy/.env.example`.
-> Zmienne `BASELINKER_*`/`BL_STATUS_*`/`CRON_SECRET` zostały USUNIĘTE (BL wycięty) — nie są już potrzebne.
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `P24_MERCHANT_ID`, `P24_POS_ID`, `P24_API_KEY`, `P24_CRC`, `P24_BASE_URL`, `NEXT_PUBLIC_APP_URL`. Pełny szablon: `sklep-meblowy/.env.example`.
+> Zmienne `STRIPE_*`, `BASELINKER_*`/`BL_STATUS_*`/`CRON_SECRET` zostały USUNIĘTE — nie są już potrzebne.
 > **Baza i storage są ZDALNE/współdzielone (Supabase).** Migracje (29–34) już wgrane, obrazy w storage. Nowy komp **nie robi setupu bazy** — wystarczy `.env.local` wskazujący na ten sam projekt Supabase. `.env.local` i `node_modules` są gitignored, więc nie przychodzą z klonem.
 
 ## Baza — migracje
-**WSZYSTKIE migracje (przez 34) są ODPALONE** na produkcyjnym Supabase (29–32: 2026-06-23; 33 EUR + 34 drop BL: 2026-06-24). Wspólna baza → świeży klon nic nie re-uruchamia. Przyszłe migracje: kolejny numer w `sklep-meblowy/supabase/migrations/`; odpala **człowiek** w Supabase SQL Editorze (agent NIE ma dostępu DDL).
+**Migracje 29–39 są ODPALONE** na produkcyjnym Supabase (29–32: 2026-06-23; 33+34: 2026-06-24; 35+36: 2026-06-25; 37+38: 2026-06-25; 39: do odpalenia po cutoverze P24). Wspólna baza → świeży klon nic nie re-uruchamia. Przyszłe migracje: kolejny numer w `supabase/migrations/`; odpala **człowiek** w Supabase SQL Editorze (agent NIE ma dostępu DDL).
+> Migracja **40** (`40_drop_stripe_payment_intent.sql`) jest w repo ale **NIE odpalać teraz** — patrz sekcja Płatności.
 
 ## Bramki jakości (uruchamiać z `sklep-meblowy/`)
 `npx tsc --noEmit` (0 błędów) · `npm run lint` (0) · `npm test` (vitest — ~208 zielonych) · `npm run build` (Turbopack przechodzi).
@@ -72,10 +98,12 @@ Origin wymaga konta **Woodecky10** — `mwlo1403` NIE ma write (push → 403). K
 brainstorming → spec (`docs/superpowers/specs/`) → plan TDD (`docs/superpowers/plans/`) → implementacja subagent-driven (świeży subagent na task + recenzja po każdym + final whole-branch review) → merge. Panel admina jest **PL-only** (bez i18n). Server actions: `"use server"` + `requireAdmin()` + `createAdminClient()` + `revalidatePath`, zwracają `ActionResult` (typ w `app/_lib/types.ts`), updaty castowane `as never`. Komponenty klienckie używają `app/admin/_shared` + `useTransition`.
 
 ## Następny krok
-1. **EUR go-live:** ustaw realny kurs w `/admin/ustawienia`; testowa sesja EUR (card+p24) na `/de`.
-2. **Zamknięcie konta BaseLinker** — można (obrazy przehostowane, kod/dane czyste).
-3. **Podprojekt 3 (faktury KSeF)** — czeka na odpowiedź: z jakiego programu fakturowego korzysta księgowa (przesądza drogę); potem spec → plan → wdrożenie.
-4. **Reszta podprojektu 4 (wysyłka)** — termin dostawy, dane transportu, model kosztu.
+1. **P24 sandbox go-live (po stronie człowieka):** wpisz klucze sandbox P24 w `.env.local`; wykonaj E2E checklist (karta PL/DE, BLIK, przelew, porzucona, duplikat notyfikacji, podrobiony sign). Patrz sekcja Płatności wyżej.
+2. **EUR go-live:** ustaw realny kurs w `/admin/ustawienia`; testowa sesja EUR (card) na `/de` w sandboxie P24.
+3. **Migracja 40 (cleanup Stripe):** ~30 dni po cutoverze odpal `40_drop_stripe_payment_intent.sql`, potem usuń `stripe_payment_intent` z `types.ts` i panelu admina.
+4. **Zamknięcie konta BaseLinker** — można (obrazy przehostowane, kod/dane czyste).
+5. **Podprojekt 3 (faktury KSeF)** — czeka na odpowiedź: z jakiego programu fakturowego korzysta księgowa (przesądza drogę); potem spec → plan → wdrożenie.
+6. **Reszta podprojektu 4 (wysyłka)** — termin dostawy, dane transportu, model kosztu.
 
 ## Drobne follow-upy (nieblokujące)
 - `schema.sql` jest niekompletnym baseline'em (pre-existing) — fresh-DB bootstrap z samego pliku byłby niepełny; źródłem prawdy są **migracje**.
