@@ -32,3 +32,113 @@ export function getP24Config(): P24Config {
   }
   return _cfg;
 }
+
+function authHeader(cfg: P24Config): string {
+  // Basic Auth: login = posId, hasło = klucz API z panelu P24.
+  const token = Buffer.from(`${cfg.posId}:${cfg.apiKey}`).toString("base64");
+  return `Basic ${token}`;
+}
+
+export type P24RegisterParams = {
+  sessionId: string;
+  amount: number; // grosze/eurocenty
+  currency: "PLN" | "EUR";
+  description: string;
+  email: string;
+  country: string;
+  language: string;
+  urlReturn: string;
+  urlStatus: string;
+};
+
+export async function registerTransaction(p: P24RegisterParams): Promise<string> {
+  const cfg = getP24Config();
+  const sign = p24Sign({
+    sessionId: p.sessionId,
+    merchantId: cfg.merchantId,
+    amount: p.amount,
+    currency: p.currency,
+    crc: cfg.crc,
+  });
+  const res = await fetch(`${cfg.baseUrl}/api/v1/transaction/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: authHeader(cfg) },
+    body: JSON.stringify({
+      merchantId: cfg.merchantId,
+      posId: cfg.posId,
+      sessionId: p.sessionId,
+      amount: p.amount,
+      currency: p.currency,
+      description: p.description,
+      email: p.email,
+      country: p.country,
+      language: p.language,
+      urlReturn: p.urlReturn,
+      urlStatus: p.urlStatus,
+      sign,
+    }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`P24 register nieudany (${res.status}): ${detail}`);
+  }
+  const json = (await res.json()) as { data?: { token?: string } };
+  const token = json.data?.token;
+  if (!token) throw new Error("P24 register: brak tokena w odpowiedzi");
+  return token;
+}
+
+export async function verifyTransaction(p: {
+  sessionId: string;
+  orderId: number;
+  amount: number;
+  currency: "PLN" | "EUR";
+}): Promise<boolean> {
+  const cfg = getP24Config();
+  const sign = p24Sign({
+    sessionId: p.sessionId,
+    orderId: p.orderId,
+    amount: p.amount,
+    currency: p.currency,
+    crc: cfg.crc,
+  });
+  const res = await fetch(`${cfg.baseUrl}/api/v1/transaction/verify`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: authHeader(cfg) },
+    body: JSON.stringify({
+      merchantId: cfg.merchantId,
+      posId: cfg.posId,
+      sessionId: p.sessionId,
+      amount: p.amount,
+      currency: p.currency,
+      orderId: p.orderId,
+      sign,
+    }),
+  });
+  if (!res.ok) return false;
+  const json = (await res.json()) as { data?: { status?: string } };
+  return json.data?.status === "success";
+}
+
+export async function refundTransaction(p: {
+  sessionId: string;
+  orderId: number;
+  amount: number;
+  requestId: string;
+}): Promise<boolean> {
+  const cfg = getP24Config();
+  const res = await fetch(`${cfg.baseUrl}/api/v1/transaction/refund`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: authHeader(cfg) },
+    body: JSON.stringify({
+      requestId: p.requestId,
+      refunds: [{ sessionId: p.sessionId, amount: p.amount }],
+      refundsUuid: p.requestId,
+    }),
+  });
+  return res.ok;
+}
+
+export function trnRequestUrl(token: string): string {
+  return `${getP24Config().baseUrl}/trnRequest/${token}`;
+}
