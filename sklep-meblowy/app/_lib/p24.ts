@@ -33,10 +33,10 @@ export function getP24Config(): P24Config {
   return _cfg;
 }
 
-function authHeader(cfg: P24Config): string {
+function jsonHeaders(cfg: P24Config): Record<string, string> {
   // Basic Auth: login = posId, hasło = klucz API z panelu P24.
   const token = Buffer.from(`${cfg.posId}:${cfg.apiKey}`).toString("base64");
-  return `Basic ${token}`;
+  return { "Content-Type": "application/json", Authorization: `Basic ${token}` };
 }
 
 export type P24RegisterParams = {
@@ -62,7 +62,7 @@ export async function registerTransaction(p: P24RegisterParams): Promise<string>
   });
   const res = await fetch(`${cfg.baseUrl}/api/v1/transaction/register`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: authHeader(cfg) },
+    headers: jsonHeaders(cfg),
     body: JSON.stringify({
       merchantId: cfg.merchantId,
       posId: cfg.posId,
@@ -104,7 +104,7 @@ export async function verifyTransaction(p: {
   });
   const res = await fetch(`${cfg.baseUrl}/api/v1/transaction/verify`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json", Authorization: authHeader(cfg) },
+    headers: jsonHeaders(cfg),
     body: JSON.stringify({
       merchantId: cfg.merchantId,
       posId: cfg.posId,
@@ -129,7 +129,7 @@ export async function refundTransaction(p: {
   const cfg = getP24Config();
   const res = await fetch(`${cfg.baseUrl}/api/v1/transaction/refund`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: authHeader(cfg) },
+    headers: jsonHeaders(cfg),
     body: JSON.stringify({
       requestId: p.requestId,
       refunds: [{ sessionId: p.sessionId, amount: p.amount }],
