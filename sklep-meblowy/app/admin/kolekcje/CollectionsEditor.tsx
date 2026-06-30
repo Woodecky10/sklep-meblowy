@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Card, EmptyState, Field, ToastView, inputCls } from "@/app/admin/_shared";
+import { Card, EmptyState, Field, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
 import Image from "next/image";
 import {
   createCollection,
@@ -12,8 +12,6 @@ import {
   type ActionResult,
 } from "./actions";
 import type { Collection, Product } from "@/app/_lib/types";
-
-type Toast = { type: "success" | "error"; message: string } | null;
 
 export default function CollectionsEditor({
   initialCollections,
@@ -384,8 +382,4 @@ function CollectionForm({
     </form>
   );
 }
-
-// ============================================================
-// Helpers
-// ============================================================
 

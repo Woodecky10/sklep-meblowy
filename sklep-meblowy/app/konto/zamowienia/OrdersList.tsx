@@ -109,10 +109,7 @@ export default function OrdersList({
       ) : (
         filtered.map((order) => {
           const status = STATUS_LABELS[order.status] ?? STATUS_LABELS.pending;
-          const statusText =
-            de
-              ? (STATUS_LABELS[order.status] ?? STATUS_LABELS.pending).labelDe
-              : status.label;
+          const statusText = de ? status.labelDe : status.label;
           const itemsCount =
             order.items?.reduce((s, i) => s + i.quantity, 0) ?? 0;
           return (

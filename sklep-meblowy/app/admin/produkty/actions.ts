@@ -7,6 +7,8 @@ import { requireAdmin } from "@/app/_lib/admin";
 import { validateImageUpload } from "@/app/_lib/image-upload";
 import { buildNewProductPayload } from "@/app/_lib/new-product";
 import { recordPriceHistory } from "@/app/_lib/price-history";
+import { findInvalidVariantSale } from "@/app/_lib/pricing";
+import { formatVariantLabel } from "@/app/_lib/variants";
 import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-html";
 import type {
   ActionResult,
@@ -245,6 +247,8 @@ export async function updateProductVariants(
 
   if (!productId) return { ok: false, error: "Brak id produktu" };
 
+  const supabase = await createAdminClient();
+
   // Walidacja: jeśli niepusty, sprawdź strukturę
   if (variants !== null) {
     if (
@@ -273,15 +277,30 @@ export async function updateProductVariants(
         if (typeof c.sale_price !== "number" || c.sale_price < 0) {
           return { ok: false, error: "Cena promocyjna kombinacji musi być liczbą ≥ 0" };
         }
-        // regularna kombinacji = price bazowa NIE jest tu znana z formularza wariantów;
-        // walidujemy względem modyfikatora: sale musi być < (price_modifier-skorygowana
-        // cena). Pełną regularną zna recordPriceHistory; tu pilnujemy tylko nieujemności
-        // i porównania z modyfikatorem nie robimy (brak ceny bazowej w tym payloadzie).
       }
+    }
+
+    // Cena promocyjna kombinacji musi być < jej ceny regularnej (base + modyfikator).
+    // Cena bazowa nie jest w payloadzie wariantów (zapisywana osobno przez
+    // updateProductBasics) — pobieramy zapisaną wartość z DB (autorytet).
+    const { data: baseRow } = await supabase
+      .from("products")
+      .select("price")
+      .eq("id", productId)
+      .maybeSingle();
+    if (!baseRow) return { ok: false, error: "Produkt nie istnieje" };
+    const basePrice = Number((baseRow as { price: number | string }).price);
+    const invalid = findInvalidVariantSale(variants.combinations, basePrice);
+    if (invalid) {
+      return {
+        ok: false,
+        error: `Cena promocyjna kombinacji „${formatVariantLabel(
+          invalid.values
+        )}" (${invalid.sale} zł) musi być niższa od jej ceny regularnej (${invalid.regular} zł).`,
+      };
     }
   }
 
-  const supabase = await createAdminClient();
   const { error } = await supabase
     .from("products")
     .update({ variants } as never)

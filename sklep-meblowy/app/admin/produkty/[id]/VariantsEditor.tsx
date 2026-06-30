@@ -23,6 +23,7 @@ import {
   applyFabricSelection,
   FABRIC_OPTION_NAME,
 } from "@/app/_lib/variants";
+import { findInvalidVariantSale } from "@/app/_lib/pricing";
 
 // ============================================================
 // Komponent
@@ -31,11 +32,13 @@ import {
 export default function VariantsEditor({
   productId,
   initial,
+  basePrice,
   fabrics,
   onToast,
 }: {
   productId: string;
   initial: ProductVariants | null;
+  basePrice: number;
   fabrics: Fabric[];
   onToast: (t: Toast) => void;
 }) {
@@ -221,6 +224,20 @@ export default function VariantsEditor({
             options: cleanOptions,
             combinations: rebuildCombinations(cleanOptions, variants.combinations),
           };
+        }
+      }
+      // Feedback przed round-tripem: cena promo kombinacji < regularnej (base+modyfikator).
+      // Serwer waliduje to ponownie autorytatywnie (basePrice z DB).
+      if (toSave) {
+        const invalid = findInvalidVariantSale(toSave.combinations, basePrice);
+        if (invalid) {
+          onToast({
+            type: "error",
+            message: `Cena promocyjna kombinacji „${formatVariantLabel(
+              invalid.values
+            )}" (${invalid.sale} zł) musi być niższa od jej ceny regularnej (${invalid.regular} zł).`,
+          });
+          return;
         }
       }
       const res = await updateProductVariants(productId, toSave);

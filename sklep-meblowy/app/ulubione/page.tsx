@@ -9,6 +9,7 @@ import { localizeHref, localizePath } from "@/app/_lib/i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import ProductCard from "@/app/_components/ui/ProductCard";
 import { getEurRate } from "@/app/_lib/store-settings";
+import { pluralForm } from "@/app/_lib/plural";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = getDictionary(await getLocale());
@@ -47,11 +48,11 @@ export default async function WishlistPage() {
         {products.length > 0 && (
           <p className="text-sm text-[var(--muted)] mt-2">
             {products.length}{" "}
-            {products.length === 1
-              ? t.home.productOne
-              : products.length < 5
-                ? t.home.productFew
-                : t.home.productMany}
+            {pluralForm(products.length, {
+              one: t.home.productOne,
+              few: t.home.productFew,
+              many: t.home.productMany,
+            })}
           </p>
         )}
       </div>
