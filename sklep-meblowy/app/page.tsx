@@ -10,6 +10,7 @@ import { getCollectionsForHome } from "./_lib/collections";
 import { getUserWishlistIds } from "./_lib/wishlist";
 import { getLocale } from "./_lib/i18n-server";
 import { getEurRate } from "./_lib/store-settings";
+import { pluralForm } from "./_lib/plural";
 import { localizePath } from "./_lib/i18n";
 import { alternatesFor } from "./_lib/sitemap-i18n";
 import { getDictionary } from "./_lib/dictionaries";
@@ -38,6 +39,16 @@ export async function generateMetadata(): Promise<Metadata> {
 // spację+literę na non-breaking space + literę, żeby trzymały się razem.
 function protectOrphans(text: string): string {
   return text.replace(/ ([A-ZĄĆĘŁŃÓŚŹŻa-ząćęłńóśźż])$/, " $1");
+}
+
+// Klasa grid dla i-tego zdjęcia w mozaice kolekcji (do 4 zdjęć). Pojedyncze
+// zdjęcie wypełnia całość, dwa dzielą się na pół wysokości, przy trzech
+// pierwsze zajmuje cały górny wiersz, przy czterech siatka 2×2.
+function mosaicTileClass(total: number, index: number): string {
+  if (total === 1) return "col-span-2 row-span-2";
+  if (total === 2) return "col-span-1 row-span-2";
+  if (total === 3 && index === 0) return "col-span-2";
+  return "";
 }
 
 export default async function HomePage() {
@@ -183,15 +194,10 @@ export default async function HomePage() {
                   {sampleProducts.slice(0, 4).map((p, i) => (
                     <div
                       key={p.id}
-                      className={`relative bg-stone-200 dark:bg-stone-800 rounded-lg overflow-hidden ${
-                        sampleProducts.length === 1
-                          ? "col-span-2 row-span-2"
-                          : sampleProducts.length === 2
-                            ? "col-span-1 row-span-2"
-                            : sampleProducts.length === 3 && i === 0
-                              ? "col-span-2"
-                              : ""
-                      }`}
+                      className={`relative bg-stone-200 dark:bg-stone-800 rounded-lg overflow-hidden ${mosaicTileClass(
+                        sampleProducts.length,
+                        i
+                      )}`}
                     >
                       {p.images?.[0] && (
                         <Image
@@ -216,11 +222,11 @@ export default async function HomePage() {
                   )}
                   <span className="mt-2 text-xs font-sans uppercase tracking-widest text-[var(--color-gold)] flex items-center gap-1">
                     {t.home.seeCollection} ({sampleProducts.length}{" "}
-                    {sampleProducts.length === 1
-                      ? t.home.productOne
-                      : sampleProducts.length < 5
-                        ? t.home.productFew
-                        : t.home.productMany})
+                    {pluralForm(sampleProducts.length, {
+                      one: t.home.productOne,
+                      few: t.home.productFew,
+                      many: t.home.productMany,
+                    })})
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M5 12h14M12 5l7 7-7 7" />
                     </svg>

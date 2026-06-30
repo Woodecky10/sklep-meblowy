@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Card, EmptyState, Field, ToastView, inputCls } from "@/app/admin/_shared";
+import { Card, EmptyState, Field, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
 import {
   createPromoCode,
   updatePromoCode,
@@ -11,8 +11,6 @@ import {
   type ActionResult,
 } from "./actions";
 import type { PromoCode } from "@/app/_lib/promo";
-
-type Toast = { type: "success" | "error"; message: string } | null;
 
 export default function PromoEditor({ initialCodes }: { initialCodes: PromoCode[] }) {
   const [codes, setCodes] = useState<PromoCode[]>(initialCodes);

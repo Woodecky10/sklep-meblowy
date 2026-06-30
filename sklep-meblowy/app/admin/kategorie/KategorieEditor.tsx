@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Card, EmptyState, Field, ToastView } from "@/app/admin/_shared";
+import { Card, EmptyState, Field, ToastView, type Toast } from "@/app/admin/_shared";
 import type { Section, CategoryDef } from "@/app/_lib/categories";
 import {
   createGroup,
@@ -18,8 +18,6 @@ type Props = {
   categories: CategoryDef[];
   productCounts: Record<string, number>;
 };
-
-type Toast = { type: "success" | "error"; message: string } | null;
 
 export default function KategorieEditor({
   sections,

@@ -25,7 +25,7 @@ export default async function CheckoutPage() {
       .select("*")
       .eq("id", user.id)
       .single();
-    profile = (data as Profile | null) ?? null;
+    profile = data as Profile | null;
   }
 
   const c = de

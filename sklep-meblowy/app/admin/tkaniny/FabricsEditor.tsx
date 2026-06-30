@@ -2,11 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Card, EmptyState, Field, ToastView, inputCls } from "@/app/admin/_shared";
+import { Card, EmptyState, Field, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
 import { createFabric, updateFabric, deleteFabric, type ActionResult } from "./actions";
 import type { Fabric } from "@/app/_lib/types";
-
-type Toast = { type: "success" | "error"; message: string } | null;
 
 export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabric[] }) {
   const [fabrics, setFabrics] = useState<Fabric[]>(initialFabrics);

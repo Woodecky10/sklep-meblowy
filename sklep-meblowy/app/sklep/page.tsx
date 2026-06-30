@@ -10,6 +10,7 @@ import {
 import { getCollection, getAllCollections } from "@/app/_lib/collections";
 import { localizeCollection } from "@/app/_lib/localize";
 import { getUserWishlistIds } from "@/app/_lib/wishlist";
+import { pluralForm } from "@/app/_lib/plural";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { getEurRate } from "@/app/_lib/store-settings";
 import { localizePath } from "@/app/_lib/i18n";
@@ -133,22 +134,21 @@ export default async function SklepPage({
   if (sp.material) rawParams.material = sp.material;
   if (sp.kolekcja) rawParams.kolekcja = sp.kolekcja;
 
-  // H1 zawsze pokazuje najbardziej szczegółowy filtr: kolekcja > wyszukiwanie
-  // > kategoria > sekcja > default. Sekcja używa labela z `sections` (np.
-  // "Narożniki" zamiast surowego slug "naroznik").
+  // Label sekcji z `sections` (np. "Narożniki" zamiast surowego slug "naroznik").
   const sectionLabel = sectionSlug
     ? sections.find((s) => s.slug === sectionSlug)?.label
     : null;
 
-  const heading = collection
-    ? collection.label
-    : search
-    ? `${t.shop.searchPrefix}: „${search}”`
-    : category
-    ? categoryLabel ?? t.shop.title
-    : sectionLabel
-    ? sectionLabel
-    : t.shop.allProducts;
+  // Najbardziej szczegółowy filtr wygrywa: kolekcja > wyszukiwanie > kategoria
+  // > sekcja > domyślny tytuł.
+  function resolveHeading(): string {
+    if (collection) return collection.label;
+    if (search) return `${t.shop.searchPrefix}: „${search}”`;
+    if (category) return categoryLabel ?? t.shop.title;
+    if (sectionLabel) return sectionLabel;
+    return t.shop.allProducts;
+  }
+  const heading = resolveHeading();
 
   // Projekcja dla FilterBar (client) — slug + label per sekcja.
   const filterSections = sections.map((s) => ({
@@ -170,11 +170,11 @@ export default async function SklepPage({
         </h1>
         <p className="text-sm text-[var(--muted)] mt-2">
           {total}{" "}
-          {total === 1
-            ? t.home.productOne
-            : total < 5
-              ? t.home.productFew
-              : t.home.productMany}
+          {pluralForm(total, {
+            one: t.home.productOne,
+            few: t.home.productFew,
+            many: t.home.productMany,
+          })}
         </p>
       </div>
 
