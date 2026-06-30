@@ -51,8 +51,10 @@ export async function recordPriceHistory(productId: string): Promise<void> {
 
   // Denormalizacja omnibus na produkt/kombinacje.
   const omniByKey = new Map(plan.omnibus.map((o) => [o.variant_key, o.value]));
-  const update: Record<string, unknown> = {};
-  if (omniByKey.has(null)) update.omnibus_price = omniByKey.get(null);
+  const setOmnibus = omniByKey.has(null); // poziom produktu (brak wariantów)
+  const omnibusValue = setOmnibus ? (omniByKey.get(null) ?? null) : null;
+
+  let variantsPayload: ProductVariants | null = null;
   if (variants && variants.combinations.length > 0) {
     const nextCombos = variants.combinations.map((c) => {
       const k = variantKey(c.values);
@@ -61,26 +63,22 @@ export async function recordPriceHistory(productId: string): Promise<void> {
       // number → ustaw; null → wyczyść (undefined znika przy serializacji JSON do kolumny).
       return v == null ? { ...c, omnibus_price: undefined } : { ...c, omnibus_price: v };
     });
-    update.variants = { ...variants, combinations: nextCombos };
+    variantsPayload = { ...variants, combinations: nextCombos };
   }
 
-  // Denormalizacja omnibus PRZED insertem historii — retry jest samonaprawialny
-  // (insert-ok/update-fail przy odwrotnej kolejności zostawiałby omnibus trwale stary).
-  if (Object.keys(update).length > 0) {
-    const { error: updErr } = await supabase
-      .from("products")
-      .update(update as never)
-      .eq("id", productId);
-    if (updErr) throw new Error(`omnibus update failed: ${updErr.message}`);
-  }
-
-  const { error: insErr } = await supabase.from("price_history").insert(
-    plan.inserts.map((i) => ({
-      product_id: productId,
+  // Denormalizacja omnibus + insert historii w JEDNEJ transakcji (RPC, migr. 39).
+  // Wcześniej były to 2 osobne zapisy — pad między nimi zostawiał omnibus
+  // wskazujący na cenę bez wiersza w historii (ryzyko integralności Omnibus).
+  const { error } = await supabase.rpc("apply_price_changes", {
+    p_product_id: productId,
+    p_set_omnibus: setOmnibus,
+    p_omnibus_price: omnibusValue,
+    p_variants: variantsPayload,
+    p_rows: plan.inserts.map((i) => ({
       variant_key: i.variant_key,
       effective_price: i.effective_price,
       recorded_at: now,
-    })) as never
-  );
-  if (insErr) throw new Error(`price_history insert failed: ${insErr.message}`);
+    })),
+  });
+  if (error) throw new Error(`apply_price_changes failed: ${error.message}`);
 }
