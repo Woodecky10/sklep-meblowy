@@ -80,7 +80,7 @@ Niezbędne env do dev (nazwy — wartości z Vercel/starego `.env.local`):
 > Migracja **40** (`40_p24_payment_ref.sql`) jest w repo ale **NIE odpalona** — uruchomić przy cutoverze P24 na produkcję. Migracja **41** (`41_drop_stripe_payment_intent.sql`) jest w repo ale **NIE odpalać teraz** — patrz sekcja Płatności.
 
 ## Bramki jakości (uruchamiać z `sklep-meblowy/`)
-`npx tsc --noEmit` (0 błędów) · `npm run lint` (0) · `npm test` (vitest — 258 zielonych) · `npm run build` (Turbopack przechodzi).
+`npx tsc --noEmit` (0 błędów) · `npm run lint` (0) · `npm test` (vitest — 268 zielonych) · `npm run build` (Turbopack przechodzi).
 > Po przełączeniu gałęzi build/tsc potrafi pokazać „phantom" błędy ze stale cache `.next` (referencje do nieistniejących już tras). Jeśli tak — `rm -rf .next` i ponów.
 
 ## Push do origin
