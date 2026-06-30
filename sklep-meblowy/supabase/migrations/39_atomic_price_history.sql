@@ -45,9 +45,13 @@ end;
 $$;
 
 -- uprawnienia: tylko service_role
+-- UWAGA: samo `revoke from public` NIE wystarcza — Supabase ALTER DEFAULT PRIVILEGES
+-- nadaje EXECUTE rolom anon/authenticated przy tworzeniu funkcji w schemacie public.
+-- Trzeba je odebrać jawnie, inaczej anon/authenticated mogą wołać funkcję
+-- (SECURITY INVOKER + RLS i tak bramkuje, ale to niezgodne z intencją).
 revoke execute on function
   public.apply_price_changes(uuid, boolean, numeric, jsonb, jsonb)
-  from public;
+  from public, anon, authenticated;
 grant execute on function
   public.apply_price_changes(uuid, boolean, numeric, jsonb, jsonb)
   to service_role;
