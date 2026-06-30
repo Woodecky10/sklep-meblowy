@@ -85,6 +85,13 @@ export default function CookieBanner() {
     saveConsent(analytics, marketing);
   }
 
+  // Lewy przycisk pełni dwie role w zależności od stanu: przed rozwinięciem
+  // otwiera szczegóły, po rozwinięciu zapisuje wybór niestandardowy.
+  function onCustomizeOrSave() {
+    if (showDetails) saveCustom();
+    else setShowDetails(true);
+  }
+
   if (consentDecided) return null;
 
   return (
@@ -132,18 +139,11 @@ export default function CookieBanner() {
           )}
 
           <div className="flex flex-wrap gap-2 justify-end">
-            {showDetails ? (
-              <button onClick={saveCustom} className={secondaryBtnClass}>
-                {t.cookies.save}
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowDetails(true)}
-                className={secondaryBtnClass}
-              >
-                {t.cookies.customize}
-              </button>
-            )}
+            {/* Jeden przycisk: przed rozwinięciem otwiera szczegóły, po
+                rozwinięciu zapisuje wybór niestandardowy (ten sam styl). */}
+            <button onClick={onCustomizeOrSave} className={secondaryBtnClass}>
+              {showDetails ? t.cookies.save : t.cookies.customize}
+            </button>
             <button
               onClick={rejectAll}
               className={secondaryBtnClass}

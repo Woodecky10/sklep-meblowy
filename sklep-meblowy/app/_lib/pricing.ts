@@ -44,6 +44,31 @@ export function computeOmnibus(history: PriceHistoryRow[]): number | null {
   return candidates.length ? Math.min(...candidates) : null;
 }
 
+// Walidacja: cena promocyjna kombinacji musi być ŚCIŚLE niższa od jej ceny
+// regularnej (base + price_modifier). Zwraca pierwszą błędną kombinację (z
+// wyliczoną ceną regularną) albo null gdy wszystkie OK. Czyste — używane
+// server-side (autorytet w updateProductVariants) i client-side (feedback w
+// VariantsEditor). Kombinacje bez sale_price są pomijane.
+export type SaleValidationCombo = {
+  values: Record<string, string>;
+  price_modifier?: number;
+  sale_price?: number | null;
+};
+
+export function findInvalidVariantSale(
+  combinations: SaleValidationCombo[],
+  basePrice: number
+): { values: Record<string, string>; regular: number; sale: number } | null {
+  for (const c of combinations) {
+    if (c.sale_price == null) continue;
+    const regular = basePrice + (c.price_modifier ?? 0);
+    if (c.sale_price >= regular) {
+      return { values: c.values, regular, sale: c.sale_price };
+    }
+  }
+  return null;
+}
+
 export type PriceUnit = {
   variant_key: string | null;
   regular: number;

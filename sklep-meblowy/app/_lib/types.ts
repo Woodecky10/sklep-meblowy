@@ -190,7 +190,7 @@ export type Order = {
   currency: "pln" | "eur";
   fx_rate: number | null;
   shipping_address: Address;
-  stripe_payment_intent: string | null; // legacy (Stripe) — usuwane w migracji 40
+  stripe_payment_intent: string | null; // legacy (Stripe) — usuwane w migracji 41
   payment_ref: string | null;
   payment_provider: "stripe" | "p24" | null;
   promo_code_id: string | null;

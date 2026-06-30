@@ -1,10 +1,10 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { submitInquiry } from "@/app/produkt/actions";
-import { useModal } from "@/app/_lib/useModal";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
+import { Field, Modal, ModalSuccess, inputCls, modalTriggerCls } from "@/app/_components/ui/Modal";
 
 // Modal "Zapytaj o inne kolory / własny wariant" — otwarty przyciskiem
 // na karcie produktu. Wysyła zapytanie do tabeli product_inquiries,
@@ -29,7 +29,6 @@ export default function InquiryModal({
   const [result, setResult] = useState<
     { ok: true; message: string } | { ok: false; error: string } | null
   >(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
 
   function close() {
     setOpen(false);
@@ -38,187 +37,113 @@ export default function InquiryModal({
     setTimeout(() => setResult(null), 200);
   }
 
-  // a11y: scroll-lock tła, Escape zamyka, focus-trap w obrębie modala.
-  useModal(open, { onClose: close, containerRef: dialogRef, trapFocus: true });
-
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="w-full py-3 border border-[var(--color-gold)] text-[var(--color-gold)] font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
-      >
+      <button type="button" onClick={() => setOpen(true)} className={modalTriggerCls}>
         {label}
       </button>
 
-      {open && (
-        <div
-          ref={dialogRef}
-          role="dialog"
-          aria-modal="true"
-          aria-label={t.inquiry.dialogAria}
-          onClick={close}
-          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-lg bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-2xl flex flex-col gap-5 p-6 my-8"
+      <Modal
+        open={open}
+        onClose={close}
+        ariaLabel={t.inquiry.dialogAria}
+        eyebrow={t.inquiry.eyebrow}
+        heading={t.inquiry.heading}
+        closeLabel={t.common.close}
+        subtitle={
+          <p className="text-sm text-[var(--muted)] mt-2">
+            {t.inquiry.productLabel}: <strong className="text-[var(--fg)]">{productName}</strong>
+          </p>
+        }
+      >
+        {result?.ok ? (
+          <ModalSuccess
+            title={t.inquiry.sentTitle}
+            message={result.message}
+            onClose={close}
+            closeLabel={t.common.close}
+          />
+        ) : (
+          <form
+            action={(fd) => {
+              startTransition(async () => {
+                const res = await submitInquiry(fd);
+                setResult(res);
+              });
+            }}
+            className="flex flex-col gap-4"
           >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-1">
-                  {t.inquiry.eyebrow}
-                </p>
-                <h2 className="font-display text-2xl font-bold text-[var(--fg)] leading-tight">
-                  {t.inquiry.heading}
-                </h2>
-                <p className="text-sm text-[var(--muted)] mt-2">
-                  {t.inquiry.productLabel}: <strong className="text-[var(--fg)]">{productName}</strong>
-                </p>
-              </div>
+            <input type="hidden" name="product_id" value={productId} />
+            <input type="hidden" name="product_name" value={productName} />
+
+            <Field label={t.inquiry.nameLabel}>
+              <input
+                name="customer_name"
+                maxLength={200}
+                placeholder="Anna Kowalska"
+                className={inputCls}
+              />
+            </Field>
+
+            <Field label={t.inquiry.emailLabel} required>
+              <input
+                type="email"
+                name="customer_email"
+                required
+                maxLength={200}
+                placeholder="anna@example.com"
+                className={inputCls}
+              />
+            </Field>
+
+            <Field label={t.inquiry.phoneLabel} hint={t.inquiry.phoneHint}>
+              <input
+                type="tel"
+                name="customer_phone"
+                maxLength={50}
+                placeholder="+48 789 826 403"
+                className={inputCls}
+              />
+            </Field>
+
+            <Field label={t.inquiry.messageLabel} required hint={t.inquiry.messageHint}>
+              <textarea
+                name="message"
+                required
+                minLength={5}
+                maxLength={2000}
+                rows={4}
+                placeholder={t.inquiry.messagePlaceholder}
+                className={`${inputCls} resize-y`}
+              />
+            </Field>
+
+            {result && !result.ok && (
+              <p className="text-sm text-red-600 dark:text-red-400">{result.error}</p>
+            )}
+
+            <div className="flex gap-2 pt-2">
               <button
-                onClick={close}
-                aria-label={t.common.close}
-                className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
+                type="submit"
+                disabled={pending}
+                className="flex-1 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
               >
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
+                {pending ? t.inquiry.submitting : t.inquiry.submit}
+              </button>
+              <button
+                type="button"
+                onClick={close}
+                disabled={pending}
+                className="px-5 py-3 border border-[var(--border)] text-[var(--fg)] font-sans text-sm uppercase tracking-widest rounded-full hover:border-[var(--color-gold)] transition-colors"
+              >
+                {t.inquiry.cancel}
               </button>
             </div>
 
-            {result?.ok ? (
-              <div className="p-5 bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 rounded-xl">
-                <p className="text-sm text-emerald-800 dark:text-emerald-200 font-semibold mb-1">
-                  {t.inquiry.sentTitle}
-                </p>
-                <p className="text-sm text-emerald-700 dark:text-emerald-300">
-                  {result.message}
-                </p>
-                <button
-                  onClick={close}
-                  className="mt-4 px-5 py-2 text-xs font-sans uppercase tracking-widest border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors"
-                >
-                  {t.common.close}
-                </button>
-              </div>
-            ) : (
-              <form
-                action={(fd) => {
-                  startTransition(async () => {
-                    const res = await submitInquiry(fd);
-                    setResult(res);
-                  });
-                }}
-                className="flex flex-col gap-4"
-              >
-                <input type="hidden" name="product_id" value={productId} />
-                <input type="hidden" name="product_name" value={productName} />
-
-                <Field label={t.inquiry.nameLabel}>
-                  <input
-                    name="customer_name"
-                    maxLength={200}
-                    placeholder="Anna Kowalska"
-                    className={inputCls}
-                  />
-                </Field>
-
-                <Field label={t.inquiry.emailLabel} required>
-                  <input
-                    type="email"
-                    name="customer_email"
-                    required
-                    maxLength={200}
-                    placeholder="anna@example.com"
-                    className={inputCls}
-                  />
-                </Field>
-
-                <Field label={t.inquiry.phoneLabel} hint={t.inquiry.phoneHint}>
-                  <input
-                    type="tel"
-                    name="customer_phone"
-                    maxLength={50}
-                    placeholder="+48 789 826 403"
-                    className={inputCls}
-                  />
-                </Field>
-
-                <Field label={t.inquiry.messageLabel} required hint={t.inquiry.messageHint}>
-                  <textarea
-                    name="message"
-                    required
-                    minLength={5}
-                    maxLength={2000}
-                    rows={4}
-                    placeholder={t.inquiry.messagePlaceholder}
-                    className={`${inputCls} resize-y`}
-                  />
-                </Field>
-
-                {result && !result.ok && (
-                  <p className="text-sm text-red-600 dark:text-red-400">
-                    {result.error}
-                  </p>
-                )}
-
-                <div className="flex gap-2 pt-2">
-                  <button
-                    type="submit"
-                    disabled={pending}
-                    className="flex-1 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
-                  >
-                    {pending ? t.inquiry.submitting : t.inquiry.submit}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={close}
-                    disabled={pending}
-                    className="px-5 py-3 border border-[var(--border)] text-[var(--fg)] font-sans text-sm uppercase tracking-widest rounded-full hover:border-[var(--color-gold)] transition-colors"
-                  >
-                    {t.inquiry.cancel}
-                  </button>
-                </div>
-
-                <p className="text-xs text-[var(--muted)] leading-snug">
-                  {t.inquiry.privacyNote}
-                </p>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
+            <p className="text-xs text-[var(--muted)] leading-snug">{t.inquiry.privacyNote}</p>
+          </form>
+        )}
+      </Modal>
     </>
-  );
-}
-
-// ============================================================
-// Helpers
-// ============================================================
-
-const inputCls =
-  "w-full px-3 py-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]";
-
-function Field({
-  label,
-  hint,
-  required,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
-        {label}
-        {required && <span className="text-red-500 ml-1" aria-hidden="true">*</span>}
-      </span>
-      {children}
-      {hint && <span className="text-xs text-[var(--muted)]">{hint}</span>}
-    </label>
   );
 }

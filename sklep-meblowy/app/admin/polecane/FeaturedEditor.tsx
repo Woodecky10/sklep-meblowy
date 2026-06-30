@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { EmptyState, ToastView, inputCls } from "@/app/admin/_shared";
+import { EmptyState, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
 import Image from "next/image";
 import {
   DndContext,
@@ -31,8 +31,6 @@ import {
 import type { FeaturedItem } from "@/app/_lib/featured";
 import type { Product } from "@/app/_lib/types";
 import { BADGE_OPTIONS } from "@/app/_lib/de-content-maps";
-
-type Toast = { type: "success" | "error"; message: string } | null;
 
 export default function FeaturedEditor({
   initialFeatured,
@@ -353,8 +351,4 @@ function SortableRow({
     </div>
   );
 }
-
-// ============================================================
-// Helpers / małe komponenty
-// ============================================================
 

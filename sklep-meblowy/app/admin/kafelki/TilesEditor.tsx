@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Card, EmptyState, Field, ToastView, inputCls } from "@/app/admin/_shared";
+import { Card, EmptyState, Field, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
 import Image from "next/image";
 import {
   DndContext,
@@ -30,8 +30,6 @@ import {
   type ActionResult,
 } from "./actions";
 import type { TileRow } from "@/app/_lib/home-tiles";
-
-type Toast = { type: "success" | "error"; message: string } | null;
 
 export default function TilesEditor({
   initialTiles,
@@ -566,8 +564,4 @@ function TilePreview({
     </div>
   );
 }
-
-// ============================================================
-// Helpers / małe komponenty
-// ============================================================
 

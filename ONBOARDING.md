@@ -48,14 +48,14 @@ Operator płatności: **Przelewy24** (PayPro SA), direct REST API v1. Stripe zos
 - `P24_BASE_URL` — `https://sandbox.przelewy24.pl` (dev) / `https://secure.przelewy24.pl` (prod)
 
 **Migracje DB (expand-contract):**
-- **Migracja 39** (`39_p24_payment_ref.sql`) — dodaje kolumny `payment_ref` + `payment_provider` do `orders`. **NIE odpalona jeszcze** — uruchomić w Supabase SQL Editorze przy cutoverze P24 na produkcję.
-- **Migracja 40** (`40_drop_stripe_payment_intent.sql`) — usuwa legacy kolumnę `stripe_payment_intent`. **NIE odpalać teraz** — poczekaj ~30 dni po cutoverze (okno zwrotów Stripe). Po odpaleniu: usunąć `stripe_payment_intent` z `types.ts` i panelu admina (osobny commit).
+- **Migracja 40** (`40_p24_payment_ref.sql`) — dodaje kolumny `payment_ref` + `payment_provider` do `orders`. **NIE odpalona jeszcze** — uruchomić w Supabase SQL Editorze przy cutoverze P24 na produkcję.
+- **Migracja 41** (`41_drop_stripe_payment_intent.sql`) — usuwa legacy kolumnę `stripe_payment_intent`. **NIE odpalać teraz** — poczekaj ~30 dni po cutoverze (okno zwrotów Stripe). Po odpaleniu: usunąć `stripe_payment_intent` z `types.ts` i panelu admina (osobny commit).
 
 **Pliki kluczowe:** `app/_lib/p24.ts` (konfiguracja, podpisy CRC, funkcje klienckie: `registerTransaction` / `verifyTransaction` / `refundTransaction`), `app/_lib/p24-events.ts` (walidacja podpisu notyfikacji), `app/api/checkout/route.ts` (rejestruje transakcję P24 w ramach tworzenia zamówienia), `app/api/p24/status/route.ts` (notyfikacja → weryfikacja → settle + idempotencja). Funkcja `refundTransaction` istnieje w `p24.ts`, ale nie jest jeszcze wpięta w żaden endpoint ani panel.
 
 **Sandbox:** panel + dane testowe → `https://sandbox.przelewy24.pl`. Ustaw `P24_BASE_URL=https://sandbox.przelewy24.pl` w `.env.local`.
 
-> ⚠️ **GO-LIVE P24 (po stronie człowieka):** wpisz realne klucze sandbox w `.env.local`; odpal migrację 39 na prod (jeśli jeszcze nie); wykonaj E2E checklist (karta PL/DE, BLIK, przelew, porzucona płatność, duplikat notyfikacji, podrobiony sign). Po ~30 dniach od cutoveru odpal migrację 40 i zrób cleanup commit.
+> ⚠️ **GO-LIVE P24 (po stronie człowieka):** wpisz realne klucze sandbox w `.env.local`; odpal migrację 40 na prod (jeśli jeszcze nie); wykonaj E2E checklist (karta PL/DE, BLIK, przelew, porzucona płatność, duplikat notyfikacji, podrobiony sign). Po ~30 dniach od cutoveru odpal migrację 41 i zrób cleanup commit.
 
 ## Edytor WYSIWYG opisów produktu (2026-06-22)
 Opisy produktu edytuje się w panelu pełnym edytorem WYSIWYG (**TipTap**) — bez ręcznego HTML. Komponent `app/admin/produkty/[id]/RichTextEditor.tsx` (TipTap, client-only, `immediatelyRender:false`), wpięty w sekcje opisu (PL custom, override, DE) oraz pojedyncze pole „Opis produktu"/„Opis (DE)". Pasek: cofnij/ponów, B/I/U/S, listy, cytat, H2–H4, wyrównanie, kolor, marker, link, obraz (upload przez `uploadProductImage` + `compressIfNeeded`).
@@ -76,8 +76,8 @@ Niezbędne env do dev (nazwy — wartości z Vercel/starego `.env.local`):
 > **Baza i storage są ZDALNE/współdzielone (Supabase).** Migracje (29–34) już wgrane, obrazy w storage. Nowy komp **nie robi setupu bazy** — wystarczy `.env.local` wskazujący na ten sam projekt Supabase. `.env.local` i `node_modules` są gitignored, więc nie przychodzą z klonem.
 
 ## Baza — migracje
-**Migracje 29–38 są ODPALONE** na produkcyjnym Supabase (29–32: 2026-06-23; 33+34: 2026-06-24; 35+36: 2026-06-25; 37+38: 2026-06-25). Wspólna baza → świeży klon nic nie re-uruchamia. Przyszłe migracje: kolejny numer w `supabase/migrations/`; odpala **człowiek** w Supabase SQL Editorze (agent NIE ma dostępu DDL).
-> Migracja **39** (`39_p24_payment_ref.sql`) jest w repo ale **NIE odpalona** — uruchomić przy cutoverze P24 na produkcję. Migracja **40** (`40_drop_stripe_payment_intent.sql`) jest w repo ale **NIE odpalać teraz** — patrz sekcja Płatności.
+**Migracje 29–38 są ODPALONE** na produkcyjnym Supabase (29–32: 2026-06-23; 33+34: 2026-06-24; 35+36: 2026-06-25; 37+38: 2026-06-25). Wspólna baza → świeży klon nic nie re-uruchamia. Przyszłe migracje: kolejny numer w `sklep-meblowy/supabase/migrations/` (kanoniczny katalog); odpala **człowiek** w Supabase SQL Editorze (agent NIE ma dostępu DDL).
+> Migracja **40** (`40_p24_payment_ref.sql`) jest w repo ale **NIE odpalona** — uruchomić przy cutoverze P24 na produkcję. Migracja **41** (`41_drop_stripe_payment_intent.sql`) jest w repo ale **NIE odpalać teraz** — patrz sekcja Płatności.
 
 ## Bramki jakości (uruchamiać z `sklep-meblowy/`)
 `npx tsc --noEmit` (0 błędów) · `npm run lint` (0) · `npm test` (vitest — 258 zielonych) · `npm run build` (Turbopack przechodzi).
@@ -100,7 +100,7 @@ brainstorming → spec (`docs/superpowers/specs/`) → plan TDD (`docs/superpowe
 ## Następny krok
 1. **P24 sandbox go-live (po stronie człowieka):** wpisz klucze sandbox P24 w `.env.local`; wykonaj E2E checklist (karta PL/DE, BLIK, przelew, porzucona, duplikat notyfikacji, podrobiony sign). Patrz sekcja Płatności wyżej.
 2. **EUR go-live:** ustaw realny kurs w `/admin/ustawienia`; testowa sesja EUR (card) na `/de` w sandboxie P24.
-3. **Migracja 40 (cleanup Stripe):** ~30 dni po cutoverze odpal `40_drop_stripe_payment_intent.sql`, potem usuń `stripe_payment_intent` z `types.ts` i panelu admina.
+3. **Migracja 41 (cleanup Stripe):** ~30 dni po cutoverze odpal `41_drop_stripe_payment_intent.sql`, potem usuń `stripe_payment_intent` z `types.ts` i panelu admina.
 4. **Zamknięcie konta BaseLinker** — można (obrazy przehostowane, kod/dane czyste).
 5. **Podprojekt 3 (faktury KSeF)** — czeka na odpowiedź: z jakiego programu fakturowego korzysta księgowa (przesądza drogę); potem spec → plan → wdrożenie.
 6. **Reszta podprojektu 4 (wysyłka)** — termin dostawy, dane transportu, model kosztu.

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Card, EmptyState, Field, ToastView, inputCls } from "@/app/admin/_shared";
+import { Card, EmptyState, Field, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
 import Image from "next/image";
 import {
   DndContext,
@@ -30,8 +30,6 @@ import {
   type ActionResult,
 } from "./actions";
 import type { SlideRow } from "@/app/_lib/slides";
-
-type Toast = { type: "success" | "error"; message: string } | null;
 
 export default function SliderEditor({
   initialSlides,
