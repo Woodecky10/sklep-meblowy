@@ -2,20 +2,15 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Image from "next/image";
-import { updateProductVariants, uploadProductImage } from "../actions";
+import { updateProductVariants } from "../actions";
 import type {
   ProductOption,
   ProductVariant,
   ProductVariants,
   Fabric,
 } from "@/app/_lib/types";
-import {
-  Field,
-  IconBtn,
-  compressIfNeeded,
-  inputClass,
-  type Toast,
-} from "./_shared";
+import { Field, IconBtn, inputClass, type Toast } from "./_shared";
+import { useImageUpload } from "./useImageUpload";
 import {
   formatVariantLabel,
   variantKey,
@@ -44,8 +39,6 @@ export default function VariantsEditor({
 }) {
   const [variants, setVariants] = useState<ProductVariants | null>(initial);
   const [saving, startSaveTransition] = useTransition();
-  // Klucze kombinacji w trakcie uploadu zdjęcia (żeby zablokować ich button)
-  const [uploadingKeys, setUploadingKeys] = useState<Set<string>>(new Set());
   const [fabricPickerOpen, setFabricPickerOpen] = useState(false);
 
   const dirty = useMemo(
@@ -150,38 +143,10 @@ export default function VariantsEditor({
     patchCombination(idx, { images });
   }
 
-  async function uploadComboImage(comboIdx: number, file: File) {
-    if (!variants) return;
+  function addComboImages(comboIdx: number, urls: string[]) {
+    if (!variants || urls.length === 0) return;
     const combo = variants.combinations[comboIdx];
-    const key = variantKey(combo.values);
-    setUploadingKeys((prev) => new Set(prev).add(key));
-    try {
-      const toSend = await compressIfNeeded(file);
-      const fd = new FormData();
-      fd.set("image", toSend, toSend.name);
-      const res = await uploadProductImage(fd);
-      if (!res.ok) {
-        onToast({ type: "error", message: res.error });
-        return;
-      }
-      const url = (res.data as { url: string } | undefined)?.url;
-      if (!url) {
-        onToast({ type: "error", message: "Brak URL po uploadzie" });
-        return;
-      }
-      const currentImages = combo.images ?? [];
-      setComboImages(comboIdx, [...currentImages, url]);
-      onToast({
-        type: "success",
-        message: "Zdjęcie wgrane. Kliknij „Zapisz warianty” żeby utrwalić.",
-      });
-    } finally {
-      setUploadingKeys((prev) => {
-        const next = new Set(prev);
-        next.delete(key);
-        return next;
-      });
-    }
+    setComboImages(comboIdx, [...(combo.images ?? []), ...urls]);
   }
 
   function moveComboImage(comboIdx: number, imgIdx: number, dir: -1 | 1) {
@@ -391,7 +356,7 @@ export default function VariantsEditor({
                 <CombinationRow
                   key={key}
                   combo={combo}
-                  uploading={uploadingKeys.has(key)}
+                  onToast={onToast}
                   allVariantImages={allVariantImages}
                   onStockChange={(stock) => patchCombination(i, { stock })}
                   onPriceModifierChange={(price_modifier) =>
@@ -400,7 +365,7 @@ export default function VariantsEditor({
                   onSalePriceChange={(sale_price) =>
                     patchCombination(i, sale_price === null ? { sale_price: undefined } : { sale_price })
                   }
-                  onUpload={(file) => uploadComboImage(i, file)}
+                  onAddImages={(urls) => addComboImages(i, urls)}
                   onAddExisting={(url) => addExistingImage(i, url)}
                   onMoveImage={(imgIdx, dir) => moveComboImage(i, imgIdx, dir)}
                   onRemoveImage={(imgIdx) => removeComboImage(i, imgIdx)}
@@ -541,25 +506,25 @@ function OptionRow({
 
 function CombinationRow({
   combo,
-  uploading,
+  onToast,
   allVariantImages,
   onStockChange,
   onPriceModifierChange,
   onSalePriceChange,
-  onUpload,
+  onAddImages,
   onAddExisting,
   onMoveImage,
   onRemoveImage,
 }: {
   combo: ProductVariant;
-  uploading: boolean;
+  onToast: (t: Toast) => void;
   // Wszystkie URL-e zdjęć ze WSZYSTKICH wariantów (z VariantsEditor).
   // CombinationRow filtruje te które już są w bieżącej kombinacji.
   allVariantImages: string[];
   onStockChange: (stock: number) => void;
   onPriceModifierChange: (mod: number) => void;
   onSalePriceChange: (v: number | null) => void;
-  onUpload: (file: File) => void;
+  onAddImages: (urls: string[]) => void;
   onAddExisting: (url: string) => void;
   onMoveImage: (imgIdx: number, dir: -1 | 1) => void;
   onRemoveImage: (imgIdx: number) => void;
@@ -567,6 +532,11 @@ function CombinationRow({
   const label = formatVariantLabel(combo.values);
   const images = combo.images ?? [];
   const [pickerOpen, setPickerOpen] = useState(false);
+  const upload = useImageUpload({
+    onUploaded: onAddImages,
+    onToast,
+    successHint: 'Kliknij „Zapisz warianty” żeby utrwalić.',
+  });
 
   // Picker pokazuje zdjęcia z innych wariantów, jeszcze nie dodane do tej
   // kombinacji. Pusty pool = nie ma żadnych zdjęć w innych wariantach (klient
@@ -613,7 +583,14 @@ function CombinationRow({
         </Field>
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div
+        {...upload.dropProps}
+        className={`relative flex flex-col gap-2 rounded-lg transition-colors ${
+          upload.isDragging
+            ? "outline outline-2 outline-dashed outline-[var(--color-gold)] outline-offset-4"
+            : ""
+        }`}
+      >
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
             Zdjęcia tej kombinacji ({images.length})
@@ -628,19 +605,13 @@ function CombinationRow({
                 {pickerOpen ? "Zamknij wybór" : `Wybierz z istniejących (${availableImages.length})`}
               </button>
             )}
-            <label className="shrink-0 px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors cursor-pointer disabled:opacity-50">
-              {uploading ? "Wgrywam..." : "+ Dodaj zdjęcie"}
-              <input
-                type="file"
-                accept="image/*"
-                disabled={uploading}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = "";
-                  if (f) onUpload(f);
-                }}
-                className="hidden"
-              />
+            <label
+              className={`shrink-0 px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors cursor-pointer ${
+                upload.uploading ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            >
+              {upload.progressText ?? "+ Dodaj zdjęcia"}
+              <input {...upload.inputProps} className="hidden" />
             </label>
           </div>
         </div>
@@ -726,6 +697,13 @@ function CombinationRow({
               </li>
             ))}
           </ul>
+        )}
+        {upload.isDragging && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-[var(--color-navy)]/60 pointer-events-none">
+            <span className="text-white font-sans text-xs uppercase tracking-widest">
+              Upuść zdjęcia tutaj
+            </span>
+          </div>
         )}
       </div>
     </li>
