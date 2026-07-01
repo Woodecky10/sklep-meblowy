@@ -16,6 +16,7 @@ import {
   variantKey,
   rebuildCombinations,
   applyFabricSelection,
+  applyValuePricing,
   FABRIC_OPTION_NAME,
 } from "@/app/_lib/variants";
 import { findInvalidVariantSale } from "@/app/_lib/pricing";
@@ -59,6 +60,15 @@ export default function VariantsEditor({
     setVariants(null);
   }
 
+  // Przelicz kombinacje po zmianie opcji: rebuild (zachowuje stock/sale/images)
+  // + applyValuePricing (gdy są dopłaty per wartość → price_modifier = suma dopłat).
+  function commitOptions(nextOptions: ProductOption[], oldCombinations: ProductVariant[]) {
+    return applyValuePricing(
+      nextOptions,
+      rebuildCombinations(nextOptions, oldCombinations)
+    );
+  }
+
   function addOption() {
     if (!variants) return;
     const nextOptions = [...variants.options, { name: "", values: [] }];
@@ -70,7 +80,7 @@ export default function VariantsEditor({
     const nextOptions = variants.options.filter((_, i) => i !== idx);
     setVariants({
       options: nextOptions,
-      combinations: rebuildCombinations(nextOptions, variants.combinations),
+      combinations: commitOptions(nextOptions, variants.combinations),
     });
   }
 
@@ -81,6 +91,8 @@ export default function VariantsEditor({
     // Jeśli nazwa się zmieniła, klucz starych kombinacji jest nieaktualny
     // — najprościej zrebuild, tracąc poprzednie stock/images (ostrzegamy w UI).
     // Ale jeśli mamy poprzednią nazwę i pasujące values, możemy zmapować.
+    // value_prices siedzą w obiekcie opcji (klucz = wartość), więc zmiana nazwy
+    // opcji ich nie rusza.
     const remappedCombos = variants.combinations.map((c) => {
       if (old.name in c.values) {
         const { [old.name]: v, ...rest } = c.values;
@@ -90,7 +102,7 @@ export default function VariantsEditor({
     });
     setVariants({
       options: nextOptions,
-      combinations: rebuildCombinations(nextOptions, remappedCombos),
+      combinations: commitOptions(nextOptions, remappedCombos),
     });
   }
 
@@ -104,18 +116,45 @@ export default function VariantsEditor({
     );
     setVariants({
       options: nextOptions,
-      combinations: rebuildCombinations(nextOptions, variants.combinations),
+      combinations: commitOptions(nextOptions, variants.combinations),
     });
   }
 
   function removeValue(optIdx: number, value: string) {
     if (!variants) return;
-    const nextOptions = variants.options.map((o, i) =>
-      i === optIdx ? { ...o, values: o.values.filter((v) => v !== value) } : o
-    );
+    const nextOptions = variants.options.map((o, i) => {
+      if (i !== optIdx) return o;
+      // Usuń też ewentualną dopłatę tej wartości.
+      const nextPrices = { ...(o.value_prices ?? {}) };
+      delete nextPrices[value];
+      return {
+        ...o,
+        values: o.values.filter((v) => v !== value),
+        value_prices: Object.keys(nextPrices).length > 0 ? nextPrices : undefined,
+      };
+    });
     setVariants({
       options: nextOptions,
-      combinations: rebuildCombinations(nextOptions, variants.combinations),
+      combinations: commitOptions(nextOptions, variants.combinations),
+    });
+  }
+
+  // Ustaw dopłatę dla wartości opcji (puste/0 usuwa wpis). Przelicza modyfikatory.
+  function setValuePrice(optIdx: number, value: string, price: number | null) {
+    if (!variants) return;
+    const nextOptions = variants.options.map((o, i) => {
+      if (i !== optIdx) return o;
+      const nextPrices = { ...(o.value_prices ?? {}) };
+      if (price === null || price === 0) delete nextPrices[value];
+      else nextPrices[value] = price;
+      return {
+        ...o,
+        value_prices: Object.keys(nextPrices).length > 0 ? nextPrices : undefined,
+      };
+    });
+    setVariants({
+      options: nextOptions,
+      combinations: applyValuePricing(nextOptions, variants.combinations),
     });
   }
 
@@ -176,19 +215,51 @@ export default function VariantsEditor({
 
   function save() {
     startSaveTransition(async () => {
-      // Sprzątanie: filtruj puste opcje/wartości, rebuild kombinacji
+      // Sprzątanie: filtruj puste opcje/wartości, zachowaj dopłaty istniejących
+      // wartości, przelicz kombinacje (applyValuePricing).
       let toSave: ProductVariants | null = variants;
       if (variants) {
         const cleanOptions = variants.options
-          .map((o) => ({ name: o.name.trim(), values: o.values.filter((v) => v.trim()) }))
+          .map((o) => {
+            const values = o.values.filter((v) => v.trim());
+            let value_prices: Record<string, number> | undefined;
+            if (o.value_prices) {
+              const kept: Record<string, number> = {};
+              for (const v of values) {
+                const p = o.value_prices[v];
+                if (typeof p === "number" && Number.isFinite(p) && p !== 0) kept[v] = p;
+              }
+              if (Object.keys(kept).length > 0) value_prices = kept;
+            }
+            return { name: o.name.trim(), values, ...(value_prices ? { value_prices } : {}) };
+          })
           .filter((o) => o.name && o.values.length > 0);
         if (cleanOptions.length === 0) {
           toSave = null;
         } else {
           toSave = {
+            ...variants,
             options: cleanOptions,
-            combinations: rebuildCombinations(cleanOptions, variants.combinations),
+            combinations: applyValuePricing(
+              cleanOptions,
+              rebuildCombinations(cleanOptions, variants.combinations)
+            ),
           };
+        }
+      }
+      // Cena regularna kombinacji nie może zejść < 0 (ujemne dopłaty).
+      if (toSave) {
+        const negative = toSave.combinations.find(
+          (c) => basePrice + (c.price_modifier ?? 0) < 0
+        );
+        if (negative) {
+          onToast({
+            type: "error",
+            message: `Cena kombinacji „${formatVariantLabel(
+              negative.values
+            )}" wychodzi poniżej zera — popraw dopłaty.`,
+          });
+          return;
         }
       }
       // Feedback przed round-tripem: cena promo kombinacji < regularnej (base+modyfikator).
@@ -318,6 +389,7 @@ export default function VariantsEditor({
             onNameChange={(name) => setOptionName(i, name)}
             onAddValue={(v) => addValue(i, v)}
             onRemoveValue={(v) => removeValue(i, v)}
+            onSetValuePrice={(v, p) => setValuePrice(i, v, p)}
             onRemoveOption={() => removeOption(i)}
           />
         ))}
@@ -356,12 +428,10 @@ export default function VariantsEditor({
                 <CombinationRow
                   key={key}
                   combo={combo}
+                  basePrice={basePrice}
                   onToast={onToast}
                   allVariantImages={allVariantImages}
                   onStockChange={(stock) => patchCombination(i, { stock })}
-                  onPriceModifierChange={(price_modifier) =>
-                    patchCombination(i, { price_modifier })
-                  }
                   onSalePriceChange={(sale_price) =>
                     patchCombination(i, sale_price === null ? { sale_price: undefined } : { sale_price })
                   }
@@ -416,12 +486,14 @@ function OptionRow({
   onNameChange,
   onAddValue,
   onRemoveValue,
+  onSetValuePrice,
   onRemoveOption,
 }: {
   option: ProductOption;
   onNameChange: (name: string) => void;
   onAddValue: (v: string) => void;
   onRemoveValue: (v: string) => void;
+  onSetValuePrice: (value: string, price: number | null) => void;
   onRemoveOption: () => void;
 }) {
   const [newValue, setNewValue] = useState("");
@@ -450,27 +522,47 @@ function OptionRow({
         <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
           Wartości
         </span>
-        <div className="flex flex-wrap gap-2">
+        <p className="text-[11px] text-[var(--muted)] -mt-1">
+          Pole „+zł” to dopłata do ceny bazowej za wybór tej wartości (np. Premium
+          +200). Dopłaty wybranych wartości sumują się. Puste = bez dopłaty.
+        </p>
+        <div className="flex flex-col gap-1.5">
           {option.values.length === 0 && (
             <span className="text-xs text-[var(--muted)] italic">Brak wartości — dodaj poniżej.</span>
           )}
           {option.values.map((v) => (
-            <span
+            <div
               key={v}
-              className="inline-flex items-center gap-1.5 pl-3 pr-1 py-1 bg-[var(--card-bg)] border border-[var(--border)] rounded-full text-sm"
+              className="flex items-center gap-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-lg px-3 py-1.5"
             >
-              {v}
+              <span className="flex-1 text-sm truncate">{v}</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-xs text-[var(--muted)]">+</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={option.value_prices?.[v] ?? ""}
+                  onChange={(e) =>
+                    onSetValuePrice(v, e.target.value === "" ? null : Number(e.target.value))
+                  }
+                  placeholder="0"
+                  aria-label={`Dopłata za ${v} (zł)`}
+                  className="w-20 px-2 py-1 bg-[var(--bg)] border border-[var(--border)] rounded text-sm text-right focus:border-[var(--color-gold)] focus:outline-none"
+                />
+                <span className="text-xs text-[var(--muted)]">zł</span>
+              </div>
               <button
                 type="button"
                 onClick={() => onRemoveValue(v)}
                 aria-label={`Usuń ${v}`}
-                className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-red-100 dark:hover:bg-red-950 text-red-600"
+                className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-100 dark:hover:bg-red-950 text-red-600 shrink-0"
               >
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                   <path d="M18 6 6 18M6 6l12 12" />
                 </svg>
               </button>
-            </span>
+            </div>
           ))}
         </div>
         <div className="flex gap-2">
@@ -506,10 +598,10 @@ function OptionRow({
 
 function CombinationRow({
   combo,
+  basePrice,
   onToast,
   allVariantImages,
   onStockChange,
-  onPriceModifierChange,
   onSalePriceChange,
   onAddImages,
   onAddExisting,
@@ -517,12 +609,12 @@ function CombinationRow({
   onRemoveImage,
 }: {
   combo: ProductVariant;
+  basePrice: number;
   onToast: (t: Toast) => void;
   // Wszystkie URL-e zdjęć ze WSZYSTKICH wariantów (z VariantsEditor).
   // CombinationRow filtruje te które już są w bieżącej kombinacji.
   allVariantImages: string[];
   onStockChange: (stock: number) => void;
-  onPriceModifierChange: (mod: number) => void;
   onSalePriceChange: (v: number | null) => void;
   onAddImages: (urls: string[]) => void;
   onAddExisting: (url: string) => void;
@@ -531,6 +623,8 @@ function CombinationRow({
 }) {
   const label = formatVariantLabel(combo.values);
   const images = combo.images ?? [];
+  const modifier = combo.price_modifier ?? 0;
+  const regularPrice = basePrice + modifier;
   const [pickerOpen, setPickerOpen] = useState(false);
   const upload = useImageUpload({
     onUploaded: onAddImages,
@@ -560,14 +654,17 @@ function CombinationRow({
             className={inputClass}
           />
         </Field>
-        <Field label="Modyfikator ceny (zł)" hint="+/- różnica vs cena bazowa produktu.">
-          <input
-            type="number"
-            step="0.01"
-            value={combo.price_modifier ?? 0}
-            onChange={(e) => onPriceModifierChange(Number(e.target.value) || 0)}
-            className={inputClass}
-          />
+        <Field
+          label="Cena regularna (zł)"
+          hint={
+            modifier !== 0
+              ? `baza ${basePrice.toFixed(2)} + dopłaty ${modifier >= 0 ? "+" : ""}${modifier.toFixed(2)}`
+              : "= cena bazowa (brak dopłat). Ustaw dopłaty przy wartościach opcji wyżej."
+          }
+        >
+          <div className={`${inputClass} bg-[var(--card-bg)] flex items-center font-semibold`}>
+            {regularPrice.toFixed(2)} zł
+          </div>
         </Field>
         <Field label="Cena promocyjna (zł)" hint="Puste = brak. < regularnej.">
           <input

@@ -14,9 +14,13 @@ export type ProductDimensions = {
 };
 
 // Definicja typu wariantu (np. "Strona": ["Lewa","Prawa"])
+// value_prices: opcjonalna dopłata per wartość opcji (np. {"Premium": 200}).
+// Dopłaty wybranych wartości sumują się do price_modifier kombinacji. Brak
+// wpisu = 0 zł. Gdy zdefiniowane, są źródłem prawdy dla price_modifier.
 export type ProductOption = {
   name: string;
   values: string[];
+  value_prices?: Record<string, number>;
 };
 
 // Konkretna kombinacja wybranych wartości + stock + ewentualny modyfikator ceny.

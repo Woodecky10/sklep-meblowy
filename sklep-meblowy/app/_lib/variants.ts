@@ -229,6 +229,45 @@ export function rebuildCombinations(
   });
 }
 
+// ── Dopłaty ceny per wartość opcji ──
+
+// Suma dopłat wartości tworzących daną kombinację. Brak dopłaty = 0.
+export function sumValueSurcharges(
+  options: ProductOption[],
+  values: Record<string, string>
+): number {
+  let sum = 0;
+  for (const opt of options) {
+    const v = values[opt.name];
+    if (v == null) continue;
+    const surcharge = opt.value_prices?.[v];
+    if (typeof surcharge === "number" && Number.isFinite(surcharge)) sum += surcharge;
+  }
+  return sum;
+}
+
+// Czy produkt używa cen per wartość (jakakolwiek opcja ma niepustą mapę dopłat).
+// Rozróżnia tryb "per wartość" od legacy "ręczny modyfikator per kombinacja".
+export function usesValuePricing(options: ProductOption[]): boolean {
+  return options.some(
+    (o) => o.value_prices && Object.keys(o.value_prices).length > 0
+  );
+}
+
+// Gdy produkt używa cen per wartość → przelicz price_modifier każdej kombinacji
+// jako sumę dopłat jej wartości (źródło prawdy). Gdy NIE używa (legacy) →
+// kombinacje bez zmian, żeby zachować ręcznie ustawione modyfikatory.
+export function applyValuePricing(
+  options: ProductOption[],
+  combinations: ProductVariant[]
+): ProductVariant[] {
+  if (!usesValuePricing(options)) return combinations;
+  return combinations.map((c) => ({
+    ...c,
+    price_modifier: sumValueSurcharges(options, c.values),
+  }));
+}
+
 // ── Tkaniny (katalog) ──
 
 // Ustawia (lub tworzy/usuwa) opcję „Tkanina" z podanym zbiorem nazw i przelicza
