@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/app/_lib/admin";
 import { getAdminOrders, getProfilesByIds } from "@/app/_lib/orders";
-import { orderCustomerDisplay } from "@/app/_lib/admin-orders";
+import { orderCustomerDisplay, orderItemsSummary } from "@/app/_lib/admin-orders";
 import { ADMIN_STATUS_LABELS } from "@/app/_lib/order-status";
 import { formatOrderAmount } from "@/app/_lib/money";
 import { EmptyState, inputCls } from "@/app/admin/_shared";
@@ -113,6 +113,7 @@ export default async function AdminOrdersPage({
                 <th className="px-4 py-3">Nr</th>
                 <th className="px-4 py-3">Data</th>
                 <th className="px-4 py-3">Klient</th>
+                <th className="px-4 py-3">Produkty</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Kwota</th>
                 <th className="px-4 py-3 text-center">Dostawa</th>
@@ -126,6 +127,7 @@ export default async function AdminOrdersPage({
                   o.user_id ? profiles[o.user_id] ?? null : null
                 );
                 const s = ADMIN_STATUS_LABELS[o.status];
+                const products = orderItemsSummary(o.items ?? []);
                 return (
                   <OrderRow
                     key={o.id}
@@ -138,6 +140,8 @@ export default async function AdminOrdersPage({
                     })}
                     customerName={cust.name ?? null}
                     customerEmail={cust.email ?? null}
+                    productsLabel={products.label}
+                    productsFull={products.full}
                     statusLabel={s.label}
                     statusClassName={s.className}
                     amountLabel={formatOrderAmount(Number(o.total), o.currency)}

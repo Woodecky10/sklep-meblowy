@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { orderCustomerDisplay } from "@/app/_lib/admin-orders";
+import { orderCustomerDisplay, orderItemsSummary } from "@/app/_lib/admin-orders";
 import type { Address } from "@/app/_lib/types";
 
 const addr: Address = {
@@ -41,5 +41,31 @@ describe("orderCustomerDisplay", () => {
       null
     );
     expect(r.name).toBeNull();
+  });
+});
+
+describe("orderItemsSummary", () => {
+  it("brak pozycji → myślnik", () => {
+    expect(orderItemsSummary([])).toEqual({ label: "—", full: "—" });
+  });
+
+  it("jedna pozycja → sama nazwa", () => {
+    const r = orderItemsSummary([{ product: { name: "Narożnik VEGAS MINI" } }]);
+    expect(r.label).toBe("Narożnik VEGAS MINI");
+    expect(r.full).toBe("Narożnik VEGAS MINI");
+  });
+
+  it("wiele pozycji → pierwsza nazwa + licznik, full = pełna lista", () => {
+    const r = orderItemsSummary([
+      { product: { name: "Sofa Porto" } },
+      { product: { name: "Fotel Cashmere" } },
+      { product: { name: "Łóżko Zen" } },
+    ]);
+    expect(r.label).toBe("Sofa Porto +2");
+    expect(r.full).toBe("Sofa Porto, Fotel Cashmere, Łóżko Zen");
+  });
+
+  it("brak nazwy produktu → fallback", () => {
+    expect(orderItemsSummary([{ product: null }]).label).toBe("produkt usunięty");
   });
 });

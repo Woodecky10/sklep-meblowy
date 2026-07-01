@@ -12,6 +12,8 @@ export default function OrderRow({
   dateLabel,
   customerName,
   customerEmail,
+  productsLabel,
+  productsFull,
   statusLabel,
   statusClassName,
   amountLabel,
@@ -22,6 +24,8 @@ export default function OrderRow({
   dateLabel: string;
   customerName: string | null;
   customerEmail: string | null;
+  productsLabel: string;
+  productsFull: string;
   statusLabel: string;
   statusClassName: string;
   amountLabel: string;
@@ -50,6 +54,11 @@ export default function OrderRow({
         {customerEmail && (
           <span className="block text-xs text-[var(--muted)]">{customerEmail}</span>
         )}
+      </td>
+      <td className="px-4 py-3 max-w-[240px]">
+        <span className="block truncate text-[var(--fg)]" title={productsFull}>
+          {productsLabel}
+        </span>
       </td>
       <td className="px-4 py-3">
         <span
