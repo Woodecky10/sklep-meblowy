@@ -7,6 +7,7 @@ import Navbar from "./_components/layout/Navbar";
 import Footer from "./_components/layout/Footer";
 import CookieBanner from "./_components/layout/CookieBanner";
 import CartToast from "./_components/layout/CartToast";
+import HideOnAdmin from "./_components/layout/HideOnAdmin";
 import { CartProvider } from "./_context/CartContext";
 import { ToastProvider } from "./_context/ToastContext";
 import { COMPANY } from "./_lib/company";
@@ -82,11 +83,15 @@ export default async function RootLayout({
             <FabricLabelProvider map={fabricMap}>
               <CartProvider>
                 <ToastProvider>
-                  <TopBar />
-                  <Navbar />
+                  <HideOnAdmin>
+                    <TopBar />
+                    <Navbar />
+                  </HideOnAdmin>
                   <main className="flex-1">{children}</main>
-                  <Footer />
-                  <CookieBanner />
+                  <HideOnAdmin>
+                    <Footer />
+                    <CookieBanner />
+                  </HideOnAdmin>
                   <CartToast />
                 </ToastProvider>
               </CartProvider>

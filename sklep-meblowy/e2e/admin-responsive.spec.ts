@@ -90,3 +90,20 @@ test("szczegóły zamówienia @ mobile — status się nie rozciąga", async ({ 
 
   await page.screenshot({ path: "e2e/screens/zamowienie-detail-mobile.png", fullPage: true });
 });
+
+test("/admin nie ma publicznej nawigacji ani stopki", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/admin");
+  // Stopka sklepu i pasek wyszukiwarki sklepu (dwie osobne grupy chrome) — ukryte.
+  await expect(page.locator("footer")).toHaveCount(0);
+  await expect(page.getByPlaceholder(/Szukaj mebli/i)).toHaveCount(0);
+  // Sanity: panel admina nadal renderuje swój sidebar.
+  await expect(page.locator('aside a[href="/admin/zamowienia"]')).toBeVisible();
+});
+
+test("strona publiczna (/sklep) nadal ma nawigację i stopkę", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/sklep");
+  await expect(page.locator("footer")).toBeVisible();
+  await expect(page.getByPlaceholder(/Szukaj mebli/i)).toBeVisible();
+});
