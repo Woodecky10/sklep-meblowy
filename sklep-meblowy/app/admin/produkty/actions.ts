@@ -8,7 +8,7 @@ import { validateImageUpload } from "@/app/_lib/image-upload";
 import { buildNewProductPayload } from "@/app/_lib/new-product";
 import { recordPriceHistory } from "@/app/_lib/price-history";
 import { findInvalidVariantSale } from "@/app/_lib/pricing";
-import { formatVariantLabel } from "@/app/_lib/variants";
+import { formatVariantLabel, applyValuePricing } from "@/app/_lib/variants";
 import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-html";
 import type {
   ActionResult,
@@ -249,6 +249,9 @@ export async function updateProductVariants(
 
   const supabase = await createAdminClient();
 
+  // Wariant faktycznie zapisywany (z serwerowo przeliczonymi modyfikatorami).
+  let variantsToSave: ProductVariants | null = variants;
+
   // Walidacja: jeśli niepusty, sprawdź strukturę
   if (variants !== null) {
     if (
@@ -261,6 +264,16 @@ export async function updateProductVariants(
     for (const opt of variants.options) {
       if (typeof opt.name !== "string" || !Array.isArray(opt.values)) {
         return { ok: false, error: "Nieprawidłowa struktura opcji wariantu" };
+      }
+      if (opt.value_prices !== undefined) {
+        if (typeof opt.value_prices !== "object" || opt.value_prices === null) {
+          return { ok: false, error: "Nieprawidłowa struktura dopłat wartości" };
+        }
+        for (const p of Object.values(opt.value_prices)) {
+          if (typeof p !== "number" || !Number.isFinite(p)) {
+            return { ok: false, error: "Dopłata wartości musi być liczbą" };
+          }
+        }
       }
     }
     for (const c of variants.combinations) {
@@ -290,7 +303,24 @@ export async function updateProductVariants(
       .maybeSingle();
     if (!baseRow) return { ok: false, error: "Produkt nie istnieje" };
     const basePrice = Number((baseRow as { price: number | string }).price);
-    const invalid = findInvalidVariantSale(variants.combinations, basePrice);
+
+    // Serwerowo przelicz price_modifier z dopłat per wartość (nie ufamy
+    // klientowi). Gdy produkt nie używa dopłat — kombinacje bez zmian.
+    const combinations = applyValuePricing(variants.options, variants.combinations);
+    variantsToSave = { ...variants, combinations };
+
+    // Cena regularna kombinacji nie może zejść < 0 (ujemne dopłaty).
+    const negative = combinations.find((c) => basePrice + (c.price_modifier ?? 0) < 0);
+    if (negative) {
+      return {
+        ok: false,
+        error: `Cena kombinacji „${formatVariantLabel(
+          negative.values
+        )}" wychodzi poniżej zera — popraw dopłaty.`,
+      };
+    }
+
+    const invalid = findInvalidVariantSale(combinations, basePrice);
     if (invalid) {
       return {
         ok: false,
@@ -303,7 +333,7 @@ export async function updateProductVariants(
 
   const { error } = await supabase
     .from("products")
-    .update({ variants } as never)
+    .update({ variants: variantsToSave } as never)
     .eq("id", productId);
 
   if (error) return { ok: false, error: error.message };

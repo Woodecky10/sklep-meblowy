@@ -6,6 +6,8 @@ import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "@/app/_lib/de-conten
 import type { Locale } from "@/app/_lib/i18n";
 import { useFabricLabels } from "@/app/_lib/fabric-context";
 import { FABRIC_OPTION_NAME } from "@/app/_lib/variants";
+import { useEurRate } from "@/app/_lib/rate-context";
+import { formatMoney } from "@/app/_lib/money";
 
 type Props = {
   variants: ProductVariants;
@@ -42,6 +44,7 @@ export default function VariantSelector({
 }: Props) {
   const locale = useClientLocale();
   const fabricMap = useFabricLabels();
+  const rate = useEurRate();
   function pick(name: string, value: string) {
     onChange({ ...selected, [name]: value });
   }
@@ -67,6 +70,7 @@ export default function VariantSelector({
               {option.values.map((v) => {
                 const isActive = current === v;
                 const label = getValueLabel(product, option.name, v, locale, fabricMap);
+                const surcharge = option.value_prices?.[v] ?? 0;
                 return (
                   <button
                     key={v}
@@ -78,6 +82,13 @@ export default function VariantSelector({
                     }`}
                   >
                     {label}
+                    {surcharge !== 0 && (
+                      <span className={isActive ? "opacity-80" : "text-[var(--muted)]"}>
+                        {" "}
+                        ({surcharge > 0 ? "+" : "−"}
+                        {formatMoney(Math.abs(surcharge), locale, rate)})
+                      </span>
+                    )}
                   </button>
                 );
               })}
