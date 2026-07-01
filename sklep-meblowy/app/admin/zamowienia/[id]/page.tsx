@@ -167,6 +167,7 @@ export default async function AdminOrderDetailPage({
         <div className="lg:col-span-1">
           <OrderControls
             orderId={order.id}
+            orderNumber={order.order_number}
             allowedStatuses={nextStatuses(order.status)}
             carrier={order.carrier}
             trackingNumber={order.tracking_number}
