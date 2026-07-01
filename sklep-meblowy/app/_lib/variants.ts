@@ -348,3 +348,20 @@ export function buildFabricDeMap(
   }
   return map;
 }
+
+// Mapa wartość-wariantu → URL zdjęcia próbki (np. „Riviera 16" → url). Klucz jak
+// w expandFabrics: „Nazwa Numer". Pomija numery bez wgranego zdjęcia.
+export function buildFabricImageMap(
+  fabrics: { name: string; colors: string[]; color_images: Record<string, string> }[]
+): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const f of fabrics) {
+    const name = f.name.trim();
+    if (!name) continue;
+    for (const code of f.colors ?? []) {
+      const url = f.color_images?.[code];
+      if (url) map[`${name} ${code}`] = url;
+    }
+  }
+  return map;
+}

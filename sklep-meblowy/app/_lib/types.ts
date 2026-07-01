@@ -155,6 +155,8 @@ export type Fabric = {
   name_de: string | null;
   // Numery/kolory kolekcji (np. ["02","04","09"]). Puste = tkanina bez kolorów.
   colors: string[];
+  // Zdjęcie próbki per kolor: { numer -> URL }. Tylko kolory z wgranym zdjęciem.
+  color_images: Record<string, string>;
   // Dopłata do ceny bazowej gdy wybrana ta tkanina (zł, >= 0).
   price: number;
   sort_order: number;

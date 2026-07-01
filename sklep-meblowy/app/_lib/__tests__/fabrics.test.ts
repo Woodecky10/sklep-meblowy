@@ -3,6 +3,7 @@ import {
   FABRIC_OPTION_NAME,
   applyFabricSelection,
   buildFabricDeMap,
+  buildFabricImageMap,
   expandFabrics,
   fabricValueBelongsTo,
 } from "../variants";
@@ -85,6 +86,23 @@ describe("fabricValueBelongsTo", () => {
   });
   it("nie należy do innej kolekcji", () => {
     expect(fabricValueBelongsTo("Monolith 02", { name: "Sawana", colors: ["02"], price: 0 })).toBe(false);
+  });
+});
+
+describe("buildFabricImageMap", () => {
+  it("mapuje „Nazwa Numer” → URL tylko dla numerów ze zdjęciem", () => {
+    const map = buildFabricImageMap([
+      {
+        name: "Riviera",
+        colors: ["16", "21", "24"],
+        color_images: { "16": "https://cdn/16.jpg", "24": "https://cdn/24.jpg" },
+      },
+      { name: "Velvet", colors: [], color_images: {} },
+    ]);
+    expect(map).toEqual({
+      "Riviera 16": "https://cdn/16.jpg",
+      "Riviera 24": "https://cdn/24.jpg",
+    });
   });
 });
 

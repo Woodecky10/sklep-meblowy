@@ -22,19 +22,34 @@ function parseSort(input: unknown): number {
   return Number.isFinite(n) ? Math.trunc(n) : 0;
 }
 
-// Kolory/numery: rozdzielane przecinkiem/średnikiem/nową linią, trim, dedupe.
-function parseColors(input: unknown): string[] {
-  if (typeof input !== "string") return [];
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const raw of input.split(/[,;\n]+/)) {
-    const v = raw.trim().slice(0, 60);
-    if (v && !seen.has(v)) {
-      seen.add(v);
-      out.push(v);
-    }
+// Wiersze koloru z JSON (`[{code, image}]`) → uporządkowane kody + mapa zdjęć.
+// Kody: trim, dedupe, zachowana kolejność. image tylko gdy to URL http(s).
+function parseColorRows(input: unknown): {
+  colors: string[];
+  color_images: Record<string, string>;
+} {
+  const colors: string[] = [];
+  const color_images: Record<string, string> = {};
+  if (typeof input !== "string") return { colors, color_images };
+  let rows: unknown;
+  try {
+    rows = JSON.parse(input);
+  } catch {
+    return { colors, color_images };
   }
-  return out;
+  if (!Array.isArray(rows)) return { colors, color_images };
+  const seen = new Set<string>();
+  for (const r of rows) {
+    if (!r || typeof r !== "object") continue;
+    const rec = r as { code?: unknown; image?: unknown };
+    const code = typeof rec.code === "string" ? rec.code.trim().slice(0, 60) : "";
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    colors.push(code);
+    const image = typeof rec.image === "string" ? rec.image.trim() : "";
+    if (/^https?:\/\//.test(image)) color_images[code] = image;
+  }
+  return { colors, color_images };
 }
 
 // Dopłata: pusta/NaN/ujemna → 0; inaczej liczba z 2 miejscami.
@@ -51,13 +66,13 @@ export async function createFabric(formData: FormData): Promise<ActionResult> {
   if (!name) return { ok: false, error: "Nazwa tkaniny jest wymagana" };
   const nameDe = emptyToNull(sanitize(formData.get("name_de")));
   const sortOrder = parseSort(formData.get("sort_order"));
-  const colors = parseColors(formData.get("colors"));
+  const { colors, color_images } = parseColorRows(formData.get("colors_json"));
   const price = parsePrice(formData.get("price"));
 
   const supabase = await createAdminClient();
   const { error, data } = await supabase
     .from("fabrics")
-    .insert({ name, name_de: nameDe, sort_order: sortOrder, colors, price } as never)
+    .insert({ name, name_de: nameDe, sort_order: sortOrder, colors, color_images, price } as never)
     .select()
     .single();
 
@@ -79,13 +94,13 @@ export async function updateFabric(formData: FormData): Promise<ActionResult> {
   if (!name) return { ok: false, error: "Nazwa tkaniny jest wymagana" };
   const nameDe = emptyToNull(sanitize(formData.get("name_de")));
   const sortOrder = parseSort(formData.get("sort_order"));
-  const colors = parseColors(formData.get("colors"));
+  const { colors, color_images } = parseColorRows(formData.get("colors_json"));
   const price = parsePrice(formData.get("price"));
 
   const supabase = await createAdminClient();
   const { error } = await supabase
     .from("fabrics")
-    .update({ name, name_de: nameDe, sort_order: sortOrder, colors, price } as never)
+    .update({ name, name_de: nameDe, sort_order: sortOrder, colors, color_images, price } as never)
     .eq("id", id);
 
   if (error) {

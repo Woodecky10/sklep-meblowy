@@ -1,10 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import type { Product, ProductVariants } from "@/app/_lib/types";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "@/app/_lib/de-content-maps";
 import type { Locale } from "@/app/_lib/i18n";
-import { useFabricLabels } from "@/app/_lib/fabric-context";
+import { useFabricLabels, useFabricImages } from "@/app/_lib/fabric-context";
 import { FABRIC_OPTION_NAME } from "@/app/_lib/variants";
 import { useEurRate } from "@/app/_lib/rate-context";
 import { formatMoney } from "@/app/_lib/money";
@@ -44,6 +45,7 @@ export default function VariantSelector({
 }: Props) {
   const locale = useClientLocale();
   const fabricMap = useFabricLabels();
+  const fabricImages = useFabricImages();
   const rate = useEurRate();
   function pick(name: string, value: string) {
     onChange({ ...selected, [name]: value });
@@ -66,36 +68,135 @@ export default function VariantSelector({
                 )}
               </span>
             </p>
-            <div className="flex flex-wrap gap-2">
-              {option.values.map((v) => {
-                const isActive = current === v;
-                const label = getValueLabel(product, option.name, v, locale, fabricMap);
-                const surcharge = option.value_prices?.[v] ?? 0;
-                return (
-                  <button
-                    key={v}
-                    onClick={() => pick(option.name, v)}
-                    className={`px-4 py-2 text-sm font-sans rounded-full border transition-colors ${
-                      isActive
-                        ? "border-[var(--color-gold)] bg-[var(--color-gold)] text-[var(--color-navy)] font-semibold"
-                        : "border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)]"
-                    }`}
-                  >
-                    {label}
-                    {surcharge !== 0 && (
-                      <span className={isActive ? "opacity-80" : "text-[var(--muted)]"}>
-                        {" "}
-                        ({surcharge > 0 ? "+" : "−"}
-                        {formatMoney(Math.abs(surcharge), locale, rate)})
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+            {option.name === FABRIC_OPTION_NAME ? (
+              <FabricSwatchGroup
+                values={option.values}
+                current={current}
+                valuePrices={option.value_prices}
+                images={fabricImages}
+                labelOf={(v) => getValueLabel(product, option.name, v, locale, fabricMap)}
+                locale={locale}
+                rate={rate}
+                onPick={(v) => pick(option.name, v)}
+              />
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {option.values.map((v) => {
+                  const isActive = current === v;
+                  const label = getValueLabel(product, option.name, v, locale, fabricMap);
+                  const surcharge = option.value_prices?.[v] ?? 0;
+                  return (
+                    <button
+                      key={v}
+                      onClick={() => pick(option.name, v)}
+                      className={`px-4 py-2 text-sm font-sans rounded-full border transition-colors ${
+                        isActive
+                          ? "border-[var(--color-gold)] bg-[var(--color-gold)] text-[var(--color-navy)] font-semibold"
+                          : "border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)]"
+                      }`}
+                    >
+                      {label}
+                      {surcharge !== 0 && (
+                        <span className={isActive ? "opacity-80" : "text-[var(--muted)]"}>
+                          {" "}
+                          ({surcharge > 0 ? "+" : "−"}
+                          {formatMoney(Math.abs(surcharge), locale, rate)})
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// Ile próbek pokazać zanim „Zobacz więcej" (jak na referencji dealmeble).
+const SWATCH_LIMIT = 5;
+
+// Opcja „Tkanina" jako okrągłe próbki ze zdjęciem + podpis + cena. Po SWATCH_LIMIT
+// kafelek „Zobacz więcej (+N)" rozwija resztę w miejscu.
+function FabricSwatchGroup({
+  values,
+  current,
+  valuePrices,
+  images,
+  labelOf,
+  locale,
+  rate,
+  onPick,
+}: {
+  values: string[];
+  current: string | undefined;
+  valuePrices: Record<string, number> | undefined;
+  images: Record<string, string>;
+  labelOf: (v: string) => string;
+  locale: Locale;
+  rate: number;
+  onPick: (v: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const shown = expanded ? values : values.slice(0, SWATCH_LIMIT);
+  const hidden = values.length - shown.length;
+
+  return (
+    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+      {shown.map((v) => {
+        const active = current === v;
+        const img = images[v];
+        const surcharge = valuePrices?.[v] ?? 0;
+        const label = labelOf(v);
+        return (
+          <button
+            key={v}
+            type="button"
+            onClick={() => onPick(v)}
+            aria-pressed={active}
+            className="flex flex-col items-center gap-1.5 text-center group"
+          >
+            <span
+              className={`relative w-16 h-16 rounded-full overflow-hidden border-2 transition-colors ${
+                active
+                  ? "border-[var(--color-gold)]"
+                  : "border-[var(--border)] group-hover:border-[var(--color-gold)]"
+              }`}
+            >
+              {img ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={img} alt={label} loading="lazy" className="w-full h-full object-cover" />
+              ) : (
+                <span className="w-full h-full flex items-center justify-center bg-[var(--bg)] text-[10px] text-[var(--muted)]">
+                  {v.split(" ").pop()}
+                </span>
+              )}
+            </span>
+            <span
+              className={`text-xs leading-tight ${
+                active ? "text-[var(--color-gold)] font-semibold" : "text-[var(--fg)]"
+              }`}
+            >
+              {label}
+            </span>
+            <span className="text-[11px] text-[var(--muted)]">
+              {surcharge > 0 ? `+${formatMoney(surcharge, locale, rate)}` : formatMoney(0, locale, rate)}
+            </span>
+          </button>
+        );
+      })}
+      {!expanded && hidden > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="flex flex-col items-center justify-center gap-0.5 min-h-[4rem] p-2 rounded-2xl border border-[var(--border)] text-[var(--color-gold)] hover:border-[var(--color-gold)] hover:bg-[var(--color-gold)]/5 transition-colors"
+        >
+          <span className="text-xs font-sans">Zobacz więcej</span>
+          <span className="text-[11px] text-[var(--muted)]">(+{hidden})</span>
+        </button>
+      )}
     </div>
   );
 }
