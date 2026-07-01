@@ -60,7 +60,7 @@ export default function OrderControls(props: Props) {
             <select
               value={selected}
               onChange={(e) => setSelected(e.target.value as OrderStatus | "")}
-              className={inputCls}
+              className={`${inputCls} sm:w-64`}
             >
               <option value="">— wybierz nowy status —</option>
               {props.allowedStatuses.map((s) => (
