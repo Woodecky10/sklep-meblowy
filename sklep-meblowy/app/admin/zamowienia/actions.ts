@@ -116,3 +116,17 @@ export async function updateOrderNote(
   revalidatePath(`/admin/zamowienia/${orderId}`);
   return { ok: true, message: "Notatka zapisana" };
 }
+
+// Trwale usuwa zamówienie. order_items i order_issues znikają kaskadowo
+// (FK ON DELETE CASCADE). Operacja nieodwracalna — UI wymaga potwierdzenia.
+export async function deleteOrder(orderId: string): Promise<ActionResult> {
+  await requireAdmin();
+  if (!orderId) return { ok: false, error: "Brak id zamówienia" };
+
+  const supabase = await createAdminClient();
+  const { error } = await supabase.from("orders").delete().eq("id", orderId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/admin/zamowienia");
+  return { ok: true, message: "Zamówienie usunięte" };
+}
