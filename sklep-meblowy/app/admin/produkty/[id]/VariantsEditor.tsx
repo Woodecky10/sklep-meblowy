@@ -17,6 +17,8 @@ import {
   rebuildCombinations,
   applyFabricSelection,
   applyValuePricing,
+  expandFabrics,
+  fabricValueBelongsTo,
   FABRIC_OPTION_NAME,
 } from "@/app/_lib/variants";
 import { findInvalidVariantSale } from "@/app/_lib/pricing";
@@ -158,10 +160,22 @@ export default function VariantsEditor({
     });
   }
 
-  // Zastosuj zaznaczone tkaniny z katalogu → ustaw opcję „Tkanina" + przelicz kombinacje.
-  function applyFabrics(selectedNames: string[]) {
+  // Zastosuj wybór z katalogu → rozwiń kolekcje na wartości „Nazwa Numer" (+dopłaty),
+  // dołącz zachowane wartości spoza katalogu, ustaw opcję „Tkanina" + przelicz.
+  function applyFabrics(selectedFabrics: Fabric[], keptOrphanValues: string[]) {
     const base = variants ?? { options: [], combinations: [] };
-    const next = applyFabricSelection(base.options, base.combinations, selectedNames);
+    const { values, valuePrices } = expandFabrics(
+      selectedFabrics.map((f) => ({ name: f.name, colors: f.colors ?? [], price: f.price ?? 0 }))
+    );
+    // Zachowaj dopłaty istniejących wartości-sierot (spoza katalogu).
+    const currentVP =
+      base.options.find((o) => o.name === FABRIC_OPTION_NAME)?.value_prices ?? {};
+    const finalValues = [...values, ...keptOrphanValues.filter((v) => !values.includes(v))];
+    const finalVP: Record<string, number> = { ...valuePrices };
+    for (const ov of keptOrphanValues) {
+      if (finalVP[ov] == null && currentVP[ov] != null) finalVP[ov] = currentVP[ov];
+    }
+    const next = applyFabricSelection(base.options, base.combinations, finalValues, finalVP);
     setVariants(next.options.length === 0 ? null : { ...base, ...next });
     setFabricPickerOpen(false);
   }
@@ -466,7 +480,7 @@ export default function VariantsEditor({
       {fabricPickerOpen && (
         <FabricPicker
           fabrics={fabrics}
-          initiallySelected={
+          initiallySelectedValues={
             variants?.options.find((o) => o.name === FABRIC_OPTION_NAME)?.values ?? []
           }
           onCancel={() => setFabricPickerOpen(false)}
@@ -809,39 +823,54 @@ function CombinationRow({
 
 function FabricPicker({
   fabrics,
-  initiallySelected,
+  initiallySelectedValues,
   onApply,
   onCancel,
 }: {
   fabrics: Fabric[];
-  initiallySelected: string[];
-  onApply: (selectedNames: string[]) => void;
+  initiallySelectedValues: string[];
+  onApply: (selectedFabrics: Fabric[], keptOrphanValues: string[]) => void;
   onCancel: () => void;
 }) {
-  const [selected, setSelected] = useState<string[]>(initiallySelected);
+  const toLite = (f: Fabric) => ({ name: f.name, colors: f.colors ?? [], price: f.price ?? 0 });
+
+  // Kolekcje zaznaczone = te, których jakakolwiek bieżąca wartość do nich należy.
+  const [selectedNames, setSelectedNames] = useState<string[]>(() =>
+    fabrics
+      .filter((f) => initiallySelectedValues.some((v) => fabricValueBelongsTo(v, toLite(f))))
+      .map((f) => f.name)
+  );
+  // Wartości spoza katalogu (żadna kolekcja ich nie obejmuje) — zachowywane, można odznaczyć.
+  const orphanValues = initiallySelectedValues.filter(
+    (v) => !fabrics.some((f) => fabricValueBelongsTo(v, toLite(f)))
+  );
+  const [keptOrphans, setKeptOrphans] = useState<string[]>(orphanValues);
   const [search, setSearch] = useState("");
 
-  // Nazwy obecne w produkcie, ale spoza katalogu — pokaż jako zaznaczone „spoza
-  // katalogu", żeby ich nie zgubić przy zapisie.
-  const catalogNames = new Set(fabrics.map((f) => f.name));
-  const orphanNames = initiallySelected.filter((n) => !catalogNames.has(n));
-
   function toggle(name: string) {
-    setSelected((prev) =>
+    setSelectedNames((prev) =>
       prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
     );
+  }
+  function toggleOrphan(v: string) {
+    setKeptOrphans((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
   }
 
   const filtered = search.trim()
     ? fabrics.filter((f) => f.name.toLowerCase().includes(search.trim().toLowerCase()))
     : fabrics;
 
+  const selectedFabrics = fabrics.filter((f) => selectedNames.includes(f.name));
+  const { values: previewValues } = expandFabrics(selectedFabrics.map(toLite));
+  const totalValues =
+    previewValues.length + keptOrphans.filter((v) => !previewValues.includes(v)).length;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
       <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl max-w-lg w-full max-h-[80vh] flex flex-col p-6 gap-4">
         <div className="flex items-center justify-between gap-3">
           <h3 className="font-display text-lg font-semibold text-[var(--fg)]">
-            Wybierz tkaniny ({selected.length})
+            Wybierz tkaniny ({selectedNames.length} → {totalValues} wart.)
           </h3>
           <input
             type="text"
@@ -852,22 +881,22 @@ function FabricPicker({
           />
         </div>
 
-        {fabrics.length === 0 ? (
+        {fabrics.length === 0 && orphanValues.length === 0 ? (
           <p className="text-sm text-[var(--muted)] italic py-6 text-center">
             Brak tkanin w katalogu. Dodaj je w &bdquo;Tkaniny&rdquo; (menu admina).
           </p>
         ) : (
           <ul className="flex-1 overflow-y-auto border border-[var(--border)] rounded-xl divide-y divide-[var(--border)]">
-            {orphanNames.map((n) => (
-              <li key={`orphan-${n}`}>
+            {orphanValues.map((v) => (
+              <li key={`orphan-${v}`}>
                 <label className="flex items-center gap-3 p-2 cursor-pointer bg-amber-50 dark:bg-amber-950/30">
                   <input
                     type="checkbox"
-                    checked={selected.includes(n)}
-                    onChange={() => toggle(n)}
+                    checked={keptOrphans.includes(v)}
+                    onChange={() => toggleOrphan(v)}
                     className="h-4 w-4 accent-[var(--color-gold)]"
                   />
-                  <span className="text-sm text-[var(--fg)]">{n}</span>
+                  <span className="text-sm text-[var(--fg)]">{v}</span>
                   <span className="text-[10px] font-sans uppercase tracking-widest text-amber-600 dark:text-amber-400 ml-auto">
                     spoza katalogu
                   </span>
@@ -878,7 +907,8 @@ function FabricPicker({
               <li className="p-4 text-xs text-[var(--muted)] italic">Brak dopasowań</li>
             )}
             {filtered.map((f) => {
-              const active = selected.includes(f.name);
+              const active = selectedNames.includes(f.name);
+              const colorCount = (f.colors ?? []).length;
               return (
                 <li key={f.id}>
                   <label className={`flex items-center gap-3 p-2 cursor-pointer transition-colors ${active ? "bg-[var(--color-gold)]/10" : "hover:bg-[var(--bg)]"}`}>
@@ -889,9 +919,10 @@ function FabricPicker({
                       className="h-4 w-4 accent-[var(--color-gold)]"
                     />
                     <span className="text-sm text-[var(--fg)]">{f.name}</span>
-                    {f.name_de && (
-                      <span className="text-[10px] text-[var(--muted)] ml-auto">DE: {f.name_de}</span>
-                    )}
+                    <span className="text-[10px] text-[var(--muted)] ml-auto text-right">
+                      {colorCount > 0 ? `${colorCount} kol.` : "bez kolorów"}
+                      {f.price > 0 && ` · +${f.price.toFixed(2)} zł`}
+                    </span>
                   </label>
                 </li>
               );
@@ -909,10 +940,10 @@ function FabricPicker({
           </button>
           <button
             type="button"
-            onClick={() => onApply(selected)}
+            onClick={() => onApply(selectedFabrics, keptOrphans)}
             className="px-5 py-2.5 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
           >
-            Zastosuj ({selected.length})
+            Zastosuj ({totalValues})
           </button>
         </div>
       </div>

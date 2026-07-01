@@ -22,17 +22,42 @@ function parseSort(input: unknown): number {
   return Number.isFinite(n) ? Math.trunc(n) : 0;
 }
 
+// Kolory/numery: rozdzielane przecinkiem/średnikiem/nową linią, trim, dedupe.
+function parseColors(input: unknown): string[] {
+  if (typeof input !== "string") return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of input.split(/[,;\n]+/)) {
+    const v = raw.trim().slice(0, 60);
+    if (v && !seen.has(v)) {
+      seen.add(v);
+      out.push(v);
+    }
+  }
+  return out;
+}
+
+// Dopłata: pusta/NaN/ujemna → 0; inaczej liczba z 2 miejscami.
+function parsePrice(input: unknown): number {
+  if (typeof input !== "string" || input.trim() === "") return 0;
+  const n = Number(input.replace(",", "."));
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.round(n * 100) / 100;
+}
+
 export async function createFabric(formData: FormData): Promise<ActionResult> {
   await requireAdmin();
   const name = sanitize(formData.get("name"));
   if (!name) return { ok: false, error: "Nazwa tkaniny jest wymagana" };
   const nameDe = emptyToNull(sanitize(formData.get("name_de")));
   const sortOrder = parseSort(formData.get("sort_order"));
+  const colors = parseColors(formData.get("colors"));
+  const price = parsePrice(formData.get("price"));
 
   const supabase = await createAdminClient();
   const { error, data } = await supabase
     .from("fabrics")
-    .insert({ name, name_de: nameDe, sort_order: sortOrder } as never)
+    .insert({ name, name_de: nameDe, sort_order: sortOrder, colors, price } as never)
     .select()
     .single();
 
@@ -54,11 +79,13 @@ export async function updateFabric(formData: FormData): Promise<ActionResult> {
   if (!name) return { ok: false, error: "Nazwa tkaniny jest wymagana" };
   const nameDe = emptyToNull(sanitize(formData.get("name_de")));
   const sortOrder = parseSort(formData.get("sort_order"));
+  const colors = parseColors(formData.get("colors"));
+  const price = parsePrice(formData.get("price"));
 
   const supabase = await createAdminClient();
   const { error } = await supabase
     .from("fabrics")
-    .update({ name, name_de: nameDe, sort_order: sortOrder } as never)
+    .update({ name, name_de: nameDe, sort_order: sortOrder, colors, price } as never)
     .eq("id", id);
 
   if (error) {

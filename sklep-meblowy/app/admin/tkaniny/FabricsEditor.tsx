@@ -92,7 +92,9 @@ export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabr
                     {f.name}
                   </p>
                   <p className="text-xs text-[var(--muted)] mt-0.5">
-                    DE: {f.name_de ?? "—"} · kolejność: {f.sort_order}
+                    DE: {f.name_de ?? "—"} · kolejność: {f.sort_order} ·{" "}
+                    {f.colors?.length ? `${f.colors.length} kolor${f.colors.length < 5 ? "y" : "ów"}` : "bez kolorów"}
+                    {f.price > 0 && ` · +${f.price.toFixed(2)} zł`}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -190,6 +192,31 @@ function FabricForm({
           className={inputCls}
         />
       </Field>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Field
+          label="Kolory / numery"
+          className="md:col-span-2"
+          hint="Numery/kolory kolekcji, oddzielone przecinkiem lub nową linią. Puste = tkanina bez kolorów."
+        >
+          <textarea
+            name="colors"
+            defaultValue={(initial?.colors ?? []).join(", ")}
+            rows={2}
+            placeholder="np. 02, 04, 09, 15, 20, 29"
+            className={`${inputCls} resize-y`}
+          />
+        </Field>
+        <Field label="Dopłata (zł)" hint="Doliczana do ceny, gdy wybrana ta tkanina. 0 = bez dopłaty.">
+          <input
+            name="price"
+            type="number"
+            step="0.01"
+            min="0"
+            defaultValue={initial?.price ?? 0}
+            className={inputCls}
+          />
+        </Field>
+      </div>
       <div className="flex gap-2 pt-2">
         <button
           type="submit"
