@@ -270,25 +270,70 @@ export function applyValuePricing(
 
 // ── Tkaniny (katalog) ──
 
-// Ustawia (lub tworzy/usuwa) opcję „Tkanina" z podanym zbiorem nazw i przelicza
-// kombinacje przez rebuildCombinations (ta sama logika co edytor). Pozostałe
-// opcje bez zmian. Pusty wybór → usuwa opcję „Tkanina".
+// Minimalny kształt tkaniny potrzebny do rozwijania na wartości wariantu.
+export type FabricLite = { name: string; colors: string[]; price: number };
+
+// Rozwija wybrane tkaniny (kolekcje) na wartości opcji „Tkanina":
+// - z kolorami → „Nazwa Numer" dla każdego numeru,
+// - bez kolorów → sama „Nazwa".
+// Dopłata kolekcji trafia do valuePrices każdej jej wartości (gdy > 0).
+// Zachowuje kolejność, deduplikuje wartości.
+export function expandFabrics(
+  fabrics: FabricLite[]
+): { values: string[]; valuePrices: Record<string, number> } {
+  const values: string[] = [];
+  const valuePrices: Record<string, number> = {};
+  const seen = new Set<string>();
+  for (const f of fabrics) {
+    const name = f.name.trim();
+    if (!name) continue;
+    const colors = (f.colors ?? []).map((c) => c.trim()).filter(Boolean);
+    const fabricValues = colors.length > 0 ? colors.map((c) => `${name} ${c}`) : [name];
+    const price = typeof f.price === "number" && Number.isFinite(f.price) ? f.price : 0;
+    for (const v of fabricValues) {
+      if (seen.has(v)) continue;
+      seen.add(v);
+      values.push(v);
+      if (price > 0) valuePrices[v] = price;
+    }
+  }
+  return { values, valuePrices };
+}
+
+// Czy wartość opcji „Tkanina" pochodzi z danej tkaniny (kolekcji)?
+// „Nazwa" (bez kolorów) lub „Nazwa Numer" (numer ∈ colors). Do seedowania pickera.
+export function fabricValueBelongsTo(value: string, fabric: FabricLite): boolean {
+  const name = fabric.name.trim();
+  if (value === name) return true;
+  const colors = (fabric.colors ?? []).map((c) => c.trim()).filter(Boolean);
+  if (colors.length === 0 || !value.startsWith(name + " ")) return false;
+  return colors.includes(value.slice(name.length + 1));
+}
+
+// Ustawia (lub tworzy/usuwa) opcję „Tkanina" z podanymi wartościami + dopłatami
+// per wartość, przelicza kombinacje (rebuild + applyValuePricing). Pozostałe
+// opcje bez zmian. Pusty zbiór wartości → usuwa opcję „Tkanina".
 export function applyFabricSelection(
   options: ProductOption[],
   combinations: ProductVariant[],
-  selectedFabricNames: string[]
+  values: string[],
+  valuePrices: Record<string, number> = {}
 ): { options: ProductOption[]; combinations: ProductVariant[] } {
+  const vp = Object.keys(valuePrices).length > 0 ? valuePrices : undefined;
   let nextOptions: ProductOption[];
-  if (selectedFabricNames.length === 0) {
+  if (values.length === 0) {
     nextOptions = options.filter((o) => o.name !== FABRIC_OPTION_NAME);
   } else if (options.some((o) => o.name === FABRIC_OPTION_NAME)) {
     nextOptions = options.map((o) =>
-      o.name === FABRIC_OPTION_NAME ? { ...o, values: selectedFabricNames } : o
+      o.name === FABRIC_OPTION_NAME ? { ...o, values, value_prices: vp } : o
     );
   } else {
-    nextOptions = [...options, { name: FABRIC_OPTION_NAME, values: selectedFabricNames }];
+    nextOptions = [...options, { name: FABRIC_OPTION_NAME, values, value_prices: vp }];
   }
-  return { options: nextOptions, combinations: rebuildCombinations(nextOptions, combinations) };
+  return {
+    options: nextOptions,
+    combinations: applyValuePricing(nextOptions, rebuildCombinations(nextOptions, combinations)),
+  };
 }
 
 // Buduje mapę PL→DE nazw tkanin (pomija puste name_de). Czysta — testowalna bez
