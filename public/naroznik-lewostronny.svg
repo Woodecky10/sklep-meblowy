@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 288" role="img" aria-label="Narożnik lewostronny — widok z góry, szezlong po lewej stronie">
+  <title>Narożnik lewostronny</title>
+  <!-- karta / tło -->
+  <rect x="8" y="8" width="224" height="224" rx="18" fill="#ece4d7" stroke="#1a1a2e" stroke-opacity="0.12"/>
+  <!-- korpus narożnika (rzut z góry) -->
+  <g>
+    <!-- siedziska / poduszki -->
+    <rect x="60" y="60" width="120" height="58" rx="8" fill="#c9a84c"/>
+    <rect x="60" y="60" width="58" height="116" rx="8" fill="#c9a84c"/>
+    <!-- oparcia (tylna i lewa krawędź — narożnik z tyłu-lewej) -->
+    <rect x="44" y="44" width="152" height="16" rx="6" fill="#1a1a2e"/>
+    <rect x="44" y="44" width="16" height="148" rx="6" fill="#1a1a2e"/>
+    <!-- podłokietniki (koniec części głównej i koniec szezlonga) -->
+    <rect x="180" y="44" width="16" height="74" rx="6" fill="#16213e"/>
+    <rect x="44" y="176" width="74" height="16" rx="6" fill="#16213e"/>
+    <!-- podziały poduszek -->
+    <g stroke="#1a1a2e" stroke-opacity="0.30" stroke-width="2" stroke-linecap="round">
+      <line x1="118" y1="64" x2="118" y2="114"/>
+      <line x1="149" y1="64" x2="149" y2="114"/>
+      <line x1="64" y1="118" x2="114" y2="118"/>
+      <line x1="64" y1="147" x2="114" y2="147"/>
+    </g>
+  </g>
+  <!-- wskaźnik "przód" -->
+  <path d="M114 214 L120 208 L126 214" fill="none" stroke="#1a1a2e" stroke-opacity="0.5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="120" y="228" text-anchor="middle" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-size="10" fill="#1a1a2e" fill-opacity="0.55" letter-spacing="0.5">WIDOK Z PRZODU</text>
+  <!-- podpis -->
+  <text x="120" y="262" text-anchor="middle" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-size="21" font-weight="700" fill="#1a1a2e">Lewostronny</text>
+</svg>
