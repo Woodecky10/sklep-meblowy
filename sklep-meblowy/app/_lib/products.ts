@@ -1,6 +1,7 @@
 import { createClient, createAdminClient } from "./supabase/server";
 import { getCategories } from "./categories";
 import { buildSearchOrFilter } from "./search-filter";
+import { sizeLabelOf } from "./size-groups";
 import { localizeProduct, buildLocalizedFacets } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Category, Product } from "./types";
@@ -284,10 +285,10 @@ export async function getSizeGroupMembersAdmin(
     .select("id, name, size_label")
     .eq("size_group", sizeGroup);
   const rows = (data ?? []) as SizeGroupMember[];
+  // Sort naturalny po etykiecie (fallback do nazwy) — ta sama semantyka co
+  // selektor na sklepie (sizeLabelOf), więc kolejność jest spójna.
   return rows.sort((a, b) =>
-    (a.size_label ?? a.name).localeCompare(b.size_label ?? b.name, "pl", {
-      numeric: true,
-    })
+    sizeLabelOf(a).localeCompare(sizeLabelOf(b), "pl", { numeric: true })
   );
 }
 
