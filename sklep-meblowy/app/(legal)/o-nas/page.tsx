@@ -43,7 +43,7 @@ export default async function OnasPage() {
         how1:
           "Die meisten unserer Möbel fertigen wir auf Bestellung — dadurch können wir die Auswahl der Stoffe, die Konfiguration der Eckcouch oder die Wahl der Bettengröße anbieten. Die genaue Lieferzeit finden Sie bei jedem Produkt.",
         how2:
-          "Wir liefern in ganz Polen. Die Lieferkosten legen wir nach der Bestellung individuell fest — sie hängen von Gewicht, Abmessungen und Lieferort ab.",
+          "Wir liefern in ganz Polen — der Versand ist kostenlos (keine Versandkosten).",
         h2Quality: "Qualität und Garantie",
         quality:
           "Auf die meisten Produkte gewähren wir eine Garantie von 2 bis 10 Jahren — Einzelheiten finden Sie auf der Produktseite. Wir wählen Lieferanten aus, deren Materialien wir persönlich geprüft haben, und stehen unseren Kunden bei der Auswahl und nach dem Kauf mit Rat und Tat zur Seite.",
@@ -73,7 +73,7 @@ export default async function OnasPage() {
         how1:
           "Większość naszych mebli realizujemy na zamówienie — dzięki temu możemy zaoferować dobór tkanin, konfigurację narożnika czy wybór rozmiaru łóżka. Dokładny czas realizacji znajdziesz przy każdym produkcie.",
         how2:
-          "Dostarczamy na terenie całej Polski. Koszt dostawy ustalamy indywidualnie po złożeniu zamówienia — zależy od wagi, gabarytów i miejsca dostawy.",
+          "Dostarczamy na terenie całej Polski — wysyłka jest darmowa (nie doliczamy kosztów dostawy).",
         h2Quality: "Jakość i gwarancja",
         quality:
           "Na większość produktów udzielamy gwarancji od 2 do 10 lat — szczegóły w karcie każdego produktu. Wybieramy dostawców, których materiały sprawdzaliśmy osobiście, a naszym klientom służymy wsparciem przy doborze i po zakupie.",

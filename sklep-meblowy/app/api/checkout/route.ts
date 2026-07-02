@@ -213,9 +213,9 @@ export async function POST(request: NextRequest) {
       // z kodem (inaczej used_count++ za rabat, którego klient nie dostał).
     }
 
-    // Koszt dostawy NIE jest doliczany — meble różnią się wagą i gabarytami.
-    // Po zamówieniu admin kontaktuje klienta i ustala koszt dostawy indywidualnie
-    // (płatność osobno: przelew albo doliczone do zamówienia jako delivery_price).
+    // Wysyłka darmowa na terenie całej Polski — nie doliczamy kosztu dostawy.
+    // Do P24 idzie tylko cena produktów (minus rabat). Pola delivery_cost /
+    // delivery_price w panelu admina zostają do rozliczeń wewnętrznych.
     const finalTotal = toCharge(Math.max(0, total - promoDiscount));
 
     // Użytkownik zalogowany?

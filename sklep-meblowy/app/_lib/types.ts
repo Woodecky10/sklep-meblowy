@@ -14,9 +14,13 @@ export type ProductDimensions = {
 };
 
 // Definicja typu wariantu (np. "Strona": ["Lewa","Prawa"])
+// value_prices: opcjonalna dopłata per wartość opcji (np. {"Premium": 200}).
+// Dopłaty wybranych wartości sumują się do price_modifier kombinacji. Brak
+// wpisu = 0 zł. Gdy zdefiniowane, są źródłem prawdy dla price_modifier.
 export type ProductOption = {
   name: string;
   values: string[];
+  value_prices?: Record<string, number>;
 };
 
 // Konkretna kombinacja wybranych wartości + stock + ewentualny modyfikator ceny.
@@ -149,7 +153,15 @@ export type Fabric = {
   id: string;
   name: string;
   name_de: string | null;
+  // Numery/kolory kolekcji (np. ["02","04","09"]). Puste = tkanina bez kolorów.
+  colors: string[];
+  // Zdjęcie próbki per kolor: { numer -> URL }. Tylko kolory z wgranym zdjęciem.
+  color_images: Record<string, string>;
+  // Dopłata do ceny bazowej gdy wybrana ta tkanina (zł, >= 0).
+  price: number;
   sort_order: number;
+  // Kategoria/typ do grupowania w pickerze wariantów (np. "welur"). Null = bez kategorii.
+  category: string | null;
   created_at: string;
 };
 

@@ -8,12 +8,14 @@ import {
   updateOrderStatus,
   updateOrderFulfillment,
   updateOrderNote,
+  deleteOrder,
   type ActionResult,
 } from "../actions";
 import type { OrderStatus } from "@/app/_lib/types";
 
 type Props = {
   orderId: string;
+  orderNumber: number;
   allowedStatuses: OrderStatus[];
   carrier: string | null;
   trackingNumber: string | null;
@@ -58,7 +60,7 @@ export default function OrderControls(props: Props) {
             <select
               value={selected}
               onChange={(e) => setSelected(e.target.value as OrderStatus | "")}
-              className={inputCls}
+              className={`${inputCls} sm:w-64`}
             >
               <option value="">— wybierz nowy status —</option>
               {props.allowedStatuses.map((s) => (
@@ -154,6 +156,40 @@ export default function OrderControls(props: Props) {
             Zapisz notatkę
           </button>
         </form>
+      </Card>
+
+      {/* Strefa niebezpieczna — trwałe usunięcie */}
+      <Card>
+        <h3 className="font-display text-lg font-bold text-red-600 dark:text-red-400 mb-2">
+          Usuń zamówienie
+        </h3>
+        <p className="text-sm text-[var(--muted)] mb-4">
+          Trwale usuwa zamówienie wraz z pozycjami. Operacji nie da się cofnąć —
+          zamówienie zniknie z historii i raportów. Do zwykłego odwołania użyj
+          statusu „Anulowane”.
+        </p>
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={() => {
+            const ok = window.confirm(
+              `Usunąć trwale zamówienie #${props.orderNumber}?\n\n` +
+                "Tej operacji nie da się cofnąć — zniknie z historii wraz z pozycjami."
+            );
+            if (!ok) return;
+            startTransition(async () => {
+              const res = await deleteOrder(props.orderId);
+              if (res.ok) {
+                router.push("/admin/zamowienia");
+              } else {
+                showToast({ type: "error", message: res.error });
+              }
+            });
+          }}
+          className="self-start px-5 py-2 text-sm font-sans uppercase tracking-widest text-red-600 dark:text-red-400 border border-red-300 dark:border-red-800 rounded-lg hover:bg-red-600 hover:text-white hover:border-red-600 transition-colors disabled:opacity-50"
+        >
+          {isPending ? "Usuwam…" : "Usuń zamówienie"}
+        </button>
       </Card>
     </div>
   );

@@ -56,12 +56,12 @@ export default function CheckoutForm({
         order: "Bestellung",
         products: "Produkte",
         shipping: "Versand",
-        shippingFrom: "ab 99 zł",
+        shippingFrom: "Gratis",
         shippingNote:
-          "den genauen Preis nennen wir Ihnen nach der Bestellung telefonisch oder per E-Mail",
+          "in ganz Polen",
         shippingNotice:
-          "Der angezeigte Betrag enthält keine Versandkosten. Wir legen sie nach der Bestellung individuell fest; sie bedürfen Ihrer Zustimmung (kostenfreier Rücktritt möglich).",
-        shippingNoticeLink: "Wie wir die Versandkosten berechnen",
+          "Der Versand innerhalb Polens ist kostenlos — wir berechnen keine Versandkosten.",
+        shippingNoticeLink: "Versanddetails",
         total: "Gesamt",
         payment: "🔒 Zahlung über Przelewy24 (Karte, BLIK, Überweisung)",
         ssl: "✓ SSL-Verschlüsselung",
@@ -90,12 +90,12 @@ export default function CheckoutForm({
         order: "Zamówienie",
         products: "Produkty",
         shipping: "Dostawa",
-        shippingFrom: "od 99 zł",
+        shippingFrom: "Gratis",
         shippingNote:
-          "dokładną wycenę podajemy telefonicznie lub mailowo po zamówieniu",
+          "na terenie całej Polski",
         shippingNotice:
-          "Podana kwota nie zawiera kosztu dostawy. Ustalamy go indywidualnie po zamówieniu i wymaga Twojej akceptacji (możesz bezpłatnie zrezygnować).",
-        shippingNoticeLink: "Jak liczymy koszt dostawy",
+          "Wysyłka jest darmowa na terenie całej Polski — nie doliczamy żadnych kosztów dostawy.",
+        shippingNoticeLink: "Szczegóły dostawy",
         total: "Razem",
         payment: "🔒 Płatność Przelewy24 (karta, BLIK, przelew)",
         ssl: "✓ Szyfrowanie SSL",
@@ -122,10 +122,9 @@ export default function CheckoutForm({
     }
   }, [items.length, router, locale]);
 
-  // Koszt dostawy ustalany indywidualnie po zamówieniu — meble różnią się
-  // wagą, gabarytami i miejscem dostawy, ten sam ryczałtowy koszt dla
-  // wszystkich nie miał sensu. Pełne uzasadnienie + 4 czynniki wyceny
-  // na stronie /dostawa.
+  // Wysyłka darmowa na terenie całej Polski — do płatności doliczamy tylko
+  // cenę produktów (minus rabat). Pole delivery_cost w panelu admina zostaje
+  // do ewentualnych rozliczeń wewnętrznych, ale klientowi nic nie doliczamy.
   const discount = appliedPromo?.discount ?? 0;
   const grandTotal = Math.max(0, total - discount);
 

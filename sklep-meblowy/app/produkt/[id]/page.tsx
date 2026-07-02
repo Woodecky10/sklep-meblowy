@@ -32,6 +32,8 @@ import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { buildSizeOptions } from "@/app/_lib/size-groups";
 import { effectivePrice } from "@/app/_lib/pricing";
+import { getFabricImageMap } from "@/app/_lib/fabrics";
+import { FabricImageProvider } from "@/app/_lib/fabric-context";
 import type { Product } from "@/app/_lib/types";
 
 type Props = { params: Promise<{ id: string }> };
@@ -107,6 +109,8 @@ export default async function ProduktPage({ params }: Props) {
       getEurRate(),
     ]);
   const sizeOptions = buildSizeOptions(sizeSiblings, product.id);
+  // Mapa zdjęć próbek tkanin (wartość „Nazwa Numer" → URL) do próbek w selektorze.
+  const fabricImageMap = await getFabricImageMap();
 
   // Etykieta cross-sell pochodzi z LABELA pierwszej cross_sell_categories tej
   // kategorii — np. dla łóżek pokaże "Polecane materace".
@@ -262,13 +266,15 @@ export default async function ProduktPage({ params }: Props) {
       {/* Główna sekcja — galeria + akcje + specyfikacja w lewej kolumnie.
           Specyfikacja przeniesiona z osobnej sekcji do ProductMainSection
           żeby wypełniała pustą przestrzeń pod galerią. */}
-      <ProductMainSection
-        product={product}
-        categoryLabel={categoryLabel ?? null}
-        rating={rating}
-        specifications={details}
-        sizeOptions={sizeOptions}
-      />
+      <FabricImageProvider map={fabricImageMap}>
+        <ProductMainSection
+          product={product}
+          categoryLabel={categoryLabel ?? null}
+          rating={rating}
+          specifications={details}
+          sizeOptions={sizeOptions}
+        />
+      </FabricImageProvider>
 
       {/* Sekcja: opis produktu.
           - Jeśli mamy description_sections (IKEA-style akordeony) →

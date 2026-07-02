@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { requireAdmin } from "@/app/_lib/admin";
 import { getAdminOrders, getProfilesByIds } from "@/app/_lib/orders";
-import { orderCustomerDisplay } from "@/app/_lib/admin-orders";
+import { orderCustomerDisplay, orderItemsSummary } from "@/app/_lib/admin-orders";
 import { ADMIN_STATUS_LABELS } from "@/app/_lib/order-status";
 import { formatOrderAmount } from "@/app/_lib/money";
 import { EmptyState, inputCls } from "@/app/admin/_shared";
 import Pagination from "@/app/_components/ui/Pagination";
+import OrderRow from "./OrderRow";
 import type { OrderStatus } from "@/app/_lib/types";
 
 export const metadata = { title: "Zamówienia — Admin" };
@@ -112,9 +113,11 @@ export default async function AdminOrdersPage({
                 <th className="px-4 py-3">Nr</th>
                 <th className="px-4 py-3">Data</th>
                 <th className="px-4 py-3">Klient</th>
+                <th className="px-4 py-3">Produkty</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Kwota</th>
                 <th className="px-4 py-3 text-center">Dostawa</th>
+                <th className="px-4 py-3 text-right">Akcja</th>
               </tr>
             </thead>
             <tbody>
@@ -124,50 +127,26 @@ export default async function AdminOrdersPage({
                   o.user_id ? profiles[o.user_id] ?? null : null
                 );
                 const s = ADMIN_STATUS_LABELS[o.status];
+                const products = orderItemsSummary(o.items ?? []);
                 return (
-                  <tr
+                  <OrderRow
                     key={o.id}
-                    className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg)] transition-colors"
-                  >
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/admin/zamowienia/${o.id}`}
-                        className="font-mono font-semibold text-[var(--color-gold)] hover:underline"
-                      >
-                        #{o.order_number}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-[var(--muted)] whitespace-nowrap">
-                      {new Date(o.created_at).toLocaleDateString("pl-PL", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "numeric",
-                      })}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-[var(--fg)]">{cust.name ?? "—"}</span>
-                      {cust.email && (
-                        <span className="block text-xs text-[var(--muted)]">{cust.email}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-sans uppercase tracking-widest ${s.className}`}
-                      >
-                        {s.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold text-[var(--fg)] whitespace-nowrap">
-                      {formatOrderAmount(Number(o.total), o.currency)}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {o.delivery_paid ? (
-                        <span className="text-emerald-600" title="Dostawa opłacona">✓</span>
-                      ) : (
-                        <span className="text-[var(--muted)]">—</span>
-                      )}
-                    </td>
-                  </tr>
+                    id={o.id}
+                    orderNumber={o.order_number}
+                    dateLabel={new Date(o.created_at).toLocaleDateString("pl-PL", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    })}
+                    customerName={cust.name ?? null}
+                    customerEmail={cust.email ?? null}
+                    productsLabel={products.label}
+                    productsFull={products.full}
+                    statusLabel={s.label}
+                    statusClassName={s.className}
+                    amountLabel={formatOrderAmount(Number(o.total), o.currency)}
+                    deliveryPaid={o.delivery_paid}
+                  />
                 );
               })}
             </tbody>

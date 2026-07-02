@@ -1,6 +1,7 @@
 import { createClient, createAdminClient } from "./supabase/server";
 import { getCategories } from "./categories";
 import { buildSearchOrFilter } from "./search-filter";
+import { sizeLabelOf } from "./size-groups";
 import { localizeProduct, buildLocalizedFacets } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Category, Product } from "./types";
@@ -269,19 +270,26 @@ export async function getSizeSiblings(
   return ((data ?? []) as Product[]).map((p) => localizeProduct(p, locale));
 }
 
-// Distinct klucze size_group (do podpowiedzi/datalist w adminie). Admin client —
-// pokazujemy też klucze produktów nieaktywnych, żeby admin trafił w istniejący klucz.
-export async function getSizeGroupKeys(): Promise<string[]> {
+// Członek grupy rozmiarów w widoku admina.
+export type SizeGroupMember = { id: string; name: string; size_label: string | null };
+
+// Członkowie grupy dla panelu admina. Admin client — pokazuje też produkty
+// nieaktywne (admin musi widzieć całą grupę). Sort naturalny po etykiecie
+// (numeric, pl) jak na sklepie; fallback do nazwy.
+export async function getSizeGroupMembersAdmin(
+  sizeGroup: string
+): Promise<SizeGroupMember[]> {
   const supabase = await createAdminClient();
   const { data } = await supabase
     .from("products")
-    .select("size_group")
-    .not("size_group", "is", null);
-  const keys = new Set<string>();
-  for (const r of (data ?? []) as { size_group: string | null }[]) {
-    if (r.size_group) keys.add(r.size_group);
-  }
-  return Array.from(keys).sort((a, b) => a.localeCompare(b));
+    .select("id, name, size_label")
+    .eq("size_group", sizeGroup);
+  const rows = (data ?? []) as SizeGroupMember[];
+  // Sort naturalny po etykiecie (fallback do nazwy) — ta sama semantyka co
+  // selektor na sklepie (sizeLabelOf), więc kolejność jest spójna.
+  return rows.sort((a, b) =>
+    sizeLabelOf(a).localeCompare(sizeLabelOf(b), "pl", { numeric: true })
+  );
 }
 
 // Pobiera unikalne wartości color/material z CAŁEJ bazy produktów — użyte

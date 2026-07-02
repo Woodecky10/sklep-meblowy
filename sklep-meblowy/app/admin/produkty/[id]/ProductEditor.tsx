@@ -3,31 +3,30 @@
 import { useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  updateProductBasics,
-  updateProductImages,
-  uploadProductImage,
-} from "../actions";
+import { updateProductBasics, updateProductImages } from "../actions";
 import type { Product, ActionResult, Fabric } from "@/app/_lib/types";
 import type { CategoryDef } from "@/app/_lib/categories";
 import { hasVariants } from "@/app/_lib/variants";
-import { Field, IconBtn, compressIfNeeded, inputClass, type Toast } from "./_shared";
+import { Field, IconBtn, inputClass, type Toast } from "./_shared";
+import { useImageUpload } from "./useImageUpload";
 import VariantsEditor from "./VariantsEditor";
 import DescriptionSectionsEditor from "./DescriptionSectionsEditor";
 import DescriptionFieldEditor from "./DescriptionFieldEditor";
 import TranslationEditor, { type ProductDeFields } from "./TranslationEditor";
+import SizeGroupEditor from "./SizeGroupEditor";
+import type { SizeGroupMember } from "@/app/_lib/products";
 
 export default function ProductEditor({
   product,
   categories,
   de,
-  sizeGroupKeys,
+  sizeGroupMembers,
   fabrics,
 }: {
   product: Product;
   categories: CategoryDef[];
   de: ProductDeFields;
-  sizeGroupKeys: string[];
+  sizeGroupMembers: SizeGroupMember[];
   fabrics: Fabric[];
 }) {
   const [images, setImages] = useState<string[]>(product.images ?? []);
@@ -38,7 +37,6 @@ export default function ProductEditor({
   const [toast, setToast] = useState<Toast>(null);
   const [savingBasics, startBasicsTransition] = useTransition();
   const [savingImages, startImagesTransition] = useTransition();
-  const [uploading, setUploading] = useState(false);
 
   function showToast(t: Toast) {
     setToast(t);
@@ -51,38 +49,14 @@ export default function ProductEditor({
   }
 
   // ============================================================
-  // Zdjęcia globalne — upload, sortowanie, usuwanie
+  // Zdjęcia globalne — upload (multi + drag&drop), sortowanie, usuwanie
   // ============================================================
 
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = ""; // reset żeby kolejny upload tego samego pliku zadziałał
-
-    setUploading(true);
-    try {
-      const toSend = await compressIfNeeded(file);
-      const fd = new FormData();
-      fd.set("image", toSend, toSend.name);
-      const res = await uploadProductImage(fd);
-      if (!res.ok) {
-        showToast({ type: "error", message: res.error });
-        return;
-      }
-      const url = (res.data as { url: string } | undefined)?.url;
-      if (!url) {
-        showToast({ type: "error", message: "Brak URL po uploadzie" });
-        return;
-      }
-      setImages((prev) => [...prev, url]);
-      showToast({
-        type: "success",
-        message: 'Zdjęcie wgrane. Kliknij „Zapisz zdjęcia” żeby utrwalić.',
-      });
-    } finally {
-      setUploading(false);
-    }
-  }
+  const upload = useImageUpload({
+    onUploaded: (urls) => setImages((prev) => [...prev, ...urls]),
+    onToast: showToast,
+    successHint: 'Kliknij „Zapisz zdjęcia” żeby utrwalić.',
+  });
 
   function moveImage(idx: number, dir: -1 | 1) {
     const target = idx + dir;
@@ -237,35 +211,11 @@ export default function ProductEditor({
             <input name="material" defaultValue={product.material ?? ""} maxLength={100} className={inputClass} />
           </Field>
 
-          <Field
-            label="Grupa rozmiarów (klucz)"
-            hint="Wpisz ten sam klucz na wszystkich rozmiarach tego mebla, np. loze-vegas. Zostaw puste, jeśli produkt nie ma innych rozmiarów."
-          >
-            <input
-              name="size_group"
-              list="size-group-keys"
-              defaultValue={product.size_group ?? ""}
-              maxLength={100}
-              className={inputClass}
-            />
-            <datalist id="size-group-keys">
-              {sizeGroupKeys.map((k) => (
-                <option key={k} value={k} />
-              ))}
-            </datalist>
-          </Field>
-
-          <Field
-            label="Etykieta rozmiaru"
-            hint="np. 140×200 cm — tekst na przycisku rozmiaru widoczny dla klienta."
-          >
-            <input
-              name="size_label"
-              defaultValue={product.size_label ?? ""}
-              maxLength={100}
-              className={inputClass}
-            />
-          </Field>
+          <SizeGroupEditor
+            currentId={product.id}
+            members={sizeGroupMembers}
+            onToast={showToast}
+          />
 
           <Field label="Wymiary (cm)" className="md:col-span-2" hint="Szerokość × głębokość × wysokość. Zostaw puste żeby wyczyścić.">
             <div className="grid grid-cols-3 gap-2">
@@ -360,24 +310,31 @@ export default function ProductEditor({
             </h2>
             <p className="text-sm text-[var(--muted)] mt-1">
               Globalna galeria pokazywana na karcie produktu gdy klient nie wybrał wariantu
-              ze zdjęciami. Strzałkami ↑/↓ ustawiasz kolejność, ikoną kosza usuwasz.
+              ze zdjęciami. Możesz dodać kilka zdjęć naraz — wybierając wiele plików lub
+              przeciągając je na galerię. Strzałkami ↑/↓ ustawiasz kolejność, ikoną kosza usuwasz.
             </p>
           </div>
-          <label className="shrink-0 px-5 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors cursor-pointer disabled:opacity-50">
-            {uploading ? "Wgrywam..." : "+ Dodaj zdjęcie"}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleUpload}
-              disabled={uploading}
-              className="hidden"
-            />
+          <label
+            className={`shrink-0 px-5 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors cursor-pointer ${
+              upload.uploading ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+          >
+            {upload.progressText ?? "+ Dodaj zdjęcia"}
+            <input {...upload.inputProps} className="hidden" />
           </label>
         </div>
 
+        <div
+          {...upload.dropProps}
+          className={`relative rounded-xl transition-colors ${
+            upload.isDragging
+              ? "outline outline-2 outline-dashed outline-[var(--color-gold)] outline-offset-4"
+              : ""
+          }`}
+        >
         {images.length === 0 ? (
           <div className="p-8 text-center text-[var(--muted)] border-2 border-dashed border-[var(--border)] rounded-xl">
-            Brak zdjęć. Wgraj pierwsze klikając &bdquo;+ Dodaj zdjęcie&rdquo;.
+            Brak zdjęć. Wgraj klikając &bdquo;+ Dodaj zdjęcia&rdquo; lub przeciągnij pliki tutaj.
           </div>
         ) : (
           <ul className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -421,6 +378,14 @@ export default function ProductEditor({
             ))}
           </ul>
         )}
+          {upload.isDragging && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-[var(--color-navy)]/60 pointer-events-none">
+              <span className="text-white font-sans text-sm uppercase tracking-widest">
+                Upuść zdjęcia tutaj
+              </span>
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center justify-between gap-4 pt-2 border-t border-[var(--border)]">
           <p className="text-xs text-[var(--muted)]">

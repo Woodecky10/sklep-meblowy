@@ -3,7 +3,7 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
-import { buildFabricDeMap } from "./variants";
+import { buildFabricDeMap, buildFabricImageMap } from "./variants";
 import type { Fabric } from "./types";
 
 export const FABRICS_CACHE_TAG = "fabrics";
@@ -28,6 +28,11 @@ export const getAllFabrics = cache(fetchAllFabrics);
 // Mapa PL→DE do renderu wartości wariantu „Tkanina" na /de.
 export async function getFabricDeMap(): Promise<Record<string, string>> {
   return buildFabricDeMap(await getAllFabrics());
+}
+
+// Mapa wartość „Nazwa Numer" → URL zdjęcia próbki (do próbek na sklepie).
+export async function getFabricImageMap(): Promise<Record<string, string>> {
+  return buildFabricImageMap(await getAllFabrics());
 }
 
 export function invalidateFabricsCache(): void {

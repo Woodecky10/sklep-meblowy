@@ -116,11 +116,13 @@ export async function getOrderById(orderId: string) {
 
 const ADMIN_ORDERS_PAGE_SIZE = 30;
 
-export type AdminOrderRow = Order & { items: { quantity: number }[] };
+export type AdminOrderRow = Order & {
+  items: { quantity: number; product: { name: string } | null }[];
+};
 
 // Lista zamówień dla panelu admina — filtr statusu, szukajka (numer / e-mail
-// gościa / nazwisko z adresu), paginacja po dacie malejąco. `items` to tylko
-// ilości (do policzenia liczby pozycji) — szczegóły ładuje getOrderById.
+// gościa / nazwisko z adresu), paginacja po dacie malejąco. `items` to ilości
+// + nazwa produktu (do skrótu pozycji na liście) — pełne szczegóły: getOrderById.
 export async function getAdminOrders({
   status,
   search,
@@ -137,7 +139,7 @@ export async function getAdminOrders({
 
   let query = supabase
     .from("orders")
-    .select("*, items:order_items(quantity)", { count: "exact" })
+    .select("*, items:order_items(quantity, product:products(name))", { count: "exact" })
     .order("created_at", { ascending: false });
 
   if (status && status !== "all") {

@@ -2,9 +2,10 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
-import { updateProductDescriptionSections, uploadProductImage } from "../actions";
+import { updateProductDescriptionSections } from "../actions";
 import type { ProductDescriptionSection } from "@/app/_lib/types";
-import { compressIfNeeded, IconBtn, inputClass, type Toast } from "./_shared";
+import { IconBtn, inputClass, type Toast } from "./_shared";
+import { useImageUpload } from "./useImageUpload";
 import RichTextEditor from "./RichTextEditor";
 
 // Sekcja + stabilne lokalne id (klucz Reacta). Id NIE jest częścią danych
@@ -46,7 +47,6 @@ export default function DescriptionSectionsEditor({
   // (audyt 2026-06-11 MED).
   const [baseline, setBaseline] = useState<ProductDescriptionSection[]>(initial);
   const [saving, startSaveTransition] = useTransition();
-  const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
 
   const sections = rows.map((r) => r.data);
   const dirty = useMemo(
@@ -96,39 +96,18 @@ export default function DescriptionSectionsEditor({
     });
   }
 
-  async function insertImageAt(insertIdx: number, file: File) {
-    setUploadingIdx(insertIdx);
-    try {
-      const compressed = await compressIfNeeded(file);
-      const fd = new FormData();
-      fd.set("image", compressed, compressed.name);
-      const res = await uploadProductImage(fd);
-      if (!res.ok) {
-        onToast({ type: "error", message: res.error });
-        return;
-      }
-      const url = (res.data as { url: string } | undefined)?.url;
-      if (!url) {
-        onToast({ type: "error", message: "Brak URL po uploadzie" });
-        return;
-      }
-      const newImage: ProductDescriptionSection = {
-        kind: "image",
-        image_url: url,
-        image_alt: "",
-      };
-      setRows((prev) => {
-        const next = prev.slice();
-        next.splice(insertIdx, 0, { id: newId(), data: newImage });
-        return next;
-      });
-      onToast({
-        type: "success",
-        message: "Zdjęcie wgrane. Kliknij „Zapisz sekcje” żeby utrwalić.",
-      });
-    } finally {
-      setUploadingIdx(null);
-    }
+  // Wstawia N sekcji-obrazów na wybranej pozycji, w kolejności `urls`.
+  function insertImagesAt(insertIdx: number, urls: string[]) {
+    if (urls.length === 0) return;
+    setRows((prev) => {
+      const next = prev.slice();
+      const newRows = urls.map((url) => ({
+        id: newId(),
+        data: { kind: "image", image_url: url, image_alt: "" } as ProductDescriptionSection,
+      }));
+      next.splice(insertIdx, 0, ...newRows);
+      return next;
+    });
   }
 
   function save() {
@@ -164,8 +143,8 @@ export default function DescriptionSectionsEditor({
       <div className="flex flex-col">
         {/* Insert button na samej górze */}
         <InsertSectionButton
-          uploading={uploadingIdx === 0}
-          onUploadImage={(file) => insertImageAt(0, file)}
+          onToast={onToast}
+          onInsertImages={(urls) => insertImagesAt(0, urls)}
           onAddCustomText={() => insertCustomTextAt(0)}
         />
 
@@ -218,8 +197,8 @@ export default function DescriptionSectionsEditor({
               />
             )}
             <InsertSectionButton
-              uploading={uploadingIdx === idx + 1}
-              onUploadImage={(file) => insertImageAt(idx + 1, file)}
+              onToast={onToast}
+              onInsertImages={(urls) => insertImagesAt(idx + 1, urls)}
               onAddCustomText={() => insertCustomTextAt(idx + 1)}
             />
           </div>
@@ -565,35 +544,41 @@ function CustomTextSectionRow({
 // Cienki przycisk wstawiający NOWĄ sekcję między istniejące. Po hover
 // pokazuje 2 opcje: Zdjęcie kontekstowe lub Własna sekcja tekstowa.
 function InsertSectionButton({
-  uploading,
-  onUploadImage,
+  onToast,
+  onInsertImages,
   onAddCustomText,
 }: {
-  uploading: boolean;
-  onUploadImage: (file: File) => void;
+  onToast: (t: Toast) => void;
+  onInsertImages: (urls: string[]) => void;
   onAddCustomText: () => void;
 }) {
+  const upload = useImageUpload({
+    onUploaded: onInsertImages,
+    onToast,
+    successHint: 'Kliknij „Zapisz sekcje” żeby utrwalić.',
+  });
   return (
     <div className="py-1 group">
-      <div className="flex items-center justify-center gap-3 py-1.5 opacity-40 group-hover:opacity-100 transition-opacity border-y border-dashed border-transparent group-hover:border-[var(--color-gold)]/50">
-        <label className="cursor-pointer inline-flex items-center gap-1.5 text-xs font-sans uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors">
+      <div
+        {...upload.dropProps}
+        className={`flex items-center justify-center gap-3 py-1.5 rounded transition-opacity border-y border-dashed ${
+          upload.isDragging
+            ? "opacity-100 border-[var(--color-gold)] bg-[var(--color-gold)]/10"
+            : "opacity-40 group-hover:opacity-100 border-transparent group-hover:border-[var(--color-gold)]/50"
+        }`}
+      >
+        <label
+          className={`cursor-pointer inline-flex items-center gap-1.5 text-xs font-sans uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors ${
+            upload.uploading ? "opacity-50 cursor-not-allowed" : ""
+          }`}
+        >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="3" y="3" width="18" height="18" rx="2" />
             <circle cx="8.5" cy="8.5" r="1.5" />
             <polyline points="21 15 16 10 5 21" />
           </svg>
-          {uploading ? "Wgrywam…" : "+ Zdjęcie"}
-          <input
-            type="file"
-            accept="image/*"
-            disabled={uploading}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              e.target.value = "";
-              if (f) onUploadImage(f);
-            }}
-            className="hidden"
-          />
+          {upload.isDragging ? "Upuść tutaj" : upload.progressText ?? "+ Zdjęcia"}
+          <input {...upload.inputProps} className="hidden" />
         </label>
         <span className="text-[var(--muted)] opacity-50">·</span>
         <button
