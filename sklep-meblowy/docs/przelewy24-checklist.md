@@ -31,11 +31,13 @@ Data audytu: 2026-07-02. Źródła: centrum pomocy Przelewy24 (linki na końcu).
 
 ## C. Do poprawy / decyzji przed weryfikacją
 
-1. **⚠️ Niespójność terminu zwrotu (ryzyko konsumenckie/P24):** plakietki UI mówią
-   **„Zwrot do 30 dni"** (`dictionaries` product/cart, `ProductMainSection`), a
-   regulamin i strona zwrotów mówią o ustawowych **14 dniach**. Trzeba ujednolicić:
-   albo oferować realnie 30 dni (i wpisać 30 w regulaminie/zwrotach), albo zmienić
-   plakietki na 14 dni. **Decyzja biznesowa — do ustalenia.**
+1. **✅ Termin zwrotu ujednolicony na 14 dni (2026-07-02).** Wcześniej plakietki UI
+   mówiły „Zwrot do 30 dni", a regulamin/strona zwrotów o ustawowych 14 dniach.
+   Decyzja biznesowa: pozostajemy przy ustawowych **14 dniach** (asortyment
+   gabarytowy i w dużej części na zamówienie — art. 38 wyłącza odstąpienie dla
+   produktów robionych na zamówienie; głównym atutem jest darmowa wysyłka).
+   Plakietki `dictionaries` (PL `returns`/`trustReturns`, DE odpowiedniki)
+   zmienione na 14 dni — spójne z regulaminem §6 i stroną zwrotów.
 2. **NIP/REGON/rachunek:** potwierdzić, że dane w `company.ts` są ostateczne i
    zgodne z kontem P24; uzupełnić `bankAccount` (jeśli gdziekolwiek pokazywany).
 3. **Weryfikacja prawnicza** treści (regulamin/polityka mają komentarze
