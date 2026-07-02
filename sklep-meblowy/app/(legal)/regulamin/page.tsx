@@ -84,7 +84,7 @@ export default async function RegulaminPage() {
         s4_1:
           "Alle im Shop angegebenen Produktpreise sind Bruttopreise (inklusive Mehrwertsteuer) und werden in polnischen Złoty (PLN) angegeben.",
         s4_2:
-          "Der Produktpreis enthält keine Lieferkosten. Aufgrund des sperrigen Charakters der Möbel werden die Lieferkosten individuell nach Aufgabe der Bestellung festgelegt (siehe § 5) und bedürfen der Zustimmung des Kunden.",
+          "Der Produktpreis ist der Endpreis — der Versand innerhalb der Republik Polen ist kostenlos, der Verkäufer berechnet keine Lieferkosten.",
         s4_3Intro:
           "Der Kunde kann eine der im Shop verfügbaren Zahlungsmethoden wählen:",
         s4_3a: "Online-Zahlung mit Zahlungskarte,",
@@ -98,10 +98,10 @@ export default async function RegulaminPage() {
           "Die Bearbeitungszeit der Bestellung wird ab dem Tag der Gutschrift der Zahlung gerechnet und ist jeweils auf der Produktseite angegeben.",
         s5_2:
           "Die Lieferung erfolgt auf dem Gebiet der Republik Polen über ein Kurierunternehmen oder einen Möbeltransport (bei sperrigen Produkten).",
-        s5_3Before: "Die Lieferkosten werden ",
-        s5_3Strong: "individuell",
+        s5_3Before: "Der Versand innerhalb der Republik Polen ist ",
+        s5_3Strong: "kostenlos",
         s5_3Mid:
-          " nach Aufgabe der Bestellung festgelegt – sie hängen vom Gewicht, den Abmessungen des Produkts und dem Lieferort ab. Der Verkäufer kontaktiert den Kunden vor dem Versand telefonisch oder per E-Mail mit einem Kostenvoranschlag für die Lieferung. Der Kostenvoranschlag bedarf der Zustimmung des Kunden; verweigert er diese, kann er die Bestellung kostenfrei stornieren. Einzelheiten finden Sie im Bereich ",
+          " — der Verkäufer berechnet keine Lieferkosten. Nach Aufgabe der Bestellung setzt sich das Transportunternehmen mit dem Kunden in Verbindung, um einen passenden Liefertermin zu vereinbaren. Einzelheiten finden Sie im Bereich ",
         s5_3Link: "Versand und Zahlung",
         s5_3After: ".",
         s5_4:
@@ -211,7 +211,7 @@ export default async function RegulaminPage() {
         s4_1:
           "Wszystkie ceny Produktów podane w Sklepie są cenami brutto (zawierają podatek VAT) i są wyrażone w złotych polskich (PLN).",
         s4_2:
-          "Cena Produktu nie zawiera kosztów dostawy. Z uwagi na wielkogabarytowy charakter mebli koszt dostawy ustalany jest indywidualnie po złożeniu zamówienia (zob. § 5) i wymaga akceptacji Klienta.",
+          "Cena Produktu jest ceną końcową — wysyłka na terenie Rzeczypospolitej Polskiej jest bezpłatna, Sprzedawca nie dolicza kosztów dostawy.",
         s4_3Intro: "Klient może wybrać jedną z dostępnych w Sklepie form płatności:",
         s4_3a: "płatność online kartą płatniczą,",
         s4_3b: "BLIK,",
@@ -224,10 +224,10 @@ export default async function RegulaminPage() {
           "Czas realizacji zamówienia liczy się od dnia zaksięgowania płatności i jest każdorazowo wskazany w karcie Produktu.",
         s5_2:
           "Dostawa odbywa się na terenie Rzeczypospolitej Polskiej za pośrednictwem firmy kurierskiej lub transportu meblowego (dla Produktów wielkogabarytowych).",
-        s5_3Before: "Koszt dostawy ustalany jest ",
-        s5_3Strong: "indywidualnie",
+        s5_3Before: "Wysyłka na terenie Rzeczypospolitej Polskiej jest ",
+        s5_3Strong: "bezpłatna",
         s5_3Mid:
-          " po złożeniu zamówienia – zależy od wagi, gabarytów Produktu oraz miejsca dostawy. Sprzedawca skontaktuje się z Klientem telefonicznie lub mailowo z wyceną dostawy przed wysyłką. Wycena wymaga akceptacji Klienta; w razie jej braku Klient może bezpłatnie zrezygnować z zamówienia. Szczegóły dostępne są w zakładce ",
+          " — Sprzedawca nie dolicza kosztów dostawy. Po złożeniu zamówienia firma transportowa skontaktuje się z Klientem w celu ustalenia dogodnego terminu dostawy. Szczegóły dostępne są w zakładce ",
         s5_3Link: "Dostawa i płatności",
         s5_3After: ".",
         s5_4:

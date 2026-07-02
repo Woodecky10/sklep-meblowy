@@ -40,7 +40,7 @@ export default async function ZwrotyPage() {
         howStep2:
           "Senden Sie das Produkt in unverändertem Zustand an die Adresse des Verkäufers zurück, am besten in der Originalverpackung.",
         howStep3:
-          "Wir erstatten Ihnen alle erhaltenen Zahlungen (einschließlich der Kosten der Standardlieferung) unverzüglich, spätestens innerhalb von 14 Tagen nach Erhalt der Erklärung. Wir können die Erstattung zurückhalten, bis wir das Produkt oder einen Nachweis seiner Rücksendung erhalten haben.",
+          "Wir erstatten Ihnen den vollständigen für das Produkt gezahlten Betrag unverzüglich, spätestens innerhalb von 14 Tagen nach Erhalt der Erklärung. Der Versand an Sie war kostenlos, daher gibt es keine Lieferkosten zu erstatten. Wir können die Erstattung zurückhalten, bis wir das Produkt oder einen Nachweis seiner Rücksendung erhalten haben.",
         h3Important: "Wichtige Informationen",
         important1: "Die Kosten der Rücksendung des Produkts trägt der Kunde.",
         important2:
@@ -107,7 +107,7 @@ Unterschrift (nur bei Übermittlung des Formulars in Papierform): ..............
         howStep2:
           "Odeślij produkt na adres Sprzedawcy w stanie niezmienionym, najlepiej w oryginalnym opakowaniu.",
         howStep3:
-          "Zwrócimy Ci wszystkie otrzymane płatności (w tym koszt dostawy podstawowej) niezwłocznie, nie później niż w ciągu 14 dni od otrzymania oświadczenia. Możemy wstrzymać zwrot do czasu otrzymania produktu lub dowodu jego odesłania.",
+          "Zwrócimy Ci pełną kwotę zapłaconą za produkt niezwłocznie, nie później niż w ciągu 14 dni od otrzymania oświadczenia. Wysyłka do Ciebie była darmowa, więc nie ma kosztu dostawy do zwrotu. Możemy wstrzymać zwrot do czasu otrzymania produktu lub dowodu jego odesłania.",
         h3Important: "Ważne informacje",
         important1: "Koszt odesłania produktu pokrywa Klient.",
         important2:

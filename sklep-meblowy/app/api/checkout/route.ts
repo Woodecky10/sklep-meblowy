@@ -260,10 +260,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Koszt dostawy NIE jest doliczany do Stripe — meble różnią się wagą
-    // i gabarytami. Po zamówieniu admin kontaktuje klienta i ustala koszt
-    // dostawy indywidualnie (płatność osobno: przelew albo doliczone do zamówienia
-    // jako delivery_price).
+    // Wysyłka darmowa na terenie całej Polski — do Stripe idzie tylko cena
+    // produktów (minus rabat), bez kosztu dostawy. Pole delivery_cost w panelu
+    // admina zostaje do rozliczeń wewnętrznych, ale klientowi nic nie doliczamy.
     const finalTotal = toCharge(Math.max(0, total - promoDiscount));
 
     // Użytkownik zalogowany?
