@@ -874,7 +874,7 @@ function FabricPicker({
   const selectedSet = new Set(selectedNames);
   const searching = q.length > 0;
   // Przy szukaniu / gdy jest tylko jedna grupa — rozwijamy automatycznie.
-  const autoExpandAll = searching || groups.length === 1;
+  const autoExpandAll = searching || onlySelected || groups.length === 1;
 
   function toggleGroup(group: (typeof groups)[number]) {
     const names = group.fabrics.map((f) => f.name);

@@ -172,6 +172,7 @@ function FabricForm({
     (initial?.colors ?? []).map((c) => ({ code: c, image: initial?.color_images?.[c] ?? "" }))
   );
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
+  const catListId = `fabric-categories-${initial?.id ?? "new"}`;
 
   function addRow() {
     setRows((r) => [...r, { code: "", image: "" }]);
@@ -250,13 +251,13 @@ function FabricForm({
         <Field label="Kategoria / typ" hint="Do grupowania przy wyborze (np. welur, sztruks). Puste = bez kategorii." className="md:col-span-2">
           <input
             name="category"
-            list="fabric-categories"
+            list={catListId}
             defaultValue={initial?.category ?? ""}
             maxLength={100}
             placeholder="np. welur"
             className={inputCls}
           />
-          <datalist id="fabric-categories">
+          <datalist id={catListId}>
             {categories.map((c) => (
               <option key={c} value={c} />
             ))}
