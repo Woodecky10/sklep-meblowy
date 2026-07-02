@@ -34,6 +34,12 @@ export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabr
     }
   }
 
+  const categories = [
+    ...new Set(
+      fabrics.map((f) => f.category?.trim()).filter((c): c is string => !!c)
+    ),
+  ].sort((a, b) => a.localeCompare(b, "pl"));
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex items-start justify-between gap-4">
@@ -67,6 +73,7 @@ export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabr
         <Card>
           <FabricForm
             mode="create"
+            categories={categories}
             onCancel={() => setCreating(false)}
             onSubmit={async (fd) => {
               const res = await createFabric(fd);
@@ -96,6 +103,7 @@ export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabr
                   <p className="text-xs text-[var(--muted)] mt-0.5">
                     DE: {f.name_de ?? "—"} · kolejność: {f.sort_order} ·{" "}
                     {f.colors?.length ? `${f.colors.length} kolor${f.colors.length < 5 ? "y" : "ów"}` : "bez kolorów"}
+                    {f.category && ` · ${f.category}`}
                     {f.price > 0 && ` · +${f.price.toFixed(2)} zł`}
                   </p>
                 </div>
@@ -126,6 +134,7 @@ export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabr
                   <FabricForm
                     mode="update"
                     initial={f}
+                    categories={categories}
                     onCancel={() => setEditingId(null)}
                     onSubmit={async (fd) => {
                       const res = await updateFabric(fd);
@@ -148,11 +157,13 @@ export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabr
 function FabricForm({
   mode,
   initial,
+  categories,
   onSubmit,
   onCancel,
 }: {
   mode: "create" | "update";
   initial?: Fabric;
+  categories: string[];
   onSubmit: (fd: FormData) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -235,6 +246,21 @@ function FabricForm({
             defaultValue={initial?.price ?? 0}
             className={inputCls}
           />
+        </Field>
+        <Field label="Kategoria / typ" hint="Do grupowania przy wyborze (np. welur, sztruks). Puste = bez kategorii." className="md:col-span-2">
+          <input
+            name="category"
+            list="fabric-categories"
+            defaultValue={initial?.category ?? ""}
+            maxLength={100}
+            placeholder="np. welur"
+            className={inputCls}
+          />
+          <datalist id="fabric-categories">
+            {categories.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
         </Field>
       </div>
 

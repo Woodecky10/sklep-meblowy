@@ -68,11 +68,12 @@ export async function createFabric(formData: FormData): Promise<ActionResult> {
   const sortOrder = parseSort(formData.get("sort_order"));
   const { colors, color_images } = parseColorRows(formData.get("colors_json"));
   const price = parsePrice(formData.get("price"));
+  const category = emptyToNull(sanitize(formData.get("category"), 100));
 
   const supabase = await createAdminClient();
   const { error, data } = await supabase
     .from("fabrics")
-    .insert({ name, name_de: nameDe, sort_order: sortOrder, colors, color_images, price } as never)
+    .insert({ name, name_de: nameDe, sort_order: sortOrder, colors, color_images, price, category } as never)
     .select()
     .single();
 
@@ -96,11 +97,12 @@ export async function updateFabric(formData: FormData): Promise<ActionResult> {
   const sortOrder = parseSort(formData.get("sort_order"));
   const { colors, color_images } = parseColorRows(formData.get("colors_json"));
   const price = parsePrice(formData.get("price"));
+  const category = emptyToNull(sanitize(formData.get("category"), 100));
 
   const supabase = await createAdminClient();
   const { error } = await supabase
     .from("fabrics")
-    .update({ name, name_de: nameDe, sort_order: sortOrder, colors, color_images, price } as never)
+    .update({ name, name_de: nameDe, sort_order: sortOrder, colors, color_images, price, category } as never)
     .eq("id", id);
 
   if (error) {
