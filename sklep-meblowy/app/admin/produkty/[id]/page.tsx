@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/app/_lib/admin";
-import { getProduct, getSizeGroupKeys } from "@/app/_lib/products";
+import { getProduct, getSizeGroupMembersAdmin } from "@/app/_lib/products";
 import { getAllCategories } from "@/app/_lib/categories";
 import { getAllFabrics } from "@/app/_lib/fabrics";
 import { createAdminClient } from "@/app/_lib/supabase/server";
@@ -17,21 +17,25 @@ export default async function AdminProductEditPage({
 }) {
   await requireAdmin();
   const { id } = await params;
-  const [product, categories, de, sizeGroupKeys, fabrics] = await Promise.all([
+  const [product, categories, de, fabrics] = await Promise.all([
     getProduct(id),
     getAllCategories(),
     getProductDe(id),
-    getSizeGroupKeys(),
     getAllFabrics(),
   ]);
   if (!product) notFound();
+
+  // Panel zawsze pokazuje bieżący produkt; gdy jest w grupie — całe rodzeństwo.
+  const sizeGroupMembers = product.size_group
+    ? await getSizeGroupMembersAdmin(product.size_group)
+    : [{ id: product.id, name: product.name, size_label: product.size_label }];
 
   return (
     <ProductEditor
       product={product}
       categories={categories}
       de={de}
-      sizeGroupKeys={sizeGroupKeys}
+      sizeGroupMembers={sizeGroupMembers}
       fabrics={fabrics}
     />
   );

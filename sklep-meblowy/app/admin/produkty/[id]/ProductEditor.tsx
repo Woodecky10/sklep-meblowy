@@ -13,18 +13,20 @@ import VariantsEditor from "./VariantsEditor";
 import DescriptionSectionsEditor from "./DescriptionSectionsEditor";
 import DescriptionFieldEditor from "./DescriptionFieldEditor";
 import TranslationEditor, { type ProductDeFields } from "./TranslationEditor";
+import SizeGroupEditor from "./SizeGroupEditor";
+import type { SizeGroupMember } from "@/app/_lib/products";
 
 export default function ProductEditor({
   product,
   categories,
   de,
-  sizeGroupKeys,
+  sizeGroupMembers,
   fabrics,
 }: {
   product: Product;
   categories: CategoryDef[];
   de: ProductDeFields;
-  sizeGroupKeys: string[];
+  sizeGroupMembers: SizeGroupMember[];
   fabrics: Fabric[];
 }) {
   const [images, setImages] = useState<string[]>(product.images ?? []);
@@ -209,35 +211,11 @@ export default function ProductEditor({
             <input name="material" defaultValue={product.material ?? ""} maxLength={100} className={inputClass} />
           </Field>
 
-          <Field
-            label="Grupa rozmiarów (klucz)"
-            hint="Wpisz ten sam klucz na wszystkich rozmiarach tego mebla, np. loze-vegas. Zostaw puste, jeśli produkt nie ma innych rozmiarów."
-          >
-            <input
-              name="size_group"
-              list="size-group-keys"
-              defaultValue={product.size_group ?? ""}
-              maxLength={100}
-              className={inputClass}
-            />
-            <datalist id="size-group-keys">
-              {sizeGroupKeys.map((k) => (
-                <option key={k} value={k} />
-              ))}
-            </datalist>
-          </Field>
-
-          <Field
-            label="Etykieta rozmiaru"
-            hint="np. 140×200 cm — tekst na przycisku rozmiaru widoczny dla klienta."
-          >
-            <input
-              name="size_label"
-              defaultValue={product.size_label ?? ""}
-              maxLength={100}
-              className={inputClass}
-            />
-          </Field>
+          <SizeGroupEditor
+            currentId={product.id}
+            members={sizeGroupMembers}
+            onToast={showToast}
+          />
 
           <Field label="Wymiary (cm)" className="md:col-span-2" hint="Szerokość × głębokość × wysokość. Zostaw puste żeby wyczyścić.">
             <div className="grid grid-cols-3 gap-2">

@@ -269,21 +269,6 @@ export async function getSizeSiblings(
   return ((data ?? []) as Product[]).map((p) => localizeProduct(p, locale));
 }
 
-// Distinct klucze size_group (do podpowiedzi/datalist w adminie). Admin client —
-// pokazujemy też klucze produktów nieaktywnych, żeby admin trafił w istniejący klucz.
-export async function getSizeGroupKeys(): Promise<string[]> {
-  const supabase = await createAdminClient();
-  const { data } = await supabase
-    .from("products")
-    .select("size_group")
-    .not("size_group", "is", null);
-  const keys = new Set<string>();
-  for (const r of (data ?? []) as { size_group: string | null }[]) {
-    if (r.size_group) keys.add(r.size_group);
-  }
-  return Array.from(keys).sort((a, b) => a.localeCompare(b));
-}
-
 // Członek grupy rozmiarów w widoku admina.
 export type SizeGroupMember = { id: string; name: string; size_label: string | null };
 
