@@ -22,6 +22,7 @@ import {
   FABRIC_OPTION_NAME,
 } from "@/app/_lib/variants";
 import { findInvalidVariantSale } from "@/app/_lib/pricing";
+import { groupFabricsByCategory, groupSelectionState } from "@/app/_lib/fabric-groups";
 
 // ============================================================
 // Komponent
@@ -834,7 +835,6 @@ function FabricPicker({
 }) {
   const toLite = (f: Fabric) => ({ name: f.name, colors: f.colors ?? [], price: f.price ?? 0 });
 
-  // Kolekcje zaznaczone = te, których jakakolwiek bieżąca wartość do nich należy.
   const [selectedNames, setSelectedNames] = useState<string[]>(() =>
     fabrics
       .filter((f) => initiallySelectedValues.some((v) => fabricValueBelongsTo(v, toLite(f))))
@@ -846,6 +846,9 @@ function FabricPicker({
   );
   const [keptOrphans, setKeptOrphans] = useState<string[]>(orphanValues);
   const [search, setSearch] = useState("");
+  const [onlySelected, setOnlySelected] = useState(false);
+  // Rozwinięte sekcje (domyślnie wszystkie zwinięte; przy szukaniu i tak rozwinięte).
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 
   function toggle(name: string) {
     setSelectedNames((prev) =>
@@ -855,10 +858,43 @@ function FabricPicker({
   function toggleOrphan(v: string) {
     setKeptOrphans((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
   }
+  function toggleExpand(cat: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  }
 
-  const filtered = search.trim()
-    ? fabrics.filter((f) => f.name.toLowerCase().includes(search.trim().toLowerCase()))
-    : fabrics;
+  const q = search.trim().toLowerCase();
+  const base = onlySelected ? fabrics.filter((f) => selectedNames.includes(f.name)) : fabrics;
+  const filtered = q ? base.filter((f) => f.name.toLowerCase().includes(q)) : base;
+  const groups = groupFabricsByCategory(filtered);
+  const selectedSet = new Set(selectedNames);
+  const searching = q.length > 0;
+  // Przy szukaniu / gdy jest tylko jedna grupa — rozwijamy automatycznie.
+  const autoExpandAll = searching || onlySelected || groups.length === 1;
+
+  function toggleGroup(group: (typeof groups)[number]) {
+    const names = group.fabrics.map((f) => f.name);
+    const state = groupSelectionState(group, selectedSet);
+    setSelectedNames((prev) => {
+      if (state === "all") {
+        const rm = new Set(names);
+        return prev.filter((n) => !rm.has(n));
+      }
+      return [...new Set([...prev, ...names])];
+    });
+  }
+  function selectAllFiltered() {
+    const names = filtered.map((f) => f.name);
+    setSelectedNames((prev) => [...new Set([...prev, ...names])]);
+  }
+  function deselectAllFiltered() {
+    const rm = new Set(filtered.map((f) => f.name));
+    setSelectedNames((prev) => prev.filter((n) => !rm.has(n)));
+  }
 
   const selectedFabrics = fabrics.filter((f) => selectedNames.includes(f.name));
   const { values: previewValues } = expandFabrics(selectedFabrics.map(toLite));
@@ -867,13 +903,14 @@ function FabricPicker({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
-      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl max-w-lg w-full max-h-[80vh] flex flex-col p-6 gap-4">
+      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col p-6 gap-3">
         <div className="flex items-center justify-between gap-3">
           <h3 className="font-display text-lg font-semibold text-[var(--fg)]">
-            Wybierz tkaniny ({selectedNames.length} → {totalValues} wart.)
+            Wybierz tkaniny (wybrano: {selectedNames.length} → {totalValues} wart.)
           </h3>
           <input
             type="text"
+            autoFocus
             placeholder="Szukaj…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -881,53 +918,117 @@ function FabricPicker({
           />
         </div>
 
+        <div className="flex items-center gap-3 flex-wrap text-xs">
+          <label className="flex items-center gap-1.5 cursor-pointer text-[var(--fg)]">
+            <input
+              type="checkbox"
+              checked={onlySelected}
+              onChange={() => setOnlySelected((v) => !v)}
+              className="h-4 w-4 accent-[var(--color-gold)]"
+            />
+            tylko zaznaczone
+          </label>
+          <button
+            type="button"
+            onClick={selectAllFiltered}
+            className="px-2 py-1 border border-[var(--border)] rounded-full hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
+          >
+            Zaznacz pasujące
+          </button>
+          <button
+            type="button"
+            onClick={deselectAllFiltered}
+            className="px-2 py-1 border border-[var(--border)] rounded-full hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
+          >
+            Odznacz pasujące
+          </button>
+        </div>
+
         {fabrics.length === 0 && orphanValues.length === 0 ? (
           <p className="text-sm text-[var(--muted)] italic py-6 text-center">
             Brak tkanin w katalogu. Dodaj je w &bdquo;Tkaniny&rdquo; (menu admina).
           </p>
         ) : (
-          <ul className="flex-1 overflow-y-auto border border-[var(--border)] rounded-xl divide-y divide-[var(--border)]">
-            {orphanValues.map((v) => (
-              <li key={`orphan-${v}`}>
-                <label className="flex items-center gap-3 p-2 cursor-pointer bg-amber-50 dark:bg-amber-950/30">
-                  <input
-                    type="checkbox"
-                    checked={keptOrphans.includes(v)}
-                    onChange={() => toggleOrphan(v)}
-                    className="h-4 w-4 accent-[var(--color-gold)]"
-                  />
-                  <span className="text-sm text-[var(--fg)]">{v}</span>
-                  <span className="text-[10px] font-sans uppercase tracking-widest text-amber-600 dark:text-amber-400 ml-auto">
-                    spoza katalogu
-                  </span>
-                </label>
-              </li>
-            ))}
-            {filtered.length === 0 && (
-              <li className="p-4 text-xs text-[var(--muted)] italic">Brak dopasowań</li>
+          <div className="flex-1 overflow-y-auto border border-[var(--border)] rounded-xl">
+            {orphanValues.length > 0 && (
+              <ul className="divide-y divide-[var(--border)] border-b border-[var(--border)]">
+                {orphanValues.map((v) => (
+                  <li key={`orphan-${v}`}>
+                    <label className="flex items-center gap-3 p-2 cursor-pointer bg-amber-50 dark:bg-amber-950/30">
+                      <input
+                        type="checkbox"
+                        checked={keptOrphans.includes(v)}
+                        onChange={() => toggleOrphan(v)}
+                        className="h-4 w-4 accent-[var(--color-gold)]"
+                      />
+                      <span className="text-sm text-[var(--fg)]">{v}</span>
+                      <span className="text-[10px] font-sans uppercase tracking-widest text-amber-600 dark:text-amber-400 ml-auto">
+                        spoza katalogu
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
             )}
-            {filtered.map((f) => {
-              const active = selectedNames.includes(f.name);
-              const colorCount = (f.colors ?? []).length;
+            {groups.length === 0 && (
+              <p className="p-4 text-xs text-[var(--muted)] italic">Brak dopasowań</p>
+            )}
+            {groups.map((group) => {
+              const state = groupSelectionState(group, selectedSet);
+              const open = autoExpandAll || expanded.has(group.category);
               return (
-                <li key={f.id}>
-                  <label className={`flex items-center gap-3 p-2 cursor-pointer transition-colors ${active ? "bg-[var(--color-gold)]/10" : "hover:bg-[var(--bg)]"}`}>
+                <div key={group.category}>
+                  <div className="flex items-center gap-2 p-2 bg-[var(--bg)] border-b border-[var(--border)] sticky top-0">
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(group.category)}
+                      className="w-5 text-[var(--muted)] hover:text-[var(--fg)]"
+                      aria-label={open ? "Zwiń" : "Rozwiń"}
+                    >
+                      {open ? "▾" : "▸"}
+                    </button>
                     <input
                       type="checkbox"
-                      checked={active}
-                      onChange={() => toggle(f.name)}
+                      ref={(el) => {
+                        if (el) el.indeterminate = state === "some";
+                      }}
+                      checked={state === "all"}
+                      onChange={() => toggleGroup(group)}
                       className="h-4 w-4 accent-[var(--color-gold)]"
+                      title="Zaznacz/odznacz całą grupę"
                     />
-                    <span className="text-sm text-[var(--fg)]">{f.name}</span>
-                    <span className="text-[10px] text-[var(--muted)] ml-auto text-right">
-                      {colorCount > 0 ? `${colorCount} kol.` : "bez kolorów"}
-                      {f.price > 0 && ` · +${f.price.toFixed(2)} zł`}
-                    </span>
-                  </label>
-                </li>
+                    <span className="text-sm font-semibold text-[var(--fg)]">{group.category}</span>
+                    <span className="text-[10px] text-[var(--muted)] ml-auto">{group.fabrics.length}</span>
+                  </div>
+                  {open && (
+                    <ul className="divide-y divide-[var(--border)]">
+                      {group.fabrics.map((f) => {
+                        const active = selectedNames.includes(f.name);
+                        const colorCount = (f.colors ?? []).length;
+                        return (
+                          <li key={f.id}>
+                            <label className={`flex items-center gap-3 p-2 pl-7 cursor-pointer transition-colors ${active ? "bg-[var(--color-gold)]/10" : "hover:bg-[var(--bg)]"}`}>
+                              <input
+                                type="checkbox"
+                                checked={active}
+                                onChange={() => toggle(f.name)}
+                                className="h-4 w-4 accent-[var(--color-gold)]"
+                              />
+                              <span className="text-sm text-[var(--fg)]">{f.name}</span>
+                              <span className="text-[10px] text-[var(--muted)] ml-auto text-right">
+                                {colorCount > 0 ? `${colorCount} kol.` : "bez kolorów"}
+                                {f.price > 0 && ` · +${f.price.toFixed(2)} zł`}
+                              </span>
+                            </label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
               );
             })}
-          </ul>
+          </div>
         )}
 
         <div className="flex gap-2 justify-end pt-2 border-t border-[var(--border)]">

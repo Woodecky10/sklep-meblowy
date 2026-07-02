@@ -160,6 +160,8 @@ export type Fabric = {
   // Dopłata do ceny bazowej gdy wybrana ta tkanina (zł, >= 0).
   price: number;
   sort_order: number;
+  // Kategoria/typ do grupowania w pickerze wariantów (np. "welur"). Null = bez kategorii.
+  category: string | null;
   created_at: string;
 };
 
