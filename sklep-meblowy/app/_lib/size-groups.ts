@@ -26,3 +26,41 @@ export function buildSizeOptions(
   );
   return options.length >= 2 ? options : [];
 }
+
+// ── Łączenie grup rozmiarów (panel admina) ─────────────────────────────
+// Klucz size_group jest wewnętrzny (niewidoczny dla klienta) — generowany
+// automatycznie, więc czytelny slug tylko ułatwia debug.
+
+// Slug bazowy z nazwy produktu: lowercase, bez diakrytyków, nie-alfanumeryczne
+// → "-", bez wielokrotnych/skrajnych myślników. Pusty wynik → "grupa".
+export function groupKeyBase(name: string): string {
+  const slug = name
+    .normalize("NFD")
+    .replace(/[\̀-ͯ]/g, "") // usuń łączące znaki diakrytyczne
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40)
+    .replace(/-+$/g, "");
+  return slug || "grupa";
+}
+
+// Składa klucz z bazy nazwy + sufiksu. Sufiks wstrzykiwany, żeby funkcja była
+// deterministyczna (losowanie robi warstwa akcji).
+export function buildGroupKey(name: string, suffix: string): string {
+  return `${groupKeyBase(name)}-${suffix}`;
+}
+
+// Wybiera wspólny klucz size_group przy łączeniu dwóch produktów:
+//  - bieżący ma grupę → jego klucz wygrywa (członkowie targetu dołączą do niego),
+//  - tylko target ma grupę → bieżący ją adoptuje,
+//  - żaden nie ma → nowy klucz (newKey).
+export function pickGroupKey(
+  currentKey: string | null,
+  targetKey: string | null,
+  newKey: string
+): string {
+  if (currentKey) return currentKey;
+  if (targetKey) return targetKey;
+  return newKey;
+}

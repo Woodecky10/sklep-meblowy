@@ -10,6 +10,7 @@ import { recordPriceHistory } from "@/app/_lib/price-history";
 import { findInvalidVariantSale } from "@/app/_lib/pricing";
 import { formatVariantLabel, applyValuePricing } from "@/app/_lib/variants";
 import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-html";
+import { buildGroupKey, pickGroupKey } from "@/app/_lib/size-groups";
 import type {
   ActionResult,
   ProductDescriptionSection,
@@ -183,8 +184,6 @@ export async function updateProductBasics(
     construction: emptyToNull(sanitize(formData.get("construction"), 1000)),
     delivery_time: emptyToNull(sanitize(formData.get("delivery_time"), 100)),
     warranty: emptyToNull(sanitize(formData.get("warranty"), 100)),
-    size_group: emptyToNull(sanitize(formData.get("size_group"), 100)),
-    size_label: emptyToNull(sanitize(formData.get("size_label"), 100)),
     sale_price: salePriceToSave,
   };
 
@@ -663,4 +662,177 @@ export async function createProduct(
   revalidatePath("/admin/produkty");
   revalidatePath("/sklep");
   return { ok: true, productId: (data as { id: string }).id };
+}
+
+// ============================================================
+// Grupy rozmiarów — łączenie osobnych produktów tego samego mebla
+// ============================================================
+
+// Rewaliduje strony wszystkich podanych produktów + listing sklepu.
+function revalidateProducts(ids: string[]): void {
+  for (const id of ids) {
+    revalidatePath(`/admin/produkty/${id}`);
+    revalidatePath(`/produkt/${id}`);
+  }
+  revalidatePath("/sklep");
+}
+
+// id-ki wszystkich produktów w danej grupie (admin client — także nieaktywne).
+async function sizeGroupMemberIds(
+  supabase: Awaited<ReturnType<typeof createAdminClient>>,
+  key: string
+): Promise<string[]> {
+  const { data } = await supabase
+    .from("products")
+    .select("id")
+    .eq("size_group", key);
+  return ((data ?? []) as { id: string }[]).map((r) => r.id);
+}
+
+// Wyszukiwarka produktów do dołączenia (po nazwie). Wyklucza bieżący produkt.
+// Zwraca size_group/size_label, by UI wiedziało o ew. scaleniu grup.
+export async function searchProductsForSizeGroup(
+  currentId: string,
+  query: string
+): Promise<ActionResult> {
+  await requireAdmin();
+  const q = sanitize(query, 100);
+  if (q.length < 2) return { ok: true, data: { results: [] } };
+  const supabase = await createAdminClient();
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, name, size_group, size_label")
+    .ilike("name", `%${q}%`)
+    .neq("id", sanitize(currentId))
+    .limit(10);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, data: { results: data ?? [] } };
+}
+
+// Łączy target z grupą bieżącego produktu (pełne scalenie obu grup).
+export async function linkSizeSibling(
+  currentId: string,
+  targetId: string
+): Promise<ActionResult> {
+  await requireAdmin();
+  const cid = sanitize(currentId);
+  const tid = sanitize(targetId);
+  if (!cid || !tid) return { ok: false, error: "Brak id produktu" };
+  if (cid === tid) return { ok: false, error: "Nie można połączyć produktu ze sobą" };
+
+  const supabase = await createAdminClient();
+  const { data: rows, error: readErr } = await supabase
+    .from("products")
+    .select("id, name, size_group")
+    .in("id", [cid, tid]);
+  if (readErr) return { ok: false, error: readErr.message };
+  type Row = { id: string; name: string; size_group: string | null };
+  const current = ((rows ?? []) as Row[]).find((r) => r.id === cid);
+  const target = ((rows ?? []) as Row[]).find((r) => r.id === tid);
+  if (!current || !target) return { ok: false, error: "Produkt nie istnieje" };
+
+  // Nowy klucz (gdy obie grupy puste): slug z nazwy bieżącego + krótki sufiks;
+  // regeneracja przy mało prawdopodobnej kolizji.
+  let newKey = buildGroupKey(current.name, randomUUID().slice(0, 4));
+  for (let i = 0; i < 5; i++) {
+    const { data: clash } = await supabase
+      .from("products")
+      .select("id")
+      .eq("size_group", newKey)
+      .limit(1);
+    if (!clash?.length) break;
+    newKey = buildGroupKey(current.name, randomUUID().slice(0, 4));
+  }
+
+  const key = pickGroupKey(current.size_group, target.size_group, newKey);
+
+  // Do rewalidacji i przepisania: bieżący, target + wszyscy członkowie OBU grup.
+  // Zbieramy członków obu grup bezwarunkowo (także grupy wygrywającej klucz) —
+  // ich lista rodzeństwa się zmienia, więc ich strony muszą być rewalidowane.
+  // Zapis klucza na członkach, którzy już go mają, to nieszkodliwy no-op.
+  const affected = new Set<string>([cid, tid]);
+  for (const gk of [current.size_group, target.size_group]) {
+    if (gk) {
+      for (const id of await sizeGroupMemberIds(supabase, gk)) affected.add(id);
+    }
+  }
+
+  const ids = Array.from(affected);
+  const { error: updErr } = await supabase
+    .from("products")
+    .update({ size_group: key } as never)
+    .in("id", ids);
+  if (updErr) return { ok: false, error: updErr.message };
+
+  revalidateProducts(ids);
+  return { ok: true, message: "Połączono rozmiary" };
+}
+
+// Odłącza produkt od grupy; jeśli zostaje 1 członek — czyści też jego klucz.
+export async function unlinkSizeSibling(productId: string): Promise<ActionResult> {
+  await requireAdmin();
+  const pid = sanitize(productId);
+  if (!pid) return { ok: false, error: "Brak id produktu" };
+
+  const supabase = await createAdminClient();
+  const { data: row, error: readErr } = await supabase
+    .from("products")
+    .select("size_group")
+    .eq("id", pid)
+    .maybeSingle();
+  if (readErr) return { ok: false, error: readErr.message };
+  const key = (row as { size_group: string | null } | null)?.size_group ?? null;
+
+  const affected = new Set<string>([pid]);
+  const { error: clearErr } = await supabase
+    .from("products")
+    .update({ size_group: null } as never)
+    .eq("id", pid);
+  if (clearErr) return { ok: false, error: clearErr.message };
+
+  if (key) {
+    const remaining = await sizeGroupMemberIds(supabase, key);
+    if (remaining.length === 1) {
+      // Grupa jednoelementowa nie ma sensu — czyścimy ostatniego członka.
+      const { error: cleanupErr } = await supabase
+        .from("products")
+        .update({ size_group: null } as never)
+        .eq("id", remaining[0]);
+      if (cleanupErr) return { ok: false, error: cleanupErr.message };
+    }
+    for (const id of remaining) affected.add(id);
+  }
+
+  revalidateProducts(Array.from(affected));
+  return { ok: true, message: "Odłączono rozmiar" };
+}
+
+// Zapis etykiety rozmiaru pojedynczego produktu.
+export async function updateSizeLabel(
+  productId: string,
+  label: string
+): Promise<ActionResult> {
+  await requireAdmin();
+  const pid = sanitize(productId);
+  if (!pid) return { ok: false, error: "Brak id produktu" };
+  const value = emptyToNull(sanitize(label, 100));
+  const supabase = await createAdminClient();
+  // Etykieta produktu jest renderowana w selektorze rozmiaru na stronie KAŻDEGO
+  // rodzeństwa (buildSizeOptions), nie tylko edytowanego produktu — więc
+  // rewalidujemy całą grupę, spójnie z link/unlinkSizeSibling.
+  const { data: row, error: readErr } = await supabase
+    .from("products")
+    .select("size_group")
+    .eq("id", pid)
+    .maybeSingle();
+  if (readErr) return { ok: false, error: readErr.message };
+  const { error } = await supabase
+    .from("products")
+    .update({ size_label: value } as never)
+    .eq("id", pid);
+  if (error) return { ok: false, error: error.message };
+  const key = (row as { size_group: string | null } | null)?.size_group ?? null;
+  const ids = key ? await sizeGroupMemberIds(supabase, key) : [pid];
+  revalidateProducts(ids.length ? ids : [pid]);
+  return { ok: true, message: "Zapisano etykietę" };
 }
