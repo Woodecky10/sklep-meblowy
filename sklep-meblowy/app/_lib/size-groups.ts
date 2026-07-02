@@ -6,6 +6,14 @@ export type SizeOption = { id: string; label: string; current: boolean };
 
 type SizeSibling = { id: string; size_label: string | null; name: string };
 
+// Etykieta rozmiaru: size_label po trim, albo nazwa produktu jako fallback
+// (także dla pustego/whitespace label). Współdzielone przez selektor na sklepie
+// (buildSizeOptions) i panel admina (getSizeGroupMembersAdmin) — jedno źródło
+// semantyki fallbacku.
+export function sizeLabelOf(item: { size_label: string | null; name: string }): string {
+  return item.size_label?.trim() || item.name;
+}
+
 // Buduje opcje selektora rozmiaru z rodzeństwa (produktów z tym samym size_group).
 // Etykieta = size_label (po trim) lub nazwa produktu jako fallback.
 // Sortowanie naturalne po etykiecie (numeric) → "140×200" < "160×200" < "180×200".
@@ -18,7 +26,7 @@ export function buildSizeOptions(
 ): SizeOption[] {
   const options: SizeOption[] = siblings.map((s) => ({
     id: s.id,
-    label: s.size_label?.trim() || s.name,
+    label: sizeLabelOf(s),
     current: s.id === currentId,
   }));
   options.sort((a, b) =>
@@ -36,7 +44,7 @@ export function buildSizeOptions(
 export function groupKeyBase(name: string): string {
   const slug = name
     .normalize("NFD")
-    .replace(/[\̀-ͯ]/g, "") // usuń łączące znaki diakrytyczne
+    .replace(/[̀-ͯ]/g, "") // usuń łączące znaki diakrytyczne
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")

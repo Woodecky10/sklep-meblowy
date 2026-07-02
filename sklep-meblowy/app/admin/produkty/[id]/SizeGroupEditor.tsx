@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -33,6 +33,10 @@ export default function SizeGroupEditor({
   const [pending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  // Licznik zapytań — ignorujemy odpowiedzi starsze niż ostatnie wpisanie
+  // (bez tego wolniejsza odpowiedź na szersze zapytanie mogłaby nadpisać
+  // świeższą, węższą). Ref, bo nie wymaga re-renderu.
+  const searchGen = useRef(0);
   // Lokalne edycje etykiet; fallback do wartości z propa members.
   const [labels, setLabels] = useState<Record<string, string>>({});
   // Ostatnio widziany `members`, żeby wykryć zmianę podczas renderu (patrz niżej).
@@ -73,7 +77,9 @@ export default function SizeGroupEditor({
       setCandidates([]);
       return;
     }
+    const gen = ++searchGen.current;
     const res = await searchProductsForSizeGroup(currentId, q);
+    if (gen !== searchGen.current) return; // wynik nieaktualny — nowsze zapytanie w toku
     if (!res.ok) {
       onToast({ type: "error", message: res.error });
       return;
@@ -107,7 +113,9 @@ export default function SizeGroupEditor({
   }
 
   function saveLabel(m: SizeGroupMember) {
-    startTransition(async () => handle(await updateSizeLabel(m.id, labelOf(m))));
+    const next = labelOf(m);
+    if (next === (m.size_label ?? "")) return; // bez zmian — nie zapisuj
+    startTransition(async () => handle(await updateSizeLabel(m.id, next)));
   }
 
   return (

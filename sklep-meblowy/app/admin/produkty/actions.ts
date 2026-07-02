@@ -731,20 +731,26 @@ export async function linkSizeSibling(
   const target = ((rows ?? []) as Row[]).find((r) => r.id === tid);
   if (!current || !target) return { ok: false, error: "Produkt nie istnieje" };
 
-  // Nowy klucz (gdy obie grupy puste): slug z nazwy bieżącego + krótki sufiks;
-  // regeneracja przy mało prawdopodobnej kolizji.
-  let newKey = buildGroupKey(current.name, randomUUID().slice(0, 4));
-  for (let i = 0; i < 5; i++) {
-    const { data: clash } = await supabase
-      .from("products")
-      .select("id")
-      .eq("size_group", newKey)
-      .limit(1);
-    if (!clash?.length) break;
-    newKey = buildGroupKey(current.name, randomUUID().slice(0, 4));
+  // Wspólny klucz. Nowy generujemy TYLKO gdy OBIE grupy są puste — inaczej
+  // pickGroupKey i tak wybierze istniejący, a zapytanie o kolizję byłoby
+  // zmarnowane. Nowy klucz: slug z nazwy + krótki sufiks, z regeneracją przy
+  // mało prawdopodobnej kolizji.
+  let key: string;
+  if (current.size_group || target.size_group) {
+    key = pickGroupKey(current.size_group, target.size_group, "");
+  } else {
+    let newKey = buildGroupKey(current.name, randomUUID().slice(0, 4));
+    for (let i = 0; i < 5; i++) {
+      const { data: clash } = await supabase
+        .from("products")
+        .select("id")
+        .eq("size_group", newKey)
+        .limit(1);
+      if (!clash?.length) break;
+      newKey = buildGroupKey(current.name, randomUUID().slice(0, 4));
+    }
+    key = newKey;
   }
-
-  const key = pickGroupKey(current.size_group, target.size_group, newKey);
 
   // Do rewalidacji i przepisania: bieżący, target + wszyscy członkowie OBU grup.
   // Zbieramy członków obu grup bezwarunkowo (także grupy wygrywającej klucz) —
@@ -783,6 +789,9 @@ export async function unlinkSizeSibling(productId: string): Promise<ActionResult
   if (readErr) return { ok: false, error: readErr.message };
   const key = (row as { size_group: string | null } | null)?.size_group ?? null;
 
+  // Produkt nie był w żadnej grupie — nic do odłączenia (bez zbędnego UPDATE).
+  if (!key) return { ok: true, message: "Odłączono rozmiar" };
+
   const affected = new Set<string>([pid]);
   const { error: clearErr } = await supabase
     .from("products")
@@ -790,18 +799,16 @@ export async function unlinkSizeSibling(productId: string): Promise<ActionResult
     .eq("id", pid);
   if (clearErr) return { ok: false, error: clearErr.message };
 
-  if (key) {
-    const remaining = await sizeGroupMemberIds(supabase, key);
-    if (remaining.length === 1) {
-      // Grupa jednoelementowa nie ma sensu — czyścimy ostatniego członka.
-      const { error: cleanupErr } = await supabase
-        .from("products")
-        .update({ size_group: null } as never)
-        .eq("id", remaining[0]);
-      if (cleanupErr) return { ok: false, error: cleanupErr.message };
-    }
-    for (const id of remaining) affected.add(id);
+  const remaining = await sizeGroupMemberIds(supabase, key);
+  if (remaining.length === 1) {
+    // Grupa jednoelementowa nie ma sensu — czyścimy ostatniego członka.
+    const { error: cleanupErr } = await supabase
+      .from("products")
+      .update({ size_group: null } as never)
+      .eq("id", remaining[0]);
+    if (cleanupErr) return { ok: false, error: cleanupErr.message };
   }
+  for (const id of remaining) affected.add(id);
 
   revalidateProducts(Array.from(affected));
   return { ok: true, message: "Odłączono rozmiar" };

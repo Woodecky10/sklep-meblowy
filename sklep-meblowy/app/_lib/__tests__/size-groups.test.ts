@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { buildSizeOptions, pickGroupKey, groupKeyBase, buildGroupKey } from "@/app/_lib/size-groups";
+import {
+  buildSizeOptions,
+  pickGroupKey,
+  groupKeyBase,
+  buildGroupKey,
+  sizeLabelOf,
+} from "@/app/_lib/size-groups";
 
 const siblings = [
   { id: "c", size_label: "180×200 cm", name: "Łóżko 180" },
@@ -71,5 +77,25 @@ describe("groupKeyBase / buildGroupKey", () => {
   });
   it("buildGroupKey łączy bazę i sufiks", () => {
     expect(buildGroupKey("Marbella", "7f3a")).toBe("marbella-7f3a");
+  });
+  it("ucina do maks 40 znaków, bez końcowego myślnika, poprawny slug", () => {
+    const long =
+      "Bardzo Dluga Nazwa Produktu Ktora Znacznie Przekracza Limit Czterdziestu Znakow";
+    const s = groupKeyBase(long);
+    expect(s.length).toBeLessThanOrEqual(40);
+    expect(s.endsWith("-")).toBe(false);
+    expect(s).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+  });
+});
+
+describe("sizeLabelOf", () => {
+  it("zwraca size_label po trim", () => {
+    expect(sizeLabelOf({ size_label: "  140×200 cm  ", name: "Łóżko" })).toBe(
+      "140×200 cm"
+    );
+  });
+  it("fallback do nazwy gdy label pusty/whitespace/null", () => {
+    expect(sizeLabelOf({ size_label: "   ", name: "Łóżko A" })).toBe("Łóżko A");
+    expect(sizeLabelOf({ size_label: null, name: "Łóżko B" })).toBe("Łóżko B");
   });
 });
