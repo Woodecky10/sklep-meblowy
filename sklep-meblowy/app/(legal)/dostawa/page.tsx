@@ -9,12 +9,12 @@ export async function generateMetadata(): Promise<Metadata> {
     ? {
         title: "Versand und Zahlung",
         description:
-          "Informationen zu Versandarten, Versandkosten und Zahlungsmethoden.",
+          "Kostenloser Versand in ganz Polen. Informationen zu Lieferung und Zahlungsmethoden.",
       }
     : {
         title: "Dostawa i płatności",
         description:
-          "Informacje o sposobach dostawy, kosztach wysyłki i formach płatności.",
+          "Darmowa wysyłka na terenie całej Polski. Informacje o dostawie i formach płatności.",
       };
 }
 
@@ -35,32 +35,9 @@ export default async function DostawaPage() {
         payTransfer: " – automatische Weiterleitung zu Ihrer Bank.",
         paymentNote:
           "Alle Transaktionen sind durch ein SSL-Zertifikat gesichert. Wir speichern keine Kartennummern – diese werden vom Zahlungsdienstleister verarbeitet.",
-        h2Cost: "Versandkosten",
-        costBefore: "Die Versandkosten beginnen ",
-        costAmount: "ab 99 zł",
-        costMiddle: " und werden ",
-        costIndividual: "individuell für jede Bestellung",
-        costAfter: " festgelegt. Den endgültigen Betrag beeinflussen:",
-        costItem1Strong: "Gewicht und Abmessungen des Möbels",
-        costItem1:
-          " – je größer und schwerer das Produkt, desto teurer der Transport (sperrige Möbel erfordern einen Möbeltransport, keinen Standardkurier).",
-        costItem2Strong: "Lieferort",
-        costItem2:
-          " – die Entfernung von unserem Lager beeinflusst den Kraftstoffsatz; die Lieferung in große Städte ist mitunter günstiger als in kleinere Ortschaften.",
-        costItem3Strong: "Anzahl der Produkte in der Bestellung",
-        costItem3:
-          " – der Versand mehrerer Möbel in einem Transport ist oft vorteilhafter als mehrfache Lieferungen.",
-        costItem4Strong: "Erforderliche Zusatzleistung",
-        costItem4:
-          " – Hineintragen in eine bestimmte Etage (falls kein Aufzug vorhanden ist), Montage, Entsorgung des alten Möbels.",
-        costContactBefore:
-          "Nach der Bestellung kontaktieren wir Sie ",
-        costContactStrong: "telefonisch oder per E-Mail",
-        costContactAfter:
-          " mit einem konkreten Kostenvoranschlag. Der Kostenvoranschlag bedarf Ihrer Zustimmung – wenn Sie mit dem Betrag nicht einverstanden sind, haben Sie das Recht, die Bestellung kostenfrei zu stornieren.",
-        costTimeBefore: "Den Kostenvoranschlag teilen wir in der Regel innerhalb von ",
-        costTimeStrong: "1 Werktag",
-        costTimeAfter: " nach Eingang der Bestellung mit.",
+        h2Cost: "Kostenloser Versand",
+        costFree:
+          "Der Versand ist in ganz Polen kostenlos — wir berechnen keine Versandkosten. Der angezeigte Preis ist der Endpreis; nach der Bestellung vereinbart das Transportunternehmen telefonisch einen Liefertermin mit Ihnen.",
         h2Time: "Lieferzeit",
         time:
           "Die Lieferzeit ist auf der Seite jedes Produkts angegeben. Wir rechnen sie ab dem Zeitpunkt der Zahlungsgutschrift. Nach der Zusammenstellung der Bestellung setzt sich der Kurier oder das Transportunternehmen telefonisch mit Ihnen in Verbindung, um einen passenden Liefertermin zu vereinbaren.",
@@ -96,31 +73,9 @@ export default async function DostawaPage() {
         payTransfer: " – automatyczne przekierowanie do Twojego banku.",
         paymentNote:
           "Wszystkie transakcje zabezpieczone są certyfikatem SSL. Nie przechowujemy numerów kart płatniczych – obsługuje je operator płatności.",
-        h2Cost: "Koszt dostawy",
-        costBefore: "Koszt dostawy zaczyna się ",
-        costAmount: "od 99 zł",
-        costMiddle: " i jest ustalany ",
-        costIndividual: "indywidualnie dla każdego zamówienia",
-        costAfter: ". Wpływ na ostateczną kwotę mają:",
-        costItem1Strong: "Waga i gabaryty mebla",
-        costItem1:
-          " – im większy i cięższy produkt, tym droższy transport (mebel wielkogabarytowy wymaga transportu meblowego, nie standardowego kuriera).",
-        costItem2Strong: "Miejsce dostawy",
-        costItem2:
-          " – odległość od naszego magazynu wpływa na stawkę paliwa; dostawa do dużych miast bywa tańsza niż do mniejszych miejscowości.",
-        costItem3Strong: "Liczba produktów w zamówieniu",
-        costItem3:
-          " – wysyłka kilku mebli jednym transportem jest często korzystniejsza niż wielokrotne dostawy.",
-        costItem4Strong: "Wymagana usługa dodatkowa",
-        costItem4:
-          " – wniesienie na konkretne piętro (jeśli nie ma windy), montaż, utylizacja starego mebla.",
-        costContactBefore: "Po złożeniu zamówienia kontaktujemy się z Tobą ",
-        costContactStrong: "telefonicznie lub mailowo",
-        costContactAfter:
-          " z konkretną wyceną. Wycena wymaga Twojej akceptacji – jeśli nie zgadzasz się z kwotą, masz prawo zrezygnować z zamówienia bez kosztów.",
-        costTimeBefore: "Wycenę podajemy zwykle w ciągu ",
-        costTimeStrong: "1 dnia roboczego",
-        costTimeAfter: " od otrzymania zamówienia.",
+        h2Cost: "Darmowa wysyłka",
+        costFree:
+          "Wysyłka jest darmowa na terenie całej Polski — nie doliczamy żadnych kosztów dostawy. Cena, którą widzisz, jest ceną końcową; po złożeniu zamówienia firma transportowa ustali z Tobą telefonicznie dogodny termin dostawy.",
         h2Time: "Czas dostawy",
         time:
           "Czas realizacji jest podany w karcie każdego produktu. Liczymy go od momentu zaksięgowania płatności. Po skompletowaniu zamówienia kurier lub firma transportowa skontaktuje się z Tobą telefonicznie, aby ustalić dogodny termin dostawy.",
@@ -168,41 +123,7 @@ export default async function DostawaPage() {
       <p>{c.paymentNote}</p>
 
       <h2>{c.h2Cost}</h2>
-      <p>
-        {c.costBefore}
-        <strong>{c.costAmount}</strong>
-        {c.costMiddle}
-        <strong>{c.costIndividual}</strong>
-        {c.costAfter}
-      </p>
-      <ul>
-        <li>
-          <strong>{c.costItem1Strong}</strong>
-          {c.costItem1}
-        </li>
-        <li>
-          <strong>{c.costItem2Strong}</strong>
-          {c.costItem2}
-        </li>
-        <li>
-          <strong>{c.costItem3Strong}</strong>
-          {c.costItem3}
-        </li>
-        <li>
-          <strong>{c.costItem4Strong}</strong>
-          {c.costItem4}
-        </li>
-      </ul>
-      <p>
-        {c.costContactBefore}
-        <strong>{c.costContactStrong}</strong>
-        {c.costContactAfter}
-      </p>
-      <p>
-        {c.costTimeBefore}
-        <strong>{c.costTimeStrong}</strong>
-        {c.costTimeAfter}
-      </p>
+      <p>{c.costFree}</p>
 
       <h2>{c.h2Time}</h2>
       <p>{c.time}</p>
