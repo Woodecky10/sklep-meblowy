@@ -817,11 +817,22 @@ export async function updateSizeLabel(
   if (!pid) return { ok: false, error: "Brak id produktu" };
   const value = emptyToNull(sanitize(label, 100));
   const supabase = await createAdminClient();
+  // Etykieta produktu jest renderowana w selektorze rozmiaru na stronie KAŻDEGO
+  // rodzeństwa (buildSizeOptions), nie tylko edytowanego produktu — więc
+  // rewalidujemy całą grupę, spójnie z link/unlinkSizeSibling.
+  const { data: row, error: readErr } = await supabase
+    .from("products")
+    .select("size_group")
+    .eq("id", pid)
+    .maybeSingle();
+  if (readErr) return { ok: false, error: readErr.message };
   const { error } = await supabase
     .from("products")
     .update({ size_label: value } as never)
     .eq("id", pid);
   if (error) return { ok: false, error: error.message };
-  revalidateProducts([pid]);
+  const key = (row as { size_group: string | null } | null)?.size_group ?? null;
+  const ids = key ? await sizeGroupMemberIds(supabase, key) : [pid];
+  revalidateProducts(ids.length ? ids : [pid]);
   return { ok: true, message: "Zapisano etykietę" };
 }
