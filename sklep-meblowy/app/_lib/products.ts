@@ -284,6 +284,28 @@ export async function getSizeGroupKeys(): Promise<string[]> {
   return Array.from(keys).sort((a, b) => a.localeCompare(b));
 }
 
+// Członek grupy rozmiarów w widoku admina.
+export type SizeGroupMember = { id: string; name: string; size_label: string | null };
+
+// Członkowie grupy dla panelu admina. Admin client — pokazuje też produkty
+// nieaktywne (admin musi widzieć całą grupę). Sort naturalny po etykiecie
+// (numeric, pl) jak na sklepie; fallback do nazwy.
+export async function getSizeGroupMembersAdmin(
+  sizeGroup: string
+): Promise<SizeGroupMember[]> {
+  const supabase = await createAdminClient();
+  const { data } = await supabase
+    .from("products")
+    .select("id, name, size_label")
+    .eq("size_group", sizeGroup);
+  const rows = (data ?? []) as SizeGroupMember[];
+  return rows.sort((a, b) =>
+    (a.size_label ?? a.name).localeCompare(b.size_label ?? b.name, "pl", {
+      numeric: true,
+    })
+  );
+}
+
 // Pobiera unikalne wartości color/material z CAŁEJ bazy produktów — użyte
 // do budowania filtrów na /sklep.
 //
