@@ -35,6 +35,24 @@ export default function SizeGroupEditor({
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   // Lokalne edycje etykiet; fallback do wartości z propa members.
   const [labels, setLabels] = useState<Record<string, string>>({});
+  // Ostatnio widziany `members`, żeby wykryć zmianę podczas renderu (patrz niżej).
+  const [prevMembers, setPrevMembers] = useState(members);
+
+  // Usuwaj szkice etykiet dla produktów, które wypadły z grupy (po „Odłącz"
+  // lub scaleniu) — inaczej po ponownym dodaniu stary szkic mógłby nadpisać
+  // prawdziwą etykietę z bazy. Reconciliacja odbywa się podczas renderu (a
+  // nie w useEffect), zgodnie z zalecanym przez Reacta wzorcem „adjusting
+  // state when a prop changes” — unika dodatkowego przebiegu commit+effect
+  // i nie jest raportowana przez regułę react-hooks/set-state-in-effect.
+  if (prevMembers !== members) {
+    setPrevMembers(members);
+    const ids = new Set(members.map((m) => m.id));
+    setLabels((prev) => {
+      const next: Record<string, string> = {};
+      for (const k of Object.keys(prev)) if (ids.has(k)) next[k] = prev[k];
+      return next;
+    });
+  }
 
   function labelOf(m: SizeGroupMember): string {
     return labels[m.id] ?? m.size_label ?? "";
@@ -76,8 +94,10 @@ export default function SizeGroupEditor({
     }
     startTransition(async () => {
       const res = await linkSizeSibling(currentId, c.id);
-      setQuery("");
-      setCandidates([]);
+      if (res.ok) {
+        setQuery("");
+        setCandidates([]);
+      }
       handle(res);
     });
   }
