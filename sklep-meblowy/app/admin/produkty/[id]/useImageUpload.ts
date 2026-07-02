@@ -97,7 +97,11 @@ export function useImageUpload({
     multiple: true,
     disabled: uploading,
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files;
+      // e.target.files to ŻYWA FileList — skopiuj do tablicy PRZED
+      // wyczyszczeniem inputu. `value = ""` opróżnia tę samą listę (referencję),
+      // więc handleFiles dostawałby 0 plików → cichy no-op (bug: zdjęcia się
+      // nie dodawały do galerii/wariantu/opisu, bez żadnego komunikatu).
+      const files = Array.from(e.target.files ?? []);
       e.target.value = ""; // reset — ponowny wybór tych samych plików działa
       void handleFiles(files);
     },
