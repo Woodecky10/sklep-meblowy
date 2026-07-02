@@ -746,10 +746,13 @@ export async function linkSizeSibling(
 
   const key = pickGroupKey(current.size_group, target.size_group, newKey);
 
-  // Do przepisania: bieżący, target + wszyscy członkowie obu grup (scalenie).
+  // Do rewalidacji i przepisania: bieżący, target + wszyscy członkowie OBU grup.
+  // Zbieramy członków obu grup bezwarunkowo (także grupy wygrywającej klucz) —
+  // ich lista rodzeństwa się zmienia, więc ich strony muszą być rewalidowane.
+  // Zapis klucza na członkach, którzy już go mają, to nieszkodliwy no-op.
   const affected = new Set<string>([cid, tid]);
   for (const gk of [current.size_group, target.size_group]) {
-    if (gk && gk !== key) {
+    if (gk) {
       for (const id of await sizeGroupMemberIds(supabase, gk)) affected.add(id);
     }
   }
@@ -772,11 +775,12 @@ export async function unlinkSizeSibling(productId: string): Promise<ActionResult
   if (!pid) return { ok: false, error: "Brak id produktu" };
 
   const supabase = await createAdminClient();
-  const { data: row } = await supabase
+  const { data: row, error: readErr } = await supabase
     .from("products")
     .select("size_group")
     .eq("id", pid)
     .maybeSingle();
+  if (readErr) return { ok: false, error: readErr.message };
   const key = (row as { size_group: string | null } | null)?.size_group ?? null;
 
   const affected = new Set<string>([pid]);
@@ -790,10 +794,11 @@ export async function unlinkSizeSibling(productId: string): Promise<ActionResult
     const remaining = await sizeGroupMemberIds(supabase, key);
     if (remaining.length === 1) {
       // Grupa jednoelementowa nie ma sensu — czyścimy ostatniego członka.
-      await supabase
+      const { error: cleanupErr } = await supabase
         .from("products")
         .update({ size_group: null } as never)
         .eq("id", remaining[0]);
+      if (cleanupErr) return { ok: false, error: cleanupErr.message };
     }
     for (const id of remaining) affected.add(id);
   }
@@ -817,8 +822,6 @@ export async function updateSizeLabel(
     .update({ size_label: value } as never)
     .eq("id", pid);
   if (error) return { ok: false, error: error.message };
-  revalidatePath(`/admin/produkty/${pid}`);
-  revalidatePath(`/produkt/${pid}`);
-  revalidatePath("/sklep");
+  revalidateProducts([pid]);
   return { ok: true, message: "Zapisano etykietę" };
 }
