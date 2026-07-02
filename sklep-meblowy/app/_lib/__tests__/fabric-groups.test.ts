@@ -46,6 +46,11 @@ describe("groupFabricsByCategory", () => {
     expect(out[1].fabrics.map((f) => f.name)).toEqual(["X", "Y"]);
   });
 
+  it("'Bez kategorii' jest ostatnia nawet gdy realna kategoria sortuje się po niej (Zamsz > Bez)", () => {
+    const out = groupFabricsByCategory([fab("Zamsz 1", "Zamsz"), fab("Orphan", null)]);
+    expect(out.map((g) => g.category)).toEqual(["Zamsz", NO_CATEGORY_LABEL]);
+  });
+
   it("puste wejście → []", () => {
     expect(groupFabricsByCategory([])).toEqual([]);
   });
