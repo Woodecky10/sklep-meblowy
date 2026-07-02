@@ -119,7 +119,8 @@ export default function VariantSelector({
 const SWATCH_LIMIT = 5;
 
 // Opcja „Tkanina" jako okrągłe próbki ze zdjęciem + podpis + cena. Po SWATCH_LIMIT
-// kafelek „Zobacz więcej (+N)" rozwija resztę w miejscu.
+// kafelek „Zobacz więcej (+N)" rozwija resztę w miejscu; po rozwinięciu ten sam
+// kafelek staje się „Zobacz mniej" i zwija listę z powrotem.
 function FabricSwatchGroup({
   values,
   current,
@@ -187,14 +188,19 @@ function FabricSwatchGroup({
           </button>
         );
       })}
-      {!expanded && hidden > 0 && (
+      {values.length > SWATCH_LIMIT && (
         <button
           type="button"
-          onClick={() => setExpanded(true)}
+          onClick={() => setExpanded((e) => !e)}
+          aria-expanded={expanded}
           className="flex flex-col items-center justify-center gap-0.5 min-h-[4rem] p-2 rounded-2xl border border-[var(--border)] text-[var(--color-gold)] hover:border-[var(--color-gold)] hover:bg-[var(--color-gold)]/5 transition-colors"
         >
-          <span className="text-xs font-sans">Zobacz więcej</span>
-          <span className="text-[11px] text-[var(--muted)]">(+{hidden})</span>
+          <span className="text-xs font-sans">
+            {expanded
+              ? locale === "de" ? "Weniger anzeigen" : "Zobacz mniej"
+              : locale === "de" ? "Mehr anzeigen" : "Zobacz więcej"}
+          </span>
+          {!expanded && <span className="text-[11px] text-[var(--muted)]">(+{hidden})</span>}
         </button>
       )}
     </div>
