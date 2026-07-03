@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import type { Metadata } from "next";
 import {
@@ -221,6 +222,7 @@ export default async function ProduktPage({ params }: Props) {
   // Escape `<` → <: bez tego product.name/description zawierające
   // </script> wybiłyby się z bloku JSON-LD i wstrzyknęły skrypt (audyt LOW).
   const jsonLdHtml = JSON.stringify(jsonLd).replace(/</g, "\\u003c");
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   // Sekcje opisu (IKEA-style akordeony). Pre-process: aplikuj admin overrides
   // (admin_title / admin_body / hidden) — admin może per produkt naprawić treść
@@ -244,6 +246,7 @@ export default async function ProduktPage({ params }: Props) {
     <div className="max-w-7xl mx-auto px-6 py-16">
       <script
         type="application/ld+json"
+        nonce={nonce}
         dangerouslySetInnerHTML={{ __html: jsonLdHtml }}
       />
 
