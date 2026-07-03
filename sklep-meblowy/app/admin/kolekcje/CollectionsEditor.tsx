@@ -11,6 +11,7 @@ import {
   setCollectionProducts,
   type ActionResult,
 } from "./actions";
+import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { Collection, Product } from "@/app/_lib/types";
 
 export default function CollectionsEditor({
@@ -165,6 +166,7 @@ function Row({
   onDelete: () => Promise<void>;
 }) {
   const [pendingDelete, startDeleteTransition] = useTransition();
+  const confirm = useConfirm();
   return (
     <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl overflow-hidden">
       <div className="flex items-center gap-3 p-4 flex-wrap">
@@ -185,8 +187,8 @@ function Row({
             {expanded ? "Zwiń" : "Edytuj"}
           </button>
           <button
-            onClick={() => {
-              if (!window.confirm(`Usunąć kolekcję "${collection.label}"? Produkty zostają, tylko stracą przypisanie.`)) return;
+            onClick={async () => {
+              if (!(await confirm({ message: `Usunąć kolekcję "${collection.label}"? Produkty zostają, tylko stracą przypisanie.`, danger: true }))) return;
               startDeleteTransition(() => onDelete());
             }}
             disabled={pendingDelete}

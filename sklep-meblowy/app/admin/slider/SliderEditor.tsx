@@ -29,6 +29,7 @@ import {
   toggleSlideActive,
   type ActionResult,
 } from "./actions";
+import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { SlideRow } from "@/app/_lib/slides";
 
 export default function SliderEditor({
@@ -224,6 +225,7 @@ function SortableRow({
     useSortable({ id: slide.id });
   const [pendingDelete, startDeleteTransition] = useTransition();
   const [pendingToggle, startToggleTransition] = useTransition();
+  const confirm = useConfirm();
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -307,8 +309,8 @@ function SortableRow({
             {expanded ? "Zwiń" : "Edytuj"}
           </button>
           <button
-            onClick={() => {
-              if (!window.confirm(`Usunąć slajd "${slide.title || "(bez tytułu)"}"? Tej operacji nie da się cofnąć.`)) return;
+            onClick={async () => {
+              if (!(await confirm({ message: `Usunąć slajd "${slide.title || "(bez tytułu)"}"? Tej operacji nie da się cofnąć.`, danger: true }))) return;
               startDeleteTransition(() => onDelete());
             }}
             disabled={pendingDelete}

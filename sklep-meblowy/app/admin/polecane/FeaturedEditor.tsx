@@ -28,6 +28,7 @@ import {
   reorderFeatured,
   type ActionResult,
 } from "./actions";
+import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { FeaturedItem } from "@/app/_lib/featured";
 import type { Product } from "@/app/_lib/types";
 import { BADGE_OPTIONS } from "@/app/_lib/de-content-maps";
@@ -260,6 +261,7 @@ function SortableRow({
   const [pendingBadge, startBadgeTransition] = useTransition();
   const [pendingRemove, startRemoveTransition] = useTransition();
   const [badge, setBadge] = useState(item.badge ?? "");
+  const confirm = useConfirm();
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -339,8 +341,8 @@ function SortableRow({
         <button
           type="button"
           disabled={pendingRemove}
-          onClick={() => {
-            if (!window.confirm(`Usunąć "${item.product.name}" z polecanych?`)) return;
+          onClick={async () => {
+            if (!(await confirm({ message: `Usunąć "${item.product.name}" z polecanych?`, danger: true }))) return;
             startRemoveTransition(() => onRemove());
           }}
           className="px-3 py-2 text-xs font-sans uppercase tracking-widest border border-red-300 dark:border-red-900 text-red-600 rounded-full hover:bg-red-50 dark:hover:bg-red-950 transition-colors disabled:opacity-50"
