@@ -24,6 +24,11 @@ import {
 } from "@/app/_lib/variants";
 import { findInvalidVariantSale } from "@/app/_lib/pricing";
 import { groupFabricsByCategory, groupSelectionState } from "@/app/_lib/fabric-groups";
+import {
+  applyCornerSideSelection,
+  hasCornerSideOption,
+  isCornerCategorySlug,
+} from "@/app/_lib/corner-side";
 
 // ============================================================
 // Komponent
@@ -33,12 +38,14 @@ export default function VariantsEditor({
   productId,
   initial,
   basePrice,
+  categorySlug,
   fabrics,
   onToast,
 }: {
   productId: string;
   initial: ProductVariants | null;
   basePrice: number;
+  categorySlug: string;
   fabrics: Fabric[];
   onToast: (t: Toast) => void;
 }) {
@@ -46,6 +53,16 @@ export default function VariantsEditor({
   const [saving, startSaveTransition] = useTransition();
   const [fabricPickerOpen, setFabricPickerOpen] = useState(false);
   const confirm = useConfirm();
+
+  // Wybór strony narożnika: stan = obecność opcji side-like (także ręcznej
+  // "STRONA"/"STRONA MEBLA"). Toggle widoczny dla kategorii narożników albo
+  // gdy produkt już ma opcję strony (żeby dało się ją wyłączyć po zmianie kategorii).
+  const sideEnabled = hasCornerSideOption(variants);
+  const showCornerToggle = isCornerCategorySlug(categorySlug) || sideEnabled;
+
+  function toggleCornerSide(enabled: boolean) {
+    setVariants(applyCornerSideSelection(variants, enabled));
+  }
 
   const dirty = useMemo(
     () => JSON.stringify(variants) !== JSON.stringify(initial),
@@ -360,6 +377,15 @@ export default function VariantsEditor({
           >
             + Dodaj tkaniny z katalogu
           </button>
+          {isCornerCategorySlug(categorySlug) && (
+            <button
+              type="button"
+              onClick={() => setVariants(applyCornerSideSelection(null, true))}
+              className="px-5 py-2.5 border border-[var(--color-gold)] text-[var(--color-gold)] font-sans font-semibold text-xs uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
+            >
+              + Dodaj wybór strony (Lewostronny/Prawostronny)
+            </button>
+          )}
         </div>
       </section>
     );
@@ -424,6 +450,17 @@ export default function VariantsEditor({
         >
           Wybierz z katalogu tkanin
         </button>
+        {showCornerToggle && (
+          <label className="self-start flex items-center gap-2 text-sm text-[var(--fg)] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={sideEnabled}
+              onChange={(e) => toggleCornerSide(e.target.checked)}
+              className="h-4 w-4 accent-[var(--color-gold)]"
+            />
+            Wybór strony narożnika (Lewostronny/Prawostronny)
+          </label>
+        )}
       </div>
 
       {/* ============================================================
