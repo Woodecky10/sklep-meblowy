@@ -29,6 +29,7 @@ export async function updateSession(request: NextRequest) {
     isDev: process.env.NODE_ENV !== "production",
     supabaseOrigin,
   });
+  requestHeaders.set("Content-Security-Policy", csp);
 
   let supabaseResponse = NextResponse.next({
     request: { headers: requestHeaders },
