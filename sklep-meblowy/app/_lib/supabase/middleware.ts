@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { localizePath, stripLocale } from "../i18n";
+import { buildCsp } from "../csp";
 
 export async function updateSession(request: NextRequest) {
   // Rozbij ścieżkę na locale + ścieżkę bez prefiksu '/de'.
@@ -11,6 +12,23 @@ export async function updateSession(request: NextRequest) {
   // Musi być w KAŻDYM NextResponse.next, który niesie request — i w initial, i w rebuildzie z setAll.
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-locale", locale);
+
+  // Nonce CSP — świeży per request; x-nonce czytają server components (layout,
+  // karta produktu) i doklejają go do inline-skryptów (next-themes, JSON-LD).
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  requestHeaders.set("x-nonce", nonce);
+  let supabaseOrigin: string | null = null;
+  try {
+    supabaseOrigin = process.env.NEXT_PUBLIC_SUPABASE_URL
+      ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin
+      : null;
+  } catch {
+    supabaseOrigin = null;
+  }
+  const csp = buildCsp(nonce, {
+    isDev: process.env.NODE_ENV !== "production",
+    supabaseOrigin,
+  });
 
   let supabaseResponse = NextResponse.next({
     request: { headers: requestHeaders },
@@ -98,8 +116,10 @@ export async function updateSession(request: NextRequest) {
     supabaseResponse.cookies.getAll().forEach((cookie) => {
       rewriteResponse.cookies.set(cookie);
     });
+    rewriteResponse.headers.set("Content-Security-Policy", csp);
     return rewriteResponse;
   }
 
+  supabaseResponse.headers.set("Content-Security-Policy", csp);
   return supabaseResponse;
 }
