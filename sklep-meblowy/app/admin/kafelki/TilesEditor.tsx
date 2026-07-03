@@ -29,6 +29,7 @@ import {
   toggleTileActive,
   type ActionResult,
 } from "./actions";
+import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { TileRow } from "@/app/_lib/home-tiles";
 
 export default function TilesEditor({
@@ -212,6 +213,7 @@ function SortableRow({
     useSortable({ id: tile.id });
   const [pendingDelete, startDeleteTransition] = useTransition();
   const [pendingToggle, startToggleTransition] = useTransition();
+  const confirm = useConfirm();
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -287,8 +289,8 @@ function SortableRow({
             {expanded ? "Zwiń" : "Edytuj"}
           </button>
           <button
-            onClick={() => {
-              if (!window.confirm(`Usunąć kafelek "${tile.label || "(bez etykiety)"}"? Tej operacji nie da się cofnąć.`)) return;
+            onClick={async () => {
+              if (!(await confirm({ message: `Usunąć kafelek "${tile.label || "(bez etykiety)"}"? Tej operacji nie da się cofnąć.`, danger: true }))) return;
               startDeleteTransition(() => onDelete());
             }}
             disabled={pendingDelete}

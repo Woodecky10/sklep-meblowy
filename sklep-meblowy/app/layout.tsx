@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "./_components/layout/ThemeProvider";
@@ -10,6 +11,7 @@ import CartToast from "./_components/layout/CartToast";
 import HideOnAdmin from "./_components/layout/HideOnAdmin";
 import { CartProvider } from "./_context/CartContext";
 import { ToastProvider } from "./_context/ToastContext";
+import { ConfirmProvider } from "./_context/ConfirmContext";
 import { COMPANY } from "./_lib/company";
 import { getLocale } from "./_lib/i18n-server";
 import { getDictionary } from "./_lib/dictionaries";
@@ -68,6 +70,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   const locale = await getLocale();
   const eurRate = await getEurRate();
   const fabricMap = await getFabricDeMap();
@@ -78,21 +81,23 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-screen flex flex-col antialiased">
-        <ThemeProvider>
+        <ThemeProvider nonce={nonce}>
           <RateProvider rate={eurRate}>
             <FabricLabelProvider map={fabricMap}>
               <CartProvider>
                 <ToastProvider>
-                  <HideOnAdmin>
-                    <TopBar />
-                    <Navbar />
-                  </HideOnAdmin>
-                  <main className="flex-1">{children}</main>
-                  <HideOnAdmin>
-                    <Footer />
-                    <CookieBanner />
-                  </HideOnAdmin>
-                  <CartToast />
+                  <ConfirmProvider>
+                    <HideOnAdmin>
+                      <TopBar />
+                      <Navbar />
+                    </HideOnAdmin>
+                    <main className="flex-1">{children}</main>
+                    <HideOnAdmin>
+                      <Footer />
+                      <CookieBanner />
+                    </HideOnAdmin>
+                    <CartToast />
+                  </ConfirmProvider>
                 </ToastProvider>
               </CartProvider>
             </FabricLabelProvider>

@@ -11,6 +11,7 @@ import {
   deleteOrder,
   type ActionResult,
 } from "../actions";
+import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { OrderStatus } from "@/app/_lib/types";
 
 type Props = {
@@ -29,6 +30,7 @@ export default function OrderControls(props: Props) {
   const [toast, setToast] = useState<Toast>(null);
   const [isPending, startTransition] = useTransition();
   const [selected, setSelected] = useState<OrderStatus | "">("");
+  const confirm = useConfirm();
 
   function showToast(t: Toast) {
     setToast(t);
@@ -171,11 +173,13 @@ export default function OrderControls(props: Props) {
         <button
           type="button"
           disabled={isPending}
-          onClick={() => {
-            const ok = window.confirm(
-              `Usunąć trwale zamówienie #${props.orderNumber}?\n\n` +
-                "Tej operacji nie da się cofnąć — zniknie z historii wraz z pozycjami."
-            );
+          onClick={async () => {
+            const ok = await confirm({
+              message:
+                `Usunąć trwale zamówienie #${props.orderNumber}?\n\n` +
+                "Tej operacji nie da się cofnąć — zniknie z historii wraz z pozycjami.",
+              danger: true,
+            });
             if (!ok) return;
             startTransition(async () => {
               const res = await deleteOrder(props.orderId);

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { setOrderIssueStatus, deleteOrderIssue } from "./actions";
+import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { AdminOrderIssue } from "@/app/_lib/order-issues-data";
 import type { OrderIssueStatus } from "@/app/_lib/order-issues";
 import { orderIssueCategoryLabel } from "@/app/_lib/order-issues";
@@ -128,6 +129,7 @@ function Row({
 }) {
   const [pending, startTransition] = useTransition();
   const [pendingDelete, startDeleteTransition] = useTransition();
+  const confirm = useConfirm();
   const date = new Date(issue.created_at).toLocaleString("pl-PL", { dateStyle: "medium", timeStyle: "short" });
 
   return (
@@ -194,8 +196,8 @@ function Row({
           Odpowiedz emailem
         </a>
         <button
-          onClick={() => {
-            if (!window.confirm("Usunąć to zgłoszenie? Tej operacji nie da się cofnąć.")) return;
+          onClick={async () => {
+            if (!(await confirm({ message: "Usunąć to zgłoszenie? Tej operacji nie da się cofnąć.", danger: true }))) return;
             startDeleteTransition(() => onDelete());
           }}
           disabled={pendingDelete}

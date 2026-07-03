@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import StarInput from "./StarInput";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
+import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { ProductReview } from "@/app/_lib/types";
 
 // Formularz dodawania/edycji opinii. Wyświetlany tylko użytkownikom, którzy kupili
@@ -57,6 +58,7 @@ export default function ReviewForm({
   const [comment, setComment] = useState<string>(existingReview?.comment ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -83,7 +85,7 @@ export default function ReviewForm({
   }
 
   async function onDelete() {
-    if (!confirm(c.confirmDelete)) return;
+    if (!(await confirm({ message: c.confirmDelete, danger: true }))) return;
     setLoading(true);
     try {
       const res = await fetch(

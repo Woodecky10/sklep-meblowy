@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { updateInquiryStatus, deleteInquiry } from "./actions";
+import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { Inquiry, InquiryStatus } from "@/app/_lib/inquiries";
 
 const STATUS_LABELS: Record<InquiryStatus, string> = {
@@ -150,6 +151,7 @@ function Row({
 }) {
   const [pending, startTransition] = useTransition();
   const [pendingDelete, startDeleteTransition] = useTransition();
+  const confirm = useConfirm();
   const date = new Date(inquiry.created_at).toLocaleString("pl-PL", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -222,8 +224,8 @@ function Row({
           Odpowiedz emailem
         </a>
         <button
-          onClick={() => {
-            if (!window.confirm("Usunąć to zapytanie? Tej operacji nie da się cofnąć.")) return;
+          onClick={async () => {
+            if (!(await confirm({ message: "Usunąć to zapytanie? Tej operacji nie da się cofnąć.", danger: true }))) return;
             startDeleteTransition(() => onDelete());
           }}
           disabled={pendingDelete}

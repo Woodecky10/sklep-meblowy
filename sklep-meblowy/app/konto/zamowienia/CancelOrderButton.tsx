@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
+import { useConfirm } from "@/app/_context/ConfirmContext";
 import { cancelOrder } from "./actions";
 
 // Anulowanie zamówienia przez klienta. Wymaga potwierdzenia żeby uniknąć
@@ -26,9 +27,10 @@ export default function CancelOrderButton({ orderId }: { orderId: string }) {
       };
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
 
-  function handleClick() {
-    if (!window.confirm(c.confirm)) {
+  async function handleClick() {
+    if (!(await confirm({ message: c.confirm, danger: true }))) {
       return;
     }
     setError(null);

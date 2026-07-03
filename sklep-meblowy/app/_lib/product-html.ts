@@ -5,7 +5,7 @@
 // zero @exodus/bytes ESM mismatch w runtime Vercela).
 //
 // Whitelist tagów odpowiednich dla opisów mebli — strukturalne paragrafy,
-// listy, podkreślenia, nagłówki H2-H4 i linki. Bez img/video/script/iframe.
+// listy, podkreślenia, nagłówki H2-H4, linki i img. Bez video/script/iframe/style-taga.
 //
 // Source produktu jest zaufany (admin → sklep), więc nie potrzebujemy
 // pełnej HTML5 spec compliance. Wystarczy whitelist + block javascript:.

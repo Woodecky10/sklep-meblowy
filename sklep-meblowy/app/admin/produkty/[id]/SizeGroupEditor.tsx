@@ -9,6 +9,7 @@ import {
   updateSizeLabel,
   searchProductsForSizeGroup,
 } from "../actions";
+import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { ActionResult } from "@/app/_lib/types";
 import type { SizeGroupMember } from "@/app/_lib/products";
 import { inputClass, type Toast } from "./_shared";
@@ -30,6 +31,7 @@ export default function SizeGroupEditor({
   onToast: (t: Toast) => void;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [pending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -89,13 +91,14 @@ export default function SizeGroupEditor({
     setCandidates(results.filter((c) => !memberIds.has(c.id)));
   }
 
-  function add(c: Candidate) {
+  async function add(c: Candidate) {
     // Kandydat nie jest członkiem bieżącej grupy (przefiltrowany), więc jego
     // niepusty size_group = INNA grupa → pytamy o scalenie.
     if (c.size_group) {
-      const ok = window.confirm(
-        "Ten produkt jest już w innej grupie rozmiarów — połączyć obie grupy?"
-      );
+      const ok = await confirm({
+        message: "Ten produkt jest już w innej grupie rozmiarów — połączyć obie grupy?",
+        danger: false,
+      });
       if (!ok) return;
     }
     startTransition(async () => {
