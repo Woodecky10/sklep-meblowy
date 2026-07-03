@@ -38,6 +38,7 @@ export type PlShape = {
   product: {
     addToCart: string;
     selectVariant: string;
+    cornerSideHint: string;
     sizeLabel: string;
     omnibusLabel: string;
     saleBadge: string;
@@ -327,6 +328,7 @@ export const pl = {
   product: {
     addToCart: "Dodaj do koszyka",
     selectVariant: "Wybierz wariant",
+    cornerSideHint: "Strony pokazane patrząc od frontu",
     sizeLabel: "Rozmiar",
     omnibusLabel: "Najniższa cena z 30 dni przed obniżką",
     saleBadge: "Promocja",
