@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "./_components/layout/ThemeProvider";
@@ -68,6 +69,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   const locale = await getLocale();
   const eurRate = await getEurRate();
   const fabricMap = await getFabricDeMap();
@@ -78,7 +80,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-screen flex flex-col antialiased">
-        <ThemeProvider>
+        <ThemeProvider nonce={nonce}>
           <RateProvider rate={eurRate}>
             <FabricLabelProvider map={fabricMap}>
               <CartProvider>
