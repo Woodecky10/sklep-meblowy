@@ -890,10 +890,22 @@ export async function enableCornerSideForCategory(): Promise<ActionResult> {
         error: `Błąd przy produkcie ${row.id} (zaktualizowano wcześniej: ${updated}): ${upErr.message}`,
       };
     }
-    await recordPriceHistory(row.id);
+    updated++;
     revalidatePath(`/admin/produkty/${row.id}`);
     revalidatePath(`/produkt/${row.id}`);
-    updated++;
+    // recordPriceHistory może rzucić (RPC) — degradujemy do czytelnego błędu
+    // z licznikiem częściowego postępu zamiast crasha error-boundary.
+    // Warianty tego produktu są już zapisane; ponowne uruchomienie pominie go
+    // (idempotencja), a historia cen dopisze się przy kolejnym zapisie cen.
+    try {
+      await recordPriceHistory(row.id);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return {
+        ok: false,
+        error: `Zapisano warianty (zaktualizowano: ${updated}, pominięto: ${skipped}), ale historia cen produktu ${row.id} nie zapisała się: ${message}`,
+      };
+    }
   }
 
   revalidatePath("/admin/produkty");
