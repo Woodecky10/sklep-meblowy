@@ -9,7 +9,7 @@ import { deleteProduct } from "./actions";
 // Przycisk usuwania produktu na liście /admin/produkty.
 // Confirm dialog + server action + router.refresh() po sukcesie (Next.js
 // re-renderuje stronę i produkt znika z listy bez optimistic state).
-// Błąd pokazujemy alertem — proste, minimalistyczne, dziala wszędzie.
+// Potwierdzenie przez useConfirm (dialog), błąd przez toast (useToast).
 export default function DeleteProductButton({
   productId,
   productName,
