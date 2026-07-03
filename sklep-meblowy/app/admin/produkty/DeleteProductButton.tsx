@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/app/_context/ToastContext";
 import { deleteProduct } from "./actions";
 
 // Przycisk usuwania produktu na liście /admin/produkty.
@@ -17,6 +18,7 @@ export default function DeleteProductButton({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const showToast = useToast();
 
   function handleClick() {
     // Spłaszcz newline'y w nazwie — gdyby admin przez przypadek wpisał
@@ -37,7 +39,7 @@ export default function DeleteProductButton({
       fd.set("id", productId);
       const res = await deleteProduct(fd);
       if (!res.ok) {
-        window.alert(`Nie udało się usunąć: ${res.error}`);
+        showToast(`Nie udało się usunąć: ${res.error}`, "error");
         return;
       }
       router.refresh();

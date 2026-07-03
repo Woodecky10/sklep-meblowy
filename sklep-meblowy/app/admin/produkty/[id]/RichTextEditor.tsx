@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useToast } from "@/app/_context/ToastContext";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -39,6 +40,7 @@ export default function RichTextEditor({
   ariaLabel,
   placeholder,
 }: RichTextEditorProps) {
+  const showToast = useToast();
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -94,9 +96,9 @@ export default function RichTextEditor({
       const fd = new FormData();
       fd.set("image", compressed, compressed.name);
       const res = await uploadProductImage(fd);
-      if (!res.ok) { window.alert("Upload nieudany: " + res.error); return; }
+      if (!res.ok) { showToast("Upload nieudany: " + res.error, "error"); return; }
       const url = (res.data as { url: string } | undefined)?.url;
-      if (!url) { window.alert("Brak URL po uploadzie"); return; }
+      if (!url) { showToast("Brak URL po uploadzie", "error"); return; }
       editor.chain().focus().setImage({ src: url, alt: "" }).run();
     } finally {
       setUploadingImg(false);
@@ -133,7 +135,7 @@ export default function RichTextEditor({
       return;
     }
     if (!/^(https?:|mailto:|tel:)/i.test(url.trim())) {
-      window.alert("Dozwolone tylko linki http(s):, mailto: lub tel:");
+      showToast("Dozwolone tylko linki http(s):, mailto: lub tel:", "error");
       return;
     }
     editor!.chain().focus().extendMarkRange("link").setLink({ href: url.trim() }).run();
