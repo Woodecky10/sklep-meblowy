@@ -33,9 +33,10 @@ export default function ConfirmDialog({
   return (
     <div
       ref={ref}
-      role="dialog"
+      role="alertdialog"
       aria-modal="true"
       aria-label={title}
+      aria-describedby="confirm-dialog-message"
       onClick={onCancel}
       className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
     >
@@ -47,7 +48,10 @@ export default function ConfirmDialog({
           <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
             {title}
           </p>
-          <p className="text-sm text-[var(--fg)] leading-relaxed whitespace-pre-line">
+          <p
+            id="confirm-dialog-message"
+            className="text-sm text-[var(--fg)] leading-relaxed whitespace-pre-line"
+          >
             {opts.message}
           </p>
         </div>
