@@ -133,7 +133,7 @@ export default async function HomePage() {
       </section>
 
       {/* Polecane */}
-      <section className="bg-[var(--card-bg)] border-y border-[var(--border)] py-24">
+      <section className="py-24">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-end justify-between mb-16">
             <div>
