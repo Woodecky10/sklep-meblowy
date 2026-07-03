@@ -2,12 +2,14 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/app/_context/ToastContext";
+import { useConfirm } from "@/app/_context/ConfirmContext";
 import { deleteProduct } from "./actions";
 
 // Przycisk usuwania produktu na liście /admin/produkty.
 // Confirm dialog + server action + router.refresh() po sukcesie (Next.js
 // re-renderuje stronę i produkt znika z listy bez optimistic state).
-// Błąd pokazujemy alertem — proste, minimalistyczne, dziala wszędzie.
+// Potwierdzenie przez useConfirm (dialog), błąd przez toast (useToast).
 export default function DeleteProductButton({
   productId,
   productName,
@@ -17,19 +19,23 @@ export default function DeleteProductButton({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const showToast = useToast();
+  const confirm = useConfirm();
 
-  function handleClick() {
+  async function handleClick() {
     // Spłaszcz newline'y w nazwie — gdyby admin przez przypadek wpisał
     // wieloliniową nazwę, dialog zostałby rozjechany i user mógłby nie
     // wiedzieć co potwierdza.
     const safeName = productName.replace(/[\r\n]+/g, " ").trim();
-    const ok = window.confirm(
-      `Usunąć produkt "${safeName}"?\n\n` +
+    const ok = await confirm({
+      message:
+        `Usunąć produkt "${safeName}"?\n\n` +
         "Tej operacji nie da się cofnąć. Produkt zniknie ze sklepu, " +
         "z list ulubionych klientów i z polecanych. " +
         "Historia zamówień zostanie nienaruszona — jeśli produkt ma " +
-        "zamówienia, usuwanie nie powiedzie się."
-    );
+        "zamówienia, usuwanie nie powiedzie się.",
+      danger: true,
+    });
     if (!ok) return;
 
     startTransition(async () => {
@@ -37,7 +43,7 @@ export default function DeleteProductButton({
       fd.set("id", productId);
       const res = await deleteProduct(fd);
       if (!res.ok) {
-        window.alert(`Nie udało się usunąć: ${res.error}`);
+        showToast(`Nie udało się usunąć: ${res.error}`, "error");
         return;
       }
       router.refresh();

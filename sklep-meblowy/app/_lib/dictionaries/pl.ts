@@ -135,6 +135,9 @@ export type PlShape = {
     close: string;
     noImage: string;
     browseShop: string;
+    confirm: string;
+    cancel: string;
+    confirmTitle: string;
   };
   meta: {
     tagline: string;
@@ -424,6 +427,9 @@ export const pl = {
     close: "Zamknij",
     noImage: "Brak zdjęcia",
     browseShop: "Przeglądaj sklep",
+    confirm: "Potwierdź",
+    cancel: "Anuluj",
+    confirmTitle: "Potwierdzenie",
   },
   meta: {
     tagline: "Meble premium",

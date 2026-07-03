@@ -6,9 +6,11 @@ import { Card, EmptyState, Field, ToastView, inputCls, type Toast } from "@/app/
 import { createFabric, updateFabric, deleteFabric, type ActionResult } from "./actions";
 import { uploadProductImage } from "@/app/admin/produkty/actions";
 import { compressIfNeeded } from "@/app/_lib/image-compress";
+import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { Fabric } from "@/app/_lib/types";
 
 export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabric[] }) {
+  const confirm = useConfirm();
   const [fabrics, setFabrics] = useState<Fabric[]>(initialFabrics);
   const [prevInitial, setPrevInitial] = useState(initialFabrics);
   if (initialFabrics !== prevInitial) {
@@ -115,8 +117,8 @@ export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabr
                     {editingId === f.id ? "Zwiń" : "Edytuj"}
                   </button>
                   <button
-                    onClick={() => {
-                      if (!window.confirm(`Usunąć tkaninę "${f.name}"? Produkty które już ją mają zachowają wartość.`)) return;
+                    onClick={async () => {
+                      if (!(await confirm({ message: `Usunąć tkaninę "${f.name}"? Produkty które już ją mają zachowają wartość.`, danger: true }))) return;
                       const fd = new FormData();
                       fd.set("id", f.id);
                       deleteFabric(fd).then((res) =>

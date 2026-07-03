@@ -7,6 +7,7 @@ import type { ProductDescriptionSection } from "@/app/_lib/types";
 import { IconBtn, inputClass, type Toast } from "./_shared";
 import { useImageUpload } from "./useImageUpload";
 import RichTextEditor from "./RichTextEditor";
+import { useConfirm } from "@/app/_context/ConfirmContext";
 
 // Sekcja + stabilne lokalne id (klucz Reacta). Id NIE jest częścią danych
 // zapisywanych do DB — służy tylko do identyfikacji wiersza w UI.
@@ -35,6 +36,7 @@ export default function DescriptionSectionsEditor({
   const [rows, setRows] = useState<SectionRow[]>(() =>
     initial.map((data, i) => ({ id: `init-${i}`, data }))
   );
+  const confirm = useConfirm();
   const nextIdRef = useRef(0);
   function newId() {
     nextIdRef.current += 1;
@@ -74,8 +76,8 @@ export default function DescriptionSectionsEditor({
     });
   }
 
-  function removeSection(idx: number) {
-    if (!window.confirm("Usunąć tę sekcję?")) return;
+  async function removeSection(idx: number) {
+    if (!(await confirm({ message: "Usunąć tę sekcję?", danger: true }))) return;
     setRows((prev) => prev.filter((_, i) => i !== idx));
   }
 

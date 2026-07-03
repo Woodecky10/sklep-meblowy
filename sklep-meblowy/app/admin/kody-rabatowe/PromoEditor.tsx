@@ -10,6 +10,7 @@ import {
   togglePromoActive,
   type ActionResult,
 } from "./actions";
+import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { PromoCode } from "@/app/_lib/promo";
 
 export default function PromoEditor({ initialCodes }: { initialCodes: PromoCode[] }) {
@@ -145,6 +146,7 @@ function Row({
 }) {
   const [pendingDelete, startDeleteTransition] = useTransition();
   const [pendingToggle, startToggleTransition] = useTransition();
+  const confirm = useConfirm();
 
   const valueLabel =
     code.discount_type === "percent"
@@ -197,8 +199,8 @@ function Row({
             {expanded ? "Zwiń" : "Edytuj"}
           </button>
           <button
-            onClick={() => {
-              if (!window.confirm(`Usunąć kod "${code.code}"? Historyczne zamówienia zachowają audyt zniżki.`)) return;
+            onClick={async () => {
+              if (!(await confirm({ message: `Usunąć kod "${code.code}"? Historyczne zamówienia zachowają audyt zniżki.`, danger: true }))) return;
               startDeleteTransition(() => onDelete());
             }}
             disabled={pendingDelete}

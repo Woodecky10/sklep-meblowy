@@ -12,6 +12,7 @@ import {
   deleteCategory,
   type ActionResult,
 } from "./actions";
+import { useConfirm } from "@/app/_context/ConfirmContext";
 
 type Props = {
   sections: Section[];
@@ -559,15 +560,16 @@ function DeleteButton({
   disabledTitle?: string;
 }) {
   const [pending, startTransition] = useTransition();
+  const confirm = useConfirm();
 
   return (
     <button
       type="button"
       disabled={disabled || pending}
       title={disabledTitle}
-      onClick={() => {
+      onClick={async () => {
         if (disabled) return;
-        if (!window.confirm(confirmMessage)) return;
+        if (!(await confirm({ message: confirmMessage, danger: true }))) return;
         startTransition(() => onConfirm());
       }}
       className={`px-3 py-1.5 text-xs font-sans uppercase tracking-widest rounded-full transition-colors ${

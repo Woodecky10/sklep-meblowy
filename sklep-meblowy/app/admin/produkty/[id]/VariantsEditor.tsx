@@ -11,6 +11,7 @@ import type {
 } from "@/app/_lib/types";
 import { Field, IconBtn, inputClass, type Toast } from "./_shared";
 import { useImageUpload } from "./useImageUpload";
+import { useConfirm } from "@/app/_context/ConfirmContext";
 import {
   formatVariantLabel,
   variantKey,
@@ -44,6 +45,7 @@ export default function VariantsEditor({
   const [variants, setVariants] = useState<ProductVariants | null>(initial);
   const [saving, startSaveTransition] = useTransition();
   const [fabricPickerOpen, setFabricPickerOpen] = useState(false);
+  const confirm = useConfirm();
 
   const dirty = useMemo(
     () => JSON.stringify(variants) !== JSON.stringify(initial),
@@ -58,8 +60,8 @@ export default function VariantsEditor({
     setVariants({ options: [], combinations: [] });
   }
 
-  function disableVariants() {
-    if (!window.confirm("Usunąć wszystkie warianty produktu? Zdjęcia per wariant zostaną wyczyszczone.")) return;
+  async function disableVariants() {
+    if (!(await confirm({ message: "Usunąć wszystkie warianty produktu? Zdjęcia per wariant zostaną wyczyszczone.", danger: true }))) return;
     setVariants(null);
   }
 
