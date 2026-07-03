@@ -145,6 +145,9 @@ export const de: DeepPartial<PlShape> = {
     close: "Schließen",
     noImage: "Kein Bild",
     browseShop: "Zum Shop",
+    confirm: "Bestätigen",
+    cancel: "Abbrechen",
+    confirmTitle: "Bestätigung",
   },
   meta: {
     tagline: "Premium-Möbel",

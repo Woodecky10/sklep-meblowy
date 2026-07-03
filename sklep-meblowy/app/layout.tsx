@@ -11,6 +11,7 @@ import CartToast from "./_components/layout/CartToast";
 import HideOnAdmin from "./_components/layout/HideOnAdmin";
 import { CartProvider } from "./_context/CartContext";
 import { ToastProvider } from "./_context/ToastContext";
+import { ConfirmProvider } from "./_context/ConfirmContext";
 import { COMPANY } from "./_lib/company";
 import { getLocale } from "./_lib/i18n-server";
 import { getDictionary } from "./_lib/dictionaries";
@@ -85,16 +86,18 @@ export default async function RootLayout({
             <FabricLabelProvider map={fabricMap}>
               <CartProvider>
                 <ToastProvider>
-                  <HideOnAdmin>
-                    <TopBar />
-                    <Navbar />
-                  </HideOnAdmin>
-                  <main className="flex-1">{children}</main>
-                  <HideOnAdmin>
-                    <Footer />
-                    <CookieBanner />
-                  </HideOnAdmin>
-                  <CartToast />
+                  <ConfirmProvider>
+                    <HideOnAdmin>
+                      <TopBar />
+                      <Navbar />
+                    </HideOnAdmin>
+                    <main className="flex-1">{children}</main>
+                    <HideOnAdmin>
+                      <Footer />
+                      <CookieBanner />
+                    </HideOnAdmin>
+                    <CartToast />
+                  </ConfirmProvider>
                 </ToastProvider>
               </CartProvider>
             </FabricLabelProvider>
