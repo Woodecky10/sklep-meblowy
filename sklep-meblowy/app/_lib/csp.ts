@@ -4,7 +4,7 @@
 // sanitizera; nonce nie obejmuje atrybutu style). script-src NIE ma
 // 'unsafe-inline' — tam liczy się ochrona przed XSS.
 
-type CspOpts = { isDev: boolean; supabaseOrigin: string | null };
+export type CspOpts = { isDev: boolean; supabaseOrigin: string | null };
 
 export function buildCsp(nonce: string, { isDev, supabaseOrigin }: CspOpts): string {
   const sbHttps = supabaseOrigin ? [supabaseOrigin] : [];
