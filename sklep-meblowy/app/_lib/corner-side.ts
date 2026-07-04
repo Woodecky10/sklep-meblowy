@@ -7,8 +7,7 @@
 // "LEWOSTRONNY"/"Lewa"/… (w tym literówkę "LEWOSTORNNY") — te produkty
 // dostają graficzny picker bez zmiany swoich danych.
 
-import type { ProductOption, ProductVariant, ProductVariants } from "./types";
-import { applyValuePricing, rebuildCombinations, variantKey } from "./variants";
+import type { ProductOption, ProductVariants } from "./types";
 
 // Kanoniczna postać opcji dodawanej przez toggle admina / backfill / nowy produkt.
 export const CORNER_SIDE_OPTION_NAME = "Strona";
@@ -75,14 +74,9 @@ export function hasCornerSideOption(variants: ProductVariants | null): boolean {
 // Włącza/wyłącza wybór strony. Idempotentne w obie strony (bez zmian, gdy
 // stan docelowy już zastany — zwraca wejście bez kopiowania).
 //
-// Włączanie: kanoniczna opcja "Strona" jako PIERWSZA (nad "Tkanina"), a istniejące
-// kombinacje są rozmnażane ×2 z ZACHOWANIEM stock/price_modifier/sale_price/
-// omnibus_price/images (strona nie zmienia ceny → duplikacja jest poprawna).
-// Świadomie NIE rebuildCombinations dla istniejących kombinacji — zmiana klucza
-// variantKey wyzerowałaby promocje i zdjęcia ustawione przez admina.
-//
-// Wyłączanie: usuwa opcje side-like; kombinacje kolapsują do pierwszej
-// pasującej per pozostały klucz. Ostatnia opcja → null (produkt bez wariantów).
+// Włączanie: kanoniczna opcja "Strona" jako PIERWSZA (nad "Tkanina").
+// Wyłączanie: usuwa opcje side-like. Ostatnia opcja → null (produkt bez wariantów).
+// Kombinacje nie sa mnożone ani kolapsowane — zawsze combinations: [].
 export function applyCornerSideSelection(
   variants: ProductVariants | null,
   enabled: boolean
@@ -94,46 +88,11 @@ export function applyCornerSideSelection(
       name: CORNER_SIDE_OPTION_NAME,
       values: [...CORNER_SIDE_VALUES],
     };
-    const options = [sideOption, ...base.options];
-    const combinations =
-      base.combinations.length > 0
-        ? CORNER_SIDE_VALUES.flatMap((side) =>
-            base.combinations.map((c) => ({
-              ...c,
-              values: { ...c.values, [CORNER_SIDE_OPTION_NAME]: side },
-            }))
-          )
-        : rebuildCombinations(options, []);
-    return {
-      ...base,
-      options,
-      combinations: applyValuePricing(options, combinations),
-    };
+    return { ...base, options: [sideOption, ...base.options], combinations: [] };
   }
 
   if (!variants || !hasCornerSideOption(variants)) return variants;
   const options = variants.options.filter((o) => !isCornerSideOptionName(o.name));
   if (options.length === 0) return null;
-  const removedNames = new Set(
-    variants.options
-      .filter((o) => isCornerSideOptionName(o.name))
-      .map((o) => o.name)
-  );
-  const seen = new Set<string>();
-  const collapsed: ProductVariant[] = [];
-  for (const c of variants.combinations) {
-    const values: Record<string, string> = {};
-    for (const [k, v] of Object.entries(c.values)) {
-      if (!removedNames.has(k)) values[k] = v;
-    }
-    const key = variantKey(values);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    collapsed.push({ ...c, values });
-  }
-  return {
-    ...variants,
-    options,
-    combinations: applyValuePricing(options, collapsed),
-  };
+  return { ...variants, options, combinations: [] };
 }

@@ -12,8 +12,7 @@ import {
 } from "@/app/_lib/corner-side";
 import type { ProductVariants } from "@/app/_lib/types";
 
-// Produkt z tkaninami (value pricing aktywny: Riviera +200) — do testów
-// zachowania danych kombinacji przy włączaniu/wyłączaniu strony.
+// Produkt z tkaninami — fixtures bez per-combo danych (combinations: []).
 const fabricVariants: ProductVariants = {
   options: [
     {
@@ -22,27 +21,14 @@ const fabricVariants: ProductVariants = {
       value_prices: { "Riviera 16": 200 },
     },
   ],
-  combinations: [
-    {
-      values: { Tkanina: "Sawana 21" },
-      stock: 3,
-      price_modifier: 0,
-      sale_price: 999,
-      omnibus_price: 1200,
-      images: ["a.jpg"],
-    },
-    { values: { Tkanina: "Riviera 16" }, stock: 1, price_modifier: 200 },
-  ],
+  combinations: [],
   overrides: { option_names: { Tkanina: "Materiał" } },
 };
 
 // Produkt z RĘCZNĄ opcją strony (uppercase, jak w prod DB).
 const manualSideVariants: ProductVariants = {
   options: [{ name: "STRONA", values: ["LEWOSTRONNY", "PRAWOSTRONNY"] }],
-  combinations: [
-    { values: { STRONA: "LEWOSTRONNY" }, stock: 0, price_modifier: 0 },
-    { values: { STRONA: "PRAWOSTRONNY" }, stock: 0, price_modifier: 0 },
-  ],
+  combinations: [],
 };
 
 describe("stałe — kanoniczne stringi", () => {
@@ -145,71 +131,29 @@ describe("hasCornerSideOption", () => {
   });
 });
 
-describe("applyCornerSideSelection — włączanie", () => {
-  it("null → struktura z 1 opcją i 2 kombinacjami (stock 0)", () => {
-    const r = applyCornerSideSelection(null, true);
-    expect(r).not.toBeNull();
-    expect(r!.options).toEqual([
-      { name: "Strona", values: ["Lewostronny", "Prawostronny"] },
-    ]);
-    expect(r!.combinations).toEqual([
-      { values: { Strona: "Lewostronny" }, stock: 0, price_modifier: 0 },
-      { values: { Strona: "Prawostronny" }, stock: 0, price_modifier: 0 },
-    ]);
+describe("applyCornerSideSelection — model tylko-opcje", () => {
+  it("null + enable → opcja Strona jako jedyna, bez kombinacji", () => {
+    const r = applyCornerSideSelection(null, true)!;
+    expect(r.options).toEqual([{ name: "Strona", values: ["Lewostronny", "Prawostronny"] }]);
+    expect(r.combinations).toEqual([]);
   });
-
-  it("produkt z tkaninami → Strona jako PIERWSZA opcja, kombinacje ×2 z zachowaniem danych", () => {
+  it("produkt z tkaninami + enable → Strona jako PIERWSza opcja, tkanina zostaje", () => {
     const r = applyCornerSideSelection(fabricVariants, true)!;
     expect(r.options.map((o) => o.name)).toEqual(["Strona", "Tkanina"]);
-    expect(r.combinations).toHaveLength(4);
-    // Dane kombinacji Sawana 21 skopiowane na OBIE strony (sale/omnibus/images/stock).
-    const sawanaLewa = r.combinations.find(
-      (c) => c.values.Strona === "Lewostronny" && c.values.Tkanina === "Sawana 21"
-    )!;
-    const sawanaPrawa = r.combinations.find(
-      (c) => c.values.Strona === "Prawostronny" && c.values.Tkanina === "Sawana 21"
-    )!;
-    for (const combo of [sawanaLewa, sawanaPrawa]) {
-      expect(combo.stock).toBe(3);
-      expect(combo.sale_price).toBe(999);
-      expect(combo.omnibus_price).toBe(1200);
-      expect(combo.images).toEqual(["a.jpg"]);
-      expect(combo.price_modifier).toBe(0);
-    }
-    // Dopłata per wartość (Riviera +200) przeliczona przez applyValuePricing.
-    const rivieraLewa = r.combinations.find(
-      (c) => c.values.Strona === "Lewostronny" && c.values.Tkanina === "Riviera 16"
-    )!;
-    expect(rivieraLewa.price_modifier).toBe(200);
-    expect(rivieraLewa.stock).toBe(1);
-    // Overrides przechodzą nietknięte.
+    expect(r.combinations).toEqual([]);
     expect(r.overrides).toEqual({ option_names: { Tkanina: "Materiał" } });
   });
-
-  it("idempotencja: produkt z ręczną opcją STRONA → bez zmian (nie dubluje)", () => {
+  it("idempotencja: ręczna opcja STRONA + enable → bez zmian", () => {
     expect(applyCornerSideSelection(manualSideVariants, true)).toBe(manualSideVariants);
   });
-});
-
-describe("applyCornerSideSelection — wyłączanie", () => {
-  it("strona + tkaniny → kolaps do kombinacji per tkanina (pierwsza pasująca), opcja usunięta", () => {
+  it("disable → usuwa opcje side-like; ostatnia opcja → null", () => {
+    expect(applyCornerSideSelection(manualSideVariants, false)).toBeNull();
     const enabled = applyCornerSideSelection(fabricVariants, true)!;
     const r = applyCornerSideSelection(enabled, false)!;
     expect(r.options.map((o) => o.name)).toEqual(["Tkanina"]);
-    expect(r.combinations).toHaveLength(2);
-    const sawana = r.combinations.find((c) => c.values.Tkanina === "Sawana 21")!;
-    expect(sawana.values).toEqual({ Tkanina: "Sawana 21" });
-    expect(sawana.stock).toBe(3);
-    expect(sawana.sale_price).toBe(999);
-    expect(sawana.images).toEqual(["a.jpg"]);
-    expect(r.overrides).toEqual({ option_names: { Tkanina: "Materiał" } });
+    expect(r.combinations).toEqual([]);
   });
-
-  it("strona jako jedyna opcja → null (produkt bez wariantów)", () => {
-    expect(applyCornerSideSelection(manualSideVariants, false)).toBeNull();
-  });
-
-  it("idempotencja: null / bez opcji strony → bez zmian", () => {
+  it("idempotencja: null/bez strony → bez zmian", () => {
     expect(applyCornerSideSelection(null, false)).toBeNull();
     expect(applyCornerSideSelection(fabricVariants, false)).toBe(fabricVariants);
   });
