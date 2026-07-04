@@ -132,9 +132,9 @@ export default function DescriptionSectionsEditor({
       <p className="text-sm text-[var(--muted)] max-w-2xl leading-relaxed">
         Wszystkie sekcje opisu są zarządzane <strong>tutaj</strong>.
         Sekcje pochodzące z dawnego importu możesz <strong>nadpisać</strong>
-        (przycisk „Edytuj override") albo ukryć.
+        (przycisk „Edytuj override”) albo ukryć.
         <br />
-        Nowe treści dodajesz przyciskami „+ Własna sekcja" (tekst) i „+ Zdjęcie".
+        Nowe treści dodajesz przyciskami „+ Własna sekcja” (tekst) i „+ Zdjęcie”.
       </p>
 
       <div className="flex flex-col">

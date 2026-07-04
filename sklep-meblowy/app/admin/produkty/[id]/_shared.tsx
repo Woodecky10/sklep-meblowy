@@ -87,6 +87,11 @@ export function CollapsibleSection({
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
+    // Sync z zapamiętanego stanu localStorage PO zamontowaniu. localStorage nie
+    // istnieje przy SSR, a czytanie go w inicjalizatorze useState dałoby rozjazd
+    // hydracji (serwer: rozwinięte, klient: zwinięte). To uzasadniony wyjątek od
+    // reguły „nie wywołuj setState w efekcie".
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCollapsed(readCollapsed(storageKey));
   }, [storageKey]);
 
@@ -108,6 +113,7 @@ export function CollapsibleSection({
           className="flex items-center gap-2 text-left group"
         >
           <svg
+            aria-hidden="true"
             width="18"
             height="18"
             viewBox="0 0 24 24"

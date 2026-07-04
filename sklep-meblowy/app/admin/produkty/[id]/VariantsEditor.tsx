@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState, useTransition } from "react";
 import Image from "next/image";
@@ -402,7 +402,7 @@ export default function VariantsEditor({
       }
     >
       <p className="text-sm text-[var(--muted)] max-w-2xl">
-        Najpierw dodaj opcje (np. „Kolor", „Strona"). Kombinacje generują się
+        Najpierw dodaj opcje (np. „Kolor”, „Strona”). Kombinacje generują się
         automatycznie z opcji × wartości. Dla każdej kombinacji ustaw stan i opcjonalnie
         zdjęcia — pokażą się klientowi po wybraniu wariantu.
       </p>
@@ -416,7 +416,7 @@ export default function VariantsEditor({
         </h3>
         {variants.options.length === 0 && (
           <p className="text-sm text-[var(--muted)] italic">
-            Brak opcji. Dodaj pierwszą żeby zacząć (np. „Kolor").
+            Brak opcji. Dodaj pierwszą żeby zacząć (np. „Kolor”).
           </p>
         )}
         {variants.options.map((opt, i) => (
@@ -571,7 +571,7 @@ function OptionRow({
           Wartości
         </span>
         <p className="text-[11px] text-[var(--muted)] -mt-1">
-          Pole „+zł" to dopłata do ceny bazowej za wybór tej wartości (np. Premium
+          Pole „+zł” to dopłata do ceny bazowej za wybór tej wartości (np. Premium
           +200). Dopłaty wybranych wartości sumują się. Puste = bez dopłaty.
         </p>
         <div className="flex flex-col gap-1.5">
