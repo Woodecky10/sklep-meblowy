@@ -38,33 +38,25 @@ export function isVariantSelectionComplete(
 }
 
 // Stock dostępny dla wybranej kombinacji.
-// Brak wariantów -> product.stock. Niekompletny wybór lub brak kombinacji -> 0.
+// Model produktowy: zawsze product.stock (stan na poziomie produktu).
 export function getVariantStock(
   product: Product,
-  selectedValues: Record<string, string>
+  _selectedValues: Record<string, string>
 ): number {
-  if (!hasVariants(product)) return product.stock;
-  const variant = findVariant(product, selectedValues);
-  return variant?.stock ?? 0;
+  return product.stock;
 }
 
-// Cena dla wybranej kombinacji = product.price + price_modifier.
-// Niekompletny wybór -> bazowa cena.
+// Cena dla wybranego zestawu opcji = product.price + suma dopłat wartości.
 export function getVariantPrice(
   product: Product,
   selectedValues: Record<string, string>
 ): number {
-  if (!hasVariants(product)) return product.price;
-  const variant = findVariant(product, selectedValues);
-  if (!variant) return product.price;
-  return product.price + (variant.price_modifier ?? 0);
+  return product.price + sumValueSurcharges(product.variants?.options ?? [], selectedValues);
 }
 
-// Suma stocków wszystkich kombinacji (lub product.stock dla produktu bez wariantów).
-// Używane np. w „Wyprzedany" gdy wszystkie kombinacje mają 0.
+// Dostępny stock produktu (model produktowy: product.stock).
 export function totalProductStock(product: Product): number {
-  if (!hasVariants(product)) return product.stock;
-  return product.variants!.combinations.reduce((sum, c) => sum + c.stock, 0);
+  return product.stock;
 }
 
 // Czy konkretna wartość opcji jest w ogóle dostępna (jakakolwiek kombinacja > 0)
@@ -113,16 +105,11 @@ export function formatVariantLabel(
     .join(", ");
 }
 
-// Zdjęcia do pokazania klientowi: jeśli wybrany wariant ma własne, użyj ich.
-// W przeciwnym razie (brak wariantów, niekompletny wybór, brak zdjęć w
-// kombinacji) wracamy do globalnej galerii produktu.
+// Zdjęcia do pokazania klientowi: galeria produktu (model produktowy).
 export function getVariantImages(
   product: Product,
-  selectedValues: Record<string, string>
+  _selectedValues: Record<string, string>
 ): string[] {
-  if (!hasVariants(product)) return product.images ?? [];
-  const variant = findVariant(product, selectedValues);
-  if (variant?.images && variant.images.length > 0) return variant.images;
   return product.images ?? [];
 }
 
@@ -156,24 +143,24 @@ export function variantKey(values: Record<string, string>): string {
     .join("|");
 }
 
-// Cena promocyjna wybranej jednostki (kombinacja lub poziom produktu).
+// Cena promocyjna wybranego zestawu opcji = product.sale_price + suma dopłat.
+// Gdy sale_price == null -> brak promocji (null).
 export function getVariantSalePrice(
   product: Product,
   selectedValues: Record<string, string>
 ): number | null {
-  if (!hasVariants(product)) return product.sale_price ?? null;
-  const variant = findVariant(product, selectedValues);
-  return variant?.sale_price ?? null;
+  if (product.sale_price == null) return null;
+  return product.sale_price + sumValueSurcharges(product.variants?.options ?? [], selectedValues);
 }
 
-// Najniższa cena z 30 dni dla wybranej jednostki (zdenormalizowana).
+// Najniższa cena z 30 dni dla wybranego zestawu opcji = product.omnibus_price + dopłaty.
+// Gdy omnibus_price == null -> null.
 export function getVariantOmnibus(
   product: Product,
   selectedValues: Record<string, string>
 ): number | null {
-  if (!hasVariants(product)) return product.omnibus_price ?? null;
-  const variant = findVariant(product, selectedValues);
-  return variant?.omnibus_price ?? null;
+  if (product.omnibus_price == null) return null;
+  return product.omnibus_price + sumValueSurcharges(product.variants?.options ?? [], selectedValues);
 }
 
 // Czy wybrana jednostka jest w promocji (sale < regularna).
