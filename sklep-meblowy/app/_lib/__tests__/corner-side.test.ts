@@ -6,6 +6,7 @@ import {
   isCornerCategorySlug,
   isCornerSideOptionName,
   cornerSideOf,
+  orderCornerSideValues,
   hasCornerSideOption,
   applyCornerSideSelection,
 } from "@/app/_lib/corner-side";
@@ -100,6 +101,37 @@ describe("cornerSideOf — mapowanie wartości na stronę", () => {
   it("wartość nierozpoznana (Sawana 21, pusty) → null", () => {
     expect(cornerSideOf("Sawana 21")).toBeNull();
     expect(cornerSideOf("")).toBeNull();
+  });
+});
+
+describe("orderCornerSideValues — stała kolejność wyświetlania (lewa→prawa)", () => {
+  it("['Prawostronny','Lewostronny'] → ['Lewostronny','Prawostronny'] (odwraca)", () => {
+    expect(orderCornerSideValues(["Prawostronny", "Lewostronny"])).toEqual([
+      "Lewostronny",
+      "Prawostronny",
+    ]);
+  });
+  it("['Lewostronny','Prawostronny'] → bez zmian", () => {
+    expect(orderCornerSideValues(["Lewostronny", "Prawostronny"])).toEqual([
+      "Lewostronny",
+      "Prawostronny",
+    ]);
+  });
+  it("wartości ręczne uppercase też porządkuje (PRAWOSTRONNY przed LEWOSTRONNY)", () => {
+    expect(orderCornerSideValues(["PRAWOSTRONNY", "LEWOSTRONNY"])).toEqual([
+      "LEWOSTRONNY",
+      "PRAWOSTRONNY",
+    ]);
+  });
+  it("nierozpoznane trafiają na koniec, w oryginalnej kolejności (stabilnie)", () => {
+    expect(
+      orderCornerSideValues(["Prawostronny", "Inna", "Lewostronny", "Druga"])
+    ).toEqual(["Lewostronny", "Prawostronny", "Inna", "Druga"]);
+  });
+  it("nie mutuje wejścia", () => {
+    const input = ["Prawostronny", "Lewostronny"];
+    orderCornerSideValues(input);
+    expect(input).toEqual(["Prawostronny", "Lewostronny"]);
   });
 });
 

@@ -11,6 +11,7 @@ import { FABRIC_OPTION_NAME } from "@/app/_lib/variants";
 import {
   cornerSideOf,
   isCornerSideOptionName,
+  orderCornerSideValues,
   type CornerSide,
 } from "@/app/_lib/corner-side";
 import { getDictionary } from "@/app/_lib/dictionaries";
@@ -259,7 +260,7 @@ function CornerSideGroup({
   return (
     <div>
       <div className="grid grid-cols-2 gap-3 max-w-sm">
-        {values.map((v) => {
+        {orderCornerSideValues(values).map((v) => {
           const side = cornerSideOf(v);
           const active = current === v;
           const label = labelOf(v);

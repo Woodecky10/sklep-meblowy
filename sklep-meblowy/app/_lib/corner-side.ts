@@ -47,6 +47,26 @@ export function cornerSideOf(value: string): CornerSide | null {
   return null;
 }
 
+// Kolejność wyświetlania stron w graficznym pickerze: ZAWSZE lewa→prawa,
+// niezależnie od kolejności zapisanej w danych. Katalog ma oba warianty
+// zapisu (część produktów "Prawostronny" przed "Lewostronny") → bez tego
+// pozycja kafelków lewo/prawo skakała między produktami (użytkownik: „na
+// niektórych produktach odwrócone względem siebie"). Wartości nierozpoznane
+// przez cornerSideOf trafiają na koniec w oryginalnej kolejności (stabilnie).
+// Zwraca nową tablicę — nie mutuje wejścia.
+export function orderCornerSideValues(values: string[]): string[] {
+  const rank = (v: string): number => {
+    const side = cornerSideOf(v);
+    if (side === "left") return 0;
+    if (side === "right") return 1;
+    return 2;
+  };
+  return values
+    .map((v, i) => ({ v, i }))
+    .sort((a, b) => rank(a.v) - rank(b.v) || a.i - b.i)
+    .map((x) => x.v);
+}
+
 // Czy produkt ma już opcję strony (dowolną side-like, także ręczną).
 export function hasCornerSideOption(variants: ProductVariants | null): boolean {
   return !!variants && variants.options.some((o) => isCornerSideOptionName(o.name));
