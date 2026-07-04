@@ -7,8 +7,6 @@ import { requireAdmin } from "@/app/_lib/admin";
 import { validateImageUpload } from "@/app/_lib/image-upload";
 import { buildNewProductPayload } from "@/app/_lib/new-product";
 import { recordPriceHistory } from "@/app/_lib/price-history";
-import { findInvalidVariantSale } from "@/app/_lib/pricing";
-import { formatVariantLabel, applyValuePricing } from "@/app/_lib/variants";
 import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-html";
 import { buildGroupKey, pickGroupKey } from "@/app/_lib/size-groups";
 import type {
@@ -158,19 +156,9 @@ export async function updateProductBasics(
   // przez sekcje w DescriptionSectionsEditor, nie przez to pole.
   const supabase = await createAdminClient();
 
-  // Defense-in-depth: ignoruj product-level sale_price gdy produkt ma warianty.
-  // UI wyłącza to pole dla produktów z wariantami, ale crafted POST mógłby go ustawić
-  // → karta by reklamowała obniżkę, której checkout nie honoruje (variant promo ≠
-  // product-level promo). Dla variant-produktów bezwarunkowo null.
-  const { data: existing } = await supabase
-    .from("products")
-    .select("variants")
-    .eq("id", id)
-    .maybeSingle();
-  const productHasVariants =
-    !!(existing as { variants?: { combinations?: unknown[] } } | null)
-      ?.variants?.combinations?.length;
-  const salePriceToSave = productHasVariants ? null : salePriceRaw;
+  // Model tylko-opcje: cena promocyjna jest produktowa także dla produktów z
+  // opcjami (dopłaty per wartość dolicza się do niej przy wyświetlaniu/checkout).
+  const salePriceToSave = salePriceRaw;
 
   const updates: Record<string, unknown> = {
     name,
@@ -253,11 +241,7 @@ export async function updateProductVariants(
 
   // Walidacja: jeśli niepusty, sprawdź strukturę
   if (variants !== null) {
-    if (
-      typeof variants !== "object" ||
-      !Array.isArray(variants.options) ||
-      !Array.isArray(variants.combinations)
-    ) {
+    if (typeof variants !== "object" || !Array.isArray(variants.options)) {
       return { ok: false, error: "Nieprawidłowa struktura wariantów" };
     }
     for (const opt of variants.options) {
@@ -269,65 +253,14 @@ export async function updateProductVariants(
           return { ok: false, error: "Nieprawidłowa struktura dopłat wartości" };
         }
         for (const p of Object.values(opt.value_prices)) {
-          if (typeof p !== "number" || !Number.isFinite(p)) {
-            return { ok: false, error: "Dopłata wartości musi być liczbą" };
+          if (typeof p !== "number" || !Number.isFinite(p) || p < 0) {
+            return { ok: false, error: "Dopłata wartości musi być liczbą >= 0" };
           }
         }
       }
     }
-    for (const c of variants.combinations) {
-      if (typeof c.values !== "object" || c.values === null) {
-        return { ok: false, error: "Nieprawidłowa struktura kombinacji" };
-      }
-      if (typeof c.stock !== "number") {
-        return { ok: false, error: "Stock kombinacji musi być liczbą" };
-      }
-      if (c.images !== undefined && !Array.isArray(c.images)) {
-        return { ok: false, error: "Zdjęcia kombinacji muszą być tablicą" };
-      }
-      if (c.sale_price !== undefined && c.sale_price !== null) {
-        if (typeof c.sale_price !== "number" || c.sale_price < 0) {
-          return { ok: false, error: "Cena promocyjna kombinacji musi być liczbą ≥ 0" };
-        }
-      }
-    }
-
-    // Cena promocyjna kombinacji musi być < jej ceny regularnej (base + modyfikator).
-    // Cena bazowa nie jest w payloadzie wariantów (zapisywana osobno przez
-    // updateProductBasics) — pobieramy zapisaną wartość z DB (autorytet).
-    const { data: baseRow } = await supabase
-      .from("products")
-      .select("price")
-      .eq("id", productId)
-      .maybeSingle();
-    if (!baseRow) return { ok: false, error: "Produkt nie istnieje" };
-    const basePrice = Number((baseRow as { price: number | string }).price);
-
-    // Serwerowo przelicz price_modifier z dopłat per wartość (nie ufamy
-    // klientowi). Gdy produkt nie używa dopłat — kombinacje bez zmian.
-    const combinations = applyValuePricing(variants.options, variants.combinations);
-    variantsToSave = { ...variants, combinations };
-
-    // Cena regularna kombinacji nie może zejść < 0 (ujemne dopłaty).
-    const negative = combinations.find((c) => basePrice + (c.price_modifier ?? 0) < 0);
-    if (negative) {
-      return {
-        ok: false,
-        error: `Cena kombinacji „${formatVariantLabel(
-          negative.values
-        )}" wychodzi poniżej zera — popraw dopłaty.`,
-      };
-    }
-
-    const invalid = findInvalidVariantSale(combinations, basePrice);
-    if (invalid) {
-      return {
-        ok: false,
-        error: `Cena promocyjna kombinacji „${formatVariantLabel(
-          invalid.values
-        )}" (${invalid.sale} zł) musi być niższa od jej ceny regularnej (${invalid.regular} zł).`,
-      };
-    }
+    // Zapisujemy tylko opcje + overrides (kombinacje znikają — Task 8 zdejmie pole z typu).
+    variantsToSave = { options: variants.options, overrides: variants.overrides, combinations: [] };
   }
 
   const { error } = await supabase
