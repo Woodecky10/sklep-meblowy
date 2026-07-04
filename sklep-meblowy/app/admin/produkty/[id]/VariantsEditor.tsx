@@ -10,7 +10,6 @@ import type {
 import { CollapsibleSection, Field, inputClass, type Toast } from "./_shared";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import {
-  formatVariantLabel,
   applyFabricSelection,
   expandFabrics,
   fabricValueBelongsTo,
