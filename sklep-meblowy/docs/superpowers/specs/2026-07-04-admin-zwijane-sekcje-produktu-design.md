@@ -65,7 +65,9 @@ Propsy:
 - `title: string` — tekst nagłówka (dawne `<h2>`).
 - `storageKey: string` — klucz persystencji (patrz tabela niżej).
 - `headerAside?: React.ReactNode` — opcjonalne akcje po prawej stronie nagłówka
-  (np. przycisk uploadu), renderowane POZA przyciskiem zwijania.
+  (np. przycisk uploadu, badge statusu), renderowane POZA przyciskiem zwijania.
+- `bodyClassName?: string` — klasy kontenera treści (domyślnie `flex flex-col gap-5`);
+  pozwala zachować różne odstępy sekcji (gap-4/5/6).
 - `children: React.ReactNode` — treść sekcji (chowana gdy zwinięte).
 
 Render:
@@ -78,10 +80,11 @@ Render:
   Refaktorując sekcję: cała dotychczasowa zawartość wiersza nagłówka OPRÓCZ `<h2>`
   (przyciski/akcje/status stojące dziś obok tytułu) przechodzi do `headerAside`;
   jeśli sekcja ma tylko `<h2>` (Opis, Podstawowe dane), `headerAside` pomijamy.
-- Treść: `{!collapsed && <div className="flex flex-col gap-5">{children}</div>}`
-  (odmontowanie treści gdy zwinięte jest OK — formularze są niekontrolowane
-  `defaultValue`, a stany edytorów wariantów/zdjęć żyją w komponentach-rodzicach
-  NAD `CollapsibleSection`, nie w jej dzieciach → zwinięcie nie gubi edycji).
+- Treść: `<div className={collapsed ? "hidden" : bodyClassName}>{children}</div>`
+  — ciało **ukrywane przez CSS** (`display:none`), NIE odmontowywane. Dzięki temu
+  niekontrolowane pola `defaultValue` w „Podstawowe dane" NIE tracą niezapisanych
+  wpisów przy zwinięciu/rozwinięciu (odmontowanie by je wyzerowało). `bodyClassName`
+  (domyślnie `flex flex-col gap-5`) pozwala zachować różne odstępy sekcji (gap-4/5/6).
 
 Stan:
 - `const [collapsed, setCollapsed] = useState(false)` — SSR-safe (rozwinięte).
