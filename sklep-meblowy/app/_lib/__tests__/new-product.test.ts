@@ -45,4 +45,25 @@ describe("buildNewProductPayload", () => {
   it("odrzuca nazwę dłuższą niż 300 znaków", () => {
     expect(buildNewProductPayload({ ...valid, name: "x".repeat(301) }).ok).toBe(false);
   });
+
+  it("kategoria naroznik-l → domyślna opcja Strona (opt-out w adminie)", () => {
+    const r = buildNewProductPayload({ ...valid, category: "naroznik-l" });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.payload.variants?.options).toEqual([
+        { name: "Strona", values: ["Lewostronny", "Prawostronny"] },
+      ]);
+      expect(r.payload.variants?.combinations).toEqual([
+        { values: { Strona: "Lewostronny" }, stock: 0, price_modifier: 0 },
+        { values: { Strona: "Prawostronny" }, stock: 0, price_modifier: 0 },
+      ]);
+    }
+  });
+
+  it("inne kategorie narożników (narozniki, pufy) → variants null (opt-in przez toggle)", () => {
+    for (const category of ["narozniki", "pufy", "sofy"]) {
+      const r = buildNewProductPayload({ ...valid, category });
+      expect(r.ok && r.payload.variants).toBeNull();
+    }
+  });
 });

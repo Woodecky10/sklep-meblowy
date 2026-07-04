@@ -1,5 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 208" role="img" aria-label="Narożnik prawy — szezlong po prawej stronie patrząc od frontu">
-  <title>Narożnik prawy</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 190">
   <!-- korpus (navy) — odbity względem osi pionowej -->
   <g transform="translate(200,0) scale(-1,1)">
     <g fill="#1a1a2e">
@@ -17,12 +16,10 @@
       <line x1="64" y1="118" x2="94" y2="118"/>
     </g>
   </g>
-  <!-- osoba patrząca od frontu -->
+  <!-- osoba patrząca od frontu (punkt odniesienia stron) -->
   <path d="M94 148 L100 142 L106 148" fill="none" stroke="#1a1a2e" stroke-opacity="0.55" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   <g fill="#1a1a2e" fill-opacity="0.8">
     <circle cx="100" cy="160" r="6"/>
     <path d="M88 176 a12 10 0 0 1 24 0 Z"/>
   </g>
-  <!-- podpis -->
-  <text x="100" y="200" text-anchor="middle" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-size="17" font-weight="600" fill="#1a1a2e" letter-spacing="0.3">Prawy</text>
 </svg>

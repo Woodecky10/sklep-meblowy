@@ -11,6 +11,11 @@ import { findInvalidVariantSale } from "@/app/_lib/pricing";
 import { formatVariantLabel, applyValuePricing } from "@/app/_lib/variants";
 import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-html";
 import { buildGroupKey, pickGroupKey } from "@/app/_lib/size-groups";
+import {
+  applyCornerSideSelection,
+  hasCornerSideOption,
+  CORNER_SIDE_DEFAULT_CATEGORY,
+} from "@/app/_lib/corner-side";
 import type {
   ActionResult,
   ProductDescriptionSection,
@@ -842,4 +847,71 @@ export async function updateSizeLabel(
   const ids = key ? await sizeGroupMemberIds(supabase, key) : [pid];
   revalidateProducts(ids.length ? ids : [pid]);
   return { ok: true, message: "Zapisano etykietę" };
+}
+
+// ============================================================
+// enableCornerSideForCategory — JEDNORAZOWY backfill wyboru strony
+// ============================================================
+// Włącza opcję "Strona" (Lewostronny/Prawostronny) wszystkim produktom
+// kategorii naroznik-l (decyzja: cała kategoria ON, opt-out per produkt).
+// Idempotentna: produkty z JAKĄKOLWIEK opcją side-like (także ręczną
+// "STRONA"/"STRONA MEBLA") są pomijane — ręczne warianty nietknięte.
+// Po potwierdzonym wykonaniu na produkcji usunąć przycisk
+// EnableCornerSideButton (ponowne kliknięcie nadpisałoby opt-outy).
+export async function enableCornerSideForCategory(): Promise<ActionResult> {
+  await requireAdmin();
+
+  const supabase = await createAdminClient();
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, variants")
+    .eq("category", CORNER_SIDE_DEFAULT_CATEGORY);
+
+  if (error) return { ok: false, error: error.message };
+
+  type Row = { id: string; variants: ProductVariants | null };
+  const rows = (data ?? []) as Row[];
+
+  let updated = 0;
+  let skipped = 0;
+  for (const row of rows) {
+    if (hasCornerSideOption(row.variants)) {
+      skipped++;
+      continue;
+    }
+    const next = applyCornerSideSelection(row.variants, true);
+    const { error: upErr } = await supabase
+      .from("products")
+      .update({ variants: next } as never)
+      .eq("id", row.id);
+    if (upErr) {
+      return {
+        ok: false,
+        error: `Błąd przy produkcie ${row.id} (zaktualizowano wcześniej: ${updated}): ${upErr.message}`,
+      };
+    }
+    updated++;
+    revalidatePath(`/admin/produkty/${row.id}`);
+    revalidatePath(`/produkt/${row.id}`);
+    // recordPriceHistory może rzucić (RPC) — degradujemy do czytelnego błędu
+    // z licznikiem częściowego postępu zamiast crasha error-boundary.
+    // Warianty tego produktu są już zapisane; ponowne uruchomienie pominie go
+    // (idempotencja), a historia cen dopisze się przy kolejnym zapisie cen.
+    try {
+      await recordPriceHistory(row.id);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return {
+        ok: false,
+        error: `Zapisano warianty (zaktualizowano: ${updated}, pominięto: ${skipped}), ale historia cen produktu ${row.id} nie zapisała się: ${message}`,
+      };
+    }
+  }
+
+  revalidatePath("/admin/produkty");
+  revalidatePath("/sklep");
+  return {
+    ok: true,
+    message: `Włączono wybór strony: ${updated}, pominięto (już mają): ${skipped}, razem: ${rows.length}`,
+  };
 }

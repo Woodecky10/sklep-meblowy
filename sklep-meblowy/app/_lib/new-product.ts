@@ -3,6 +3,12 @@
 // woła to i robi sam insert. Payload castowany `as never` przy insercie
 // (Product type nie zawiera kolumn needs_translation/_de).
 
+import type { ProductVariants } from "./types";
+import {
+  applyCornerSideSelection,
+  CORNER_SIDE_DEFAULT_CATEGORY,
+} from "./corner-side";
+
 export type NewProductPayload = {
   name: string;
   price: number;
@@ -12,7 +18,7 @@ export type NewProductPayload = {
   stock: number;
   features: { key: string; value: string }[];
   description_sections: unknown[];
-  variants: null;
+  variants: ProductVariants | null;
   color: null;
   material: null;
   dimensions: null;
@@ -64,7 +70,11 @@ export function buildNewProductPayload(input: {
       stock: 0,
       features: [],
       description_sections: [],
-      variants: null,
+      // Narożniki L dostają wybór strony domyślnie (decyzja: opt-out w adminie).
+      variants:
+        category === CORNER_SIDE_DEFAULT_CATEGORY
+          ? applyCornerSideSelection(null, true)
+          : null,
       color: null,
       material: null,
       dimensions: null,
