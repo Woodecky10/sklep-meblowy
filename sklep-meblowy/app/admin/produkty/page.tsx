@@ -6,7 +6,6 @@ import type { Product } from "@/app/_lib/types";
 import { hasVariants, totalProductStock } from "@/app/_lib/variants";
 import DeleteProductButton from "./DeleteProductButton";
 import ToggleProductActiveButton from "./ToggleProductActiveButton";
-import EnableCornerSideButton from "./EnableCornerSideButton";
 
 export const metadata = { title: "Produkty — Admin" };
 
@@ -37,15 +36,12 @@ export default async function AdminProductsPage() {
             Kliknij &bdquo;Edytuj&rdquo; przy produkcie, żeby zmienić nazwę, cenę, opis, zdjęcia lub warianty.
           </p>
         </div>
-        <div className="shrink-0 flex items-start gap-3">
-          <EnableCornerSideButton />
-          <Link
-            href="/admin/produkty/nowy"
-            className="shrink-0 px-5 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
-          >
-            + Nowy produkt
-          </Link>
-        </div>
+        <Link
+          href="/admin/produkty/nowy"
+          className="shrink-0 px-5 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
+        >
+          + Nowy produkt
+        </Link>
       </div>
 
       {error && (
