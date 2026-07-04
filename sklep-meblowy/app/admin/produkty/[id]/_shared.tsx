@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { readCollapsed, writeCollapsed } from "@/app/_lib/section-collapse";
+
 export { compressIfNeeded } from "@/app/_lib/image-compress";
 
 // Shared helpers dla ProductEditor i VariantsEditor.
@@ -62,3 +65,69 @@ export function IconBtn({
   );
 }
 
+// Zwijana sekcja edytora produktu. Renderuje standardową kartę z klikalnym
+// nagłówkiem (chevron + tytuł). Stan zapamiętywany w localStorage per storageKey
+// (wspólnie dla wszystkich produktów). Start rozwinięty (SSR-safe); po
+// zamontowaniu ustawiany zapamiętany stan (możliwe jednoklatkowe mignięcie —
+// akceptowalne w adminie). headerAside pozostaje widoczne także po zwinięciu;
+// klik w akcję w headerAside nie zwija sekcji (osobny element, nie przycisk toggle).
+export function CollapsibleSection({
+  title,
+  storageKey,
+  headerAside,
+  bodyClassName = "flex flex-col gap-5",
+  children,
+}: {
+  title: string;
+  storageKey: string;
+  headerAside?: React.ReactNode;
+  bodyClassName?: string;
+  children: React.ReactNode;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    setCollapsed(readCollapsed(storageKey));
+  }, [storageKey]);
+
+  function toggle() {
+    setCollapsed((v) => {
+      const next = !v;
+      writeCollapsed(storageKey, next);
+      return next;
+    });
+  }
+
+  return (
+    <section className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col gap-5">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={!collapsed}
+          className="flex items-center gap-2 text-left group"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className={`text-[var(--muted)] transition-transform ${collapsed ? "" : "rotate-90"}`}
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+          <h2 className="font-display text-xl font-semibold text-[var(--fg)]">
+            {title}
+          </h2>
+        </button>
+        {headerAside && <div className="shrink-0">{headerAside}</div>}
+      </div>
+      {/* Ukrywamy przez CSS (display:none), NIE odmontowujemy — zachowuje stan
+          niekontrolowanych pól (defaultValue) w sekcji „Podstawowe dane" przy
+          zwinięciu/rozwinięciu. */}
+      <div className={collapsed ? "hidden" : bodyClassName}>{children}</div>
+    </section>
+  );
+}
