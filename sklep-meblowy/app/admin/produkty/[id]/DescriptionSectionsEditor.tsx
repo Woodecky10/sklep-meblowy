@@ -4,7 +4,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { updateProductDescriptionSections } from "../actions";
 import type { ProductDescriptionSection } from "@/app/_lib/types";
-import { IconBtn, inputClass, type Toast } from "./_shared";
+import { CollapsibleSection, IconBtn, inputClass, type Toast } from "./_shared";
 import { useImageUpload } from "./useImageUpload";
 import RichTextEditor from "./RichTextEditor";
 import { useConfirm } from "@/app/_context/ConfirmContext";
@@ -128,19 +128,14 @@ export default function DescriptionSectionsEditor({
   }
 
   return (
-    <section className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col gap-4">
-      <div>
-        <h2 className="font-display text-xl font-semibold text-[var(--fg)]">
-          Sekcje opisu produktu
-        </h2>
-        <p className="text-sm text-[var(--muted)] mt-1 max-w-2xl leading-relaxed">
-          Wszystkie sekcje opisu są zarządzane <strong>tutaj</strong>.
-          Sekcje pochodzące z dawnego importu możesz <strong>nadpisać</strong>
-          (przycisk „Edytuj override”) albo ukryć.
-          <br />
-          Nowe treści dodajesz przyciskami „+ Własna sekcja” (tekst) i „+ Zdjęcie”.
-        </p>
-      </div>
+    <CollapsibleSection title="Sekcje opisu produktu" storageKey="sekcje-opisu" bodyClassName="flex flex-col gap-4">
+      <p className="text-sm text-[var(--muted)] max-w-2xl leading-relaxed">
+        Wszystkie sekcje opisu są zarządzane <strong>tutaj</strong>.
+        Sekcje pochodzące z dawnego importu możesz <strong>nadpisać</strong>
+        (przycisk „Edytuj override") albo ukryć.
+        <br />
+        Nowe treści dodajesz przyciskami „+ Własna sekcja" (tekst) i „+ Zdjęcie".
+      </p>
 
       <div className="flex flex-col">
         {/* Insert button na samej górze */}
@@ -228,7 +223,7 @@ export default function DescriptionSectionsEditor({
           {saving ? "Zapisuję..." : "Zapisz sekcje"}
         </button>
       </div>
-    </section>
+    </CollapsibleSection>
   );
 }
 
