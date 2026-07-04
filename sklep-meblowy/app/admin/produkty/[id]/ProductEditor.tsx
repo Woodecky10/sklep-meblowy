@@ -388,7 +388,7 @@ export default function ProductEditor({
       {/* ============================================================
           Sekcja: Warianty (pełny editor)
           ============================================================ */}
-      <VariantsEditor productId={product.id} initial={product.variants} basePrice={product.price} categorySlug={product.category} fabrics={fabrics} onToast={showToast} />
+      <VariantsEditor productId={product.id} initial={product.variants} categorySlug={product.category} fabrics={fabrics} onToast={showToast} />
 
       {/* ============================================================
           Sekcja: Pojedynczy opis (fallback gdy brak sekcji)

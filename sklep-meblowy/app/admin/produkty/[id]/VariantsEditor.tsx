@@ -30,14 +30,12 @@ import {
 export default function VariantsEditor({
   productId,
   initial,
-  basePrice,
   categorySlug,
   fabrics,
   onToast,
 }: {
   productId: string;
   initial: ProductVariants | null;
-  basePrice: number;
   categorySlug: string;
   fabrics: Fabric[];
   onToast: (t: Toast) => void;
@@ -254,9 +252,7 @@ export default function VariantsEditor({
       }
     >
       <p className="text-sm text-[var(--muted)] max-w-2xl">
-        Najpierw dodaj opcje (np. „Kolor”, „Strona”). Kombinacje generują się
-        automatycznie z opcji × wartości. Dla każdej kombinacji ustaw stan i opcjonalnie
-        zdjęcia — pokażą się klientowi po wybraniu wariantu.
+        Dodaj opcje (np. „Kolor”, „Tkanina”, „Strona”) i ich wartości — klient wybiera po jednej wartości z każdej opcji. Przy wartości możesz ustawić dopłatę „+zł” (np. droższa tkanina). Stan magazynowy, cena promocyjna i zdjęcia są wspólne dla całego produktu — ustawiasz je w „Podstawowych danych” i „Zdjęciach produktu” wyżej.
       </p>
 
       {/* ============================================================
