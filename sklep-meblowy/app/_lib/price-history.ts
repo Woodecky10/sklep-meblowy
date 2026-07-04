@@ -2,7 +2,6 @@
 // price_history i denormalizuje wyliczone omnibus_price na produkt/kombinację.
 // Czysta logika (computePriceUpdates) jest w pricing.ts; tu tylko IO.
 import { createAdminClient } from "./supabase/server";
-import { variantKey } from "./variants";
 import { computePriceUpdates, type PriceUnit } from "./pricing";
 import type { Product, ProductVariants } from "./types";
 
@@ -15,21 +14,13 @@ export async function recordPriceHistory(productId: string): Promise<void> {
     .maybeSingle();
   if (!data) return;
   const product = data as Pick<Product, "id" | "price" | "sale_price" | "variants">;
-  const variants = product.variants as ProductVariants | null;
   const basePrice = Number(product.price);
 
-  const units: PriceUnit[] = [];
-  if (!variants || variants.combinations.length === 0) {
-    units.push({ variant_key: null, regular: basePrice, sale: product.sale_price });
-  } else {
-    for (const c of variants.combinations) {
-      units.push({
-        variant_key: variantKey(c.values),
-        regular: basePrice + (c.price_modifier ?? 0),
-        sale: c.sale_price ?? null,
-      });
-    }
-  }
+  // Model tylko-opcje: historia cen jest produktowa (dopłaty nie wchodzą do
+  // śledzenia — są stałym dodatkiem przy wyświetlaniu).
+  const units: PriceUnit[] = [
+    { variant_key: null, regular: basePrice, sale: product.sale_price },
+  ];
 
   const { data: histRows } = await supabase
     .from("price_history")
@@ -54,17 +45,7 @@ export async function recordPriceHistory(productId: string): Promise<void> {
   const setOmnibus = omniByKey.has(null); // poziom produktu (brak wariantów)
   const omnibusValue = setOmnibus ? (omniByKey.get(null) ?? null) : null;
 
-  let variantsPayload: ProductVariants | null = null;
-  if (variants && variants.combinations.length > 0) {
-    const nextCombos = variants.combinations.map((c) => {
-      const k = variantKey(c.values);
-      if (!omniByKey.has(k)) return c;
-      const v = omniByKey.get(k);
-      // number → ustaw; null → wyczyść (undefined znika przy serializacji JSON do kolumny).
-      return v == null ? { ...c, omnibus_price: undefined } : { ...c, omnibus_price: v };
-    });
-    variantsPayload = { ...variants, combinations: nextCombos };
-  }
+  const variantsPayload: ProductVariants | null = null;
 
   // Denormalizacja omnibus + insert historii w JEDNEJ transakcji (RPC, migr. 39).
   // Wcześniej były to 2 osobne zapisy — pad między nimi zostawiał omnibus
