@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { saveProductDe } from "../actions";
 import type { ProductDescriptionSection } from "@/app/_lib/types";
-import { Field, inputClass, type Toast } from "./_shared";
+import { CollapsibleSection, Field, inputClass, type Toast } from "./_shared";
 import RichTextEditor from "./RichTextEditor";
 
 // Surowe pola tłumaczenia DE produktu (niezlokalizowane — patrz page.tsx).
@@ -174,19 +174,10 @@ export default function TranslationEditor({
   }
 
   return (
-    <section className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="font-display text-xl font-semibold text-[var(--fg)]">
-            Tłumaczenie niemieckie (DE)
-          </h2>
-          <p className="text-sm text-[var(--muted)] mt-1 max-w-2xl leading-relaxed">
-            Treść pokazywana klientom w niemieckiej wersji sklepu. Wpisz ją
-            <strong> ręcznie</strong> — także sekcje opisu (po lewej polska treść
-            jako wzór do tłumaczenia). Puste pole = fallback do polskiej treści.
-          </p>
-        </div>
-        {/* Status badge */}
+    <CollapsibleSection
+      title="Tłumaczenie niemieckie (DE)"
+      storageKey="tlumaczenie-de"
+      headerAside={
         <div className="shrink-0 flex flex-col items-end gap-1">
           {initial.needs_translation ? (
             <span className="px-3 py-1 rounded-full text-[10px] font-sans uppercase tracking-widest bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200">
@@ -203,7 +194,13 @@ export default function TranslationEditor({
             </span>
           )}
         </div>
-      </div>
+      }
+    >
+      <p className="text-sm text-[var(--muted)] max-w-2xl leading-relaxed">
+        Treść pokazywana klientom w niemieckiej wersji sklepu. Wpisz ją
+        <strong> ręcznie</strong> — także sekcje opisu (po lewej polska treść
+        jako wzór do tłumaczenia). Puste pole = fallback do polskiej treści.
+      </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Field label="Nazwa (DE)" className="md:col-span-2">
@@ -309,7 +306,7 @@ export default function TranslationEditor({
           {saving ? "Zapisuję..." : "Zapisz tłumaczenie DE"}
         </button>
       </div>
-    </section>
+    </CollapsibleSection>
   );
 }
 
