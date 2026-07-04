@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState, useTransition } from "react";
 import Image from "next/image";
@@ -9,7 +9,7 @@ import type {
   ProductVariants,
   Fabric,
 } from "@/app/_lib/types";
-import { Field, IconBtn, inputClass, type Toast } from "./_shared";
+import { CollapsibleSection, Field, IconBtn, inputClass, type Toast } from "./_shared";
 import { useImageUpload } from "./useImageUpload";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import {
@@ -350,15 +350,10 @@ export default function VariantsEditor({
 
   if (!variants) {
     return (
-      <section className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col gap-4">
-        <div>
-          <h2 className="font-display text-xl font-semibold text-[var(--fg)]">
-            Warianty produktu
-          </h2>
-          <p className="text-sm text-[var(--muted)] mt-1">
-            Produkt nie ma wariantów. Stock jest zarządzany w polu &bdquo;Stan magazynowy&rdquo; wyżej.
-          </p>
-        </div>
+      <CollapsibleSection title="Warianty produktu" storageKey="warianty" bodyClassName="flex flex-col gap-4">
+        <p className="text-sm text-[var(--muted)]">
+          Produkt nie ma wariantów. Stock jest zarządzany w polu &bdquo;Stan magazynowy&rdquo; wyżej.
+        </p>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -387,23 +382,16 @@ export default function VariantsEditor({
             </button>
           )}
         </div>
-      </section>
+      </CollapsibleSection>
     );
   }
 
   return (
-    <section className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="font-display text-xl font-semibold text-[var(--fg)]">
-            Warianty produktu
-          </h2>
-          <p className="text-sm text-[var(--muted)] mt-1 max-w-2xl">
-            Najpierw dodaj opcje (np. „Kolor”, „Strona”). Kombinacje generują się
-            automatycznie z opcji × wartości. Dla każdej kombinacji ustaw stan i opcjonalnie
-            zdjęcia — pokażą się klientowi po wybraniu wariantu.
-          </p>
-        </div>
+    <CollapsibleSection
+      title="Warianty produktu"
+      storageKey="warianty"
+      bodyClassName="flex flex-col gap-6"
+      headerAside={
         <button
           type="button"
           onClick={disableVariants}
@@ -411,7 +399,13 @@ export default function VariantsEditor({
         >
           Usuń warianty
         </button>
-      </div>
+      }
+    >
+      <p className="text-sm text-[var(--muted)] max-w-2xl">
+        Najpierw dodaj opcje (np. „Kolor", „Strona"). Kombinacje generują się
+        automatycznie z opcji × wartości. Dla każdej kombinacji ustaw stan i opcjonalnie
+        zdjęcia — pokażą się klientowi po wybraniu wariantu.
+      </p>
 
       {/* ============================================================
           Opcje wariantów
@@ -422,7 +416,7 @@ export default function VariantsEditor({
         </h3>
         {variants.options.length === 0 && (
           <p className="text-sm text-[var(--muted)] italic">
-            Brak opcji. Dodaj pierwszą żeby zacząć (np. „Kolor”).
+            Brak opcji. Dodaj pierwszą żeby zacząć (np. „Kolor").
           </p>
         )}
         {variants.options.map((opt, i) => (
@@ -527,7 +521,7 @@ export default function VariantsEditor({
           onApply={applyFabrics}
         />
       )}
-    </section>
+    </CollapsibleSection>
   );
 }
 
@@ -577,7 +571,7 @@ function OptionRow({
           Wartości
         </span>
         <p className="text-[11px] text-[var(--muted)] -mt-1">
-          Pole „+zł” to dopłata do ceny bazowej za wybór tej wartości (np. Premium
+          Pole „+zł" to dopłata do ceny bazowej za wybór tej wartości (np. Premium
           +200). Dopłaty wybranych wartości sumują się. Puste = bez dopłaty.
         </p>
         <div className="flex flex-col gap-1.5">
@@ -683,7 +677,7 @@ function CombinationRow({
   const upload = useImageUpload({
     onUploaded: onAddImages,
     onToast,
-    successHint: 'Kliknij „Zapisz warianty” żeby utrwalić.',
+    successHint: 'Kliknij „Zapisz warianty" żeby utrwalić.',
   });
 
   // Picker pokazuje zdjęcia z innych wariantów, jeszcze nie dodane do tej
