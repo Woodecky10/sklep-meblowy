@@ -677,7 +677,7 @@ function CombinationRow({
   const upload = useImageUpload({
     onUploaded: onAddImages,
     onToast,
-    successHint: 'Kliknij „Zapisz warianty" żeby utrwalić.',
+    successHint: 'Kliknij „Zapisz warianty” żeby utrwalić.',
   });
 
   // Picker pokazuje zdjęcia z innych wariantów, jeszcze nie dodane do tej

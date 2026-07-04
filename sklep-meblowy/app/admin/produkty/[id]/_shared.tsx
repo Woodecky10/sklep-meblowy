@@ -110,7 +110,7 @@ export function CollapsibleSection({
           type="button"
           onClick={toggle}
           aria-expanded={!collapsed}
-          className="flex items-center gap-2 text-left group"
+          className="flex items-center gap-2 text-left"
         >
           <svg
             aria-hidden="true"
