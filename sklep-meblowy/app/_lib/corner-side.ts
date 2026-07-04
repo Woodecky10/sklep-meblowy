@@ -71,28 +71,27 @@ export function hasCornerSideOption(variants: ProductVariants | null): boolean {
   return !!variants && variants.options.some((o) => isCornerSideOptionName(o.name));
 }
 
-// Włącza/wyłącza wybór strony. Idempotentne w obie strony (bez zmian, gdy
-// stan docelowy już zastany — zwraca wejście bez kopiowania).
+// Wlacza/wylacza wybor strony. Idempotentne w obie strony (bez zmian, gdy
+// stan docelowy juz zastany — zwraca wejscie bez kopiowania).
 //
-// Włączanie: kanoniczna opcja "Strona" jako PIERWSZA (nad "Tkanina").
-// Wyłączanie: usuwa opcje side-like. Ostatnia opcja → null (produkt bez wariantów).
-// Kombinacje nie sa mnożone ani kolapsowane — zawsze combinations: [].
+// Wlaczanie: kanoniczna opcja "Strona" jako PIERWSZA (nad "Tkanina").
+// Wylaczanie: usuwa opcje side-like. Ostatnia opcja → null (produkt bez wariantow).
 export function applyCornerSideSelection(
   variants: ProductVariants | null,
   enabled: boolean
 ): ProductVariants | null {
   if (enabled) {
     if (hasCornerSideOption(variants)) return variants;
-    const base = variants ?? { options: [], combinations: [] };
+    const base = variants ?? { options: [] };
     const sideOption: ProductOption = {
       name: CORNER_SIDE_OPTION_NAME,
       values: [...CORNER_SIDE_VALUES],
     };
-    return { ...base, options: [sideOption, ...base.options], combinations: [] };
+    return { ...base, options: [sideOption, ...base.options] };
   }
 
   if (!variants || !hasCornerSideOption(variants)) return variants;
   const options = variants.options.filter((o) => !isCornerSideOptionName(o.name));
   if (options.length === 0) return null;
-  return { ...variants, options, combinations: [] };
+  return { ...variants, options };
 }

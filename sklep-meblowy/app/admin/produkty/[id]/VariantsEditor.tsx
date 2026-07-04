@@ -4,7 +4,6 @@ import { useMemo, useState, useTransition } from "react";
 import { updateProductVariants } from "../actions";
 import type {
   ProductOption,
-  ProductVariant,
   ProductVariants,
   Fabric,
 } from "@/app/_lib/types";
@@ -12,14 +11,11 @@ import { CollapsibleSection, Field, inputClass, type Toast } from "./_shared";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import {
   formatVariantLabel,
-  rebuildCombinations,
   applyFabricSelection,
-  applyValuePricing,
   expandFabrics,
   fabricValueBelongsTo,
   FABRIC_OPTION_NAME,
 } from "@/app/_lib/variants";
-import { findInvalidVariantSale } from "@/app/_lib/pricing";
 import { groupFabricsByCategory, groupSelectionState } from "@/app/_lib/fabric-groups";
 import {
   applyCornerSideSelection,
@@ -71,17 +67,12 @@ export default function VariantsEditor({
   // ============================================================
 
   function enableVariants() {
-    setVariants({ options: [], combinations: [] });
+    setVariants({ options: [] });
   }
 
   async function disableVariants() {
     if (!(await confirm({ message: "Usunąć wszystkie warianty produktu? Zdjęcia per wariant zostaną wyczyszczone.", danger: true }))) return;
     setVariants(null);
-  }
-
-  // Kombinacje usunięte z UI — zawsze zapisujemy pustą tablicę.
-  function commitOptions(_nextOptions: ProductOption[], _old: ProductVariant[]): ProductVariant[] {
-    return [];
   }
 
   function addOption() {
@@ -93,32 +84,13 @@ export default function VariantsEditor({
   function removeOption(idx: number) {
     if (!variants) return;
     const nextOptions = variants.options.filter((_, i) => i !== idx);
-    setVariants({
-      options: nextOptions,
-      combinations: commitOptions(nextOptions, variants.combinations),
-    });
+    setVariants({ ...variants, options: nextOptions });
   }
 
   function setOptionName(idx: number, name: string) {
     if (!variants) return;
-    const old = variants.options[idx];
     const nextOptions = variants.options.map((o, i) => (i === idx ? { ...o, name } : o));
-    // Jeśli nazwa się zmieniła, klucz starych kombinacji jest nieaktualny
-    // — najprościej zrebuild, tracąc poprzednie stock/images (ostrzegamy w UI).
-    // Ale jeśli mamy poprzednią nazwę i pasujące values, możemy zmapować.
-    // value_prices siedzą w obiekcie opcji (klucz = wartość), więc zmiana nazwy
-    // opcji ich nie rusza.
-    const remappedCombos = variants.combinations.map((c) => {
-      if (old.name in c.values) {
-        const { [old.name]: v, ...rest } = c.values;
-        return { ...c, values: { ...rest, [name]: v } };
-      }
-      return c;
-    });
-    setVariants({
-      options: nextOptions,
-      combinations: commitOptions(nextOptions, remappedCombos),
-    });
+    setVariants({ ...variants, options: nextOptions });
   }
 
   function addValue(optIdx: number, value: string) {
@@ -129,10 +101,7 @@ export default function VariantsEditor({
     const nextOptions = variants.options.map((o, i) =>
       i === optIdx ? { ...o, values: [...o.values, trimmed] } : o
     );
-    setVariants({
-      options: nextOptions,
-      combinations: commitOptions(nextOptions, variants.combinations),
-    });
+    setVariants({ ...variants, options: nextOptions });
   }
 
   function removeValue(optIdx: number, value: string) {
@@ -148,13 +117,10 @@ export default function VariantsEditor({
         value_prices: Object.keys(nextPrices).length > 0 ? nextPrices : undefined,
       };
     });
-    setVariants({
-      options: nextOptions,
-      combinations: commitOptions(nextOptions, variants.combinations),
-    });
+    setVariants({ ...variants, options: nextOptions });
   }
 
-  // Ustaw dopłatę dla wartości opcji (puste/0 usuwa wpis). Przelicza modyfikatory.
+  // Ustaw dopłatę dla wartości opcji (puste/0 usuwa wpis).
   function setValuePrice(optIdx: number, value: string, price: number | null) {
     if (!variants) return;
     const nextOptions = variants.options.map((o, i) => {
@@ -167,20 +133,17 @@ export default function VariantsEditor({
         value_prices: Object.keys(nextPrices).length > 0 ? nextPrices : undefined,
       };
     });
-    setVariants({
-      options: nextOptions,
-      combinations: applyValuePricing(nextOptions, variants.combinations),
-    });
+    setVariants({ ...variants, options: nextOptions });
   }
 
-  // Zastosuj wybór z katalogu → rozwiń kolekcje na wartości „Nazwa Numer" (+dopłaty),
-  // dołącz zachowane wartości spoza katalogu, ustaw opcję „Tkanina" + przelicz.
+  // Zastosuj wybor z katalogu → rozwin kolekcje na wartosci „Nazwa Numer" (+doplaty),
+  // dolacz zachowane wartosci spoza katalogu, ustaw opcje „Tkanina".
   function applyFabrics(selectedFabrics: Fabric[], keptOrphanValues: string[]) {
-    const base = variants ?? { options: [], combinations: [] };
+    const base = variants ?? { options: [] };
     const { values, valuePrices } = expandFabrics(
       selectedFabrics.map((f) => ({ name: f.name, colors: f.colors ?? [], price: f.price ?? 0 }))
     );
-    // Zachowaj dopłaty istniejących wartości-sierot (spoza katalogu).
+    // Zachowaj doplaty istniejacych wartosci-sierot (spoza katalogu).
     const currentVP =
       base.options.find((o) => o.name === FABRIC_OPTION_NAME)?.value_prices ?? {};
     const finalValues = [...values, ...keptOrphanValues.filter((v) => !values.includes(v))];
@@ -188,8 +151,8 @@ export default function VariantsEditor({
     for (const ov of keptOrphanValues) {
       if (finalVP[ov] == null && currentVP[ov] != null) finalVP[ov] = currentVP[ov];
     }
-    const next = applyFabricSelection(base.options, base.combinations, finalValues, finalVP);
-    setVariants(next.options.length === 0 ? null : { ...base, ...next });
+    const next = applyFabricSelection(base.options, finalValues, finalVP);
+    setVariants(next.options.length === 0 ? null : { ...base, options: next.options });
     setFabricPickerOpen(false);
   }
 
@@ -199,8 +162,7 @@ export default function VariantsEditor({
 
   function save() {
     startSaveTransition(async () => {
-      // Sprzątanie: filtruj puste opcje/wartości, zachowaj dopłaty istniejących
-      // wartości, przelicz kombinacje (applyValuePricing).
+      // Sprzatanie: filtruj puste opcje/wartosci, zachowaj doplaty istniejacych wartosci.
       let toSave: ProductVariants | null = variants;
       if (variants) {
         const cleanOptions = variants.options
@@ -221,43 +183,7 @@ export default function VariantsEditor({
         if (cleanOptions.length === 0) {
           toSave = null;
         } else {
-          toSave = {
-            ...variants,
-            options: cleanOptions,
-            combinations: applyValuePricing(
-              cleanOptions,
-              rebuildCombinations(cleanOptions, variants.combinations)
-            ),
-          };
-        }
-      }
-      // Cena regularna kombinacji nie może zejść < 0 (ujemne dopłaty).
-      if (toSave) {
-        const negative = toSave.combinations.find(
-          (c) => basePrice + (c.price_modifier ?? 0) < 0
-        );
-        if (negative) {
-          onToast({
-            type: "error",
-            message: `Cena kombinacji „${formatVariantLabel(
-              negative.values
-            )}" wychodzi poniżej zera — popraw dopłaty.`,
-          });
-          return;
-        }
-      }
-      // Feedback przed round-tripem: cena promo kombinacji < regularnej (base+modyfikator).
-      // Serwer waliduje to ponownie autorytatywnie (basePrice z DB).
-      if (toSave) {
-        const invalid = findInvalidVariantSale(toSave.combinations, basePrice);
-        if (invalid) {
-          onToast({
-            type: "error",
-            message: `Cena promocyjna kombinacji „${formatVariantLabel(
-              invalid.values
-            )}" (${invalid.sale} zł) musi być niższa od jej ceny regularnej (${invalid.regular} zł).`,
-          });
-          return;
+          toSave = { options: cleanOptions, overrides: variants.overrides };
         }
       }
       const res = await updateProductVariants(productId, toSave);
@@ -291,7 +217,7 @@ export default function VariantsEditor({
           <button
             type="button"
             onClick={() => {
-              setVariants({ options: [], combinations: [] });
+              setVariants({ options: [] });
               setFabricPickerOpen(true);
             }}
             className="px-5 py-2.5 border border-[var(--color-gold)] text-[var(--color-gold)] font-sans font-semibold text-xs uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"

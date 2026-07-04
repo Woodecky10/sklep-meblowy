@@ -46,12 +46,11 @@ describe("buildNewProductPayload", () => {
     expect(buildNewProductPayload({ ...valid, name: "x".repeat(301) }).ok).toBe(false);
   });
 
-  it("naroznik-l → variants ma opcję Strona, combinations puste", () => {
+  it("naroznik-l → variants ma opcje Strona", () => {
     const r = buildNewProductPayload({ name: "N", price: 1000, category: "naroznik-l" });
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.payload.variants?.options.map((o) => o.name)).toEqual(["Strona"]);
-      expect(r.payload.variants?.combinations).toEqual([]);
     }
   });
 

@@ -259,8 +259,8 @@ export async function updateProductVariants(
         }
       }
     }
-    // Zapisujemy tylko opcje + overrides (kombinacje znikają — Task 8 zdejmie pole z typu).
-    variantsToSave = { options: variants.options, overrides: variants.overrides, combinations: [] };
+    // Zapisujemy tylko opcje + overrides.
+    variantsToSave = { options: variants.options, overrides: variants.overrides };
   }
 
   const { error } = await supabase
@@ -329,7 +329,6 @@ export async function deleteProduct(formData: FormData): Promise<ActionResult> {
   const productRow = product as {
     name: string;
     images: string[] | null;
-    variants: { combinations: { images?: string[] | null }[] } | null;
   };
 
   const { error: deleteErr } = await supabase
@@ -339,19 +338,12 @@ export async function deleteProduct(formData: FormData): Promise<ActionResult> {
 
   if (deleteErr) return { ok: false, error: deleteErr.message };
 
-  // 4. Posprzątaj storage — best effort, nie blokujemy sukcesu jeśli się
-  // nie uda (zdjęcie sierota w bucket'cie to mniejszy problem niż wisząca
-  // operacja). Zbieramy URL-e z globalnej galerii + każdej kombinacji.
+  // 4. Posprzataj storage — best effort, nie blokujemy sukcesu jesli sie
+  // nie uda (zdjecie sierota w buckecie to mniejszy problem niz wiszaca
+  // operacja). Zbieramy URL-e z globalnej galerii produktu.
   const allImageUrls: string[] = [];
   if (Array.isArray(productRow.images)) {
     allImageUrls.push(...productRow.images.filter((u): u is string => typeof u === "string"));
-  }
-  if (productRow.variants?.combinations) {
-    for (const c of productRow.variants.combinations) {
-      if (Array.isArray(c.images)) {
-        allImageUrls.push(...c.images.filter((u): u is string => typeof u === "string"));
-      }
-    }
   }
   await Promise.all(allImageUrls.map((url) => deleteStorageImage(url)));
 

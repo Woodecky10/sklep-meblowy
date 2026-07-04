@@ -4,7 +4,6 @@ import {
   isOnSale,
   computeOmnibus,
   computePriceUpdates,
-  findInvalidVariantSale,
 } from "@/app/_lib/pricing";
 
 describe("effectivePrice / isOnSale", () => {
@@ -107,47 +106,3 @@ describe("computePriceUpdates", () => {
   });
 });
 
-describe("findInvalidVariantSale — promo kombinacji musi być < regularnej", () => {
-  it("wszystkie sale < regularnej (base+modyfikator) → null", () => {
-    const combos = [
-      { values: { Kolor: "Beż" }, sale_price: 800 }, // regular 1000
-      { values: { Kolor: "Dąb" }, price_modifier: 200, sale_price: 1100 }, // regular 1200
-    ];
-    expect(findInvalidVariantSale(combos, 1000)).toBeNull();
-  });
-  it("kombinacje bez sale_price są pomijane (null/undefined)", () => {
-    const combos = [
-      { values: { Kolor: "Beż" } },
-      { values: { Kolor: "Dąb" }, sale_price: null },
-    ];
-    expect(findInvalidVariantSale(combos, 1000)).toBeNull();
-  });
-  it("sale >= regularnej (literówka) → zwraca pierwszą błędną z wyliczoną regularną", () => {
-    const combos = [
-      { values: { Kolor: "Beż" }, sale_price: 800 }, // ok, regular 1000
-      { values: { Kolor: "Dąb" }, price_modifier: 200, sale_price: 7000 }, // regular 1200, błąd
-    ];
-    expect(findInvalidVariantSale(combos, 1000)).toEqual({
-      values: { Kolor: "Dąb" },
-      regular: 1200,
-      sale: 7000,
-    });
-  });
-  it("sale równa regularnej → błąd (musi być ŚCIŚLE niższa)", () => {
-    const combos = [{ values: { Kolor: "Beż" }, sale_price: 1000 }];
-    expect(findInvalidVariantSale(combos, 1000)).toEqual({
-      values: { Kolor: "Beż" },
-      regular: 1000,
-      sale: 1000,
-    });
-  });
-  it("ujemny modyfikator obniża regularną → sale musi być < obniżonej", () => {
-    const combos = [{ values: { Rozmiar: "S" }, price_modifier: -300, sale_price: 750 }];
-    // regular = 1000 - 300 = 700; sale 750 >= 700 → błąd
-    expect(findInvalidVariantSale(combos, 1000)).toEqual({
-      values: { Rozmiar: "S" },
-      regular: 700,
-      sale: 750,
-    });
-  });
-});

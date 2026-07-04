@@ -17,13 +17,12 @@ import {
 } from "@/app/_lib/variants";
 import type { Product } from "@/app/_lib/types";
 
-// Produkt z opcjami + dopłatą per wartość; stan/promo/zdjęcia PRODUKTOWE.
+// Produkt z opcjami + doplatą per wartosc; stan/promo/zdjecia PRODUKTOWE.
 const product = {
   id: "p1", name: "Sofa", price: 2000, stock: 5,
   sale_price: 1800, omnibus_price: 1700, images: ["prod.jpg"],
   variants: {
     options: [{ name: "Tkanina", values: ["Sawana 21", "Riviera 16"], value_prices: { "Riviera 16": 200 } }],
-    combinations: [], // pole jeszcze istnieje w typie (usuwane w Tasku 8)
   },
 } as unknown as import("@/app/_lib/types").Product;
 
@@ -75,7 +74,7 @@ describe("formatVariantLabel", () => {
 
 describe("getOptionDisplayName / getValueDisplayLabel", () => {
   it("brak overrides -> zwraca oryginalna nazwa", () => {
-    const p = { variants: { options: [], combinations: [], overrides: {} } } as unknown as Product;
+    const p = { variants: { options: [], overrides: {} } } as unknown as Product;
     expect(getOptionDisplayName(p, "Tkanina")).toBe("Tkanina");
     expect(getValueDisplayLabel(p, "Tkanina", "Sawana 21")).toBe("Sawana 21");
   });

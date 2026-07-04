@@ -11,8 +11,8 @@ import { formatVariantLabel } from "../variants";
 import type { ProductOption } from "../types";
 
 describe("applyFabricSelection", () => {
-  it("applyFabricSelection → ustawia opcję Tkanina + dopłaty (bez kombinacji)", () => {
-    const r = applyFabricSelection([], [], ["Sawana 21", "Riviera 16"], { "Riviera 16": 200 });
+  it("applyFabricSelection → ustawia opcje Tkanina + doplaty", () => {
+    const r = applyFabricSelection([], ["Sawana 21", "Riviera 16"], { "Riviera 16": 200 });
     const opt = r.options.find((o) => o.name === "Tkanina")!;
     expect(opt.values).toEqual(["Sawana 21", "Riviera 16"]);
     expect(opt.value_prices).toEqual({ "Riviera 16": 200 });

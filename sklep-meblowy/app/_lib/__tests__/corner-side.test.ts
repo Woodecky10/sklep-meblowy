@@ -12,7 +12,7 @@ import {
 } from "@/app/_lib/corner-side";
 import type { ProductVariants } from "@/app/_lib/types";
 
-// Produkt z tkaninami — fixtures bez per-combo danych (combinations: []).
+// Produkt z tkaninami.
 const fabricVariants: ProductVariants = {
   options: [
     {
@@ -21,14 +21,12 @@ const fabricVariants: ProductVariants = {
       value_prices: { "Riviera 16": 200 },
     },
   ],
-  combinations: [],
   overrides: { option_names: { Tkanina: "Materiał" } },
 };
 
-// Produkt z RĘCZNĄ opcją strony (uppercase, jak w prod DB).
+// Produkt z RECZNA opcja strony (uppercase, jak w prod DB).
 const manualSideVariants: ProductVariants = {
   options: [{ name: "STRONA", values: ["LEWOSTRONNY", "PRAWOSTRONNY"] }],
-  combinations: [],
 };
 
 describe("stałe — kanoniczne stringi", () => {
@@ -132,18 +130,16 @@ describe("hasCornerSideOption", () => {
 });
 
 describe("applyCornerSideSelection — model tylko-opcje", () => {
-  it("null + enable → opcja Strona jako jedyna, bez kombinacji", () => {
+  it("null + enable → opcja Strona jako jedyna", () => {
     const r = applyCornerSideSelection(null, true)!;
     expect(r.options).toEqual([{ name: "Strona", values: ["Lewostronny", "Prawostronny"] }]);
-    expect(r.combinations).toEqual([]);
   });
   it("produkt z tkaninami + enable → Strona jako PIERWSza opcja, tkanina zostaje", () => {
     const r = applyCornerSideSelection(fabricVariants, true)!;
     expect(r.options.map((o) => o.name)).toEqual(["Strona", "Tkanina"]);
-    expect(r.combinations).toEqual([]);
     expect(r.overrides).toEqual({ option_names: { Tkanina: "Materiał" } });
   });
-  it("idempotencja: ręczna opcja STRONA + enable → bez zmian", () => {
+  it("idempotencja: reczna opcja STRONA + enable → bez zmian", () => {
     expect(applyCornerSideSelection(manualSideVariants, true)).toBe(manualSideVariants);
   });
   it("disable → usuwa opcje side-like; ostatnia opcja → null", () => {
@@ -151,7 +147,6 @@ describe("applyCornerSideSelection — model tylko-opcje", () => {
     const enabled = applyCornerSideSelection(fabricVariants, true)!;
     const r = applyCornerSideSelection(enabled, false)!;
     expect(r.options.map((o) => o.name)).toEqual(["Tkanina"]);
-    expect(r.combinations).toEqual([]);
   });
   it("idempotencja: null/bez strony → bez zmian", () => {
     expect(applyCornerSideSelection(null, false)).toBeNull();
