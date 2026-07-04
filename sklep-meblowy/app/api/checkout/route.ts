@@ -5,10 +5,10 @@ import { createClient } from "@/app/_lib/supabase/server";
 import { createOrder } from "@/app/_lib/orders";
 import { validatePromoCode } from "@/app/_lib/promo";
 import {
-  findVariant,
   formatVariantLabel,
   hasVariants,
   isVariantSelectionComplete,
+  sumValueSurcharges,
 } from "@/app/_lib/variants";
 import type { Address, Product } from "@/app/_lib/types";
 import { getEurRate } from "@/app/_lib/store-settings";
@@ -178,20 +178,14 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
-        const variant = findVariant(product, item.variantValues);
-        if (!variant) {
-          return NextResponse.json(
-            {
-              error: tr(
-                `Nieprawidłowy wariant dla: ${product.name}`,
-                `Ungültige Variante für: ${product.name}`
-              ),
-            },
-            { status: 400 }
-          );
-        }
-        const regular = Number(product.price) + (variant.price_modifier ?? 0);
-        unitPrice = effectivePrice(regular, variant.sale_price);
+        const surcharge = sumValueSurcharges(
+          product.variants?.options ?? [],
+          item.variantValues
+        );
+        const regular = Number(product.price) + surcharge;
+        const sale =
+          product.sale_price != null ? Number(product.sale_price) + surcharge : null;
+        unitPrice = effectivePrice(regular, sale);
         variantValues = item.variantValues;
       }
 
