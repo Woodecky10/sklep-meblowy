@@ -59,7 +59,7 @@ export default async function AdminProductsPage() {
           {products.map((p) => {
             const thumb = p.images[0] ?? null;
             const stock = hasVariants(p) ? totalProductStock(p) : p.stock;
-            const variantCount = hasVariants(p) ? p.variants!.combinations.length : 0;
+            const variantCount = p.variants?.options.length ?? 0;
             return (
               <li
                 key={p.id}

@@ -46,17 +46,12 @@ describe("buildNewProductPayload", () => {
     expect(buildNewProductPayload({ ...valid, name: "x".repeat(301) }).ok).toBe(false);
   });
 
-  it("kategoria naroznik-l → domyślna opcja Strona (opt-out w adminie)", () => {
-    const r = buildNewProductPayload({ ...valid, category: "naroznik-l" });
+  it("naroznik-l → variants ma opcję Strona, combinations puste", () => {
+    const r = buildNewProductPayload({ name: "N", price: 1000, category: "naroznik-l" });
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.payload.variants?.options).toEqual([
-        { name: "Strona", values: ["Lewostronny", "Prawostronny"] },
-      ]);
-      expect(r.payload.variants?.combinations).toEqual([
-        { values: { Strona: "Lewostronny" }, stock: 0, price_modifier: 0 },
-        { values: { Strona: "Prawostronny" }, stock: 0, price_modifier: 0 },
-      ]);
+      expect(r.payload.variants?.options.map((o) => o.name)).toEqual(["Strona"]);
+      expect(r.payload.variants?.combinations).toEqual([]);
     }
   });
 

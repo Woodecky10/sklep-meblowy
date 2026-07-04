@@ -6,7 +6,6 @@ import Link from "next/link";
 import { updateProductBasics, updateProductImages } from "../actions";
 import type { Product, ActionResult, Fabric } from "@/app/_lib/types";
 import type { CategoryDef } from "@/app/_lib/categories";
-import { hasVariants } from "@/app/_lib/variants";
 import { Field, IconBtn, inputClass, CollapsibleSection, type Toast } from "./_shared";
 import { useImageUpload } from "./useImageUpload";
 import VariantsEditor from "./VariantsEditor";
@@ -157,11 +156,7 @@ export default function ProductEditor({
 
           <Field
             label="Cena promocyjna (zł)"
-            hint={
-              hasVariants(product)
-                ? "Produkt ma warianty — ustaw promocję per kombinacja w sekcji Warianty."
-                : "Zostaw puste = brak promocji. Musi być niższa od ceny regularnej."
-            }
+            hint="Zostaw puste = brak promocji. Musi być niższa od ceny regularnej."
           >
             <input
               name="sale_price"
@@ -170,7 +165,6 @@ export default function ProductEditor({
               min="0"
               defaultValue={product.sale_price ?? ""}
               className={inputClass}
-              disabled={hasVariants(product)}
             />
           </Field>
 
@@ -184,10 +178,7 @@ export default function ProductEditor({
             </select>
           </Field>
 
-          <Field
-            label="Stan magazynowy"
-            hint={hasVariants(product) ? "Dla produktów z wariantami suma stocków = stock per kombinacja." : undefined}
-          >
+          <Field label="Stan magazynowy">
             <input
               name="stock"
               type="number"
@@ -195,7 +186,6 @@ export default function ProductEditor({
               step="1"
               defaultValue={product.stock}
               className={inputClass}
-              disabled={hasVariants(product)}
             />
           </Field>
 
