@@ -63,7 +63,7 @@ export default function FilterBar({
   const sort = searchParams.get("sortuj") ?? "alphabetic";
   const inStockOnly = searchParams.get("dostepne") === "1";
   const selectedColors = (searchParams.get("kolor") ?? "").split(",").filter(Boolean);
-  const selectedMaterials = (searchParams.get("material") ?? "").split(",").filter(Boolean);
+  const selectedMaterials = (searchParams.get("tkanina") ?? "").split(",").filter(Boolean);
 
   const [priceMin, setPriceMin] = useState(searchParams.get("cena_od") ?? "");
   const [priceMax, setPriceMax] = useState(searchParams.get("cena_do") ?? "");
@@ -368,7 +368,7 @@ export default function FilterBar({
               return (
                 <button
                   key={m.value}
-                  onClick={() => toggleMulti("material", selectedMaterials, m.value)}
+                  onClick={() => toggleMulti("tkanina", selectedMaterials, m.value)}
                   className={`px-3 py-1.5 rounded-full text-xs font-sans capitalize transition-colors ${
                     active
                       ? "bg-[var(--color-gold)] text-white"
@@ -474,7 +474,7 @@ export default function FilterBar({
               key={`material-${m}`}
               label={`${t.filter.material}: ${materialLabel(m)}`}
               removeLabel={t.filter.removeFilter}
-              onRemove={() => toggleMulti("material", selectedMaterials, m)}
+              onRemove={() => toggleMulti("tkanina", selectedMaterials, m)}
             />
           ))}
           {priceActive && (

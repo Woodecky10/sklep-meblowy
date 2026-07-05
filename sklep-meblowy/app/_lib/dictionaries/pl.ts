@@ -459,7 +459,7 @@ export const pl = {
     category: "Kategoria",
     collection: "Kolekcja",
     color: "Kolor",
-    material: "Materiał",
+    material: "Tkanina",
     price: "Cena",
     inStock: "Dostępne od ręki",
     clear: "Wyczyść",

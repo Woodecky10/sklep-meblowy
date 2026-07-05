@@ -176,7 +176,7 @@ export const de: DeepPartial<PlShape> = {
     category: "Kategorie",
     collection: "Kollektion",
     color: "Farbe",
-    material: "Material",
+    material: "Stoff",
     price: "Preis",
     inStock: "Sofort verfügbar",
     clear: "Zurücksetzen",
