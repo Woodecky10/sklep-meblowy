@@ -139,6 +139,7 @@ export async function getProducts(filters: ProductFilters = {}) {
   // pozostałymi filtrami zostają w DB.
   if (materials?.length) {
     const [{ data: fabricRows }, fabrics] = await Promise.all([
+      // Bez .limit() — świadomie (katalog ~dziesiątki produktów). Przy dużym wzroście katalogu PostgREST utnie wiersze i filtr/facety po cichu zgubią produkty — wtedy zdenormalizować rodziny do kolumny.
       supabase.from("products").select("id, variants, material"),
       getAllFabrics(),
     ]);
@@ -354,6 +355,7 @@ export async function getFilterFacets(locale: Locale = DEFAULT_LOCALE) {
       .select("color, color_de")
       .not("color", "is", null),
     // Źródła facetu tkanin: opcje wariantów (rodziny) + legacy kolumna material.
+    // Bez .limit() — świadomie (katalog ~dziesiątki produktów). Przy dużym wzroście katalogu PostgREST utnie wiersze i filtr/facety po cichu zgubią produkty — wtedy zdenormalizować rodziny do kolumny.
     supabase.from("products").select("variants, material, material_de"),
     getAllFabrics(),
   ]);

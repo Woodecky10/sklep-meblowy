@@ -29,7 +29,7 @@ describe("deriveFabricFamilies — rodziny tkanin z wartości opcji", () => {
     ).toEqual(["Poso"]);
   });
 
-  it("opcja pisana TKANINA (uppercase) też działa", () => {
+  it("wartość tkaniny wykrywana w dowolnie nazwanej opcji (np. TKANINA)", () => {
     expect(
       deriveFabricFamilies(v([{ name: "TKANINA", values: ["Trinity 01 Cream"] }]), FAMILIES)
     ).toEqual(["Trinity"]);
@@ -84,6 +84,16 @@ describe("deriveFabricFamilies — rodziny tkanin z wartości opcji", () => {
       )
     ).toEqual(["Inari", "Woolly"]);
   });
+
+  it("puste familyNames → []", () => {
+    expect(deriveFabricFamilies(v([{ name: "Tkanina", values: ["Poso 105"] }]), [])).toEqual([]);
+  });
+
+  it("wielokrotne spacje w wartości → nadal pasuje", () => {
+    expect(
+      deriveFabricFamilies(v([{ name: "Tkanina", values: ["Chill   Me   22"] }]), FAMILIES)
+    ).toEqual(["Chill Me"]);
+  });
 });
 
 describe("productMatchesFabric — unia: rodziny z wariantów LUB legacy material", () => {
@@ -112,5 +122,9 @@ describe("productMatchesFabric — unia: rodziny z wariantów LUB legacy materia
     expect(
       productMatchesFabric(null, "Monolith + Solar", ["Monolith + Solar"], FAMILIES)
     ).toBe(true);
+  });
+
+  it("selected puste → false", () => {
+    expect(productMatchesFabric(fabricProduct, "Poso", [], FAMILIES)).toBe(false);
   });
 });
