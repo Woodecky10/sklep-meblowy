@@ -64,7 +64,10 @@ export default function FilterBar({
   // od razu przy kliku; zwalniane gdy nawigacja się zatwierdzi. Szybkie
   // wieloklikanie: każdy klik nadpisuje pendingQuery (buduje na effectiveParams,
   // więc wybory się składają); zatwierdzenie starszej nawigacji może na moment
-  // pokazać jej stan — akceptowalne, brak ryzyka "zawieszonego" pendingu.
+  // pokazać jej stan — akceptowalne. Dwa mechanizmy zwalniania pendingu:
+  // (1) zmiana committedQuery (efekt niżej), (2) zakończenie transition bez
+  // zmiany URL — patrz wasNavPending (nawigacja na IDENTYCZNY URL, np. ponowny
+  // klik już-aktywnej opcji sortowania, nigdy nie zmieni committedQuery).
   const [isPending, startTransition] = useTransition();
   const [pendingQuery, setPendingQuery] = useState<string | null>(null);
   const committedQuery = searchParams.toString();
@@ -76,6 +79,13 @@ export default function FilterBar({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPendingQuery(null);
   }, [committedQuery]);
+  // Nawigacja na IDENTYCZNY URL nie zmienia committedQuery — pending zwalniamy
+  // też gdy transition się zakończy (true→false), inaczej pasek wisiałby na zawsze.
+  const wasNavPending = useRef(false);
+  useEffect(() => {
+    if (wasNavPending.current && !isPending) setPendingQuery(null);
+    wasNavPending.current = isPending;
+  }, [isPending]);
   const effectiveParams = new URLSearchParams(pendingQuery ?? committedQuery);
   const showPending = isPending || pendingQuery !== null;
 
@@ -122,7 +132,7 @@ export default function FilterBar({
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(pendingQuery ?? searchParams.toString());
       if (priceMin) params.set("cena_od", priceMin);
       else params.delete("cena_od");
       if (priceMax) params.set("cena_do", priceMax);
@@ -141,9 +151,12 @@ export default function FilterBar({
     // navigate/effectiveParams celowo pominięte: navigate jest nowym obiektem
     // funkcji przy każdym renderze (niezmemoizowany), więc dodanie go
     // resetowałoby debounce przy każdym renderze zamiast tylko przy zmianie
-    // ceny — zmieniłoby to zachowanie debounce'a.
+    // ceny — zmieniłoby to zachowanie debounce'a. pendingQuery jest w deps:
+    // restart debounce'a gdy w trakcie wpisywania ceny wystartuje inna
+    // nawigacja (np. klik chipa) jest akceptowalny, a dzięki temu efekt buduje
+    // params na aktualnym stanie optymistycznym zamiast go nadpisywać.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [priceMin, priceMax, router, searchParams, locale]);
+  }, [priceMin, priceMax, router, searchParams, locale, pendingQuery]);
 
   // Jedyna ścieżka nawigacji filtrów: ustawia optymistyczny stan i odpala
   // router.push w transition (isPending → pasek pending pod FilterBarem).

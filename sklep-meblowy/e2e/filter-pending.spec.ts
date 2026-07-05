@@ -33,3 +33,16 @@ test("filtr tkaniny — natychmiastowy feedback przed odpowiedzią serwera", asy
   await expect(page.locator('div[aria-busy="true"]')).toHaveCount(0, { timeout: 10_000 });
   expect(optionLabel.length).toBeGreaterThan(0);
 });
+
+// Regresja: nawigacja na IDENTYCZNY URL (ponowny klik aktywnego sortowania)
+// nie może zostawić wiszącego wskaźnika pending.
+test("ponowny klik aktywnej opcji sortowania — pending znika", async ({ page }) => {
+  await page.goto("/sklep?sortuj=newest");
+  await page.getByRole("button", { name: /sortuj/i }).first().click();
+  // kliknij już-aktywną opcję "Najnowsze" w dropdownie sortowania (dopasowanie
+  // dokładne odróżnia opcję "Najnowsze" od piguły wyzwalającej "Sortuj: Najnowsze").
+  const active = page.getByRole("button", { name: "Najnowsze", exact: true });
+  await active.click();
+  // pending może się pojawić, ale MUSI zniknąć po zakończeniu transition
+  await expect(page.locator('div[aria-busy="true"]')).toHaveCount(0, { timeout: 5000 });
+});

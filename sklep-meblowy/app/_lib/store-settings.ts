@@ -13,25 +13,35 @@ export const EUR_RATE_CACHE_TAG = "eur-rate";
 // odczytu DB per request. Wewnątrz unstable_cache nie wolno używać cookies()
 // → czysty klient anon (store_settings ma publiczny odczyt RLS — dotąd też
 // czytane anon-kluczem).
-export const getEurRate = unstable_cache(
+const fetchEurRate = unstable_cache(
   async (): Promise<number> => {
-    try {
-      const supabase = createBareAnonClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-      const { data } = await supabase
-        .from("store_settings")
-        .select("eur_rate")
-        .eq("id", true)
-        .single();
-      const rate = data ? Number((data as { eur_rate: number }).eur_rate) : NaN;
-      return Number.isFinite(rate) && rate > 0 ? rate : DEFAULT_EUR_RATE;
-    } catch (err) {
-      console.error("[store-settings] getEurRate failed, using DEFAULT_EUR_RATE", err);
-      return DEFAULT_EUR_RATE;
-    }
+    const supabase = createBareAnonClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { data, error } = await supabase
+      .from("store_settings")
+      .select("eur_rate")
+      .eq("id", true)
+      .single();
+    if (error) throw error;
+    const rate = Number((data as { eur_rate: number }).eur_rate);
+    // Rzucamy (zamiast zwracać fallback), żeby unstable_cache NIE zapisał
+    // wartości awaryjnej na 300 s — kurs trafia m.in. do wyceny w checkout.
+    if (!Number.isFinite(rate) || rate <= 0) throw new Error("invalid eur_rate");
+    return rate;
   },
   ["eur-rate"],
   { tags: [EUR_RATE_CACHE_TAG], revalidate: 300 }
 );
+
+// Fallback per WYWOŁANIE (nie per wpis cache): błąd odczytu nie zamraża
+// DEFAULT_EUR_RATE dla wszystkich — kolejne żądania ponawiają odczyt.
+export async function getEurRate(): Promise<number> {
+  try {
+    return await fetchEurRate();
+  } catch (err) {
+    console.error("[store-settings] getEurRate failed, using DEFAULT_EUR_RATE", err);
+    return DEFAULT_EUR_RATE;
+  }
+}

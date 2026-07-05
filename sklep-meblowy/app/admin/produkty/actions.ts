@@ -554,6 +554,7 @@ export async function saveProductDe(
 
   revalidatePath(`/admin/produkty/${id}`);
   revalidatePath(`/produkt/${id}`);
+  invalidateFacetsCache();
   return { ok: true, message: "Zapisano tłumaczenie DE" };
 }
 
