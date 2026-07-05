@@ -1,7 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { createAdminClient } from "@/app/_lib/supabase/server";
+import { EUR_RATE_CACHE_TAG } from "@/app/_lib/store-settings";
 import { requireAdmin } from "@/app/_lib/admin";
 import type { ActionResult } from "@/app/_lib/types";
 
@@ -21,6 +22,7 @@ export async function updateEurRate(rate: number): Promise<ActionResult> {
 
   if (error) return { ok: false, error: error.message };
 
+  revalidateTag(EUR_RATE_CACHE_TAG, "max");
   revalidatePath("/", "layout");
   revalidatePath("/admin/ustawienia");
   return { ok: true, message: "Zapisano kurs EUR" };

@@ -90,6 +90,8 @@ export default async function SklepPage({
     allCollections,
     categoryLabel,
     collection,
+    wishlistIds,
+    rate,
   ] = await Promise.all([
     getProducts({
       category,
@@ -111,14 +113,14 @@ export default async function SklepPage({
     getAllCollections(),
     getCategoryLabel(category, locale),
     collectionSlug ? getCollection(collectionSlug, locale) : Promise.resolve(null),
-  ]);
-
-  // Batch pobrania ocen — jedno zapytanie dla całej strony list.
-  const [ratings, wishlistIds, rate] = await Promise.all([
-    getRatingsForProducts(products.map((p) => p.id)),
+    // wishlist i kurs NIE zależą od listy produktów — kiedyś czekały w drugiej
+    // paczce (pełny dodatkowy łańcuch RTT po products).
     getUserWishlistIds(),
     getEurRate(),
   ]);
+
+  // Oceny wymagają id produktów — jedyne genuinie sekwencyjne zapytanie.
+  const ratings = await getRatingsForProducts(products.map((p) => p.id));
   const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
 
   // Zachowaj wszystkie aktywne filtry w linkach paginacji
