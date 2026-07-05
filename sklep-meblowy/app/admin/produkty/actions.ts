@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
+import { invalidateFacetsCache } from "@/app/_lib/products";
 import { validateImageUpload } from "@/app/_lib/image-upload";
 import { buildNewProductPayload } from "@/app/_lib/new-product";
 import { recordPriceHistory } from "@/app/_lib/price-history";
@@ -185,6 +186,7 @@ export async function updateProductBasics(
   await recordPriceHistory(id);
   revalidatePath(`/admin/produkty/${id}`);
   revalidatePath(`/produkt/${id}`);
+  invalidateFacetsCache();
   revalidatePath("/sklep");
   return { ok: true, message: "Zapisano podstawowe dane" };
 }
@@ -273,6 +275,7 @@ export async function updateProductVariants(
   await recordPriceHistory(productId);
   revalidatePath(`/admin/produkty/${productId}`);
   revalidatePath(`/produkt/${productId}`);
+  invalidateFacetsCache();
   revalidatePath("/sklep");
   return { ok: true, message: "Zapisano warianty" };
 }
@@ -348,6 +351,7 @@ export async function deleteProduct(formData: FormData): Promise<ActionResult> {
   await Promise.all(allImageUrls.map((url) => deleteStorageImage(url)));
 
   revalidatePath("/admin/produkty");
+  invalidateFacetsCache();
   revalidatePath("/sklep");
   revalidatePath(`/produkt/${id}`);
 
@@ -378,6 +382,7 @@ export async function setProductActive(
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/admin/produkty");
+  invalidateFacetsCache();
   revalidatePath("/sklep");
   revalidatePath("/");
   return { ok: true, message: active ? "Produkt przywrócony" : "Produkt ukryty" };
@@ -585,6 +590,7 @@ export async function createProduct(
 
   await recordPriceHistory((data as { id: string }).id);
   revalidatePath("/admin/produkty");
+  invalidateFacetsCache();
   revalidatePath("/sklep");
   return { ok: true, productId: (data as { id: string }).id };
 }
@@ -599,6 +605,7 @@ function revalidateProducts(ids: string[]): void {
     revalidatePath(`/admin/produkty/${id}`);
     revalidatePath(`/produkt/${id}`);
   }
+  invalidateFacetsCache();
   revalidatePath("/sklep");
 }
 

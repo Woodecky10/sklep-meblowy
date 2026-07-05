@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
 import { invalidateFabricsCache } from "@/app/_lib/fabrics";
+import { invalidateFacetsCache } from "@/app/_lib/products";
 
 export type ActionResult =
   | { ok: true; message?: string; data?: unknown }
@@ -83,6 +84,7 @@ export async function createFabric(formData: FormData): Promise<ActionResult> {
   }
 
   invalidateFabricsCache();
+  invalidateFacetsCache();
   revalidatePath("/admin/tkaniny");
   return { ok: true, message: `Tkanina "${name}" dodana`, data };
 }
@@ -111,6 +113,7 @@ export async function updateFabric(formData: FormData): Promise<ActionResult> {
   }
 
   invalidateFabricsCache();
+  invalidateFacetsCache();
   revalidatePath("/admin/tkaniny");
   return { ok: true, message: "Tkanina zapisana" };
 }
@@ -128,6 +131,7 @@ export async function deleteFabric(formData: FormData): Promise<ActionResult> {
   if (error) return { ok: false, error: error.message };
 
   invalidateFabricsCache();
+  invalidateFacetsCache();
   revalidatePath("/admin/tkaniny");
   return { ok: true, message: "Tkanina usunięta" };
 }
