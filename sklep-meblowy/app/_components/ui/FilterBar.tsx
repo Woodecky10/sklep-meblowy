@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { localizeHref } from "@/app/_lib/i18n";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
@@ -58,12 +58,33 @@ export default function FilterBar({
     { value: "price_desc", label: t.filter.sortPriceDesc },
   ];
 
-  const category = searchParams.get("kategoria") ?? "";
-  const collection = searchParams.get("kolekcja") ?? "";
-  const sort = searchParams.get("sortuj") ?? "alphabetic";
-  const inStockOnly = searchParams.get("dostepne") === "1";
-  const selectedColors = (searchParams.get("kolor") ?? "").split(",").filter(Boolean);
-  const selectedMaterials = (searchParams.get("tkanina") ?? "").split(",").filter(Boolean);
+  // Optymistyczny stan URL: useSearchParams aktualizuje się dopiero po
+  // nadejściu odpowiedzi RSC (~setki ms), więc bez tego kliknięty chip/suwak
+  // podświetlał się z opóźnieniem. pendingQuery = docelowe parametry ustawiane
+  // od razu przy kliku; zwalniane gdy nawigacja się zatwierdzi. Szybkie
+  // wieloklikanie: każdy klik nadpisuje pendingQuery (buduje na effectiveParams,
+  // więc wybory się składają); zatwierdzenie starszej nawigacji może na moment
+  // pokazać jej stan — akceptowalne, brak ryzyka "zawieszonego" pendingu.
+  const [isPending, startTransition] = useTransition();
+  const [pendingQuery, setPendingQuery] = useState<string | null>(null);
+  const committedQuery = searchParams.toString();
+  useEffect(() => {
+    // Synchronizacja z zewnętrznym źródłem (URL z next/navigation po
+    // zatwierdzeniu nawigacji) — nie da się tego wyrazić jako obliczenie
+    // podczas renderu, bo committedQuery zmienia się poza cyklem renderu tego
+    // komponentu (nawigacja przeglądarki/routera).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPendingQuery(null);
+  }, [committedQuery]);
+  const effectiveParams = new URLSearchParams(pendingQuery ?? committedQuery);
+  const showPending = isPending || pendingQuery !== null;
+
+  const category = effectiveParams.get("kategoria") ?? "";
+  const collection = effectiveParams.get("kolekcja") ?? "";
+  const sort = effectiveParams.get("sortuj") ?? "alphabetic";
+  const inStockOnly = effectiveParams.get("dostepne") === "1";
+  const selectedColors = (effectiveParams.get("kolor") ?? "").split(",").filter(Boolean);
+  const selectedMaterials = (effectiveParams.get("tkanina") ?? "").split(",").filter(Boolean);
 
   const [priceMin, setPriceMin] = useState(searchParams.get("cena_od") ?? "");
   const [priceMax, setPriceMax] = useState(searchParams.get("cena_do") ?? "");
@@ -112,19 +133,36 @@ export default function FilterBar({
       if (priceMin === currentMin && priceMax === currentMax) return;
 
       params.delete("strona");
-      router.push(localizeHref(`/sklep?${params.toString()}`, locale));
+      navigate(params);
     }, 500);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
+    // navigate/effectiveParams celowo pominięte: navigate jest nowym obiektem
+    // funkcji przy każdym renderze (niezmemoizowany), więc dodanie go
+    // resetowałoby debounce przy każdym renderze zamiast tylko przy zmianie
+    // ceny — zmieniłoby to zachowanie debounce'a.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [priceMin, priceMax, router, searchParams, locale]);
 
+  // Jedyna ścieżka nawigacji filtrów: ustawia optymistyczny stan i odpala
+  // router.push w transition (isPending → pasek pending pod FilterBarem).
+  function navigate(params: URLSearchParams) {
+    const qs = params.toString();
+    setPendingQuery(qs);
+    startTransition(() => {
+      router.push(localizeHref(`/sklep?${qs}`, locale));
+    });
+  }
+
   function update(key: string, value: string) {
-    const params = new URLSearchParams(searchParams.toString());
+    // Baza = effectiveParams (nie searchParams): szybkie kliki składają się
+    // zamiast nadpisywać nawzajem sprzed zatwierdzenia.
+    const params = new URLSearchParams(effectiveParams.toString());
     if (value) params.set(key, value);
     else params.delete(key);
     params.delete("strona");
-    router.push(localizeHref(`/sklep?${params.toString()}`, locale));
+    navigate(params);
   }
 
   function toggleMulti(key: string, current: string[], value: string) {
@@ -169,18 +207,27 @@ export default function FilterBar({
 
   function clearAll() {
     const params = new URLSearchParams();
-    const q = searchParams.get("q");
+    const q = effectiveParams.get("q");
     if (q) params.set("q", q);
     // Sortowanie zachowujemy jeśli różne od default (alphabetic).
     if (sort && sort !== "alphabetic") params.set("sortuj", sort);
     setPriceMin("");
     setPriceMax("");
     setOpenDropdown(null);
-    router.push(localizeHref(`/sklep?${params.toString()}`, locale));
+    navigate(params);
   }
 
   return (
-    <div ref={containerRef} className="mb-10 relative">
+    <div ref={containerRef} className="mb-10 relative" aria-busy={showPending}>
+      {/* Wskaźnik trwającej nawigacji filtrów: cienki pulsujący pasek pod
+          FilterBarem. FilterBar nie ma dostępu do siatki produktów (sibling
+          server component), więc sygnalizuje we własnym obszarze. */}
+      {showPending && (
+        <div
+          aria-hidden="true"
+          className="absolute -bottom-1 left-0 right-0 h-0.5 rounded-full bg-[var(--color-gold)] animate-pulse"
+        />
+      )}
       {/* Pasek filtrów. Na mobile: horizontal scroll (overflow-x-auto), żeby
           nie wieszały się na 3 linie. Na desktop: flex-wrap z gap. */}
       <div className="flex items-center gap-2 overflow-x-auto md:overflow-x-visible md:flex-wrap pb-2 md:pb-0 -mx-1 px-1 scrollbar-thin">
