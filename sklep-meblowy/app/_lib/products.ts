@@ -5,6 +5,8 @@ import { sizeLabelOf } from "./size-groups";
 import { localizeProduct, buildLocalizedFacets } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Category, Product } from "./types";
+import { deriveFabricFamilies, productMatchesFabric } from "./fabric-filter";
+import { getAllFabrics } from "./fabrics";
 
 // Górny limit rozmiaru strony — broni przed ?limit=999999 (kosztowny request).
 export const PRODUCTS_PAGE_LIMIT_MAX = 100;
@@ -39,6 +41,8 @@ export type ProductFilters = {
   priceMax?: number;
   inStockOnly?: boolean;
   colors?: string[];
+  // Filtr tkanin (?tkanina=). Wartości: rodziny tkanin z katalogu fabrics
+  // (dopasowywane do opcji wariantów) ∪ legacy wartości kolumny material.
   materials?: string[];
   // Slug kolekcji — filtruje produkty należące do konkretnej kolekcji
   // (np. ?kolekcja=lisbon w URL).
@@ -126,7 +130,33 @@ export async function getProducts(filters: ProductFilters = {}) {
   if (inStockOnly) query = query.gt("stock", 0);
 
   if (colors?.length) query = query.in("color", colors);
-  if (materials?.length) query = query.in("material", materials);
+
+  // Filtr tkanin: wartości pochodzą z rodzin tkanin w opcjach wariantów
+  // (katalog fabrics) W UNII z legacy kolumną material — tego nie da się
+  // wyrazić w .in() na kolumnie, więc liczymy pasujące id w JS (skala:
+  // dziesiątki produktów; RLS i tak ogranicza odczyt do aktywnych) i
+  // zawężamy główne zapytanie przez .in("id", ids). Paginacja/sort/AND z
+  // pozostałymi filtrami zostają w DB.
+  if (materials?.length) {
+    const [{ data: fabricRows }, fabrics] = await Promise.all([
+      supabase.from("products").select("id, variants, material"),
+      getAllFabrics(),
+    ]);
+    const familyNames = fabrics.map((f) => f.name);
+    const ids = (
+      (fabricRows ?? []) as {
+        id: string;
+        variants: Product["variants"];
+        material: string | null;
+      }[]
+    )
+      .filter((r) => productMatchesFabric(r.variants, r.material, materials, familyNames))
+      .map((r) => r.id);
+    if (ids.length === 0) {
+      return { products: [], total: 0, pages: 0 };
+    }
+    query = query.in("id", ids);
+  }
 
   if (sort === "price_asc") {
     query = query.order("price", { ascending: true });
@@ -292,7 +322,8 @@ export async function getSizeGroupMembersAdmin(
   );
 }
 
-// Pobiera unikalne wartości color/material z CAŁEJ bazy produktów — użyte
+// Pobiera unikalne wartości color + facet tkanin (rodziny z opcji wariantów
+// × katalog fabrics ∪ legacy material) z CAŁEJ bazy produktów — użyte
 // do budowania filtrów na /sklep.
 //
 // Decyzja: nie ograniczamy facets do bieżącego search/category. User
@@ -315,16 +346,16 @@ export async function getFilterFacets(locale: Locale = DEFAULT_LOCALE) {
   // buildLocalizedFacets (czysty, testowalny helper).
   const [
     { data: colorsData },
-    { data: materialsData },
+    { data: fabricSourceData },
+    fabrics,
   ] = await Promise.all([
     supabase
       .from("products")
       .select("color, color_de")
       .not("color", "is", null),
-    supabase
-      .from("products")
-      .select("material, material_de")
-      .not("material", "is", null),
+    // Źródła facetu tkanin: opcje wariantów (rodziny) + legacy kolumna material.
+    supabase.from("products").select("variants, material, material_de"),
+    getAllFabrics(),
   ]);
 
   const colors = buildLocalizedFacets(
@@ -334,13 +365,31 @@ export async function getFilterFacets(locale: Locale = DEFAULT_LOCALE) {
     locale
   );
 
+  // Facet „Tkanina" = rodziny tkanin UŻYTE w widocznych produktach (value =
+  // nazwa PL z katalogu, label DE = fabrics.name_de) ∪ legacy wartości kolumny
+  // material (label DE = material_de). Dedupe po PL value robi
+  // buildLocalizedFacets (rodzina z name_de wygrywa etykietę nad legacy).
+  const fabricRows = (fabricSourceData ?? []) as {
+    variants: Product["variants"];
+    material: string | null;
+    material_de: string | null;
+  }[];
+  const familyNames = fabrics.map((f) => f.name);
+  const usedFamilies = new Set<string>();
+  for (const row of fabricRows) {
+    for (const fam of deriveFabricFamilies(row.variants, familyNames)) {
+      usedFamilies.add(fam);
+    }
+  }
   const materials = buildLocalizedFacets(
-    (
-      (materialsData ?? []) as {
-        material: string | null;
-        material_de: string | null;
-      }[]
-    ).map((r) => ({ value: r.material, value_de: r.material_de })),
+    [
+      ...fabrics
+        .filter((f) => usedFamilies.has(f.name))
+        .map((f) => ({ value: f.name, value_de: f.name_de })),
+      ...fabricRows
+        .filter((r) => r.material)
+        .map((r) => ({ value: r.material, value_de: r.material_de })),
+    ],
     locale
   );
 
