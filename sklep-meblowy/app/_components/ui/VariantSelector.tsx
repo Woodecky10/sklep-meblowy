@@ -1,12 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import type { Product, ProductVariants } from "@/app/_lib/types";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "@/app/_lib/de-content-maps";
 import type { Locale } from "@/app/_lib/i18n";
 import { useFabricLabels, useFabricImages } from "@/app/_lib/fabric-context";
-import { FABRIC_OPTION_NAME } from "@/app/_lib/variants";
+import { FABRIC_OPTION_NAME, sortVariantValues } from "@/app/_lib/variants";
+import {
+  cornerSideOf,
+  isCornerSideOptionName,
+  orderCornerSideValues,
+  type CornerSide,
+} from "@/app/_lib/corner-side";
+import { getDictionary } from "@/app/_lib/dictionaries";
 import { useEurRate } from "@/app/_lib/rate-context";
 import { formatMoney } from "@/app/_lib/money";
 
@@ -47,6 +55,7 @@ export default function VariantSelector({
   const fabricMap = useFabricLabels();
   const fabricImages = useFabricImages();
   const rate = useEurRate();
+  const t = getDictionary(locale);
   function pick(name: string, value: string) {
     onChange({ ...selected, [name]: value });
   }
@@ -56,6 +65,16 @@ export default function VariantSelector({
       {variants.options.map((option) => {
         const current = selected[option.name];
         const displayName = getOptionName(product, option.name, locale);
+        // Kolejność wyświetlania A-Z (naturalnie, po etykiecie). Narożniki (Strona)
+        // mają własne sortowanie semantyczne w CornerSideGroup (orderCornerSideValues),
+        // więc dla nich zostawiamy surową kolejność.
+        const orderedValues = isCornerSideOptionName(option.name)
+          ? option.values
+          : sortVariantValues(
+              option.values,
+              (v) => getValueLabel(product, option.name, v, locale, fabricMap),
+              locale
+            );
         return (
           <div key={option.name}>
             <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
@@ -70,7 +89,7 @@ export default function VariantSelector({
             </p>
             {option.name === FABRIC_OPTION_NAME ? (
               <FabricSwatchGroup
-                values={option.values}
+                values={orderedValues}
                 current={current}
                 valuePrices={option.value_prices}
                 images={fabricImages}
@@ -79,9 +98,20 @@ export default function VariantSelector({
                 rate={rate}
                 onPick={(v) => pick(option.name, v)}
               />
+            ) : isCornerSideOptionName(option.name) ? (
+              <CornerSideGroup
+                values={option.values}
+                current={current}
+                valuePrices={option.value_prices}
+                labelOf={(v) => getValueLabel(product, option.name, v, locale, fabricMap)}
+                hint={t.product.cornerSideHint}
+                locale={locale}
+                rate={rate}
+                onPick={(v) => pick(option.name, v)}
+              />
             ) : (
               <div className="flex flex-wrap gap-2">
-                {option.values.map((v) => {
+                {orderedValues.map((v) => {
                   const isActive = current === v;
                   const label = getValueLabel(product, option.name, v, locale, fabricMap);
                   const surcharge = option.value_prices?.[v] ?? 0;
@@ -203,6 +233,105 @@ function FabricSwatchGroup({
           {!expanded && <span className="text-[11px] text-[var(--muted)]">(+{hidden})</span>}
         </button>
       )}
+    </div>
+  );
+}
+
+// Grafiki stron narożnika (statyczne SVG z public/, językowo neutralne —
+// etykieta pod kafelkiem idzie z wartości opcji przez overrides → mapy DE).
+const CORNER_SIDE_IMAGES: Record<CornerSide, string> = {
+  left: "/naroznik-lewostronny.svg",
+  right: "/naroznik-prawostronny.svg",
+};
+
+// Opcja „Strona" (narożnik lewostronny/prawostronny) jako dwa kafelki z grafiką
+// mebla — wzorzec FabricSwatchGroup (aria-pressed, złota obwódka aktywnego).
+// Kremowe tło kafelka (#ECE4D7, kolor brandowy) — granatowy korpus czytelny
+// także w dark mode. Wartość nierozpoznana przez cornerSideOf → chip tekstowy.
+function CornerSideGroup({
+  values,
+  current,
+  valuePrices,
+  labelOf,
+  hint,
+  locale,
+  rate,
+  onPick,
+}: {
+  values: string[];
+  current: string | undefined;
+  valuePrices: Record<string, number> | undefined;
+  labelOf: (v: string) => string;
+  hint: string;
+  locale: Locale;
+  rate: number;
+  onPick: (v: string) => void;
+}) {
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-3 max-w-sm">
+        {orderCornerSideValues(values).map((v) => {
+          const side = cornerSideOf(v);
+          const active = current === v;
+          const label = labelOf(v);
+          const surcharge = valuePrices?.[v] ?? 0;
+          if (!side) {
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => onPick(v)}
+                aria-pressed={active}
+                className={`px-4 py-2 text-sm font-sans rounded-full border transition-colors ${
+                  active
+                    ? "border-[var(--color-gold)] bg-[var(--color-gold)] text-[var(--color-navy)] font-semibold"
+                    : "border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)]"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          }
+          return (
+            <button
+              key={v}
+              type="button"
+              onClick={() => onPick(v)}
+              aria-pressed={active}
+              className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-colors ${
+                active
+                  ? "border-[var(--color-gold)]"
+                  : "border-[var(--border)] hover:border-[var(--color-gold)]"
+              }`}
+            >
+              <span className="w-full rounded-xl bg-[#ECE4D7] p-2">
+                <Image
+                  src={CORNER_SIDE_IMAGES[side]}
+                  alt=""
+                  width={200}
+                  height={190}
+                  className="w-full h-auto"
+                />
+              </span>
+              <span
+                className={`text-xs leading-tight ${
+                  active ? "text-[var(--color-gold)] font-semibold" : "text-[var(--fg)]"
+                }`}
+              >
+                {label}
+                {surcharge !== 0 && (
+                  <span className={active ? "opacity-80" : "text-[var(--muted)]"}>
+                    {" "}
+                    ({surcharge > 0 ? "+" : "−"}
+                    {formatMoney(Math.abs(surcharge), locale, rate)})
+                  </span>
+                )}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-[11px] text-[var(--muted)] mt-2">{hint}</p>
     </div>
   );
 }

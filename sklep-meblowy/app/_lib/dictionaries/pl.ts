@@ -38,6 +38,7 @@ export type PlShape = {
   product: {
     addToCart: string;
     selectVariant: string;
+    cornerSideHint: string;
     sizeLabel: string;
     omnibusLabel: string;
     saleBadge: string;
@@ -71,7 +72,8 @@ export type PlShape = {
     specWarranty: string;
     dimensionsHint: string;
     returns: string;
-    warranty: string;
+    warrantyLabel: string;
+    warrantyDefault: string;
     deliveryTimeLabel: string;
     deliveryTimeDefault: string;
     deliveryCostNote: string;
@@ -224,6 +226,7 @@ export type PlShape = {
     prevImage: string;
     nextImage: string;
     productImageDialog: string;
+    backToTop: string;
   };
   pagination: {
     prev: string;
@@ -270,6 +273,18 @@ export type PlShape = {
     submitting: string;
     cancel: string;
     privacyNote: string;
+  };
+  trustBar: {
+    eyebrow: string;
+    heading: string;
+    producer: string;
+    quality: string;
+    delivery: string;
+    deliveryScope: string;
+    warranty: string;
+    iconFree: string;
+    iconYears: string;
+    iconYearsWord: string;
   };
   footer: {
     information: string;
@@ -328,6 +343,7 @@ export const pl = {
   product: {
     addToCart: "Dodaj do koszyka",
     selectVariant: "Wybierz wariant",
+    cornerSideHint: "Strony pokazane patrząc od frontu",
     sizeLabel: "Rozmiar",
     omnibusLabel: "Najniższa cena z 30 dni przed obniżką",
     saleBadge: "Promocja",
@@ -361,7 +377,10 @@ export const pl = {
     specWarranty: "Gwarancja",
     dimensionsHint: "szer. × gł. × wys.",
     returns: "Zwrot do 14 dni",
-    warranty: "Gwarancja 2 lata",
+    // Gwarancja w bloku "✓" prawej kolumny: label + wartość z product.warranty
+    // (fallback do warrantyDefault gdy pole puste) — jak deliveryTimeLabel/Default.
+    warrantyLabel: "Gwarancja:",
+    warrantyDefault: "2 lata",
     deliveryTimeLabel: "Czas dostawy:",
     deliveryTimeDefault: "14–21 dni roboczych",
     deliveryCostNote: "Darmowa wysyłka na terenie całej Polski",
@@ -458,7 +477,7 @@ export const pl = {
     category: "Kategoria",
     collection: "Kolekcja",
     color: "Kolor",
-    material: "Materiał",
+    material: "Tkanina",
     price: "Cena",
     inStock: "Dostępne od ręki",
     clear: "Wyczyść",
@@ -519,6 +538,7 @@ export const pl = {
     prevImage: "Poprzednie zdjęcie",
     nextImage: "Następne zdjęcie",
     productImageDialog: "Zdjęcie produktu",
+    backToTop: "Wróć na górę",
   },
   pagination: {
     prev: "Poprzednia strona",
@@ -566,6 +586,19 @@ export const pl = {
     submitting: "Wysyłam...",
     cancel: "Anuluj",
     privacyNote: "Twoje dane i zdjęcia wykorzystamy wyłącznie do rozpatrzenia tego zgłoszenia.",
+  },
+  // Pasek zaufania (TrustBar) — treści 1:1 z grafik docs/grafika-zaufanie-sklepu*.png
+  trustBar: {
+    eyebrow: "MEBLE Z CHARAKTEREM",
+    heading: "Dlaczego warto kupować u nas?",
+    producer: "Polski producent",
+    quality: "Gwarancja jakości",
+    delivery: "Darmowa dostawa",
+    deliveryScope: "na terenie całej Polski",
+    warranty: "2 lata gwarancji",
+    iconFree: "0 zł",
+    iconYears: "2",
+    iconYearsWord: "LATA",
   },
   footer: {
     information: "Informacje",

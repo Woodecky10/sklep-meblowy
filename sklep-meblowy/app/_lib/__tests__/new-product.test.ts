@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildNewProductPayload } from "@/app/_lib/new-product";
+import { DEFAULT_DELIVERY_TIME, DEFAULT_WARRANTY } from "@/app/_lib/spec-format";
+import { DELIVERY_TIME_DE, WARRANTY_DE } from "@/app/_lib/de-content-maps";
 
 const valid = { name: "Sofa Mollien", price: "1999.99", category: "sofy" };
 
@@ -44,5 +46,31 @@ describe("buildNewProductPayload", () => {
 
   it("odrzuca nazwę dłuższą niż 300 znaków", () => {
     expect(buildNewProductPayload({ ...valid, name: "x".repeat(301) }).ok).toBe(false);
+  });
+
+  it("naroznik-l → variants ma opcje Strona", () => {
+    const r = buildNewProductPayload({ name: "N", price: 1000, category: "naroznik-l" });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.payload.variants?.options.map((o) => o.name)).toEqual(["Strona"]);
+    }
+  });
+
+  it("inne kategorie narożników (narozniki, pufy) → variants null (opt-in przez toggle)", () => {
+    for (const category of ["narozniki", "pufy", "sofy"]) {
+      const r = buildNewProductPayload({ ...valid, category });
+      expect(r.ok && r.payload.variants).toBeNull();
+    }
+  });
+
+  it("nowy produkt dostaje domyślny czas dostawy i gwarancję", () => {
+    const r = buildNewProductPayload(valid);
+    expect(r.ok && r.payload.delivery_time).toBe("21 dni roboczych");
+    expect(r.ok && r.payload.warranty).toBe("2 lata");
+  });
+
+  it("domyślne wartości mają tłumaczenia DE (spójność z mapami)", () => {
+    expect(DELIVERY_TIME_DE[DEFAULT_DELIVERY_TIME]).toBeTruthy();
+    expect(WARRANTY_DE[DEFAULT_WARRANTY]).toBeTruthy();
   });
 });

@@ -18,6 +18,7 @@ export default function OrderRow({
   statusClassName,
   amountLabel,
   deliveryPaid,
+  cod,
 }: {
   id: string;
   orderNumber: number;
@@ -30,6 +31,7 @@ export default function OrderRow({
   statusClassName: string;
   amountLabel: string;
   deliveryPaid: boolean;
+  cod: boolean;
 }) {
   const router = useRouter();
   const href = `/admin/zamowienia/${id}`;
@@ -66,6 +68,14 @@ export default function OrderRow({
         >
           {statusLabel}
         </span>
+        {cod && (
+          <span
+            className="ml-1.5 px-2.5 py-1 rounded-full text-xs font-sans uppercase tracking-widest text-yellow-800 bg-yellow-100 dark:bg-yellow-950 dark:text-yellow-300"
+            title="Płatność przy odbiorze — kurier pobiera gotówkę"
+          >
+            Pobranie
+          </span>
+        )}
       </td>
       <td className="px-4 py-3 text-right font-semibold text-[var(--fg)] whitespace-nowrap">
         {amountLabel}

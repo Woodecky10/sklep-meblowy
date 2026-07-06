@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useModal } from "@/app/_lib/useModal";
@@ -33,6 +33,19 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
   // -1 = brak zaznaczonej, 0..n = zaznaczona sugestia (keyboard nav)
   const [highlighted, setHighlighted] = useState(-1);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+
+  // Pending nawigacji do wyników/produktu: modal nie znika "w próżnię" —
+  // pokazuje "Szukam..." i zamyka się dopiero po zatwierdzeniu nawigacji.
+  const [isPending, startTransition] = useTransition();
+  const wasPending = useRef(false);
+  useEffect(() => {
+    if (wasPending.current && !isPending) {
+      setOpen(false);
+      setSuggestionsOpen(false);
+    }
+    wasPending.current = isPending;
+  }, [isPending]);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -123,15 +136,17 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
     if (q) params.set("q", q);
     else params.delete("q");
     params.delete("strona");
-    router.push(localizeHref(`/sklep?${params.toString()}`, locale));
-    setOpen(false);
     setSuggestionsOpen(false);
+    startTransition(() => {
+      router.push(localizeHref(`/sklep?${params.toString()}`, locale));
+    });
   }
 
   function goToProduct(id: string) {
-    router.push(localizeHref(`/produkt/${id}`, locale));
-    setOpen(false);
     setSuggestionsOpen(false);
+    startTransition(() => {
+      router.push(localizeHref(`/produkt/${id}`, locale));
+    });
   }
 
   function close() {
@@ -170,6 +185,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
       <div ref={containerRef} className="relative w-full max-w-md">
         <form
           onSubmit={submit}
+          aria-busy={isPending}
           className="flex items-center gap-2 w-full bg-[var(--bg)] border border-[var(--border)] rounded-full px-4 py-2 focus-within:border-[var(--color-gold)] transition-colors"
         >
           <SearchIcon className="text-[var(--muted)] shrink-0" size={18} />
@@ -194,6 +210,12 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
             >
               ✕
             </button>
+          )}
+          {isPending && (
+            <span
+              aria-hidden="true"
+              className="w-2 h-2 rounded-full bg-[var(--color-gold)] animate-pulse shrink-0"
+            />
           )}
         </form>
 
@@ -236,6 +258,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
           <div className="w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
             <form
               onSubmit={submit}
+              aria-busy={isPending}
               className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-2xl flex items-center gap-3 px-5 py-4"
             >
               <SearchIcon className="text-[var(--muted)]" size={22} />
@@ -272,6 +295,12 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
                 {t.nav.search}
               </button>
             </form>
+
+            {isPending && (
+              <p className="mt-3 text-center text-sm font-sans text-white/90">
+                {t.search.searching}
+              </p>
+            )}
 
             {showDropdown && (
               <SuggestionsList

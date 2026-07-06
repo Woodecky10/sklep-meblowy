@@ -42,9 +42,17 @@
   --color-gold-text: #c9a84c;
 }
 
+/* clip zamiast hidden: tak samo ucina poziomy scroll, ale nie robi z
+   html/body scroll-containera — hidden łamał position:sticky headera. */
 html,
 body {
-  overflow-x: hidden;
+  overflow-x: clip;
+}
+
+/* Sticky header (~133px) zasłaniałby cel kotwic (#opinie, #wzor-odstapienia
+   itd.) — scroll-padding odsuwa każde przewinięcie do kotwicy pod header. */
+html {
+  scroll-padding-top: 9rem;
 }
 
 body {

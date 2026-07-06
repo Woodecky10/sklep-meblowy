@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { sanitizeProductHtml, sanitizeSectionsHtml, sanitizeStyleAttr } from "@/app/_lib/product-html";
+import { FONT_OPTIONS } from "@/app/_lib/description-fonts";
 import type { ProductDescriptionSection } from "@/app/_lib/types";
 
 // Normalizacja jak przeglądarka traktuje URL w href: ignoruje znaki sterujące.
@@ -109,6 +110,16 @@ describe("sanitizeSectionsHtml — sanityzacja body sekcji przy zapisie", () => 
     const out = sanitizeSectionsHtml(sections);
     if (out[0].kind === "text") expect(out[0].admin_body).toBeUndefined();
   });
+
+  it("image: przepuszcza display bez zmian (tryb wyświetlania na karcie)", () => {
+    const sections: ProductDescriptionSection[] = [
+      { kind: "image", image_url: "https://x/a.jpg", image_alt: "a", display: "wide" },
+      { kind: "image", image_url: "https://x/b.jpg", image_alt: "b" },
+    ];
+    const out = sanitizeSectionsHtml(sections);
+    expect(out[0]).toEqual(sections[0]);
+    expect((out[1] as { display?: string }).display).toBeUndefined();
+  });
 });
 
 describe("sanitizeStyleAttr — waska whitelista CSS", () => {
@@ -162,5 +173,29 @@ describe("sanitizeProductHtml — nowe tagi i style", () => {
     const out = sanitizeProductHtml('<p style="text-align:center; background:url(x)">x</p>');
     expect(out).toContain("text-align: center");
     expect(out.toLowerCase()).not.toContain("url(");
+  });
+});
+
+describe("sanitizeStyleAttr — font-family (zamknięta lista czcionek opisów)", () => {
+  it("każdy dozwolony stack przechodzi w formie kanonicznej", () => {
+    for (const o of FONT_OPTIONS) {
+      expect(sanitizeStyleAttr("span", `font-family: ${o.stack}`)).toBe(`font-family: ${o.stack}`);
+    }
+  });
+  it("normalizuje cudzysłowy i wielkość liter do kanonicznego stacka", () => {
+    expect(sanitizeStyleAttr("span", 'font-family: "courier new", MONOSPACE')).toBe(
+      "font-family: 'Courier New', monospace"
+    );
+  });
+  it("obce i niebezpieczne wartości są wycinane", () => {
+    expect(sanitizeStyleAttr("span", "font-family: Comic Sans MS")).toBe("");
+    expect(sanitizeStyleAttr("span", "font-family: url(javascript:x)")).toBe("");
+    expect(sanitizeStyleAttr("span", "font-family: expression(alert(1))")).toBe("");
+    expect(sanitizeStyleAttr("span", "font-family: var(--cokolwiek), serif")).toBe("");
+  });
+  it("color + font-family w jednym stylu — obie deklaracje zachowane", () => {
+    expect(sanitizeStyleAttr("span", "color: #ff0000; font-family: Georgia, serif")).toBe(
+      "color: #ff0000; font-family: Georgia, serif"
+    );
   });
 });

@@ -4,7 +4,7 @@
 import { useState, useTransition } from "react";
 import { updateProductDescription } from "../actions";
 import RichTextEditor from "./RichTextEditor";
-import type { Toast } from "./_shared";
+import { CollapsibleSection, type Toast } from "./_shared";
 
 // Pojedynczy opis produktu (PL). Renderuje sie na karcie TYLKO gdy produkt nie
 // ma sekcji opisu (fallback) — stad hint. Ma wlasny zapis (jak zdjecia/sekcje/
@@ -36,16 +36,14 @@ export default function DescriptionFieldEditor({
   }
 
   return (
-    <section className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col gap-4">
-      <div>
-        <h2 className="font-display text-xl font-semibold text-[var(--fg)]">
-          Opis produktu
-        </h2>
-        <p className="text-sm text-[var(--muted)] mt-1 max-w-2xl leading-relaxed">
-          Pokazywany na karcie produktu <strong>tylko gdy nie dodasz sekcji opisu
-          poniżej</strong>. Jeśli używasz sekcji, to pole jest ignorowane.
-        </p>
-      </div>
+    <CollapsibleSection title="Opis produktu" storageKey="opis" bodyClassName="flex flex-col gap-4">
+      {/* CollapsibleSection nie przekazuje dowolnych atrybutów do <section>,
+          więc jednostka guarda opakowuje bezpośrednio całą zawartość. */}
+      <div data-guard-section className="flex flex-col gap-4">
+      <p className="text-sm text-[var(--muted)] max-w-2xl leading-relaxed">
+        Pokazywany na karcie produktu <strong>tylko gdy nie dodasz sekcji opisu
+        poniżej</strong>. Jeśli używasz sekcji, to pole jest ignorowane.
+      </p>
 
       <RichTextEditor
         value={value}
@@ -62,11 +60,14 @@ export default function DescriptionFieldEditor({
           type="button"
           onClick={save}
           disabled={saving || !dirty}
+          aria-busy={saving}
+          data-guard-save
           className="px-6 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
         >
           {saving ? "Zapisuję..." : "Zapisz opis"}
         </button>
       </div>
-    </section>
+      </div>
+    </CollapsibleSection>
   );
 }

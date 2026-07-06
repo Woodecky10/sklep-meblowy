@@ -6,8 +6,7 @@ import Link from "next/link";
 import { updateProductBasics, updateProductImages } from "../actions";
 import type { Product, ActionResult, Fabric } from "@/app/_lib/types";
 import type { CategoryDef } from "@/app/_lib/categories";
-import { hasVariants } from "@/app/_lib/variants";
-import { Field, IconBtn, inputClass, type Toast } from "./_shared";
+import { Field, IconBtn, inputClass, CollapsibleSection, type Toast } from "./_shared";
 import { useImageUpload } from "./useImageUpload";
 import VariantsEditor from "./VariantsEditor";
 import DescriptionSectionsEditor from "./DescriptionSectionsEditor";
@@ -118,6 +117,7 @@ export default function ProductEditor({
               : "bg-red-600 text-white"
           }`}
           role="status"
+          data-toast-type={toast.type}
         >
           {toast.message}
         </div>
@@ -126,11 +126,7 @@ export default function ProductEditor({
       {/* ============================================================
           Sekcja: Podstawowe dane
           ============================================================ */}
-      <section className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col gap-5">
-        <h2 className="font-display text-xl font-semibold text-[var(--fg)]">
-          Podstawowe dane
-        </h2>
-
+      <CollapsibleSection title="Podstawowe dane" storageKey="podstawowe">
         <form
           action={(fd) => startBasicsTransition(async () => handleResult(await updateProductBasics(fd)))}
           className="grid grid-cols-1 md:grid-cols-2 gap-4"
@@ -161,11 +157,7 @@ export default function ProductEditor({
 
           <Field
             label="Cena promocyjna (zł)"
-            hint={
-              hasVariants(product)
-                ? "Produkt ma warianty — ustaw promocję per kombinacja w sekcji Warianty."
-                : "Zostaw puste = brak promocji. Musi być niższa od ceny regularnej."
-            }
+            hint="Zostaw puste = brak promocji. Musi być niższa od ceny regularnej."
           >
             <input
               name="sale_price"
@@ -174,7 +166,6 @@ export default function ProductEditor({
               min="0"
               defaultValue={product.sale_price ?? ""}
               className={inputClass}
-              disabled={hasVariants(product)}
             />
           </Field>
 
@@ -188,10 +179,7 @@ export default function ProductEditor({
             </select>
           </Field>
 
-          <Field
-            label="Stan magazynowy"
-            hint={hasVariants(product) ? "Dla produktów z wariantami suma stocków = stock per kombinacja." : undefined}
-          >
+          <Field label="Stan magazynowy">
             <input
               name="stock"
               type="number"
@@ -199,7 +187,6 @@ export default function ProductEditor({
               step="1"
               defaultValue={product.stock}
               className={inputClass}
-              disabled={hasVariants(product)}
             />
           </Field>
 
@@ -297,23 +284,15 @@ export default function ProductEditor({
             </button>
           </div>
         </form>
-      </section>
+      </CollapsibleSection>
 
       {/* ============================================================
           Sekcja: Zdjęcia produktu (globalna galeria)
           ============================================================ */}
-      <section className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col gap-5">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h2 className="font-display text-xl font-semibold text-[var(--fg)]">
-              Zdjęcia produktu
-            </h2>
-            <p className="text-sm text-[var(--muted)] mt-1">
-              Globalna galeria pokazywana na karcie produktu gdy klient nie wybrał wariantu
-              ze zdjęciami. Możesz dodać kilka zdjęć naraz — wybierając wiele plików lub
-              przeciągając je na galerię. Strzałkami ↑/↓ ustawiasz kolejność, ikoną kosza usuwasz.
-            </p>
-          </div>
+      <CollapsibleSection
+        title="Zdjęcia produktu"
+        storageKey="zdjecia"
+        headerAside={
           <label
             className={`shrink-0 px-5 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors cursor-pointer ${
               upload.uploading ? "opacity-50 cursor-not-allowed" : ""
@@ -322,7 +301,13 @@ export default function ProductEditor({
             {upload.progressText ?? "+ Dodaj zdjęcia"}
             <input {...upload.inputProps} className="hidden" />
           </label>
-        </div>
+        }
+      >
+        <p className="text-sm text-[var(--muted)] max-w-2xl">
+          Globalna galeria pokazywana na karcie produktu gdy klient nie wybrał wariantu
+          ze zdjęciami. Możesz dodać kilka zdjęć naraz — wybierając wiele plików lub
+          przeciągając je na galerię. Strzałkami ↑/↓ ustawiasz kolejność, ikoną kosza usuwasz.
+        </p>
 
         <div
           {...upload.dropProps}
@@ -399,12 +384,12 @@ export default function ProductEditor({
             {savingImages ? "Zapisuję..." : "Zapisz zdjęcia"}
           </button>
         </div>
-      </section>
+      </CollapsibleSection>
 
       {/* ============================================================
           Sekcja: Warianty (pełny editor)
           ============================================================ */}
-      <VariantsEditor productId={product.id} initial={product.variants} basePrice={product.price} fabrics={fabrics} onToast={showToast} />
+      <VariantsEditor productId={product.id} initial={product.variants} categorySlug={product.category} fabrics={fabrics} onToast={showToast} />
 
       {/* ============================================================
           Sekcja: Pojedynczy opis (fallback gdy brak sekcji)

@@ -8,6 +8,7 @@ import Navbar from "./_components/layout/Navbar";
 import Footer from "./_components/layout/Footer";
 import CookieBanner from "./_components/layout/CookieBanner";
 import CartToast from "./_components/layout/CartToast";
+import BackToTop from "./_components/layout/BackToTop";
 import HideOnAdmin from "./_components/layout/HideOnAdmin";
 import { CartProvider } from "./_context/CartContext";
 import { ToastProvider } from "./_context/ToastContext";
@@ -88,13 +89,19 @@ export default async function RootLayout({
                 <ToastProvider>
                   <ConfirmProvider>
                     <HideOnAdmin>
-                      <TopBar />
-                      <Navbar />
+                      {/* Wspólny sticky na oba paski — jeden element zamiast
+                          dwóch osobnych sticky eliminuje 1px szczeliny przy
+                          ułamkowym zoomie. */}
+                      <div className="sticky top-0 z-50">
+                        <TopBar />
+                        <Navbar />
+                      </div>
                     </HideOnAdmin>
                     <main className="flex-1">{children}</main>
                     <HideOnAdmin>
                       <Footer />
                       <CookieBanner />
+                      <BackToTop />
                     </HideOnAdmin>
                     <CartToast />
                   </ConfirmProvider>

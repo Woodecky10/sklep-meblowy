@@ -65,6 +65,7 @@ export default function InquiriesList({
       {toast && (
         <div
           role="status"
+          data-toast-type={toast.type}
           className={`fixed top-24 right-6 z-50 max-w-sm px-5 py-3 rounded-xl shadow-2xl text-sm ${
             toast.type === "success"
               ? "bg-emerald-600 text-white"

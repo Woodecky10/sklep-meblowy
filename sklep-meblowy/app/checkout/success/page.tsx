@@ -8,9 +8,11 @@ import ClearCart from "./ClearCart";
 export default async function SuccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ order?: string }>;
+  // ?order= — powrót z P24 (urlReturn); ?order_id= — redirect pobrania (COD).
+  searchParams: Promise<{ order?: string; order_id?: string }>;
 }) {
-  const { order: orderParam } = await searchParams;
+  const { order: orderQ, order_id } = await searchParams;
+  const orderParam = orderQ ?? order_id;
   const locale = await getLocale();
   const de = locale === "de";
 
@@ -23,6 +25,8 @@ export default async function SuccessPage({
           "Die Zahlung wurde erfolgreich abgewickelt. An die angegebene E-Mail-Adresse haben wir eine Bestellbestätigung mit allen Details geschickt.",
         introPending:
           "Die Zahlung wird vom Anbieter bestätigt. Sobald der Betrag eingegangen ist, senden wir eine Bestätigung an Ihre E-Mail. Sie können diese Seite schließen.",
+        introCod:
+          "Ihre Bestellung wurde angenommen. Sie zahlen bequem bei Lieferung an den Kurier (Nachnahme).",
         details: "Details",
         orderNumber: "Bestellnummer",
         email: "E-Mail",
@@ -37,6 +41,8 @@ export default async function SuccessPage({
           "Płatność zrealizowana pomyślnie. Na podany adres email wysłaliśmy potwierdzenie zamówienia wraz ze szczegółami.",
         introPending:
           "Trwa potwierdzanie płatności przez operatora. Gdy środki wpłyną, wyślemy potwierdzenie na podany adres email. Tę stronę można zamknąć.",
+        introCod:
+          "Zamówienie zostało przyjęte do realizacji. Zapłacisz wygodnie kurierowi przy odbiorze (za pobraniem).",
         details: "Szczegóły",
         orderNumber: "Numer zamówienia",
         email: "Email",
@@ -49,6 +55,7 @@ export default async function SuccessPage({
   let email: string | null = null;
   let orderCurrency: "pln" | "eur" = "pln";
   let isPaid = false;
+  let isCod = false;
 
   if (orderParam) {
     try {
@@ -56,15 +63,18 @@ export default async function SuccessPage({
       orderId = order.id;
       total = Number(order.total);
       orderCurrency = order.currency;
-      email = order.guest_email;
+      email = order.guest_email; // null dla zalogowanych — wiersz się nie wyrenderuje
+      isCod = order.payment_method === "cod";
       isPaid = order.status !== "pending";
     } catch {
-      // brak zamówienia — pokaż ogólny komunikat
+      // brak zamówienia — pokaż ogólny komunikat bez szczegółów
     }
   }
 
-  const heading = isPaid ? c.heading : c.headingPending;
-  const intro = isPaid ? c.intro : c.introPending;
+  // COD: przyjęte, płatność u kuriera. Online (P24): nagłówek/intro zależą od
+  // tego, czy notyfikacja zdążyła oznaczyć zamówienie jako opłacone.
+  const heading = isCod || isPaid ? c.heading : c.headingPending;
+  const intro = isCod ? c.introCod : isPaid ? c.intro : c.introPending;
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-24 text-center">

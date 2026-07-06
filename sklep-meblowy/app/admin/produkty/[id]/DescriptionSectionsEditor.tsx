@@ -4,7 +4,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { updateProductDescriptionSections } from "../actions";
 import type { ProductDescriptionSection } from "@/app/_lib/types";
-import { IconBtn, inputClass, type Toast } from "./_shared";
+import { CollapsibleSection, IconBtn, inputClass, type Toast } from "./_shared";
 import { useImageUpload } from "./useImageUpload";
 import RichTextEditor from "./RichTextEditor";
 import { useConfirm } from "@/app/_context/ConfirmContext";
@@ -128,19 +128,17 @@ export default function DescriptionSectionsEditor({
   }
 
   return (
-    <section className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col gap-4">
-      <div>
-        <h2 className="font-display text-xl font-semibold text-[var(--fg)]">
-          Sekcje opisu produktu
-        </h2>
-        <p className="text-sm text-[var(--muted)] mt-1 max-w-2xl leading-relaxed">
-          Wszystkie sekcje opisu są zarządzane <strong>tutaj</strong>.
-          Sekcje pochodzące z dawnego importu możesz <strong>nadpisać</strong>
-          (przycisk „Edytuj override”) albo ukryć.
-          <br />
-          Nowe treści dodajesz przyciskami „+ Własna sekcja” (tekst) i „+ Zdjęcie”.
-        </p>
-      </div>
+    <CollapsibleSection title="Sekcje opisu produktu" storageKey="sekcje-opisu" bodyClassName="flex flex-col gap-4">
+      {/* CollapsibleSection nie przekazuje dowolnych atrybutów do <section>,
+          więc jednostka guarda opakowuje bezpośrednio całą zawartość. */}
+      <div data-guard-section className="flex flex-col gap-4">
+      <p className="text-sm text-[var(--muted)] max-w-2xl leading-relaxed">
+        Wszystkie sekcje opisu są zarządzane <strong>tutaj</strong>.
+        Sekcje pochodzące z dawnego importu możesz <strong>nadpisać</strong>
+        (przycisk „Edytuj override”) albo ukryć.
+        <br />
+        Nowe treści dodajesz przyciskami „+ Własna sekcja” (tekst) i „+ Zdjęcie”.
+      </p>
 
       <div className="flex flex-col">
         {/* Insert button na samej górze */}
@@ -193,6 +191,7 @@ export default function DescriptionSectionsEditor({
                 onCaptionChange={(v) =>
                   patchSection(idx, { caption: v.trim() === "" ? undefined : v })
                 }
+                onDisplayChange={(v) => patchSection(idx, { display: v })}
                 onRemove={() => removeSection(idx)}
                 onMoveUp={idx > 0 ? () => moveSection(idx, -1) : undefined}
                 onMoveDown={idx < sections.length - 1 ? () => moveSection(idx, 1) : undefined}
@@ -223,12 +222,15 @@ export default function DescriptionSectionsEditor({
           type="button"
           onClick={save}
           disabled={saving || !dirty}
+          aria-busy={saving}
+          data-guard-save
           className="px-6 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
         >
           {saving ? "Zapisuję..." : "Zapisz sekcje"}
         </button>
       </div>
-    </section>
+      </div>
+    </CollapsibleSection>
   );
 }
 
@@ -413,6 +415,7 @@ function ImageSectionRow({
   section,
   onAltChange,
   onCaptionChange,
+  onDisplayChange,
   onRemove,
   onMoveUp,
   onMoveDown,
@@ -420,6 +423,7 @@ function ImageSectionRow({
   section: Extract<ProductDescriptionSection, { kind: "image" }>;
   onAltChange: (v: string) => void;
   onCaptionChange: (v: string) => void;
+  onDisplayChange: (v: "wide" | undefined) => void;
   onRemove: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
@@ -432,7 +436,7 @@ function ImageSectionRow({
           alt={section.image_alt || "Zdjęcie sekcji"}
           fill
           sizes="96px"
-          className="object-cover"
+          className={section.display === "wide" ? "object-cover" : "object-contain"}
         />
       </div>
       <div className="flex-1 min-w-0 flex flex-col gap-2">
@@ -455,6 +459,19 @@ function ImageSectionRow({
           maxLength={200}
           className={inputClass}
         />
+        <label className="flex items-center gap-2 text-xs font-sans text-[var(--muted)]">
+          <span className="uppercase tracking-widest shrink-0">Wyświetlanie</span>
+          <select
+            value={section.display ?? "natural"}
+            onChange={(e) =>
+              onDisplayChange(e.target.value === "wide" ? "wide" : undefined)
+            }
+            className={inputClass}
+          >
+            <option value="natural">Całe zdjęcie (bez przycinania)</option>
+            <option value="wide">Kadr panoramiczny 16:9</option>
+          </select>
+        </label>
       </div>
       <div className="flex flex-col gap-1 shrink-0">
         <IconBtn label="W górę" onClick={onMoveUp ?? (() => {})} disabled={!onMoveUp}>

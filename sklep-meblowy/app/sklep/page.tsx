@@ -48,7 +48,7 @@ type SearchParams = Promise<{
   cena_do?: string;
   dostepne?: string;
   kolor?: string;
-  material?: string;
+  tkanina?: string;
   kolekcja?: string;
 }>;
 
@@ -79,7 +79,7 @@ export default async function SklepPage({
   const priceMax = parsePositiveNumber(sp.cena_do);
   const inStockOnly = sp.dostepne === "1";
   const colors = sp.kolor?.split(",").filter(Boolean);
-  const materials = sp.material?.split(",").filter(Boolean);
+  const materials = sp.tkanina?.split(",").filter(Boolean);
   const collectionSlug = sp.kolekcja?.trim() || undefined;
 
   const [
@@ -90,6 +90,8 @@ export default async function SklepPage({
     allCollections,
     categoryLabel,
     collection,
+    wishlistIds,
+    rate,
   ] = await Promise.all([
     getProducts({
       category,
@@ -111,14 +113,14 @@ export default async function SklepPage({
     getAllCollections(),
     getCategoryLabel(category, locale),
     collectionSlug ? getCollection(collectionSlug, locale) : Promise.resolve(null),
-  ]);
-
-  // Batch pobrania ocen — jedno zapytanie dla całej strony list.
-  const [ratings, wishlistIds, rate] = await Promise.all([
-    getRatingsForProducts(products.map((p) => p.id)),
+    // wishlist i kurs NIE zależą od listy produktów — kiedyś czekały w drugiej
+    // paczce (pełny dodatkowy łańcuch RTT po products).
     getUserWishlistIds(),
     getEurRate(),
   ]);
+
+  // Oceny wymagają id produktów — jedyne genuinie sekwencyjne zapytanie.
+  const ratings = await getRatingsForProducts(products.map((p) => p.id));
   const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
 
   // Zachowaj wszystkie aktywne filtry w linkach paginacji
@@ -131,7 +133,7 @@ export default async function SklepPage({
   if (sp.cena_do) rawParams.cena_do = sp.cena_do;
   if (sp.dostepne) rawParams.dostepne = sp.dostepne;
   if (sp.kolor) rawParams.kolor = sp.kolor;
-  if (sp.material) rawParams.material = sp.material;
+  if (sp.tkanina) rawParams.tkanina = sp.tkanina;
   if (sp.kolekcja) rawParams.kolekcja = sp.kolekcja;
 
   // Label sekcji z `sections` (np. "Narożniki" zamiast surowego slug "naroznik").

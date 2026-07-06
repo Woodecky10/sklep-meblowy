@@ -62,7 +62,7 @@ export default async function AdminOrdersPage({
       </div>
 
       {/* Szukajka — natywny formularz GET (działa bez JS) */}
-      <form action="/admin/zamowienia" className="flex gap-2 max-w-lg">
+      <form action="/admin/zamowienia" data-guard-ignore className="flex gap-2 max-w-lg">
         {status !== "all" && <input type="hidden" name="status" value={status} />}
         <input
           name="q"
@@ -146,6 +146,7 @@ export default async function AdminOrdersPage({
                     statusClassName={s.className}
                     amountLabel={formatOrderAmount(Number(o.total), o.currency)}
                     deliveryPaid={o.delivery_paid}
+                    cod={o.payment_method === "cod"}
                   />
                 );
               })}

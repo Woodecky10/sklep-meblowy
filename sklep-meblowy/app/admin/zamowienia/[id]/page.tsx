@@ -67,6 +67,14 @@ export default async function AdminOrderDetailPage({
         <span className={`px-3 py-1 rounded-full text-xs font-sans uppercase tracking-widest self-start ${s.className}`}>
           {s.label}
         </span>
+        {order.payment_method === "cod" && (
+          <span
+            title="Płatność przy odbiorze — kurier pobiera gotówkę"
+            className="px-3 py-1 rounded-full text-xs font-sans uppercase tracking-widest self-start text-yellow-800 bg-yellow-100 dark:bg-yellow-950 dark:text-yellow-300"
+          >
+            Pobranie
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -122,7 +130,7 @@ export default async function AdminOrderDetailPage({
                 </div>
               )}
               <div className="flex justify-between border-t border-[var(--border)] pt-2 font-bold text-base text-[var(--fg)]">
-                <dt>Zapłacono</dt>
+                <dt>{order.payment_method === "cod" ? "Do pobrania" : "Zapłacono"}</dt>
                 <dd>{formatOrderAmount(Number(order.total), order.currency)}</dd>
               </div>
             </dl>
@@ -150,7 +158,21 @@ export default async function AdminOrderDetailPage({
             </Card>
           )}
 
-          {(order.payment_ref || order.stripe_payment_intent) && (
+          {/* Karty "Płatność" wzajemnie wykluczone: COD nie ma referencji
+              płatności online, ale gdyby dane kiedyś się rozjechały, admin
+              ma zobaczyć JEDNĄ kartę właściwą dla metody płatności. */}
+          {order.payment_method === "cod" ? (
+            <Card>
+              <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-3">Płatność</h3>
+              <p className="text-sm text-[var(--fg)]">
+                Za pobraniem — kurier pobiera{" "}
+                <span className="font-semibold">
+                  {formatOrderAmount(Number(order.total), order.currency)}
+                </span>{" "}
+                przy dostawie.
+              </p>
+            </Card>
+          ) : (order.payment_ref || order.stripe_payment_intent) ? (
             <Card>
               <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-3">Płatność</h3>
               <p className="text-xs text-[var(--muted)]">
@@ -162,7 +184,7 @@ export default async function AdminOrderDetailPage({
                 {order.payment_ref ?? order.stripe_payment_intent}
               </p>
             </Card>
-          )}
+          ) : null}
         </div>
 
         {/* Prawa kolumna: kontrolki admina */}

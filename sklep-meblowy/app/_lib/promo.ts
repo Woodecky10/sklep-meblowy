@@ -1,5 +1,5 @@
 // Helpery do tabeli promo_codes — kody rabatowe.
-// Klient wpisuje kod w koszyku/checkout, server walidacja przed Stripe.
+// Klient wpisuje kod w koszyku/checkout, server walidacja przed płatnością.
 
 import { createAdminClient } from "./supabase/server";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
@@ -34,7 +34,7 @@ export function normalizeCode(raw: string): string {
 // ============================================================
 // Wywoływana z:
 //   - server action w koszyku (live preview zniżki)
-//   - /api/checkout (autorytatywna walidacja przed Stripe)
+//   - /api/checkout (autorytatywna walidacja przed rejestracją P24)
 // Używa admin client (bypass RLS), bo musi czytać used_count i wartości
 // kodów których klient nie powinien zobaczyć w listingu.
 export async function validatePromoCode(
@@ -99,7 +99,8 @@ export async function validatePromoCode(
 }
 
 // ============================================================
-// Increment used_count — wywoływane przez Stripe webhook po opłaceniu
+// Increment used_count — wywoływane przez notyfikację P24 po opłaceniu
+// oraz przy złożeniu zamówienia pobraniowego (COD nie ma notyfikacji)
 // ============================================================
 export async function incrementPromoUsage(promoId: string): Promise<void> {
   const supabase = await createAdminClient();

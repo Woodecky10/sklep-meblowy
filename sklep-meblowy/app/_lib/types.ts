@@ -15,41 +15,26 @@ export type ProductDimensions = {
 
 // Definicja typu wariantu (np. "Strona": ["Lewa","Prawa"])
 // value_prices: opcjonalna dopłata per wartość opcji (np. {"Premium": 200}).
-// Dopłaty wybranych wartości sumują się do price_modifier kombinacji. Brak
-// wpisu = 0 zł. Gdy zdefiniowane, są źródłem prawdy dla price_modifier.
+// Dopłaty wybranych wartości sumują sie i dodawane sa do ceny bazowej produktu.
+// Brak wpisu = 0 zl. Gdy zdefiniowane, sa zrodlem prawdy dla ceny wariantu.
 export type ProductOption = {
   name: string;
   values: string[];
   value_prices?: Record<string, number>;
 };
 
-// Konkretna kombinacja wybranych wartości + stock + ewentualny modyfikator ceny.
-// values mapuje nazwę opcji → wybraną wartość, np. {"Strona":"Lewa","Kolor":"Beżowy"}.
-// images: opcjonalny zestaw zdjęć dla tej kombinacji — jeśli pusty/null,
-// frontend pokazuje globalną galerię produktu (products.images).
-export type ProductVariant = {
-  values: Record<string, string>;
-  stock: number;
-  price_modifier?: number;
-  // Omnibus (migracja 36): cena promocyjna i najniższa-z-30-dni per kombinacja.
-  sale_price?: number;
-  omnibus_price?: number;
-  images?: string[];
-};
-
-// Override-y wyświetlanych nazw — admin może zmienić "Wariant" → "Kolor"
-// i "01 beż drewniany stelaż" → "Beż drewniany". Zapisane oddzielnie żeby
-// kolejny import nie nadpisał ich (import zwraca surowe nazwy).
+// Override-y wyswietlanych nazw — admin moze zmienic "Wariant" -> "Kolor"
+// i "01 bez drewniany stelaz" -> "Bez drewniany". Zapisane oddzielnie zeby
+// kolejny import nie nadpisal ich (import zwraca surowe nazwy).
 export type ProductVariantOverrides = {
   // np. {"Wariant": "Kolor"}
   option_names?: Record<string, string>;
-  // np. {"Wariant": {"01 beż drewniany stelaż": "Beż drewniany"}}
+  // np. {"Wariant": {"01 bez drewniany stelaz": "Bez drewniany"}}
   value_labels?: Record<string, Record<string, string>>;
 };
 
 export type ProductVariants = {
   options: ProductOption[];
-  combinations: ProductVariant[];
   overrides?: ProductVariantOverrides;
 };
 
@@ -91,6 +76,10 @@ export type ProductDescriptionSectionImage = {
   image_url: string;
   image_alt: string;
   caption?: string;
+  // Tryb wyświetlania na karcie produktu. Brak pola = „całe zdjęcie"
+  // (naturalne proporcje, nic nie ucinane). "wide" = kadr panoramiczny 16:9
+  // z przycięciem (object-cover) — dawny, jedyny wygląd sprzed tego pola.
+  display?: "wide";
 };
 
 export type ProductDescriptionSection =
@@ -185,6 +174,8 @@ export type Address = {
   phone?: string;
 };
 
+export type PaymentMethod = "online" | "cod";
+
 export type OrderStatus =
   | "pending"
   | "paid"
@@ -202,9 +193,12 @@ export type Order = {
   currency: "pln" | "eur";
   fx_rate: number | null;
   shipping_address: Address;
-  stripe_payment_intent: string | null; // legacy (Stripe) — usuwane w migracji 41
+  stripe_payment_intent: string | null; // legacy (Stripe) — usuwane w migracji drop_stripe_payment_intent
   payment_ref: string | null;
   payment_provider: "stripe" | "p24" | null;
+  // Metoda płatności (migracja 45): online = płatność elektroniczna (P24),
+  // cod = za pobraniem u kuriera.
+  payment_method: PaymentMethod;
   promo_code_id: string | null;
   promo_discount: number;
   created_at: string;

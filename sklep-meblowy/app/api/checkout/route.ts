@@ -2,11 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { registerTransaction, trnRequestUrl, type P24RegisterParams } from "@/app/_lib/p24";
 import { createClient } from "@/app/_lib/supabase/server";
 import { createOrder } from "@/app/_lib/orders";
-import { validatePromoCode } from "@/app/_lib/promo";
+import { validatePromoCode, incrementPromoUsage } from "@/app/_lib/promo";
+import { isValidCodPhone } from "@/app/_lib/cod";
 import {
-  findVariant,
   hasVariants,
   isVariantSelectionComplete,
+  sumValueSurcharges,
 } from "@/app/_lib/variants";
 import type { Address, Product } from "@/app/_lib/types";
 import { getEurRate } from "@/app/_lib/store-settings";
@@ -28,6 +29,7 @@ type CheckoutBody = {
   address: Address;
   promoCode?: string | null;
   locale?: "pl" | "de";
+  paymentMethod?: "online" | "cod";
 };
 
 export async function POST(request: NextRequest) {
@@ -41,6 +43,8 @@ export async function POST(request: NextRequest) {
     locale = body.locale === "de" ? "de" : "pl";
 
     const isDe = locale === "de";
+    // Brak pola = "online" — kompatybilnie ze starszym klientem (cache SW itp.).
+    const isCod = body.paymentMethod === "cod";
     const rate = isDe ? await getEurRate() : 1;
     const currency: "pln" | "eur" = isDe ? "eur" : "pln";
     const toCharge = (pln: number) => (isDe ? convertToEur(pln, rate) : pln);
@@ -80,6 +84,20 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: tr("Brak pełnego adresu dostawy", "Unvollständige Lieferadresse") },
+        { status: 400 }
+      );
+    }
+
+    // Pobranie: kurier musi mieć telefon (i to zapora przed fałszywkami).
+    // Walidacja autorytatywna — formularz waliduje tylko dla UX.
+    if (isCod && !isValidCodPhone(shippingAddress.phone)) {
+      return NextResponse.json(
+        {
+          error: tr(
+            "Przy płatności za pobraniem wymagany jest numer telefonu (7–15 cyfr)",
+            "Bei Nachnahme ist eine Telefonnummer erforderlich (7–15 Ziffern)"
+          ),
+        },
         { status: 400 }
       );
     }
@@ -166,20 +184,14 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
-        const variant = findVariant(product, item.variantValues);
-        if (!variant) {
-          return NextResponse.json(
-            {
-              error: tr(
-                `Nieprawidłowy wariant dla: ${product.name}`,
-                `Ungültige Variante für: ${product.name}`
-              ),
-            },
-            { status: 400 }
-          );
-        }
-        const regular = Number(product.price) + (variant.price_modifier ?? 0);
-        unitPrice = effectivePrice(regular, variant.sale_price);
+        const surcharge = sumValueSurcharges(
+          product.variants?.options ?? [],
+          item.variantValues
+        );
+        const regular = Number(product.price) + surcharge;
+        const sale =
+          product.sale_price != null ? Number(product.sale_price) + surcharge : null;
+        unitPrice = effectivePrice(regular, sale);
         variantValues = item.variantValues;
       }
 
@@ -204,13 +216,15 @@ export async function POST(request: NextRequest) {
       if (!promoResult.ok) {
         return NextResponse.json({ error: promoResult.error }, { status: 400 });
       }
+      // Rabat wiąże się z zamówieniem tylko gdy realnie obniża kwotę w groszach.
+      // Rabat zaokrąglony do 0 gr (np. 1% z 0,49 zł) nie wiąże kodu — inaczej
+      // used_count++ za rabat, którego klient nie dostał. Ta sama reguła dla
+      // P24 i pobrania (spójność: COD też nie pali użycia kodu za 0,00 zł).
       const amountOffGr = Math.round(toCharge(promoResult.discount) * 100);
       if (amountOffGr > 0) {
         promoCodeId = promoResult.promo.id;
         promoDiscount = promoResult.discount;
       }
-      // Rabat zaokrąglił się do 0 gr (np. 1% z 0,49 zł) — nie wiążemy zamówienia
-      // z kodem (inaczej used_count++ za rabat, którego klient nie dostał).
     }
 
     // Wysyłka darmowa na terenie całej Polski — nie doliczamy kosztu dostawy.
@@ -234,14 +248,33 @@ export async function POST(request: NextRequest) {
       promoDiscount: toCharge(promoDiscount),
       currency,
       fxRate: isDe ? rate : null,
+      paymentMethod: isCod ? "cod" : "online",
     });
 
-    // Rejestracja transakcji P24
     const origin =
       request.headers.get("origin") ??
       process.env.NEXT_PUBLIC_APP_URL ??
       "http://localhost:3000";
 
+    // ── Pobranie: bez płatności online. Zamówienie już utworzone (status
+    // "processing"), klient płaci kurierowi. Promo inkrementujemy TERAZ —
+    // notyfikacja P24 (/api/p24/status) nigdy nie przyjdzie dla COD.
+    // Best-effort: used_count to miękka statystyka.
+    if (isCod) {
+      const localePrefix = isDe ? "/de" : "";
+      if (promoCodeId) {
+        try {
+          await incrementPromoUsage(promoCodeId);
+        } catch (err) {
+          console.error("[promo] increment used_count (COD) nieudany:", err);
+        }
+      }
+      return NextResponse.json({
+        url: `${origin}${localePrefix}/checkout/success?order_id=${order.id}`,
+      });
+    }
+
+    // Rejestracja transakcji P24
     const token = await registerTransaction(
       buildP24RegisterParams({
         orderId: order.id,

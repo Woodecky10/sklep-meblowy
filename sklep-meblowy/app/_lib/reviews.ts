@@ -105,8 +105,9 @@ export async function getRatingsForProducts(
 
 // Sprawdza czy aktualnie zalogowany user może dodać opinię o produkcie:
 // - musi być zalogowany
-// - musi mieć przynajmniej jedno zamówienie zawierające ten produkt ze statusem
-//   paid/processing/shipped/delivered
+// - musi mieć przynajmniej jedno zamówienie zawierające ten produkt, które
+//   liczy się jako zweryfikowany zakup (patrz warunek niżej — inny dla
+//   online/cod)
 // - nie może mieć jeszcze wystawionej opinii (unique constraint)
 // Zwraca istniejącą opinię (jeśli user ją już dał), żeby móc ją edytować.
 export async function getReviewStatus(productId: string): Promise<{
@@ -123,13 +124,25 @@ export async function getReviewStatus(productId: string): Promise<{
   // Czy ma zamówienie z tym produktem?
   const { data: orderItems } = await supabase
     .from("order_items")
-    .select("order_id, product_id, orders!inner(user_id, status)")
+    .select("order_id, product_id, orders!inner(user_id, status, payment_method)")
     .eq("product_id", productId)
-    .eq("orders.user_id", user.id)
-    .in("orders.status", ["paid", "processing", "shipped", "delivered"])
-    .limit(1);
+    .eq("orders.user_id", user.id);
 
-  if (!orderItems || orderItems.length === 0) {
+  // Zamówienia COD dostają status "processing" ZANIM klient zapłaci (płatność
+  // przy odbiorze) — w przeciwieństwie do "online", gdzie "processing" to już
+  // opłacone. Dla COD zweryfikowany zakup liczy się dopiero od "shipped"
+  // (towar faktycznie wysłany), inaczej każdy mógłby wystawić darmowe
+  // zamówienie COD i od razu dostać "zweryfikowaną" opinię.
+  const hasVerifiedPurchase = (
+    (orderItems ?? []) as unknown as { orders: { status: string; payment_method: string } }[]
+  ).some(
+    ({ orders: o }) =>
+      (o.payment_method === "online" &&
+        ["paid", "processing", "shipped", "delivered"].includes(o.status)) ||
+      (o.payment_method === "cod" && ["shipped", "delivered"].includes(o.status))
+  );
+
+  if (!hasVerifiedPurchase) {
     return { canReview: false, reason: "not_purchased" };
   }
 

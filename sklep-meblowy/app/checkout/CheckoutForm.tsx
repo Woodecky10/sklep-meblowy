@@ -12,6 +12,7 @@ import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { formatMoney } from "@/app/_lib/money";
 import { useEurRate } from "@/app/_lib/rate-context";
 import { useFabricLabels } from "@/app/_lib/fabric-context";
+import { isValidCodPhone } from "@/app/_lib/cod";
 import type { Address } from "@/app/_lib/types";
 
 export default function CheckoutForm({
@@ -66,6 +67,16 @@ export default function CheckoutForm({
         payment: "🔒 Zahlung über Przelewy24 (Karte, BLIK, Überweisung)",
         ssl: "✓ SSL-Verschlüsselung",
         defaultCountry: "Polen",
+        phone: "Telefon",
+        phoneCodNote: "Bei Nachnahme erforderlich — der Kurier braucht Ihre Nummer.",
+        paymentMethod: "Zahlungsart",
+        payOnline: "Online-Zahlung",
+        payOnlineDesc: "Karte, BLIK, Überweisung — sichere Zahlung über Przelewy24",
+        payCod: "Nachnahme",
+        payCodDesc: "Zahlung bei Lieferung an den Kurier",
+        placeOrder: "Bestellung aufgeben →",
+        codPhoneError: "Bei Nachnahme ist eine Telefonnummer erforderlich (7–15 Ziffern).",
+        codSidebarNote: "💵 Zahlung bei Lieferung (Nachnahme)",
       }
     : {
         haveAccount: "Masz już konto?",
@@ -100,6 +111,16 @@ export default function CheckoutForm({
         payment: "🔒 Płatność Przelewy24 (karta, BLIK, przelew)",
         ssl: "✓ Szyfrowanie SSL",
         defaultCountry: "Polska",
+        phone: "Telefon",
+        phoneCodNote: "Wymagany przy pobraniu — kurier musi mieć kontakt.",
+        paymentMethod: "Metoda płatności",
+        payOnline: "Płatność online",
+        payOnlineDesc: "Karta, BLIK, przelew — bezpieczna płatność Przelewy24",
+        payCod: "Za pobraniem",
+        payCodDesc: "Zapłacisz kurierowi przy odbiorze",
+        placeOrder: "Złóż zamówienie →",
+        codPhoneError: "Przy płatności za pobraniem wymagany jest numer telefonu (7–15 cyfr).",
+        codSidebarNote: "💵 Płatność przy odbiorze (za pobraniem)",
       };
 
   const [fullName, setFullName] = useState(defaultFullName);
@@ -110,6 +131,9 @@ export default function CheckoutForm({
   const [country, setCountry] = useState(
     defaultAddress?.country ?? c.defaultCountry
   );
+  const [phone, setPhone] = useState(defaultAddress?.phone ?? "");
+  const [paymentMethod, setPaymentMethod] = useState<"online" | "cod">("online");
+  const isCod = paymentMethod === "cod";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Wymagana akceptacja regulaminu + polityki przed płatnością.
@@ -138,6 +162,11 @@ export default function CheckoutForm({
       );
       return;
     }
+    // Walidacja UX — serwer i tak sprawdza autorytatywnie (isValidCodPhone).
+    if (isCod && !isValidCodPhone(phone)) {
+      setError(c.codPhoneError);
+      return;
+    }
     setError(null);
     setLoading(true);
 
@@ -163,9 +192,11 @@ export default function CheckoutForm({
             postal_code: postalCode,
             country,
             fullname: fullName,
+            phone: phone.trim() || undefined,
           },
           promoCode: appliedPromo?.code ?? null,
           locale: de ? "de" : "pl",
+          paymentMethod,
         }),
       });
 
@@ -268,12 +299,59 @@ export default function CheckoutForm({
               />
               <Field label={c.city} value={city} onChange={setCity} required />
             </div>
+            <div>
+              <Field
+                label={c.phone}
+                type="tel"
+                value={phone}
+                onChange={setPhone}
+                placeholder="+48 600 000 000"
+                required={isCod}
+              />
+              <p className="mt-1.5 text-xs text-[var(--muted)]">{c.phoneCodNote}</p>
+            </div>
             <Field
               label={c.country}
               value={country}
               onChange={setCountry}
               required
             />
+          </div>
+        </div>
+
+        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8">
+          <h2 className="font-display text-xl font-bold text-[var(--fg)] mb-6">
+            {c.paymentMethod}
+          </h2>
+          <div className="flex flex-col gap-3">
+            {(
+              [
+                { value: "online", label: c.payOnline, desc: c.payOnlineDesc },
+                { value: "cod", label: c.payCod, desc: c.payCodDesc },
+              ] as const
+            ).map((opt) => (
+              <label
+                key={opt.value}
+                className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${
+                  paymentMethod === opt.value
+                    ? "border-[var(--color-gold)] bg-[var(--bg)]"
+                    : "border-[var(--border)] hover:border-[var(--color-gold)]"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value={opt.value}
+                  checked={paymentMethod === opt.value}
+                  onChange={() => setPaymentMethod(opt.value)}
+                  className="mt-1 w-4 h-4 accent-[var(--color-gold)] shrink-0"
+                />
+                <span className="flex flex-col gap-0.5">
+                  <span className="font-semibold text-sm text-[var(--fg)]">{opt.label}</span>
+                  <span className="text-xs text-[var(--muted)]">{opt.desc}</span>
+                </span>
+              </label>
+            ))}
           </div>
         </div>
 
@@ -319,7 +397,7 @@ export default function CheckoutForm({
           disabled={loading || !acceptedTerms}
           className="w-full py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? c.redirecting : c.payNow}
+          {loading ? c.redirecting : isCod ? c.placeOrder : c.payNow}
         </button>
 
         <Link
@@ -331,7 +409,7 @@ export default function CheckoutForm({
       </form>
 
       <div className="lg:col-span-1">
-        <div className="sticky top-24 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8 flex flex-col gap-6">
+        <div className="sticky top-40 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8 flex flex-col gap-6">
           <h2 className="font-display text-2xl font-bold text-[var(--fg)]">
             {c.order} ({count})
           </h2>
@@ -405,7 +483,7 @@ export default function CheckoutForm({
           </div>
 
           <div className="border-t border-[var(--border)] pt-4 text-xs text-[var(--muted)] space-y-1">
-            <p>{c.payment}</p>
+            <p>{isCod ? c.codSidebarNote : c.payment}</p>
             <p>{c.ssl}</p>
           </div>
         </div>

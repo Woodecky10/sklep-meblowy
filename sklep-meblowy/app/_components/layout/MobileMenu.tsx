@@ -54,7 +54,7 @@ export default function MobileMenu({
         )}
       </button>
       {open && (
-        <div className="absolute top-full left-0 right-0 bg-[var(--card-bg)] border-b border-[var(--border)] shadow-lg lg:hidden">
+        <div className="absolute top-full left-0 right-0 bg-[var(--card-bg)] border-b border-[var(--border)] shadow-lg lg:hidden max-h-[calc(100dvh-8.5rem)] overflow-y-auto">
           <nav className="flex flex-col px-6 py-4 gap-3">
             {sections.map((section) => {
               const isOpen = openSection === section.slug;

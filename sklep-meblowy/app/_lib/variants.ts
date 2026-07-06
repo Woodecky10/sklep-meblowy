@@ -1,4 +1,4 @@
-import type { Product, ProductOption, ProductVariant } from "./types";
+import type { Product, ProductOption } from "./types";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "./de-content-maps";
 import { effectivePrice, isOnSale } from "./pricing";
@@ -8,27 +8,7 @@ export function hasVariants(product: Product): boolean {
   return !!product.variants && product.variants.options.length > 0;
 }
 
-// Znajdź dokładną kombinację dopasowaną do wybranych wartości.
-// Zwraca null jeśli nie wszystkie opcje są wybrane lub kombinacja nie istnieje.
-export function findVariant(
-  product: Product,
-  selectedValues: Record<string, string>
-): ProductVariant | null {
-  if (!product.variants) return null;
-  const optionNames = product.variants.options.map((o) => o.name);
-
-  for (const name of optionNames) {
-    if (!selectedValues[name]) return null;
-  }
-
-  return (
-    product.variants.combinations.find((c) =>
-      optionNames.every((n) => c.values[n] === selectedValues[n])
-    ) ?? null
-  );
-}
-
-// Czy wybór wariantu jest kompletny (wszystkie opcje mają wartość)?
+// Czy wybor wariantu jest kompletny (wszystkie opcje mają wartość)?
 export function isVariantSelectionComplete(
   product: Product,
   selectedValues: Record<string, string>
@@ -38,53 +18,25 @@ export function isVariantSelectionComplete(
 }
 
 // Stock dostępny dla wybranej kombinacji.
-// Brak wariantów -> product.stock. Niekompletny wybór lub brak kombinacji -> 0.
+// Model produktowy: zawsze product.stock (stan na poziomie produktu).
 export function getVariantStock(
   product: Product,
-  selectedValues: Record<string, string>
+  _selectedValues: Record<string, string>
 ): number {
-  if (!hasVariants(product)) return product.stock;
-  const variant = findVariant(product, selectedValues);
-  return variant?.stock ?? 0;
+  return product.stock;
 }
 
-// Cena dla wybranej kombinacji = product.price + price_modifier.
-// Niekompletny wybór -> bazowa cena.
+// Cena dla wybranego zestawu opcji = product.price + suma dopłat wartości.
 export function getVariantPrice(
   product: Product,
   selectedValues: Record<string, string>
 ): number {
-  if (!hasVariants(product)) return product.price;
-  const variant = findVariant(product, selectedValues);
-  if (!variant) return product.price;
-  return product.price + (variant.price_modifier ?? 0);
+  return product.price + sumValueSurcharges(product.variants?.options ?? [], selectedValues);
 }
 
-// Suma stocków wszystkich kombinacji (lub product.stock dla produktu bez wariantów).
-// Używane np. w „Wyprzedany" gdy wszystkie kombinacje mają 0.
+// Dostępny stock produktu (model produktowy: product.stock).
 export function totalProductStock(product: Product): number {
-  if (!hasVariants(product)) return product.stock;
-  return product.variants!.combinations.reduce((sum, c) => sum + c.stock, 0);
-}
-
-// Czy konkretna wartość opcji jest w ogóle dostępna (jakakolwiek kombinacja > 0)
-// przy uwzględnieniu już wybranych innych opcji. Używane do wyszarzania chipów.
-export function isOptionValueAvailable(
-  product: Product,
-  optionName: string,
-  value: string,
-  selectedValues: Record<string, string>
-): boolean {
-  if (!product.variants) return true;
-  const otherSelections = Object.entries(selectedValues).filter(
-    ([k, v]) => k !== optionName && !!v
-  );
-
-  return product.variants.combinations.some((c) => {
-    if (c.values[optionName] !== value) return false;
-    if (c.stock <= 0) return false;
-    return otherSelections.every(([k, v]) => c.values[k] === v);
-  });
+  return product.stock;
 }
 
 // Stała nazwa opcji wariantu reprezentującej tkaninę. Musi być zdefiniowana przed
@@ -113,16 +65,11 @@ export function formatVariantLabel(
     .join(", ");
 }
 
-// Zdjęcia do pokazania klientowi: jeśli wybrany wariant ma własne, użyj ich.
-// W przeciwnym razie (brak wariantów, niekompletny wybór, brak zdjęć w
-// kombinacji) wracamy do globalnej galerii produktu.
+// Zdjęcia do pokazania klientowi: galeria produktu (model produktowy).
 export function getVariantImages(
   product: Product,
-  selectedValues: Record<string, string>
+  _selectedValues: Record<string, string>
 ): string[] {
-  if (!hasVariants(product)) return product.images ?? [];
-  const variant = findVariant(product, selectedValues);
-  if (variant?.images && variant.images.length > 0) return variant.images;
   return product.images ?? [];
 }
 
@@ -147,6 +94,23 @@ export function getValueDisplayLabel(
   );
 }
 
+// Sortuje wartości opcji wariantu DO WYŚWIETLENIA: naturalnie (liczby rosnąco,
+// „Woolly 2" < „Woolly 10") i alfabetycznie A-Z wg locale. Sortuje po ETYKIECIE
+// (labelOf uwzględnia override'y admina + tłumaczenie DE), więc kolejność jest
+// poprawna w języku klienta. Case-/diakrytyko-niewrażliwe. Nie mutuje wejścia.
+// Używane display-time w VariantSelector — działa dla obecnych i przyszłych
+// produktów bez zmian w bazie. Narożniki (Strona) mają własne sortowanie
+// semantyczne (orderCornerSideValues) i tu nie przechodzą.
+export function sortVariantValues(
+  values: string[],
+  labelOf: (value: string) => string,
+  locale: Locale = DEFAULT_LOCALE
+): string[] {
+  return [...values].sort((a, b) =>
+    labelOf(a).localeCompare(labelOf(b), locale, { numeric: true, sensitivity: "base" })
+  );
+}
+
 // Deterministyczny klucz kombinacji (nazwy opcji posortowane). Współdzielony
 // z VariantsEditor i price-history, żeby kluczowanie było spójne.
 export function variantKey(values: Record<string, string>): string {
@@ -156,24 +120,24 @@ export function variantKey(values: Record<string, string>): string {
     .join("|");
 }
 
-// Cena promocyjna wybranej jednostki (kombinacja lub poziom produktu).
+// Cena promocyjna wybranego zestawu opcji = product.sale_price + suma dopłat.
+// Gdy sale_price == null -> brak promocji (null).
 export function getVariantSalePrice(
   product: Product,
   selectedValues: Record<string, string>
 ): number | null {
-  if (!hasVariants(product)) return product.sale_price ?? null;
-  const variant = findVariant(product, selectedValues);
-  return variant?.sale_price ?? null;
+  if (product.sale_price == null) return null;
+  return product.sale_price + sumValueSurcharges(product.variants?.options ?? [], selectedValues);
 }
 
-// Najniższa cena z 30 dni dla wybranej jednostki (zdenormalizowana).
+// Najniższa cena z 30 dni dla wybranego zestawu opcji = product.omnibus_price + dopłaty.
+// Gdy omnibus_price == null -> null.
 export function getVariantOmnibus(
   product: Product,
   selectedValues: Record<string, string>
 ): number | null {
-  if (!hasVariants(product)) return product.omnibus_price ?? null;
-  const variant = findVariant(product, selectedValues);
-  return variant?.omnibus_price ?? null;
+  if (product.omnibus_price == null) return null;
+  return product.omnibus_price + sumValueSurcharges(product.variants?.options ?? [], selectedValues);
 }
 
 // Czy wybrana jednostka jest w promocji (sale < regularna).
@@ -196,37 +160,6 @@ export function getVariantEffectivePrice(
     getVariantPrice(product, selectedValues),
     getVariantSalePrice(product, selectedValues)
   );
-}
-
-// ── Generowanie kombinacji wariantów (współdzielone z VariantsEditor + applyFabricSelection) ──
-
-// Wszystkie kombinacje opcji (iloczyn kartezjański). Pomija opcje bez nazwy/wartości.
-export function cartesianProduct(
-  options: ProductOption[]
-): Array<Record<string, string>> {
-  const valid = options.filter((o) => o.name.trim() && o.values.length > 0);
-  if (valid.length === 0) return [];
-  return valid.reduce<Array<Record<string, string>>>(
-    (acc, opt) =>
-      acc.flatMap((prev) => opt.values.map((v) => ({ ...prev, [opt.name]: v }))),
-    [{}]
-  );
-}
-
-// Po zmianie opcji przelicz kombinacje, zachowując stock/price/images/sale dla
-// kombinacji których klucz dalej istnieje. Nowe → stock 0, price_modifier 0.
-export function rebuildCombinations(
-  options: ProductOption[],
-  oldCombinations: ProductVariant[]
-): ProductVariant[] {
-  const oldMap = new Map<string, ProductVariant>(
-    oldCombinations.map((c) => [variantKey(c.values), c])
-  );
-  return cartesianProduct(options).map((values) => {
-    const prev = oldMap.get(variantKey(values));
-    if (prev) return { ...prev, values };
-    return { values, stock: 0, price_modifier: 0 };
-  });
 }
 
 // ── Dopłaty ceny per wartość opcji ──
@@ -252,20 +185,6 @@ export function usesValuePricing(options: ProductOption[]): boolean {
   return options.some(
     (o) => o.value_prices && Object.keys(o.value_prices).length > 0
   );
-}
-
-// Gdy produkt używa cen per wartość → przelicz price_modifier każdej kombinacji
-// jako sumę dopłat jej wartości (źródło prawdy). Gdy NIE używa (legacy) →
-// kombinacje bez zmian, żeby zachować ręcznie ustawione modyfikatory.
-export function applyValuePricing(
-  options: ProductOption[],
-  combinations: ProductVariant[]
-): ProductVariant[] {
-  if (!usesValuePricing(options)) return combinations;
-  return combinations.map((c) => ({
-    ...c,
-    price_modifier: sumValueSurcharges(options, c.values),
-  }));
 }
 
 // ── Tkaniny (katalog) ──
@@ -310,15 +229,13 @@ export function fabricValueBelongsTo(value: string, fabric: FabricLite): boolean
   return colors.includes(value.slice(name.length + 1));
 }
 
-// Ustawia (lub tworzy/usuwa) opcję „Tkanina" z podanymi wartościami + dopłatami
-// per wartość, przelicza kombinacje (rebuild + applyValuePricing). Pozostałe
-// opcje bez zmian. Pusty zbiór wartości → usuwa opcję „Tkanina".
+// Ustawia (lub tworzy/usuwa) opcje "Tkanina" z podanymi wartosciami + doplatami
+// per wartosc. Pozostale opcje bez zmian. Pusty zbior wartosci → usuwa opcje "Tkanina".
 export function applyFabricSelection(
   options: ProductOption[],
-  combinations: ProductVariant[],
   values: string[],
   valuePrices: Record<string, number> = {}
-): { options: ProductOption[]; combinations: ProductVariant[] } {
+): { options: ProductOption[] } {
   const vp = Object.keys(valuePrices).length > 0 ? valuePrices : undefined;
   let nextOptions: ProductOption[];
   if (values.length === 0) {
@@ -330,10 +247,7 @@ export function applyFabricSelection(
   } else {
     nextOptions = [...options, { name: FABRIC_OPTION_NAME, values, value_prices: vp }];
   }
-  return {
-    options: nextOptions,
-    combinations: applyValuePricing(nextOptions, rebuildCombinations(nextOptions, combinations)),
-  };
+  return { options: nextOptions };
 }
 
 // Buduje mapę PL→DE nazw tkanin (pomija puste name_de). Czysta — testowalna bez

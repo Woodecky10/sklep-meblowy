@@ -1,3 +1,5 @@
+import { unstable_cache, revalidateTag } from "next/cache";
+import { createClient as createBareAnonClient } from "@supabase/supabase-js";
 import { createClient, createAdminClient } from "./supabase/server";
 import { getCategories } from "./categories";
 import { buildSearchOrFilter } from "./search-filter";
@@ -5,6 +7,8 @@ import { sizeLabelOf } from "./size-groups";
 import { localizeProduct, buildLocalizedFacets } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Category, Product } from "./types";
+import { deriveFabricFamilies, productMatchesFabric } from "./fabric-filter";
+import { getAllFabrics } from "./fabrics";
 
 // Górny limit rozmiaru strony — broni przed ?limit=999999 (kosztowny request).
 export const PRODUCTS_PAGE_LIMIT_MAX = 100;
@@ -39,6 +43,8 @@ export type ProductFilters = {
   priceMax?: number;
   inStockOnly?: boolean;
   colors?: string[];
+  // Filtr tkanin (?tkanina=). Wartości: rodziny tkanin z katalogu fabrics
+  // (dopasowywane do opcji wariantów) ∪ legacy wartości kolumny material.
   materials?: string[];
   // Slug kolekcji — filtruje produkty należące do konkretnej kolekcji
   // (np. ?kolekcja=lisbon w URL).
@@ -126,7 +132,34 @@ export async function getProducts(filters: ProductFilters = {}) {
   if (inStockOnly) query = query.gt("stock", 0);
 
   if (colors?.length) query = query.in("color", colors);
-  if (materials?.length) query = query.in("material", materials);
+
+  // Filtr tkanin: wartości pochodzą z rodzin tkanin w opcjach wariantów
+  // (katalog fabrics) W UNII z legacy kolumną material — tego nie da się
+  // wyrazić w .in() na kolumnie, więc liczymy pasujące id w JS (skala:
+  // dziesiątki produktów; RLS i tak ogranicza odczyt do aktywnych) i
+  // zawężamy główne zapytanie przez .in("id", ids). Paginacja/sort/AND z
+  // pozostałymi filtrami zostają w DB.
+  if (materials?.length) {
+    const [{ data: fabricRows }, fabrics] = await Promise.all([
+      // Bez .limit() — świadomie (katalog ~dziesiątki produktów). Przy dużym wzroście katalogu PostgREST utnie wiersze i filtr/facety po cichu zgubią produkty — wtedy zdenormalizować rodziny do kolumny.
+      supabase.from("products").select("id, variants, material"),
+      getAllFabrics(),
+    ]);
+    const familyNames = fabrics.map((f) => f.name);
+    const ids = (
+      (fabricRows ?? []) as {
+        id: string;
+        variants: Product["variants"];
+        material: string | null;
+      }[]
+    )
+      .filter((r) => productMatchesFabric(r.variants, r.material, materials, familyNames))
+      .map((r) => r.id);
+    if (ids.length === 0) {
+      return { products: [], total: 0, pages: 0 };
+    }
+    query = query.in("id", ids);
+  }
 
   if (sort === "price_asc") {
     query = query.order("price", { ascending: true });
@@ -292,57 +325,93 @@ export async function getSizeGroupMembersAdmin(
   );
 }
 
-// Pobiera unikalne wartości color/material z CAŁEJ bazy produktów — użyte
-// do budowania filtrów na /sklep.
+export const FACETS_CACHE_TAG = "facets";
+
+// Inwalidacja cache facetów — wołana w akcjach admina mutujących produkty
+// (kolor/materiał/warianty/aktywność) i katalog tkanin. Wzorzec jak
+// invalidateFabricsCache (fabrics.ts).
+export function invalidateFacetsCache(): void {
+  revalidateTag(FACETS_CACHE_TAG, "max");
+}
+
+// Surowe, locale-NIEZALEŻNE źródło facetów, cachowane (tag + 300 s siatka
+// bezpieczeństwa na edycje bezpośrednio w DB). Wcześniej każdy klik filtra
+// robił 2 pełne skany products (w tym ciężki JSON variants) — to był główny
+// niecachowany koszt renderu /sklep.
 //
-// Decyzja: nie ograniczamy facets do bieżącego search/category. User
-// zgłaszał że "tylko beżowy" pojawiał się w filtrze, bo poprzednia wersja
-// kaskadowała — w wybranej kategorii istniał tylko 1 kolor, więc filtr
-// pokazywał ten 1 kolor. Lepiej zawsze pokazać pełną paletę: klient widzi
-// co jest dostępne w sklepie ogólnie, może kliknąć "biały" i zobaczyć
-// czy taki kolor jest w wybranej kategorii.
-//
-// Jeśli kolor nie ma żadnego produktu spełniającego pozostałe filtry —
-// kliknięcie zwróci pustą listę i user wyczyści filtry sam.
+// ⚠️ Wewnątrz unstable_cache nie wolno używać cookies() → products czytamy
+// CZYSTYM klientem anon (RLS widzi dokładnie to co gość: tylko is_active —
+// przy okazji facety przestają zawierać dane produktów ukrytych, gdy ogląda
+// je zalogowany admin). fabrics ma RLS admin-only → createAdminClient
+// (wzorzec fetchAllFabrics, działa w unstable_cache).
+const getFacetSource = unstable_cache(
+  async (): Promise<{
+    colorRows: { value: string | null; value_de: string | null }[];
+    fabricFacetRows: { value: string | null; value_de: string | null }[];
+  }> => {
+    const anon = createBareAnonClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const admin = await createAdminClient();
+    const [{ data: colorsData }, { data: fabricSourceData }, { data: fabricsData }] =
+      await Promise.all([
+        anon.from("products").select("color, color_de").not("color", "is", null),
+        // Bez .limit() — świadomie (katalog ~dziesiątki produktów). Przy dużym
+        // wzroście katalogu PostgREST utnie wiersze i facety po cichu zgubią
+        // produkty — wtedy zdenormalizować rodziny do kolumny.
+        anon.from("products").select("variants, material, material_de"),
+        admin
+          .from("fabrics")
+          .select("name, name_de")
+          .order("sort_order", { ascending: true })
+          .order("name", { ascending: true }),
+      ]);
+
+    const colorRows = (
+      (colorsData ?? []) as { color: string | null; color_de: string | null }[]
+    ).map((r) => ({ value: r.color, value_de: r.color_de }));
+
+    // Facet „Tkanina" = rodziny tkanin UŻYTE w widocznych produktach (value =
+    // nazwa PL z katalogu, label DE = fabrics.name_de) ∪ legacy wartości kolumny
+    // material (label DE = material_de). Dedupe po PL value robi
+    // buildLocalizedFacets (rodzina z name_de wygrywa etykietę nad legacy).
+    const fabricRows = (fabricSourceData ?? []) as {
+      variants: Product["variants"];
+      material: string | null;
+      material_de: string | null;
+    }[];
+    const fabrics = (fabricsData ?? []) as { name: string; name_de: string | null }[];
+    const familyNames = fabrics.map((f) => f.name);
+    const usedFamilies = new Set<string>();
+    for (const row of fabricRows) {
+      for (const fam of deriveFabricFamilies(row.variants, familyNames)) {
+        usedFamilies.add(fam);
+      }
+    }
+    const fabricFacetRows = [
+      ...fabrics
+        .filter((f) => usedFamilies.has(f.name))
+        .map((f) => ({ value: f.name as string | null, value_de: f.name_de })),
+      ...fabricRows
+        .filter((r) => r.material)
+        .map((r) => ({ value: r.material, value_de: r.material_de })),
+    ];
+
+    return { colorRows, fabricFacetRows };
+  },
+  ["facet-source"],
+  { tags: [FACETS_CACHE_TAG], revalidate: 300 }
+);
+
+// Pobiera facety filtrów na /sklep. Wartości cachowane (getFacetSource);
+// lokalizacja/sortowanie per request (tania, czysta buildLocalizedFacets).
+// Decyzja historyczna: nie ograniczamy facets do bieżącego search/category
+// (pełna paleta zawsze; pusta lista po kliknięciu jest akceptowana).
 export async function getFilterFacets(locale: Locale = DEFAULT_LOCALE) {
-  const supabase = await createClient();
-
-  // Każdy facet niesie KANONICZNĄ wartość PL (`value`) + zlokalizowany `label`.
-  // Dedupe robimy po PL value, więc kliknięcie zawsze wysyła ?kolor=<PL> i
-  // pasuje do `.in("color", ...)` w getProducts (predykat dalej PL — patrz
-  // niżej). DE produkty pokażą niemiecką etykietę (label), ale filtrują po PL.
-  // Selektujemy obie kolumny i składamy { value, label } w JS przez
-  // buildLocalizedFacets (czysty, testowalny helper).
-  const [
-    { data: colorsData },
-    { data: materialsData },
-  ] = await Promise.all([
-    supabase
-      .from("products")
-      .select("color, color_de")
-      .not("color", "is", null),
-    supabase
-      .from("products")
-      .select("material, material_de")
-      .not("material", "is", null),
-  ]);
-
-  const colors = buildLocalizedFacets(
-    ((colorsData ?? []) as { color: string | null; color_de: string | null }[]).map(
-      (r) => ({ value: r.color, value_de: r.color_de })
-    ),
-    locale
-  );
-
-  const materials = buildLocalizedFacets(
-    (
-      (materialsData ?? []) as {
-        material: string | null;
-        material_de: string | null;
-      }[]
-    ).map((r) => ({ value: r.material, value_de: r.material_de })),
-    locale
-  );
-
-  return { colors, materials };
+  const { colorRows, fabricFacetRows } = await getFacetSource();
+  return {
+    colors: buildLocalizedFacets(colorRows, locale),
+    materials: buildLocalizedFacets(fabricFacetRows, locale),
+  };
 }

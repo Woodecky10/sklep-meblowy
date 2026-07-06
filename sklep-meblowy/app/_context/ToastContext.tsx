@@ -59,8 +59,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={showToast}>
       {children}
+      {/* bottom-24, żeby toasty siedziały NAD pływającym przyciskiem powrotu
+          na górę (bottom-6 + h-12) i nie zasłaniały go */}
       <div
-        className="fixed bottom-4 right-4 sm:right-6 z-[70] flex flex-col gap-2 w-[calc(100%-2rem)] sm:w-80"
+        className="fixed bottom-24 right-4 sm:right-6 z-[70] flex flex-col gap-2 w-[calc(100%-2rem)] sm:w-80"
         aria-live="polite"
       >
         {toasts.map((t) => (

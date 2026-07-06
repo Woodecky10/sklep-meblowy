@@ -8,10 +8,11 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import TextAlign from "@tiptap/extension-text-align";
 // W TipTap 3.x TextStyle i Color są eksportowane z @tiptap/extension-text-style
-import { TextStyle, Color } from "@tiptap/extension-text-style";
+import { TextStyle, Color, FontFamily } from "@tiptap/extension-text-style";
 import Highlight from "@tiptap/extension-highlight";
 import Image from "@tiptap/extension-image";
 import { normalizeEditorHtml } from "@/app/_lib/rich-text";
+import { FONT_OPTIONS } from "@/app/_lib/description-fonts";
 import { uploadProductImage } from "../actions";
 import { compressIfNeeded } from "./_shared";
 
@@ -68,6 +69,7 @@ export default function RichTextEditor({
       }),
       TextStyle,
       Color,
+      FontFamily,
       Highlight, // bez multicolor -> zwykły <mark>
       Image.configure({ inline: false, allowBase64: false }),
     ],
@@ -165,6 +167,27 @@ export default function RichTextEditor({
         <button type="button" onClick={() => editor.chain().focus().setTextAlign("center").run()} className={btn(editor.isActive({ textAlign: "center" }))} aria-label="Wyśrodkuj">≡</button>
         <button type="button" onClick={() => editor.chain().focus().setTextAlign("right").run()} className={btn(editor.isActive({ textAlign: "right" }))} aria-label="Do prawej">⯈</button>
         <button type="button" onClick={() => editor.chain().focus().setTextAlign("justify").run()} className={btn(editor.isActive({ textAlign: "justify" }))} aria-label="Wyjustuj">≣</button>
+        <span className="w-px h-5 bg-[var(--border)] mx-1" />
+        {/* Czcionka — zamknięta lista (to samo źródło prawdy co sanitizer:
+            description-fonts). Wartość pusta = Domyślna (unsetFontFamily). */}
+        <select
+          value={(editor.getAttributes("textStyle").fontFamily as string | undefined) ?? ""}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "") editor.chain().focus().unsetFontFamily().run();
+            else editor.chain().focus().setFontFamily(v).run();
+          }}
+          title="Czcionka"
+          aria-label="Czcionka"
+          className="h-7 px-1.5 text-xs bg-transparent border border-[var(--border)] rounded-md text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
+        >
+          <option value="">Domyślna</option>
+          {FONT_OPTIONS.map((o) => (
+            <option key={o.stack} value={o.stack} style={{ fontFamily: o.stack }}>
+              {o.label}
+            </option>
+          ))}
+        </select>
         <span className="w-px h-5 bg-[var(--border)] mx-1" />
         {/* Kolor tekstu — stała paleta */}
         {TEXT_COLORS.map((col) => (
