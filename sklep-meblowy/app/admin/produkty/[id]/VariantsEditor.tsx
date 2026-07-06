@@ -250,6 +250,11 @@ export default function VariantsEditor({
         </button>
       }
     >
+      {/* CollapsibleSection nie przekazuje dowolnych atrybutów do swojego
+          <section>, więc jednostka guarda (data-guard-section) opakowuje
+          bezpośrednio całą zawartość zwracaną tutaj — jedyny realny wspólny
+          kontener DOM, do którego mamy dostęp. */}
+      <div data-guard-section className="flex flex-col gap-6">
       <p className="text-sm text-[var(--muted)] max-w-2xl">
         Dodaj opcje (np. „Kolor”, „Tkanina”, „Strona”) i ich wartości — klient wybiera po jednej wartości z każdej opcji. Przy wartości możesz ustawić dopłatę „+zł” (np. droższa tkanina). Stan magazynowy, cena promocyjna i zdjęcia są wspólne dla całego produktu — ustawiasz je w „Podstawowych danych” i „Zdjęciach produktu” wyżej.
       </p>
@@ -315,6 +320,7 @@ export default function VariantsEditor({
           type="button"
           onClick={save}
           disabled={saving || !dirty}
+          data-guard-save
           className="px-6 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
         >
           {saving ? "Zapisuję..." : "Zapisz warianty"}
@@ -331,6 +337,7 @@ export default function VariantsEditor({
           onApply={applyFabrics}
         />
       )}
+      </div>
     </CollapsibleSection>
   );
 }
