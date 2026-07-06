@@ -162,7 +162,12 @@ export default function ProductMainSection({
 
         <div className="border-t border-[var(--border)] pt-6 text-sm text-[var(--muted)] space-y-2">
           <p>✓ {t.product.returns}</p>
-          <p>✓ {t.product.warranty}</p>
+          <p>
+            ✓ {t.product.warrantyLabel}{" "}
+            <strong className="text-[var(--fg)]">
+              {product.warranty || t.product.warrantyDefault}
+            </strong>
+          </p>
           <p>
             ✓ {t.product.deliveryTimeLabel}{" "}
             <strong className="text-[var(--fg)]">

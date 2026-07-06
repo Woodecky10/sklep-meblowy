@@ -72,7 +72,8 @@ export type PlShape = {
     specWarranty: string;
     dimensionsHint: string;
     returns: string;
-    warranty: string;
+    warrantyLabel: string;
+    warrantyDefault: string;
     deliveryTimeLabel: string;
     deliveryTimeDefault: string;
     deliveryCostNote: string;
@@ -362,7 +363,10 @@ export const pl = {
     specWarranty: "Gwarancja",
     dimensionsHint: "szer. × gł. × wys.",
     returns: "Zwrot do 14 dni",
-    warranty: "Gwarancja 2 lata",
+    // Gwarancja w bloku "✓" prawej kolumny: label + wartość z product.warranty
+    // (fallback do warrantyDefault gdy pole puste) — jak deliveryTimeLabel/Default.
+    warrantyLabel: "Gwarancja:",
+    warrantyDefault: "2 lata",
     deliveryTimeLabel: "Czas dostawy:",
     deliveryTimeDefault: "14–21 dni roboczych",
     deliveryCostNote: "Darmowa wysyłka na terenie całej Polski",
