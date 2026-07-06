@@ -51,7 +51,7 @@ export default function SettingsForm({ initialRate }: { initialRate: number }) {
           {saving ? "Zapisuję..." : "Zapisz kurs"}
         </button>
         {msg && (
-          <span className={msg.ok ? "text-green-600 text-sm" : "text-red-600 text-sm"}>
+          <span className={msg.ok ? "text-green-600 text-sm" : "text-red-600 text-sm"} data-toast-type={msg.ok ? "success" : "error"}>
             {msg.text}
           </span>
         )}
