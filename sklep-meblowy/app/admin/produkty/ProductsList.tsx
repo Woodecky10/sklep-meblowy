@@ -64,7 +64,7 @@ export default function ProductsList({ products }: { products: AdminProductRow[]
 
       <p className="text-sm text-[var(--muted)]">
         {q
-          ? `${visible.length} z ${products.length} ${productsWord(products.length)}`
+          ? `${visible.length} z ${products.length} ${products.length === 1 ? "produktu" : "produktów"}`
           : `Łącznie: ${products.length} ${productsWord(products.length)}`}
       </p>
 
