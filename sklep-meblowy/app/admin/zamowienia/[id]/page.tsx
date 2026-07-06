@@ -68,7 +68,10 @@ export default async function AdminOrderDetailPage({
           {s.label}
         </span>
         {order.payment_method === "cod" && (
-          <span className="px-3 py-1 rounded-full text-xs font-sans uppercase tracking-widest self-start text-yellow-800 bg-yellow-100 dark:bg-yellow-950 dark:text-yellow-300">
+          <span
+            title="Płatność przy odbiorze — kurier pobiera gotówkę"
+            className="px-3 py-1 rounded-full text-xs font-sans uppercase tracking-widest self-start text-yellow-800 bg-yellow-100 dark:bg-yellow-950 dark:text-yellow-300"
+          >
             Pobranie
           </span>
         )}
@@ -155,19 +158,10 @@ export default async function AdminOrderDetailPage({
             </Card>
           )}
 
-          {order.stripe_payment_intent && (
-            <Card>
-              <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-3">Płatność</h3>
-              <p className="text-xs text-[var(--muted)]">
-                Stripe payment_intent (referencja do zwrotów):
-              </p>
-              <p className="font-mono text-sm text-[var(--fg)] break-all">
-                {order.stripe_payment_intent}
-              </p>
-            </Card>
-          )}
-
-          {order.payment_method === "cod" && (
+          {/* Karty "Płatność" wzajemnie wykluczone: COD nigdy nie ma
+              stripe_payment_intent, ale gdyby dane kiedyś się rozjechały,
+              admin ma zobaczyć JEDNĄ kartę właściwą dla metody płatności. */}
+          {order.payment_method === "cod" ? (
             <Card>
               <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-3">Płatność</h3>
               <p className="text-sm text-[var(--fg)]">
@@ -178,7 +172,17 @@ export default async function AdminOrderDetailPage({
                 przy dostawie.
               </p>
             </Card>
-          )}
+          ) : order.stripe_payment_intent ? (
+            <Card>
+              <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-3">Płatność</h3>
+              <p className="text-xs text-[var(--muted)]">
+                Stripe payment_intent (referencja do zwrotów):
+              </p>
+              <p className="font-mono text-sm text-[var(--fg)] break-all">
+                {order.stripe_payment_intent}
+              </p>
+            </Card>
+          ) : null}
         </div>
 
         {/* Prawa kolumna: kontrolki admina */}
