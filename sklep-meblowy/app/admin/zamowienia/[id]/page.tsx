@@ -67,6 +67,11 @@ export default async function AdminOrderDetailPage({
         <span className={`px-3 py-1 rounded-full text-xs font-sans uppercase tracking-widest self-start ${s.className}`}>
           {s.label}
         </span>
+        {order.payment_method === "cod" && (
+          <span className="px-3 py-1 rounded-full text-xs font-sans uppercase tracking-widest self-start text-yellow-800 bg-yellow-100 dark:bg-yellow-950 dark:text-yellow-300">
+            Pobranie
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -158,6 +163,19 @@ export default async function AdminOrderDetailPage({
               </p>
               <p className="font-mono text-sm text-[var(--fg)] break-all">
                 {order.stripe_payment_intent}
+              </p>
+            </Card>
+          )}
+
+          {order.payment_method === "cod" && (
+            <Card>
+              <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-3">Płatność</h3>
+              <p className="text-sm text-[var(--fg)]">
+                Za pobraniem — kurier pobiera{" "}
+                <span className="font-semibold">
+                  {formatOrderAmount(Number(order.total), order.currency)}
+                </span>{" "}
+                przy dostawie.
               </p>
             </Card>
           )}

@@ -146,6 +146,7 @@ export default async function AdminOrdersPage({
                     statusClassName={s.className}
                     amountLabel={formatOrderAmount(Number(o.total), o.currency)}
                     deliveryPaid={o.delivery_paid}
+                    cod={o.payment_method === "cod"}
                   />
                 );
               })}
