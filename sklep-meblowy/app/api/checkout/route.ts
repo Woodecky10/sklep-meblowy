@@ -275,6 +275,7 @@ export async function POST(request: NextRequest) {
       promoDiscount: toCharge(promoDiscount),
       currency,
       fxRate: isDe ? rate : null,
+      paymentMethod: "online",
     });
 
     // Stripe Checkout Session

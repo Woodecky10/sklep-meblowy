@@ -174,6 +174,8 @@ export type Address = {
   phone?: string;
 };
 
+export type PaymentMethod = "online" | "cod";
+
 export type OrderStatus =
   | "pending"
   | "paid"
@@ -192,6 +194,8 @@ export type Order = {
   fx_rate: number | null;
   shipping_address: Address;
   stripe_payment_intent: string | null;
+  // Metoda płatności (migracja 45): online = Stripe, cod = za pobraniem.
+  payment_method: PaymentMethod;
   promo_code_id: string | null;
   promo_discount: number;
   created_at: string;

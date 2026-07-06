@@ -1,5 +1,5 @@
 import { createAdminClient } from "./supabase/server";
-import type { Address, Order, OrderItem, OrderStatus } from "./types";
+import type { Address, Order, OrderItem, OrderStatus, PaymentMethod } from "./types";
 
 type CreateOrderInput = {
   userId: string | null;
@@ -17,6 +17,7 @@ type CreateOrderInput = {
   promoDiscount?: number;
   currency: "pln" | "eur";
   fxRate: number | null;
+  paymentMethod: PaymentMethod;
 };
 
 export async function createOrder({
@@ -29,6 +30,7 @@ export async function createOrder({
   promoDiscount,
   currency,
   fxRate,
+  paymentMethod,
 }: CreateOrderInput) {
   // Service role — pomijamy RLS, walidacja jest w API route (ceny, stock, auth)
   const supabase = await createAdminClient();
@@ -44,6 +46,12 @@ export async function createOrder({
       promo_discount: promoDiscount ?? 0,
       currency,
       fx_rate: fxRate,
+      payment_method: paymentMethod,
+      // COD nie ma etapu płatności — od razu "processing" (przyjęte do
+      // realizacji). Dzięki temu nie miesza się z porzuconymi "pending"
+      // (nieopłacone checkouty Stripe) i webhook Stripe go nie dotyczy.
+      // Reguła TYLKO tu — caller nie przekazuje statusu.
+      ...(paymentMethod === "cod" ? { status: "processing" } : {}),
     } as never)
     .select()
     .single();
