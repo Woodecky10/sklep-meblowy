@@ -36,7 +36,19 @@ export default function UnsavedChangesGuard() {
   // state — zmiany nie mają renderować; render tylko dla dialogu.
   const dirtyRef = useRef<Set<Element>>(new Set());
   const [pendingHref, setPendingHref] = useState<string | null>(null);
+  // Źródło prawdy dla domknięć pętli zapisu (state służy tylko do renderu
+  // dialogu — patrz openDialog/closeDialog i komentarz przy saveAndLeave).
+  const pendingHrefRef = useRef<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  function openDialog(href: string) {
+    pendingHrefRef.current = href;
+    setPendingHref(href);
+  }
+  function closeDialog() {
+    pendingHrefRef.current = null;
+    setPendingHref(null);
+  }
 
   // Zmiana strony w panelu unieważnia jednostki poprzedniej strony.
   useEffect(() => {
@@ -107,7 +119,8 @@ export default function UnsavedChangesGuard() {
       if (!shouldInterceptLink(info, dirtyRef.current.size)) return;
       e.preventDefault();
       e.stopPropagation();
-      setPendingHref(anchor.getAttribute("href"));
+      const href = anchor.getAttribute("href");
+      if (href) openDialog(href);
     }
 
     function onBeforeUnload(e: BeforeUnloadEvent) {
@@ -132,22 +145,28 @@ export default function UnsavedChangesGuard() {
   }, []);
 
   function leaveWithoutSaving() {
-    if (!pendingHref) return;
+    const href = pendingHrefRef.current;
+    if (!href) return;
     dirtyRef.current.clear();
-    const href = pendingHref;
-    setPendingHref(null);
+    closeDialog();
     router.push(href);
   }
 
   // „Zapisz i wyjdź": wyzwól natywne zapisy edytorów, czekaj aż ustaną
   // (migawka disabled eliminuje przyciski zablokowane z innych powodów),
   // nawiguj tylko przy czystym sukcesie (bez toastu błędu / resztek dirty).
-  // „Zostań" kliknięte (lub Escape) w trakcie zapisu = anulowanie wyjścia:
-  // setPendingHref(null) w onStay powoduje, że leaveWithoutSaving() poniżej
-  // stanie się no-opem (guard `if (!pendingHref) return;`) — pętla zapisu
-  // dokończy się w tle, ale nawigacja już nie nastąpi.
+  // Domknięcie tej pętli jest zamrożone na renderze, w którym powstało —
+  // nie widzi PÓŹNIEJSZYCH setPendingHref. Dlatego intencja nawigacji jest
+  // pilnowana przez pendingHrefRef (żywy, czytany na bieżąco) + token
+  // hrefAtStart: nawigujemy po zakończeniu zapisu tylko jeśli ref wciąż
+  // wskazuje na TEN SAM href, na który użytkownik kliknął „Zapisz i wyjdź".
+  // „Zostań" (lub Escape) w trakcie zapisu robi closeDialog() → ref = null →
+  // po ustaniu zapisu leaveWithoutSaving() jest no-opem (guard `if (!href)`).
+  // Jeśli w międzyczasie otwarto NOWY dialog (inny link), ref wskazuje na
+  // inny href niż hrefAtStart — stara pętla go nie nadpisuje ani nie nawiguje.
   async function saveAndLeave() {
-    if (!pendingHref || saving) return;
+    const hrefAtStart = pendingHrefRef.current;
+    if (!hrefAtStart || saving) return;
     setSaving(true);
     const units = Array.from(dirtyRef.current);
 
@@ -190,9 +209,9 @@ export default function UnsavedChangesGuard() {
     });
     setSaving(false);
     if (decision === "leave") {
-      leaveWithoutSaving();
-    } else {
-      setPendingHref(null); // zostań — użytkownik widzi toast/walidację
+      if (pendingHrefRef.current === hrefAtStart) leaveWithoutSaving();
+    } else if (pendingHrefRef.current === hrefAtStart) {
+      closeDialog(); // zostań — użytkownik widzi toast/walidację
     }
   }
 
@@ -200,7 +219,7 @@ export default function UnsavedChangesGuard() {
     <UnsavedDialog
       open={pendingHref !== null}
       saving={saving}
-      onStay={() => setPendingHref(null)}
+      onStay={closeDialog}
       onSaveAndLeave={saveAndLeave}
       onLeave={leaveWithoutSaving}
     />
