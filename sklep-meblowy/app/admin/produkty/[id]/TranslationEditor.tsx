@@ -306,6 +306,7 @@ export default function TranslationEditor({
           type="button"
           onClick={save}
           disabled={saving || !dirty}
+          aria-busy={saving}
           data-guard-save
           className="px-6 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
         >

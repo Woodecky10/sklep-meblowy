@@ -62,6 +62,21 @@ export function nextSettleState(
   };
 }
 
+// Czy przycisk zapisu wciąż zapisuje? Przyciski bramkowane na dirty
+// (disabled={saving || !dirty}) po UDANYM zapisie zostają disabled — sam
+// `disabled` fałszywie sygnalizował „trwa zapis" i pętla settle wisiała do
+// timeoutu (guard nie wychodził mimo udanego zapisu). Prawda: aria-busy={saving}
+// (edytory sekcji ustawiają jawnie). Bez atrybutu — fallback do starego
+// zachowania (disabled = trwa), żeby formularze bez aria-busy działały jak dotąd.
+export function isButtonStillSaving(info: {
+  disabled: boolean;
+  ariaBusy: string | null;
+}): boolean {
+  if (!info.disabled) return false;
+  if (info.ariaBusy === null) return true;
+  return info.ariaBusy === "true";
+}
+
 // Po „Zapisz i wyjdź": nawigujemy tylko gdy zapisy zakończone bez błędu.
 // Toast błędu / niedokończona walidacja / timeout → zostajemy, żeby użytkownik
 // widział co się stało (bez nawigacji w ciemno).
