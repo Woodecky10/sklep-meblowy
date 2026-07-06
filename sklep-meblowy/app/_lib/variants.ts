@@ -94,6 +94,23 @@ export function getValueDisplayLabel(
   );
 }
 
+// Sortuje wartości opcji wariantu DO WYŚWIETLENIA: naturalnie (liczby rosnąco,
+// „Woolly 2" < „Woolly 10") i alfabetycznie A-Z wg locale. Sortuje po ETYKIECIE
+// (labelOf uwzględnia override'y admina + tłumaczenie DE), więc kolejność jest
+// poprawna w języku klienta. Case-/diakrytyko-niewrażliwe. Nie mutuje wejścia.
+// Używane display-time w VariantSelector — działa dla obecnych i przyszłych
+// produktów bez zmian w bazie. Narożniki (Strona) mają własne sortowanie
+// semantyczne (orderCornerSideValues) i tu nie przechodzą.
+export function sortVariantValues(
+  values: string[],
+  labelOf: (value: string) => string,
+  locale: Locale = DEFAULT_LOCALE
+): string[] {
+  return [...values].sort((a, b) =>
+    labelOf(a).localeCompare(labelOf(b), locale, { numeric: true, sensitivity: "base" })
+  );
+}
+
 // Deterministyczny klucz kombinacji (nazwy opcji posortowane). Współdzielony
 // z VariantsEditor i price-history, żeby kluczowanie było spójne.
 export function variantKey(values: Record<string, string>): string {

@@ -7,7 +7,7 @@ import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "@/app/_lib/de-content-maps";
 import type { Locale } from "@/app/_lib/i18n";
 import { useFabricLabels, useFabricImages } from "@/app/_lib/fabric-context";
-import { FABRIC_OPTION_NAME } from "@/app/_lib/variants";
+import { FABRIC_OPTION_NAME, sortVariantValues } from "@/app/_lib/variants";
 import {
   cornerSideOf,
   isCornerSideOptionName,
@@ -65,6 +65,16 @@ export default function VariantSelector({
       {variants.options.map((option) => {
         const current = selected[option.name];
         const displayName = getOptionName(product, option.name, locale);
+        // Kolejność wyświetlania A-Z (naturalnie, po etykiecie). Narożniki (Strona)
+        // mają własne sortowanie semantyczne w CornerSideGroup (orderCornerSideValues),
+        // więc dla nich zostawiamy surową kolejność.
+        const orderedValues = isCornerSideOptionName(option.name)
+          ? option.values
+          : sortVariantValues(
+              option.values,
+              (v) => getValueLabel(product, option.name, v, locale, fabricMap),
+              locale
+            );
         return (
           <div key={option.name}>
             <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
@@ -79,7 +89,7 @@ export default function VariantSelector({
             </p>
             {option.name === FABRIC_OPTION_NAME ? (
               <FabricSwatchGroup
-                values={option.values}
+                values={orderedValues}
                 current={current}
                 valuePrices={option.value_prices}
                 images={fabricImages}
@@ -101,7 +111,7 @@ export default function VariantSelector({
               />
             ) : (
               <div className="flex flex-wrap gap-2">
-                {option.values.map((v) => {
+                {orderedValues.map((v) => {
                   const isActive = current === v;
                   const label = getValueLabel(product, option.name, v, locale, fabricMap);
                   const surcharge = option.value_prices?.[v] ?? 0;
