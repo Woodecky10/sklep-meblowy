@@ -117,6 +117,7 @@ export default function ProductEditor({
               : "bg-red-600 text-white"
           }`}
           role="status"
+          data-toast-type={toast.type}
         >
           {toast.message}
         </div>

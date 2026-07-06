@@ -196,6 +196,9 @@ export default function TranslationEditor({
         </div>
       }
     >
+      {/* CollapsibleSection nie przekazuje dowolnych atrybutów do <section>,
+          więc jednostka guarda opakowuje bezpośrednio całą zawartość. */}
+      <div data-guard-section className="flex flex-col gap-5">
       <p className="text-sm text-[var(--muted)] max-w-2xl leading-relaxed">
         Treść pokazywana klientom w niemieckiej wersji sklepu. Wpisz ją
         <strong> ręcznie</strong> — także sekcje opisu (po lewej polska treść
@@ -301,10 +304,12 @@ export default function TranslationEditor({
           type="button"
           onClick={save}
           disabled={saving || !dirty}
+          data-guard-save
           className="px-6 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
         >
           {saving ? "Zapisuję..." : "Zapisz tłumaczenie DE"}
         </button>
+      </div>
       </div>
     </CollapsibleSection>
   );

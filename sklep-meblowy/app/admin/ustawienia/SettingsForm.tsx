@@ -23,7 +23,7 @@ export default function SettingsForm({ initialRate }: { initialRate: number }) {
   }
 
   return (
-    <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col gap-4">
+    <div data-guard-section className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col gap-4">
       <label className="flex flex-col gap-2">
         <span className="text-sm font-sans uppercase tracking-widest text-[var(--muted)]">
           Kurs EUR (1 zł = … €)
@@ -45,12 +45,13 @@ export default function SettingsForm({ initialRate }: { initialRate: number }) {
           type="button"
           onClick={save}
           disabled={saving}
+          data-guard-save
           className="px-6 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
         >
           {saving ? "Zapisuję..." : "Zapisz kurs"}
         </button>
         {msg && (
-          <span className={msg.ok ? "text-green-600 text-sm" : "text-red-600 text-sm"}>
+          <span className={msg.ok ? "text-green-600 text-sm" : "text-red-600 text-sm"} data-toast-type={msg.ok ? "success" : "error"}>
             {msg.text}
           </span>
         )}

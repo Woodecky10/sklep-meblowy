@@ -61,6 +61,7 @@ export function ToastView({
   return (
     <div
       role="status"
+      data-toast-type={toast.type}
       className={`fixed top-24 right-6 z-50 max-w-sm px-5 py-4 rounded-2xl shadow-2xl border ${
         toast.type === "success"
           ? "bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-200"

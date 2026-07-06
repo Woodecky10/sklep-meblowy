@@ -122,7 +122,8 @@ export default function SizeGroupEditor({
   }
 
   return (
-    <div className="md:col-span-2 flex flex-col gap-3 rounded-lg border border-[var(--border)] p-4">
+    // etykiety zapisują się na blur, input to wyszukiwarka — guard pomija
+    <div data-guard-ignore className="md:col-span-2 flex flex-col gap-3 rounded-lg border border-[var(--border)] p-4">
       <div>
         <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
           Rozmiary tego mebla
