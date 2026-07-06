@@ -9,9 +9,9 @@ import ClearCart from "./ClearCart";
 export default async function SuccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ session_id?: string }>;
+  searchParams: Promise<{ session_id?: string; order_id?: string }>;
 }) {
-  const { session_id } = await searchParams;
+  const { session_id, order_id } = await searchParams;
   const locale = await getLocale();
   const de = locale === "de";
 
@@ -21,6 +21,8 @@ export default async function SuccessPage({
         heading: "Bestellung erhalten",
         intro:
           "Die Zahlung wurde erfolgreich abgewickelt. An die angegebene E-Mail-Adresse haben wir eine Bestellbestätigung mit allen Details geschickt.",
+        introCod:
+          "Ihre Bestellung wurde angenommen. Sie zahlen bequem bei Lieferung an den Kurier (Nachnahme).",
         details: "Details",
         orderNumber: "Bestellnummer",
         email: "E-Mail",
@@ -32,6 +34,8 @@ export default async function SuccessPage({
         heading: "Zamówienie przyjęte",
         intro:
           "Płatność zrealizowana pomyślnie. Na podany adres email wysłaliśmy potwierdzenie zamówienia wraz ze szczegółami.",
+        introCod:
+          "Zamówienie zostało przyjęte do realizacji. Zapłacisz wygodnie kurierowi przy odbiorze (za pobraniem).",
         details: "Szczegóły",
         orderNumber: "Numer zamówienia",
         email: "Email",
@@ -43,6 +47,7 @@ export default async function SuccessPage({
   let total: number | null = null;
   let email: string | null = null;
   let orderCurrency: "pln" | "eur" = "pln";
+  let isCod = false;
 
   if (session_id) {
     try {
@@ -56,6 +61,24 @@ export default async function SuccessPage({
       }
     } catch {
       // sesja mogła wygasnąć — pokaż ogólny komunikat
+    }
+  }
+
+  if (!session_id && order_id) {
+    try {
+      const order = await getOrderById(order_id);
+      // Szczegóły tylko dla zamówień pobraniowych — strona nie może być
+      // wyrocznią do podglądania CUDZYCH zamówień online po id (UUID jest
+      // niezgadywalny, ale zawężenie nic nie kosztuje).
+      if (order.payment_method === "cod") {
+        isCod = true;
+        orderId = order.id;
+        total = Number(order.total);
+        orderCurrency = order.currency;
+        email = order.guest_email; // null dla zalogowanych — wiersz się nie wyrenderuje
+      }
+    } catch {
+      // nieistniejące id — pokaż ogólny komunikat bez szczegółów
     }
   }
 
@@ -82,7 +105,7 @@ export default async function SuccessPage({
       <h1 className="font-display text-4xl md:text-5xl font-bold text-[var(--fg)] mb-6">
         {c.heading}
       </h1>
-      <p className="text-[var(--muted)] mb-10 leading-relaxed">{c.intro}</p>
+      <p className="text-[var(--muted)] mb-10 leading-relaxed">{isCod ? c.introCod : c.intro}</p>
 
       {(orderId || total !== null || email) && (
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8 mb-10 text-left">
