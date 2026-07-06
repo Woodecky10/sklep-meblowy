@@ -238,6 +238,7 @@ export const de: DeepPartial<PlShape> = {
     prevImage: "Vorheriges Bild",
     nextImage: "Nächstes Bild",
     productImageDialog: "Produktbild",
+    backToTop: "Zurück nach oben",
   },
   pagination: {
     prev: "Vorherige Seite",

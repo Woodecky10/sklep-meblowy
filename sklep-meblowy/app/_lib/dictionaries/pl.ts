@@ -226,6 +226,7 @@ export type PlShape = {
     prevImage: string;
     nextImage: string;
     productImageDialog: string;
+    backToTop: string;
   };
   pagination: {
     prev: string;
@@ -536,6 +537,7 @@ export const pl = {
     prevImage: "Poprzednie zdjęcie",
     nextImage: "Następne zdjęcie",
     productImageDialog: "Zdjęcie produktu",
+    backToTop: "Wróć na górę",
   },
   pagination: {
     prev: "Poprzednia strona",

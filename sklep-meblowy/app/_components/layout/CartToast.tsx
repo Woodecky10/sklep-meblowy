@@ -44,7 +44,7 @@ export default function CartToast() {
     <div
       role="status"
       aria-live="polite"
-      className={`fixed top-28 right-4 sm:right-6 z-[60] w-[calc(100%-2rem)] sm:w-80 transition-all duration-300 ${
+      className={`fixed top-36 right-4 sm:right-6 z-[60] w-[calc(100%-2rem)] sm:w-80 transition-all duration-300 ${
         visible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2 pointer-events-none"
       }`}
     >
