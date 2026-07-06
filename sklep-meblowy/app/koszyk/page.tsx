@@ -239,7 +239,7 @@ export default function KoszykPage() {
 
         {/* Podsumowanie (z cross-sell pod nim w mobile) */}
         <div className="lg:col-span-1">
-          <div className="sticky top-24 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8 flex flex-col gap-6">
+          <div className="sticky top-40 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8 flex flex-col gap-6">
             <h2 className="font-display text-2xl font-bold text-[var(--fg)]">
               {t.cart.summary}
             </h2>

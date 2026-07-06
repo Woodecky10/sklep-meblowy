@@ -369,7 +369,7 @@ export default async function ProduktPage({ params }: Props) {
       )}
 
       {/* Sekcja opinii */}
-      <section id="opinie" className="mb-24 scroll-mt-24">
+      <section id="opinie" className="mb-24">
         <div className="mb-8 flex items-end justify-between flex-wrap gap-4">
           <div>
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">

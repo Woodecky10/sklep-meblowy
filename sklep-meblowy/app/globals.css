@@ -49,6 +49,12 @@ body {
   overflow-x: clip;
 }
 
+/* Sticky header (~133px) zasłaniałby cel kotwic (#opinie, #wzor-odstapienia
+   itd.) — scroll-padding odsuwa każde przewinięcie do kotwicy pod header. */
+html {
+  scroll-padding-top: 9rem;
+}
+
 body {
   background: var(--bg);
   color: var(--fg);
