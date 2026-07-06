@@ -10,6 +10,7 @@ import { buildNewProductPayload } from "@/app/_lib/new-product";
 import { recordPriceHistory } from "@/app/_lib/price-history";
 import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-html";
 import { buildGroupKey, pickGroupKey } from "@/app/_lib/size-groups";
+import { normalizeDeliveryTime, normalizeWarranty } from "@/app/_lib/spec-format";
 import type {
   ActionResult,
   ProductDescriptionSection,
@@ -171,8 +172,11 @@ export async function updateProductBasics(
     dimensions,
     weight: parseNumber(formData.get("weight")),
     construction: emptyToNull(sanitize(formData.get("construction"), 1000)),
-    delivery_time: emptyToNull(sanitize(formData.get("delivery_time"), 100)),
-    warranty: emptyToNull(sanitize(formData.get("warranty"), 100)),
+    // Auto-normalizacja: gdy admin wpisze samo "21" / "2", zapisujemy kanoniczne
+    // "21 dni roboczych" / "2 lata" (z poprawną odmianą). Chroni przed powrotem
+    // surowych liczb i utrzymuje pokrycie tłumaczeń DE. Wolny tekst przechodzi bez zmian.
+    delivery_time: emptyToNull(normalizeDeliveryTime(sanitize(formData.get("delivery_time"), 100))),
+    warranty: emptyToNull(normalizeWarranty(sanitize(formData.get("warranty"), 100))),
     sale_price: salePriceToSave,
   };
 

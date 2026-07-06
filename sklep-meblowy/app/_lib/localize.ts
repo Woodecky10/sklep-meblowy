@@ -17,6 +17,21 @@ import {
   FEATURE_VALUE_DE,
   mapDe,
 } from "./de-content-maps";
+import { formatDeliveryTimeDe, formatWarrantyDe } from "./spec-format";
+
+// delivery_time / warranty na DE: ręczna mapa ma pierwszeństwo (dopracowane
+// tłumaczenia), potem ogólny formater liczbowy (np. "30 dni roboczych" → "30
+// Werktage"), a na końcu passthrough PL. Dzięki temu wartości wpisane w adminie
+// po jednorazowej naprawie danych nie wyciekają po polsku na /de.
+function localizeDeliveryTime(pl: string | null | undefined): string | null | undefined {
+  if (pl == null) return pl;
+  return DELIVERY_TIME_DE[pl] ?? formatDeliveryTimeDe(pl) ?? pl;
+}
+
+function localizeWarranty(pl: string | null | undefined): string | null | undefined {
+  if (pl == null) return pl;
+  return WARRANTY_DE[pl] ?? formatWarrantyDe(pl) ?? pl;
+}
 
 // Akceptujemy dowolny kształt wiersza produktu, byle miał pola PL + _de.
 // Generic <T> żeby zachować pozostałe pola (id, price, images...) bez utraty typu.
@@ -69,8 +84,8 @@ export function localizeProduct<T extends ProductLocalizable>(
     color: pickNullable(row.color, row.color_de),
     material: pickNullable(row.material, row.material_de),
     construction: mapDe(CONSTRUCTION_DE, row.construction),
-    delivery_time: mapDe(DELIVERY_TIME_DE, row.delivery_time),
-    warranty: mapDe(WARRANTY_DE, row.warranty),
+    delivery_time: localizeDeliveryTime(row.delivery_time),
+    warranty: localizeWarranty(row.warranty),
     features: featuresDe,
     description_sections:
       Array.isArray(sectionsDe) && sectionsDe.length > 0
