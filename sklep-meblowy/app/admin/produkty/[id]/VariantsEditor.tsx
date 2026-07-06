@@ -231,6 +231,34 @@ export default function VariantsEditor({
             </button>
           )}
         </div>
+        {/* Usunięcie/wyzerowanie wariantów („Usuń warianty", „Zastosuj (0)" w
+            pickerze) ląduje w tej gałęzi jako stan w pamięci — bez tego paska
+            NIE dało się go utrwalić (brak przycisku zapisu = zmiana ginęła po
+            wyjściu, a w bazie zostawały stare warianty). */}
+        {dirty && (
+          <div className="flex items-center gap-3 flex-wrap pt-3 border-t border-[var(--border)]">
+            <p className="text-sm text-amber-600 dark:text-amber-500">
+              Masz niezapisane usunięcie wariantów.
+            </p>
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving}
+              aria-busy={saving}
+              className="px-5 py-2.5 bg-[var(--color-navy)] text-white font-sans font-semibold text-xs uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
+            >
+              {saving ? "Zapisuję..." : "Zapisz warianty"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setVariants(initial)}
+              disabled={saving}
+              className="px-5 py-2.5 border border-[var(--border)] text-[var(--fg)] font-sans text-xs uppercase tracking-widest rounded-full hover:border-[var(--color-gold)] transition-colors disabled:opacity-50"
+            >
+              Cofnij
+            </button>
+          </div>
+        )}
       </CollapsibleSection>
     );
   }
@@ -320,6 +348,7 @@ export default function VariantsEditor({
           type="button"
           onClick={save}
           disabled={saving || !dirty}
+          aria-busy={saving}
           data-guard-save
           className="px-6 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
         >

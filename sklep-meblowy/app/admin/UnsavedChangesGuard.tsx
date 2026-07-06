@@ -9,6 +9,7 @@ import {
   shouldInterceptLink,
   nextSettleState,
   decideAfterSave,
+  isButtonStillSaving,
   SETTLE_INTERVAL_MS,
   type SettleState,
 } from "@/app/_lib/unsaved-guard-core";
@@ -186,10 +187,18 @@ export default function UnsavedChangesGuard() {
       }
     }
 
+    // „Trwa zapis": przycisk z aria-busy mówi prawdę wprost (dirty-gated
+    // przyciski zostają disabled po udanym zapisie — sam disabled kłamie);
+    // bez atrybutu fallback: disabled = trwa (formularze bez aria-busy).
     const anyStillSaving = () =>
       units.some((unit) =>
         (enabledButtons.get(unit) ?? []).some(
-          (b) => b.isConnected && (b as HTMLButtonElement).disabled
+          (b) =>
+            b.isConnected &&
+            isButtonStillSaving({
+              disabled: (b as HTMLButtonElement).disabled,
+              ariaBusy: b.getAttribute("aria-busy"),
+            })
         )
       );
 

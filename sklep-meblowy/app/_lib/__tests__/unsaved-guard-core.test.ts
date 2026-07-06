@@ -4,6 +4,7 @@ import {
   shouldInterceptLink,
   nextSettleState,
   decideAfterSave,
+  isButtonStillSaving,
   SETTLE_INTERVAL_MS,
   SETTLE_TIMEOUT_MS,
 } from "@/app/_lib/unsaved-guard-core";
@@ -94,5 +95,21 @@ describe("decideAfterSave", () => {
   });
   it("timeout → stay (bez nawigacji w ciemno)", () => {
     expect(decideAfterSave({ errorToastVisible: false, anyStillDirty: false, timedOut: true })).toBe("stay");
+  });
+});
+
+describe("isButtonStillSaving — rozpoznanie zapisu w toku po aria-busy", () => {
+  it("aria-busy=true + disabled → trwa", () => {
+    expect(isButtonStillSaving({ disabled: true, ariaBusy: "true" })).toBe(true);
+  });
+  it("aria-busy=false + disabled → NIE trwa (dirty-gated po udanym zapisie)", () => {
+    expect(isButtonStillSaving({ disabled: true, ariaBusy: "false" })).toBe(false);
+  });
+  it("bez atrybutu aria-busy → fallback: disabled = trwa (stare zachowanie)", () => {
+    expect(isButtonStillSaving({ disabled: true, ariaBusy: null })).toBe(true);
+  });
+  it("przycisk aktywny → nigdy nie trwa (niezależnie od aria-busy)", () => {
+    expect(isButtonStillSaving({ disabled: false, ariaBusy: "true" })).toBe(false);
+    expect(isButtonStillSaving({ disabled: false, ariaBusy: null })).toBe(false);
   });
 });
