@@ -21,6 +21,14 @@ import {
 //   Wyjdź bez zapisywania;
 // - beforeunload (zamknięcie karty/reload) → natywny prompt przeglądarki.
 // Spec: docs/superpowers/specs/2026-07-06-admin-unsaved-guard-design.md
+//
+// Odłączone jednostki: jeśli edytor został odmontowany bez zapisu (np. usunięty
+// z DOM), jego element trafiony wcześniej do dirtyRef zostaje "osierocony" —
+// pruneDetached() czyści takie wpisy przed każdą decyzją opartą o rozmiar zbioru.
+function pruneDetached(set: Set<Element>) {
+  for (const el of set) if (!el.isConnected) set.delete(el);
+}
+
 export default function UnsavedChangesGuard() {
   const router = useRouter();
   const pathname = usePathname();
@@ -95,6 +103,7 @@ export default function UnsavedChangesGuard() {
         hasDownload: anchor.hasAttribute("download"),
         mainButton: e.button === 0,
       };
+      pruneDetached(dirtyRef.current);
       if (!shouldInterceptLink(info, dirtyRef.current.size)) return;
       e.preventDefault();
       e.stopPropagation();
@@ -102,6 +111,7 @@ export default function UnsavedChangesGuard() {
     }
 
     function onBeforeUnload(e: BeforeUnloadEvent) {
+      pruneDetached(dirtyRef.current);
       if (dirtyRef.current.size > 0) e.preventDefault();
     }
 
@@ -132,6 +142,10 @@ export default function UnsavedChangesGuard() {
   // „Zapisz i wyjdź": wyzwól natywne zapisy edytorów, czekaj aż ustaną
   // (migawka disabled eliminuje przyciski zablokowane z innych powodów),
   // nawiguj tylko przy czystym sukcesie (bez toastu błędu / resztek dirty).
+  // „Zostań" kliknięte (lub Escape) w trakcie zapisu = anulowanie wyjścia:
+  // setPendingHref(null) w onStay powoduje, że leaveWithoutSaving() poniżej
+  // stanie się no-opem (guard `if (!pendingHref) return;`) — pętla zapisu
+  // dokończy się w tle, ale nawigacja już nie nastąpi.
   async function saveAndLeave() {
     if (!pendingHref || saving) return;
     setSaving(true);
@@ -195,6 +209,9 @@ export default function UnsavedChangesGuard() {
 
 // Dialog 3-przyciskowy — layout i a11y jak ConfirmDialog (useModal: scroll-lock,
 // Escape → Zostań, focus-trap). Panel admina jest polskojęzyczny — teksty PL.
+// Escape/backdrop-Zostań działają identycznie podczas zapisu jak przycisk
+// „Zostań" (celowo NIE blokujemy Escape w trakcie saving — patrz przycisk
+// „Zostań" niżej, który z tego samego powodu pozostaje aktywny).
 function UnsavedDialog({
   open,
   saving,
@@ -209,7 +226,17 @@ function UnsavedDialog({
   onLeave: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const stayRef = useRef<HTMLButtonElement>(null);
   useModal(open, { onClose: onStay, containerRef: ref, trapFocus: true });
+
+  // Pozostałe dwa przyciski dostają disabled podczas zapisu — przeglądarka
+  // odbiera im focus (ląduje na <body>), co wypuściłoby Tab poza modal (trap
+  // useModal przechwytuje tylko na granicach focusowalnych WEWNĄTRZ
+  // kontenera). „Zostań" zostaje aktywne właśnie po to, by było czym złapać
+  // focus z powrotem.
+  useEffect(() => {
+    if (saving) stayRef.current?.focus();
+  }, [saving]);
 
   if (!open) return null;
 
@@ -237,10 +264,10 @@ function UnsavedDialog({
         </div>
         <div className="flex flex-wrap gap-3 justify-end">
           <button
+            ref={stayRef}
             type="button"
             onClick={onStay}
-            disabled={saving}
-            className="px-5 py-2.5 border border-[var(--border)] text-[var(--fg)] font-sans text-sm uppercase tracking-widest rounded-full hover:border-[var(--color-gold)] transition-colors disabled:opacity-50"
+            className="px-5 py-2.5 border border-[var(--border)] text-[var(--fg)] font-sans text-sm uppercase tracking-widest rounded-full hover:border-[var(--color-gold)] transition-colors"
           >
             Zostań
           </button>
