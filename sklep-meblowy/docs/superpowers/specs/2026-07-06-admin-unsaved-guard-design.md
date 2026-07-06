@@ -29,16 +29,19 @@ Jednostka śledzenia = **formularz** lub **sekcja z atrybutem**:
    Obejmuje: ProductEditor (podstawy), NewProductForm, FabricsEditor,
    KategorieEditor, PromoEditor, CollectionsEditor, FeaturedEditor,
    TilesEditor, SliderEditor, OrderControls (status + notatki).
-2. **`[data-guard-section]` (6 edytorów bez `<form>`):** kontener sekcji
+2. **`[data-guard-section]` (5 edytorów bez `<form>`):** kontener sekcji
    dostaje `data-guard-section`, przycisk zapisu `data-guard-save`.
    `input`/`change` wewnątrz kontenera → sekcja brudna; klik w element
    `[data-guard-save]` wewnątrz kontenera → czysta. Dotyczy:
-   - `app/admin/ustawienia/SettingsForm.tsx`
-   - `app/admin/produkty/[id]/VariantsEditor.tsx`
-   - `app/admin/produkty/[id]/DescriptionSectionsEditor.tsx`
-   - `app/admin/produkty/[id]/TranslationEditor.tsx`
-   - `app/admin/produkty/[id]/SizeGroupEditor.tsx`
-   - `app/admin/produkty/[id]/DescriptionFieldEditor.tsx`
+   - `app/admin/ustawienia/SettingsForm.tsx` (przycisk „Zapisz kurs")
+   - `app/admin/produkty/[id]/VariantsEditor.tsx` („Zapisz warianty")
+   - `app/admin/produkty/[id]/DescriptionSectionsEditor.tsx` („Zapisz sekcje")
+   - `app/admin/produkty/[id]/TranslationEditor.tsx` („Zapisz tłumaczenie DE")
+   - `app/admin/produkty/[id]/DescriptionFieldEditor.tsx` („Zapisz opis")
+
+   `SizeGroupEditor` NIE jest sekcją — jego etykiety zapisują się same na
+   blur (klik w link = blur = auto-zapis), a drugi input to wyszukiwarka
+   produktów; kontener dostaje `data-guard-ignore`.
 
    **Kontener sekcji ma dokładnie JEDEN przycisk `data-guard-save`** (główny
    zapis stanu sekcji). Jeśli edytor zapisuje per wiersz, każdy wiersz jest
