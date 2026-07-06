@@ -286,6 +286,18 @@ export const de: DeepPartial<PlShape> = {
     cancel: "Abbrechen",
     privacyNote: "Ihre Daten und Fotos verwenden wir ausschließlich zur Bearbeitung dieser Meldung.",
   },
+  trustBar: {
+    eyebrow: "MÖBEL MIT CHARAKTER",
+    heading: "Warum bei uns kaufen?",
+    producer: "Polnischer Hersteller",
+    quality: "Qualitätsgarantie",
+    delivery: "Kostenlose Lieferung",
+    deliveryScope: "in ganz Polen",
+    warranty: "2 Jahre Garantie",
+    iconFree: "0 zł",
+    iconYears: "2",
+    iconYearsWord: "JAHRE",
+  },
   footer: {
     information: "Informationen",
     about: "Über uns",
