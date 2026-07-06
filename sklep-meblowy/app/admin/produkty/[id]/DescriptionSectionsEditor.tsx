@@ -191,6 +191,7 @@ export default function DescriptionSectionsEditor({
                 onCaptionChange={(v) =>
                   patchSection(idx, { caption: v.trim() === "" ? undefined : v })
                 }
+                onDisplayChange={(v) => patchSection(idx, { display: v })}
                 onRemove={() => removeSection(idx)}
                 onMoveUp={idx > 0 ? () => moveSection(idx, -1) : undefined}
                 onMoveDown={idx < sections.length - 1 ? () => moveSection(idx, 1) : undefined}
@@ -413,6 +414,7 @@ function ImageSectionRow({
   section,
   onAltChange,
   onCaptionChange,
+  onDisplayChange,
   onRemove,
   onMoveUp,
   onMoveDown,
@@ -420,6 +422,7 @@ function ImageSectionRow({
   section: Extract<ProductDescriptionSection, { kind: "image" }>;
   onAltChange: (v: string) => void;
   onCaptionChange: (v: string) => void;
+  onDisplayChange: (v: "wide" | undefined) => void;
   onRemove: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
@@ -432,7 +435,7 @@ function ImageSectionRow({
           alt={section.image_alt || "Zdjęcie sekcji"}
           fill
           sizes="96px"
-          className="object-cover"
+          className={section.display === "wide" ? "object-cover" : "object-contain"}
         />
       </div>
       <div className="flex-1 min-w-0 flex flex-col gap-2">
@@ -455,6 +458,19 @@ function ImageSectionRow({
           maxLength={200}
           className={inputClass}
         />
+        <label className="flex items-center gap-2 text-xs font-sans text-[var(--muted)]">
+          <span className="uppercase tracking-widest shrink-0">Wyświetlanie</span>
+          <select
+            value={section.display ?? "natural"}
+            onChange={(e) =>
+              onDisplayChange(e.target.value === "wide" ? "wide" : undefined)
+            }
+            className={inputClass}
+          >
+            <option value="natural">Całe zdjęcie (bez przycinania)</option>
+            <option value="wide">Kadr panoramiczny 16:9</option>
+          </select>
+        </label>
       </div>
       <div className="flex flex-col gap-1 shrink-0">
         <IconBtn label="W górę" onClick={onMoveUp ?? (() => {})} disabled={!onMoveUp}>
