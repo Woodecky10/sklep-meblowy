@@ -118,15 +118,29 @@ function ImageSection({
 }) {
   return (
     <figure className="flex flex-col gap-2">
-      <div className="relative aspect-[16/9] w-full bg-stone-100 dark:bg-stone-800 rounded-2xl overflow-hidden">
-        <Image
+      {section.display === "wide" ? (
+        // Kadr panoramiczny 16:9 — równa ramka kosztem przycięcia (object-cover).
+        <div className="relative aspect-[16/9] w-full bg-stone-100 dark:bg-stone-800 rounded-2xl overflow-hidden">
+          <Image
+            src={section.image_url}
+            alt={section.image_alt}
+            fill
+            sizes="(max-width: 768px) 100vw, 800px"
+            className="object-cover"
+          />
+        </div>
+      ) : (
+        // Tryb domyślny „całe zdjęcie": naturalne proporcje, nic nie ucinane.
+        // Zwykły <img> — wymiary intrinsic nie są znane (next/image fill wymaga
+        // sztywnego aspect ratio kontenera); precedens: FabricSwatchGroup.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
           src={section.image_url}
           alt={section.image_alt}
-          fill
-          sizes="(max-width: 768px) 100vw, 800px"
-          className="object-cover"
+          loading="lazy"
+          className="w-full h-auto rounded-2xl bg-stone-100 dark:bg-stone-800"
         />
-      </div>
+      )}
       {section.caption && (
         <figcaption className="text-sm text-[var(--muted)] text-center italic px-4">
           {section.caption}

@@ -76,6 +76,10 @@ export type ProductDescriptionSectionImage = {
   image_url: string;
   image_alt: string;
   caption?: string;
+  // Tryb wyświetlania na karcie produktu. Brak pola = „całe zdjęcie"
+  // (naturalne proporcje, nic nie ucinane). "wide" = kadr panoramiczny 16:9
+  // z przycięciem (object-cover) — dawny, jedyny wygląd sprzed tego pola.
+  display?: "wide";
 };
 
 export type ProductDescriptionSection =

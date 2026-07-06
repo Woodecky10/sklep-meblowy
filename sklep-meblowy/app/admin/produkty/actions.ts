@@ -465,6 +465,9 @@ export async function updateProductDescriptionSections(
       if (typeof s.image_alt !== "string") {
         return { ok: false, error: `Sekcja ${i + 1}: alt obrazu musi być stringiem` };
       }
+      if (s.display !== undefined && s.display !== "wide") {
+        return { ok: false, error: `Sekcja ${i + 1}: display musi być "wide" albo pominięte` };
+      }
     } else {
       return { ok: false, error: `Sekcja ${i + 1}: nieznany kind` };
     }
