@@ -273,6 +273,18 @@ export type PlShape = {
     cancel: string;
     privacyNote: string;
   };
+  trustBar: {
+    eyebrow: string;
+    heading: string;
+    producer: string;
+    quality: string;
+    delivery: string;
+    deliveryScope: string;
+    warranty: string;
+    iconFree: string;
+    iconYears: string;
+    iconYearsWord: string;
+  };
   footer: {
     information: string;
     about: string;
@@ -571,6 +583,19 @@ export const pl = {
     submitting: "Wysyłam...",
     cancel: "Anuluj",
     privacyNote: "Twoje dane i zdjęcia wykorzystamy wyłącznie do rozpatrzenia tego zgłoszenia.",
+  },
+  // Pasek zaufania (TrustBar) — treści 1:1 z grafik docs/grafika-zaufanie-sklepu*.png
+  trustBar: {
+    eyebrow: "MEBLE Z CHARAKTEREM",
+    heading: "Dlaczego warto kupować u nas?",
+    producer: "Polski producent",
+    quality: "Gwarancja jakości",
+    delivery: "Darmowa dostawa",
+    deliveryScope: "na terenie całej Polski",
+    warranty: "2 lata gwarancji",
+    iconFree: "0 zł",
+    iconYears: "2",
+    iconYearsWord: "LATA",
   },
   footer: {
     information: "Informacje",
