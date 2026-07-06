@@ -42,9 +42,11 @@
   --color-gold-text: #c9a84c;
 }
 
+/* clip zamiast hidden: tak samo ucina poziomy scroll, ale nie robi z
+   html/body scroll-containera — hidden łamał position:sticky headera. */
 html,
 body {
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {

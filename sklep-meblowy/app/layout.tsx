@@ -88,8 +88,13 @@ export default async function RootLayout({
                 <ToastProvider>
                   <ConfirmProvider>
                     <HideOnAdmin>
-                      <TopBar />
-                      <Navbar />
+                      {/* Wspólny sticky na oba paski — jeden element zamiast
+                          dwóch osobnych sticky eliminuje 1px szczeliny przy
+                          ułamkowym zoomie. */}
+                      <div className="sticky top-0 z-50">
+                        <TopBar />
+                        <Navbar />
+                      </div>
                     </HideOnAdmin>
                     <main className="flex-1">{children}</main>
                     <HideOnAdmin>

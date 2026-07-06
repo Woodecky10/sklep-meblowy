@@ -52,7 +52,7 @@ export default async function Navbar() {
   }));
 
   return (
-    <header className="sticky top-0 z-50 bg-[var(--bg)] border-b border-[var(--border)] backdrop-blur-sm">
+    <header className="bg-[var(--bg)] border-b border-[var(--border)] backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-24 flex items-center justify-between gap-2 sm:gap-6 relative">
         {/* Logo */}
         <LocalizedLink
