@@ -73,6 +73,8 @@ function buildDeSections(
     };
     const caption = deImage?.caption ?? "";
     if (caption !== "") out.caption = caption;
+    // display to prezentacja, nie tłumaczenie — lustrzane z PL.
+    if (plSection.display) out.display = plSection.display;
     return out;
   });
 }

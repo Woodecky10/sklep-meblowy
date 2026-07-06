@@ -109,6 +109,16 @@ describe("sanitizeSectionsHtml — sanityzacja body sekcji przy zapisie", () => 
     const out = sanitizeSectionsHtml(sections);
     if (out[0].kind === "text") expect(out[0].admin_body).toBeUndefined();
   });
+
+  it("image: przepuszcza display bez zmian (tryb wyświetlania na karcie)", () => {
+    const sections: ProductDescriptionSection[] = [
+      { kind: "image", image_url: "https://x/a.jpg", image_alt: "a", display: "wide" },
+      { kind: "image", image_url: "https://x/b.jpg", image_alt: "b" },
+    ];
+    const out = sanitizeSectionsHtml(sections);
+    expect(out[0]).toEqual(sections[0]);
+    expect((out[1] as { display?: string }).display).toBeUndefined();
+  });
 });
 
 describe("sanitizeStyleAttr — waska whitelista CSS", () => {

@@ -8,6 +8,7 @@ import {
   applyCornerSideSelection,
   CORNER_SIDE_DEFAULT_CATEGORY,
 } from "./corner-side";
+import { DEFAULT_DELIVERY_TIME, DEFAULT_WARRANTY } from "./spec-format";
 
 export type NewProductPayload = {
   name: string;
@@ -24,8 +25,8 @@ export type NewProductPayload = {
   dimensions: null;
   weight: null;
   construction: null;
-  delivery_time: null;
-  warranty: null;
+  delivery_time: string;
+  warranty: string;
   collection_id: null;
   is_active: boolean;
   needs_translation: boolean;
@@ -80,8 +81,8 @@ export function buildNewProductPayload(input: {
       dimensions: null,
       weight: null,
       construction: null,
-      delivery_time: null,
-      warranty: null,
+      delivery_time: DEFAULT_DELIVERY_TIME,
+      warranty: DEFAULT_WARRANTY,
       collection_id: null,
       is_active: true,
       needs_translation: true,

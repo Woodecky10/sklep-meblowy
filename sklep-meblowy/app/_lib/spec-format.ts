@@ -92,3 +92,10 @@ export function formatWarrantyDe(pl: string): string | null {
   }
   return null;
 }
+
+// Kanoniczne domyślne wartości dla NOWYCH produktów (buildNewProductPayload) —
+// admin nie wpisuje ich ręcznie za każdym razem, ale może edytować (zapis
+// przechodzi przez normalizeDeliveryTime/normalizeWarranty wyżej). Muszą być
+// kluczami map DELIVERY_TIME_DE / WARRANTY_DE (test new-product pilnuje).
+export const DEFAULT_DELIVERY_TIME = "21 dni roboczych";
+export const DEFAULT_WARRANTY = "2 lata";
