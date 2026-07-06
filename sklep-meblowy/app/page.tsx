@@ -15,6 +15,7 @@ import { localizePath } from "./_lib/i18n";
 import { alternatesFor } from "./_lib/sitemap-i18n";
 import { getDictionary } from "./_lib/dictionaries";
 import ProductCard from "./_components/ui/ProductCard";
+import TrustBar from "./_components/ui/TrustBar";
 
 // Home jest w pełni przetłumaczone przez słownik UI → DE zawsze (hasDe: true).
 // generateMetadata na poziomie strony nadpisuje statyczne metadata z layoutu
@@ -169,6 +170,11 @@ export default async function HomePage() {
             </div>
           )}
         </div>
+      </section>
+
+      {/* Pasek zaufania — dlaczego warto kupować u nas (spec 2026-07-06) */}
+      <section className="max-w-7xl mx-auto px-6 py-24">
+        <TrustBar withHeading locale={locale} />
       </section>
 
       {/* Nasze kolekcje — auto-render kolekcji z DB które mają produkty */}

@@ -24,6 +24,7 @@ import ReviewList from "@/app/_components/ui/ReviewList";
 import ReviewForm from "@/app/_components/ui/ReviewForm";
 import { sanitizeProductHtml } from "@/app/_lib/product-html";
 import ProductDescriptionSections from "@/app/_components/ui/ProductDescriptionSections";
+import TrustBar from "@/app/_components/ui/TrustBar";
 import { COMPANY } from "@/app/_lib/company";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { localizePath, localizeHref } from "@/app/_lib/i18n";
@@ -315,6 +316,12 @@ export default async function ProduktPage({ params }: Props) {
             />
           </section>
         )}
+
+      {/* Pasek zaufania — atuty sklepu pod opisem produktu (spec 2026-07-06).
+          Renderuje się też gdy produkt nie ma opisu — wtedy zaraz po sekcji głównej. */}
+      <section className="mb-24">
+        <TrustBar locale={locale} />
+      </section>
 
       {/* Cross-sell — np. dla łóżka pokaż "Polecane materace" */}
       {crossSell.length > 0 && (
