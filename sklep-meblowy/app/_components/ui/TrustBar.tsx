@@ -5,17 +5,16 @@ import { getDictionary } from "@/app/_lib/dictionaries";
 // Pasek zaufania „Dlaczego warto kupować u nas?" — HTML/CSS 1:1 z grafik
 // docs/grafika-zaufanie-sklepu*.png (wzorzec wierności; PNG nie idą do runtime).
 // Server component, zero JS klienta. Kolory ze zmiennych motywu → dark/light
-// przełącza się samo. Wariant onNavy: stopka ma ZAWSZE granatowe tło, więc
-// kontury są stałe kremowe (jak grafika granatowa), niezależnie od motywu.
+// przełącza się samo.
 const GOLD = "var(--color-gold)";
 
-type Props = { locale: Locale; withHeading?: boolean; onNavy?: boolean };
+type Props = { locale: Locale; withHeading?: boolean };
 
-export default function TrustBar({ locale, withHeading = false, onNavy = false }: Props) {
+export default function TrustBar({ locale, withHeading = false }: Props) {
   const t = getDictionary(locale).trustBar;
-  const ink = onNavy ? "text-[#ECE4D7]" : "text-[var(--fg)]";
-  const muted = onNavy ? "text-white/60" : "text-[var(--muted)]";
-  const divide = onNavy ? "lg:divide-white/15" : "lg:divide-[var(--border)]";
+  const ink = "text-[var(--fg)]";
+  const muted = "text-[var(--muted)]";
+  const divide = "lg:divide-[var(--border)]";
 
   const items: { icon: ReactNode; label: string; sub?: string }[] = [
     { icon: <MedalPL />, label: t.producer },

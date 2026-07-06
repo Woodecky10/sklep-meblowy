@@ -4,8 +4,6 @@ import { getSections, getCategories } from "@/app/_lib/categories";
 import { COMPANY, isFilled } from "@/app/_lib/company";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { getDictionary } from "@/app/_lib/dictionaries";
-import FooterTrustBar from "./FooterTrustBar";
-import TrustBar from "../ui/TrustBar";
 
 export default async function Footer() {
   const locale = await getLocale();
@@ -28,12 +26,6 @@ export default async function Footer() {
 
   return (
     <footer className="bg-[var(--color-navy)] text-white">
-      {/* Pasek zaufania — nad treścią stopki; ukryty na kartach produktu (dubel). */}
-      <FooterTrustBar>
-        <div className="max-w-7xl mx-auto px-6 pt-16 pb-4">
-          <TrustBar locale={locale} onNavy />
-        </div>
-      </FooterTrustBar>
       <div className="max-w-7xl mx-auto px-6 py-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
         <div>
           <div className="flex items-center gap-3 mb-4">
