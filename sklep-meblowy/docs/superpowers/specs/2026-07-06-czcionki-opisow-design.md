@@ -68,10 +68,12 @@ Edytor to Tiptap 3.27; zainstalowany `@tiptap/extension-text-style` eksportuje
 ## Weryfikacja
 
 - Unit: sanitizer (jak wyżej) — pełny zestaw vitest + tsc + build.
-- E2E (Playwright, lokalny build, sesja admina): w edytorze pola opisu
-  zaznacz tekst → wybierz „Georgia" → zapisz → karta produktu zawiera
-  `<span style="font-family: Georgia, serif">`; przywróć oryginalny opis
-  po teście (snapshot przed, zapis oryginału po — zero zmian netto w prod DB).
+- E2E (Playwright, lokalny build, sesja admina) — BEZ zapisów do prod DB:
+  select widoczny; wybór „Georgia" owija zaznaczenie
+  `span[style*="font-family: Georgia"]` w DOM edytora (podgląd na żywo);
+  „Domyślna" zdejmuje styl; wyjście przez dialog guarda „Wyjdź bez
+  zapisywania". Ścieżkę zapis→render pokrywają testy sanitizera (identyczny
+  mechanizm jak działające kolory).
 
 ## Poza zakresem (świadomie)
 
