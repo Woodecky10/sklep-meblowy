@@ -10,6 +10,7 @@
 // Source produktu jest zaufany (admin → sklep), więc nie potrzebujemy
 // pełnej HTML5 spec compliance. Wystarczy whitelist + block javascript:.
 
+import { FONT_OPTIONS, normalizeFontStack } from "@/app/_lib/description-fonts";
 import type { ProductDescriptionSection } from "@/app/_lib/types";
 
 const ALLOWED_TAGS = new Set([
@@ -99,7 +100,7 @@ const ALLOWED_STYLE_PROPS: Record<string, Set<string>> = {
   h2: new Set(["text-align"]),
   h3: new Set(["text-align"]),
   h4: new Set(["text-align"]),
-  span: new Set(["color"]),
+  span: new Set(["color", "font-family"]),
 };
 const TEXT_ALIGN_VALUES = new Set(["left", "center", "right", "justify"]);
 
@@ -130,6 +131,12 @@ export function sanitizeStyleAttr(tag: string, raw: string): string {
       if (TEXT_ALIGN_VALUES.has(value.toLowerCase())) out.push(`text-align: ${value.toLowerCase()}`);
     } else if (prop === "color") {
       if (isSafeColorValue(value)) out.push(`color: ${value}`);
+    } else if (prop === "font-family") {
+      // Zamknięta lista stacków (description-fonts) — wyjście ZAWSZE kanoniczne.
+      const canonical = FONT_OPTIONS.find(
+        (o) => normalizeFontStack(o.stack) === normalizeFontStack(value)
+      );
+      if (canonical) out.push(`font-family: ${canonical.stack}`);
     }
   }
   return out.join("; ");
