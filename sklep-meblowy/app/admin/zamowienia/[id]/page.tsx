@@ -130,7 +130,7 @@ export default async function AdminOrderDetailPage({
                 </div>
               )}
               <div className="flex justify-between border-t border-[var(--border)] pt-2 font-bold text-base text-[var(--fg)]">
-                <dt>Zapłacono</dt>
+                <dt>{order.payment_method === "cod" ? "Do pobrania" : "Zapłacono"}</dt>
                 <dd>{formatOrderAmount(Number(order.total), order.currency)}</dd>
               </div>
             </dl>
