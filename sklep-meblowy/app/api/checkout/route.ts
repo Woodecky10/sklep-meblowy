@@ -3,7 +3,8 @@ import type Stripe from "stripe";
 import { getStripe } from "@/app/_lib/stripe";
 import { createClient } from "@/app/_lib/supabase/server";
 import { createOrder } from "@/app/_lib/orders";
-import { validatePromoCode } from "@/app/_lib/promo";
+import { validatePromoCode, incrementPromoUsage } from "@/app/_lib/promo";
+import { isValidCodPhone } from "@/app/_lib/cod";
 import {
   formatVariantLabel,
   hasVariants,
@@ -37,6 +38,7 @@ type CheckoutBody = {
   address: Address;
   promoCode?: string | null;
   locale?: "pl" | "de";
+  paymentMethod?: "online" | "cod";
 };
 
 export async function POST(request: NextRequest) {
@@ -51,6 +53,8 @@ export async function POST(request: NextRequest) {
     locale = body.locale === "de" ? "de" : "pl";
 
     const isDe = locale === "de";
+    // Brak pola = "online" — kompatybilnie ze starszym klientem (cache SW itp.).
+    const isCod = body.paymentMethod === "cod";
     const rate = isDe ? await getEurRate() : 1;
     const currency: "pln" | "eur" = isDe ? "eur" : "pln";
     const toCharge = (pln: number) => (isDe ? convertToEur(pln, rate) : pln);
@@ -91,6 +95,20 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: tr("Brak pełnego adresu dostawy", "Unvollständige Lieferadresse") },
+        { status: 400 }
+      );
+    }
+
+    // Pobranie: kurier musi mieć telefon (i to zapora przed fałszywkami).
+    // Walidacja autorytatywna — formularz waliduje tylko dla UX.
+    if (isCod && !isValidCodPhone(shippingAddress.phone)) {
+      return NextResponse.json(
+        {
+          error: tr(
+            "Przy płatności za pobraniem wymagany jest numer telefonu (7–15 cyfr)",
+            "Bei Nachnahme ist eine Telefonnummer erforderlich (7–15 Ziffern)"
+          ),
+        },
         { status: 400 }
       );
     }
@@ -228,29 +246,35 @@ export async function POST(request: NextRequest) {
       promoCodeId = promoResult.promo.id;
       promoDiscount = promoResult.discount;
 
-      // Stripe Coupon (one-shot, dla tej sesji). Zawsze amount_off (kwotowo,
-      // w groszach) — także dla kuponów procentowych. percent_off liczyłby
-      // Stripe po swojemu (własne zaokrąglenia), a rabat w systemie (ujemna
-      // pozycja K1) i orders.promo_discount używają NASZEJ kwoty z
-      // validatePromoCode — jedna kwota wszędzie eliminuje rozjazd o grosz
-      // między kwotą pobraną a sumą pozycji w systemie.
-      // amount_off=0 jest błędem w Stripe (np. 1% z 0,49 zł zaokrągla się
-      // do 0 gr) — wtedy po prostu nie tworzymy kuponu.
-      const amountOffGr = Math.round(toCharge(promoDiscount) * 100);
-      if (amountOffGr > 0) {
-        const coupon = await stripe.coupons.create({
-          amount_off: amountOffGr,
-          currency,
-          duration: "once",
-          name: promoResult.promo.code,
-        });
-        stripeCouponId = coupon.id;
-      } else {
-        // Rabat zaokrąglił się do 0 gr (np. 1% z 0,49 zł). Nie tworzymy kuponu
-        // Stripe ANI nie wiążemy zamówienia z kodem — inaczej webhook spaliłby
-        // użycie kodu (used_count++) za rabat, którego klient nie dostał.
-        promoDiscount = 0;
-        promoCodeId = null;
+      // Kupon Stripe tylko dla płatności online — przy pobraniu Stripe nie
+      // uczestniczy, a rabat i tak siedzi w orders.total/promo_discount.
+      // (Zeroing przy amount_off=0 gr to ograniczenie Stripe — przy COD
+      // zostawiamy rabat wyliczony przez validatePromoCode bez zmian.)
+      if (!isCod) {
+        // Stripe Coupon (one-shot, dla tej sesji). Zawsze amount_off (kwotowo,
+        // w groszach) — także dla kuponów procentowych. percent_off liczyłby
+        // Stripe po swojemu (własne zaokrąglenia), a rabat w systemie (ujemna
+        // pozycja K1) i orders.promo_discount używają NASZEJ kwoty z
+        // validatePromoCode — jedna kwota wszędzie eliminuje rozjazd o grosz
+        // między kwotą pobraną a sumą pozycji w systemie.
+        // amount_off=0 jest błędem w Stripe (np. 1% z 0,49 zł zaokrągla się
+        // do 0 gr) — wtedy po prostu nie tworzymy kuponu.
+        const amountOffGr = Math.round(toCharge(promoDiscount) * 100);
+        if (amountOffGr > 0) {
+          const coupon = await stripe.coupons.create({
+            amount_off: amountOffGr,
+            currency,
+            duration: "once",
+            name: promoResult.promo.code,
+          });
+          stripeCouponId = coupon.id;
+        } else {
+          // Rabat zaokrąglił się do 0 gr (np. 1% z 0,49 zł). Nie tworzymy kuponu
+          // Stripe ANI nie wiążemy zamówienia z kodem — inaczej webhook spaliłby
+          // użycie kodu (used_count++) za rabat, którego klient nie dostał.
+          promoDiscount = 0;
+          promoCodeId = null;
+        }
       }
     }
 
@@ -275,7 +299,7 @@ export async function POST(request: NextRequest) {
       promoDiscount: toCharge(promoDiscount),
       currency,
       fxRate: isDe ? rate : null,
-      paymentMethod: "online",
+      paymentMethod: isCod ? "cod" : "online",
     });
 
     // Stripe Checkout Session
@@ -288,6 +312,23 @@ export async function POST(request: NextRequest) {
     // dla locale "de" (proxy przepisuje /de/* na /*). Dla "pl" zostaje pusty,
     // więc URL pozostaje oryginalny.
     const localePrefix = locale === "de" ? "/de" : "";
+
+    // ── Pobranie: bez Stripe. Zamówienie już utworzone (status "processing"),
+    // klient płaci kurierowi. Promo inkrementujemy TERAZ (nie ma webhooka,
+    // który by to zrobił po płatności) — best-effort jak w webhooku,
+    // used_count to miękka statystyka.
+    if (isCod) {
+      if (promoCodeId) {
+        try {
+          await incrementPromoUsage(promoCodeId);
+        } catch (err) {
+          console.error("[promo] increment used_count (COD) nieudany:", err);
+        }
+      }
+      return NextResponse.json({
+        url: `${origin}${localePrefix}/checkout/success?order_id=${order.id}`,
+      });
+    }
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
