@@ -57,6 +57,7 @@ export default function ReklamacjeList({ initialIssues }: { initialIssues: Admin
       {toast && (
         <div
           role="status"
+          data-toast-type={toast.type}
           className={`fixed top-24 right-6 z-50 max-w-sm px-5 py-3 rounded-xl shadow-2xl text-sm ${
             toast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
           }`}
