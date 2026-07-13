@@ -7,7 +7,7 @@ import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "@/app/_lib/de-content-maps";
 import type { Locale } from "@/app/_lib/i18n";
 import { useFabricLabels, useFabricImages } from "@/app/_lib/fabric-context";
-import { FABRIC_OPTION_NAME, sortVariantValues } from "@/app/_lib/variants";
+import { FABRIC_OPTION_NAME, sortVariantValues, sortVariantOptions } from "@/app/_lib/variants";
 import {
   cornerSideOf,
   isCornerSideOptionName,
@@ -60,9 +60,17 @@ export default function VariantSelector({
     onChange({ ...selected, [name]: value });
   }
 
+  // Kolejność opcji (kategorii wariantu) A-Z po nazwie wyświetlanej — spójnie
+  // z sortowaniem wartości niżej. Nie mutuje propsa.
+  const orderedOptions = sortVariantOptions(
+    variants.options,
+    (name) => getOptionName(product, name, locale),
+    locale
+  );
+
   return (
     <div className="flex flex-col gap-4">
-      {variants.options.map((option) => {
+      {orderedOptions.map((option) => {
         const current = selected[option.name];
         const displayName = getOptionName(product, option.name, locale);
         // Kolejność wyświetlania A-Z (naturalnie, po etykiecie). Narożniki (Strona)

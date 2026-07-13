@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { sortVariantValues } from "@/app/_lib/variants";
+import { sortVariantValues, sortVariantOptions } from "@/app/_lib/variants";
+import type { ProductOption } from "@/app/_lib/types";
 
 const id = (v: string) => v;
+const opt = (name: string, values: string[] = ["x"]): ProductOption => ({ name, values });
 
 describe("sortVariantValues — sortowanie naturalne A-Z po etykiecie", () => {
   it("liczby w nazwie rosnąco (naturalnie, nie leksykalnie)", () => {
@@ -65,5 +67,58 @@ describe("sortVariantValues — sortowanie naturalne A-Z po etykiecie", () => {
   it("pusta i jednoelementowa tablica", () => {
     expect(sortVariantValues([], id, "pl")).toEqual([]);
     expect(sortVariantValues(["X"], id, "pl")).toEqual(["X"]);
+  });
+});
+
+describe("sortVariantOptions — sortowanie nazw opcji (kategorii) A-Z", () => {
+  it("sortuje opcje A-Z po nazwie wyświetlanej", () => {
+    const options = [opt("Rozmiar"), opt("Kolor"), opt("Tkanina")];
+    expect(sortVariantOptions(options, id, "pl").map((o) => o.name)).toEqual([
+      "Kolor",
+      "Rozmiar",
+      "Tkanina",
+    ]);
+  });
+
+  it("sortuje wg nazwy WYŚWIETLANEJ (override admina), nie surowej", () => {
+    // Surowa nazwa "Wariant" z override na "Kolor" → ma trafić przed "Rozmiar".
+    const displayNameOf = (name: string) => (name === "Wariant" ? "Kolor" : name);
+    const options = [opt("Rozmiar"), opt("Wariant")];
+    expect(sortVariantOptions(options, displayNameOf, "pl").map((o) => o.name)).toEqual([
+      "Wariant",
+      "Rozmiar",
+    ]);
+  });
+
+  it("diakrytyki i wielkość liter (Ł traktowane jak L, case-insensitive)", () => {
+    const options = [opt("Zagłówek"), opt("łóżko"), opt("Materiał")];
+    expect(sortVariantOptions(options, id, "pl").map((o) => o.name)).toEqual([
+      "łóżko",
+      "Materiał",
+      "Zagłówek",
+    ]);
+  });
+
+  it("zachowuje nienaruszone obiekty opcji (values, value_prices)", () => {
+    const options: ProductOption[] = [
+      { name: "Rozmiar", values: ["S", "M"], value_prices: { M: 100 } },
+      { name: "Kolor", values: ["Beż"] },
+    ];
+    const sorted = sortVariantOptions(options, id, "pl");
+    expect(sorted[0]).toEqual({ name: "Kolor", values: ["Beż"] });
+    expect(sorted[1]).toEqual({ name: "Rozmiar", values: ["S", "M"], value_prices: { M: 100 } });
+  });
+
+  it("nie mutuje tablicy wejściowej", () => {
+    const options = [opt("Rozmiar"), opt("Kolor")];
+    const copy = [...options];
+    sortVariantOptions(options, id, "pl");
+    expect(options).toEqual(copy);
+    expect(options[0].name).toBe("Rozmiar");
+  });
+
+  it("pusta i jednoelementowa tablica", () => {
+    expect(sortVariantOptions([], id, "pl")).toEqual([]);
+    expect(sortVariantOptions([opt("Kolor")], id, "pl").map((o) => o.name)).toEqual(["Kolor"]);
   });
 });
