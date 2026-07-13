@@ -3,7 +3,12 @@
 // woła to i robi sam insert. Payload castowany `as never` przy insercie
 // (Product type nie zawiera kolumn needs_translation/_de).
 
-import type { ProductVariants } from "./types";
+import type {
+  ProductVariants,
+  ProductDimensions,
+  ProductFeature,
+  ProductDescriptionSection,
+} from "./types";
 import {
   applyCornerSideSelection,
   CORNER_SIDE_DEFAULT_CATEGORY,
@@ -89,5 +94,99 @@ export function buildNewProductPayload(input: {
       sale_price: null,
       omnibus_price: null,
     },
+  };
+}
+
+// ============================================================
+// Duplikacja oferty (admin)
+// ============================================================
+// Wiersz źródłowy (z DB) potrzebny do zbudowania kopii. Zawiera pola _de i
+// kolumny spoza publicznego typu Product — dlatego osobny typ.
+export type DuplicateSource = {
+  name: string;
+  description: string;
+  price: number;
+  sale_price: number | null;
+  category: string;
+  images: string[];
+  stock: number;
+  color: string | null;
+  material: string | null;
+  dimensions: ProductDimensions | null;
+  weight: number | null;
+  construction: string | null;
+  delivery_time: string | null;
+  warranty: string | null;
+  collection_id: string | null;
+  features: ProductFeature[];
+  description_sections: ProductDescriptionSection[];
+  variants: ProductVariants | null;
+  name_de: string | null;
+  description_de: string | null;
+  description_sections_de: unknown;
+  color_de: string | null;
+  material_de: string | null;
+  needs_translation: boolean;
+  translated_at: string | null;
+  // Kopiowane tylko po to, by mieć pełny wiersz z DB — buildDuplicatePayload
+  // je świadomie RESETUJE (nie mogą przejść do kopii).
+  size_group: string | null;
+  size_label: string | null;
+  omnibus_price: number | null;
+};
+
+// Payload INSERTa duplikatu. Bez id/created_at — zostają defaulty DB.
+export type DuplicateProductPayload = Omit<
+  DuplicateSource,
+  "size_group" | "size_label" | "omnibus_price"
+> & {
+  is_active: boolean;
+  deactivation_source: "manual";
+  size_group: null;
+  size_label: null;
+  omnibus_price: null;
+};
+
+// Buduje payload duplikatu wg reguł ze spec-a:
+// - nazwa + „ (kopia)"; cała treść/warianty/cechy/sekcje/pola DE kopiowane 1:1,
+// - zdjęcia współdzielone (te same URL-e — patrz imageUrlsToDelete przy usuwaniu),
+// - ukryty szkic (is_active=false, deactivation_source='manual'),
+// - size_group/size_label wyzerowane (grupę ustawia linkowanie, rozmiar to nowy),
+// - omnibus_price wyzerowane (nowa oferta nie dziedziczy „najniższej z 30 dni" —
+//   zgodność z Omnibusem; historię cen zaczynamy od zera po insercie).
+export function buildDuplicatePayload(
+  source: DuplicateSource
+): DuplicateProductPayload {
+  return {
+    name: `${source.name} (kopia)`,
+    description: source.description,
+    price: source.price,
+    sale_price: source.sale_price,
+    category: source.category,
+    images: [...source.images],
+    stock: source.stock,
+    color: source.color,
+    material: source.material,
+    dimensions: source.dimensions,
+    weight: source.weight,
+    construction: source.construction,
+    delivery_time: source.delivery_time,
+    warranty: source.warranty,
+    collection_id: source.collection_id,
+    features: source.features,
+    description_sections: source.description_sections,
+    variants: source.variants,
+    name_de: source.name_de,
+    description_de: source.description_de,
+    description_sections_de: source.description_sections_de,
+    color_de: source.color_de,
+    material_de: source.material_de,
+    needs_translation: source.needs_translation,
+    translated_at: source.translated_at,
+    is_active: false,
+    deactivation_source: "manual",
+    size_group: null,
+    size_label: null,
+    omnibus_price: null,
   };
 }

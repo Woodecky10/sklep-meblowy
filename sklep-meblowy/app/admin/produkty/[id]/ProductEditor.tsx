@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { updateProductBasics, updateProductImages } from "../actions";
+import { updateProductBasics, updateProductImages, duplicateProduct } from "../actions";
+import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { Product, ActionResult, Fabric } from "@/app/_lib/types";
 import type { CategoryDef } from "@/app/_lib/categories";
 import { Field, IconBtn, inputClass, CollapsibleSection, type Toast } from "./_shared";
@@ -36,10 +38,34 @@ export default function ProductEditor({
   const [toast, setToast] = useState<Toast>(null);
   const [savingBasics, startBasicsTransition] = useTransition();
   const [savingImages, startImagesTransition] = useTransition();
+  const [duplicating, startDuplicateTransition] = useTransition();
+  const router = useRouter();
+  const confirm = useConfirm();
 
   function showToast(t: Toast) {
     setToast(t);
     if (t) setTimeout(() => setToast(null), 4000);
+  }
+
+  // Duplikuj ofertę: potwierdzenie → utworzenie ukrytej kopii w grupie
+  // rozmiarów oryginału → przejście do edytora kopii. Kopia zawiera ostatnio
+  // ZAPISANY stan produktu (niezapisane zmiany w tym formularzu nie wchodzą).
+  async function handleDuplicate() {
+    const ok = await confirm({
+      message:
+        "Utworzyć kopię tej oferty? Powstanie jako ukryty szkic w tej samej grupie rozmiarów — zmienisz w niej rozmiar i włączysz ją.",
+      confirmLabel: "Duplikuj",
+    });
+    if (!ok) return;
+    startDuplicateTransition(async () => {
+      const res = await duplicateProduct(product.id);
+      if (res.ok) {
+        showToast({ type: "success", message: "Utworzono kopię — przechodzę do edytora" });
+        router.push(`/admin/produkty/${res.productId}`);
+      } else {
+        showToast({ type: "error", message: res.error });
+      }
+    });
   }
 
   function handleResult(res: ActionResult) {
@@ -91,22 +117,37 @@ export default function ProductEditor({
   return (
     <div className="flex flex-col gap-8">
       {/* Header z breadcrumb */}
-      <div>
-        <Link
-          href="/admin/produkty"
-          className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)] inline-flex items-center gap-1.5"
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <Link
+            href="/admin/produkty"
+            className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)] inline-flex items-center gap-1.5"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            Wszystkie produkty
+          </Link>
+          <h1 className="font-display text-3xl font-bold text-[var(--fg)] mt-2">
+            {product.name}
+          </h1>
+          <p className="text-sm text-[var(--muted)] mt-1">
+            ID: {product.id}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleDuplicate}
+          disabled={duplicating}
+          title="Utwórz ukrytą kopię tej oferty w tej samej grupie rozmiarów"
+          className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 text-xs font-sans font-semibold uppercase tracking-widest rounded-full border border-[var(--color-navy)] text-[var(--color-navy)] dark:border-[var(--color-gold)] dark:text-[var(--color-gold)] hover:bg-[var(--color-navy)] hover:text-white dark:hover:bg-[var(--color-gold)] dark:hover:text-[var(--color-navy)] transition-colors disabled:opacity-50"
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="15 18 9 12 15 6" />
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
           </svg>
-          Wszystkie produkty
-        </Link>
-        <h1 className="font-display text-3xl font-bold text-[var(--fg)] mt-2">
-          {product.name}
-        </h1>
-        <p className="text-sm text-[var(--muted)] mt-1">
-          ID: {product.id}
-        </p>
+          {duplicating ? "Duplikuję..." : "Duplikuj ofertę"}
+        </button>
       </div>
 
       {toast && (
