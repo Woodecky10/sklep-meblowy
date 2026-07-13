@@ -52,6 +52,17 @@ const fetchSiteTexts = unstable_cache(
 
 export const getSiteTexts = cache(fetchSiteTexts);
 
+// Admin: świeży odczyt bez cache (formularz musi widzieć zapis po refresh).
+export async function getAllSiteTexts(): Promise<SiteTextsMap> {
+  const supabase = await createAdminClient();
+  const { data } = await supabase.from("site_texts").select("key, value, value_de");
+  const map: SiteTextsMap = {};
+  for (const row of (data ?? []) as { key: string; value: string | null; value_de: string | null }[]) {
+    map[row.key] = { value: row.value, value_de: row.value_de };
+  }
+  return map;
+}
+
 export function invalidateSiteTextsCache() {
   revalidateTag(SITE_TEXTS_CACHE_TAG, "max");
 }
