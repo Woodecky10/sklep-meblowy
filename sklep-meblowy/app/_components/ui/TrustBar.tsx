@@ -8,10 +8,24 @@ import { getDictionary } from "@/app/_lib/dictionaries";
 // przełącza się samo.
 const GOLD = "var(--color-gold)";
 
-type Props = { locale: Locale; withHeading?: boolean };
+type Props = {
+  locale: Locale;
+  withHeading?: boolean;
+  // Nagłówek sekcji z home_sections (admin) — fallback na słownik, żeby
+  // karta produktu i stopka (bez propsów) działały bez zmian.
+  heading?: string | null;
+  eyebrow?: string | null;
+};
 
-export default function TrustBar({ locale, withHeading = false }: Props) {
+export default function TrustBar({
+  locale,
+  withHeading = false,
+  heading,
+  eyebrow,
+}: Props) {
   const t = getDictionary(locale).trustBar;
+  const resolvedHeading = heading ?? t.heading;
+  const resolvedEyebrow = eyebrow ?? t.eyebrow;
   const ink = "text-[var(--fg)]";
   const muted = "text-[var(--muted)]";
   const divide = "lg:divide-[var(--border)]";
@@ -27,10 +41,14 @@ export default function TrustBar({ locale, withHeading = false }: Props) {
     <div className={ink}>
       {withHeading && (
         <div className="text-center mb-14">
-          <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-3">
-            {t.eyebrow}
-          </p>
-          <h2 className="font-display text-4xl font-bold">{t.heading}</h2>
+          {resolvedEyebrow && (
+            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-3">
+              {resolvedEyebrow}
+            </p>
+          )}
+          {resolvedHeading && (
+            <h2 className="font-display text-4xl font-bold">{resolvedHeading}</h2>
+          )}
         </div>
       )}
       <div
