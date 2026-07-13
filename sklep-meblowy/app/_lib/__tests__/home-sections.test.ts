@@ -7,10 +7,7 @@ import {
   type HomeSectionRow,
 } from "@/app/_lib/home-sections";
 import { pl } from "@/app/_lib/dictionaries/pl";
-import type { PlShape } from "@/app/_lib/dictionaries/pl";
 import { de } from "@/app/_lib/dictionaries/de";
-
-const deFull = de as PlShape;
 
 describe("DEFAULT_HOME_SECTIONS", () => {
   it("zawiera 5 sekcji w dzisiejszej kolejności strony", () => {
@@ -26,11 +23,11 @@ describe("DEFAULT_HOME_SECTIONS", () => {
   it("nagłówki domyślne = wartości ze słowników (jedno źródło prawdy)", () => {
     const tiles = DEFAULT_HOME_SECTIONS.find((s) => s.key === "tiles")!;
     expect(tiles.heading).toBe(pl.home.collectionsHeading);
-    expect(tiles.heading_de).toBe(deFull.home.collectionsHeading);
+    expect(tiles.heading_de).toBe(de.home?.collectionsHeading ?? pl.home.collectionsHeading);
     expect(tiles.subheading).toBe(pl.home.collectionsEyebrow);
     const trust = DEFAULT_HOME_SECTIONS.find((s) => s.key === "trust_bar")!;
     expect(trust.heading).toBe(pl.trustBar.heading);
-    expect(trust.subheading_de).toBe(deFull.trustBar.eyebrow);
+    expect(trust.subheading_de).toBe(de.trustBar?.eyebrow ?? pl.trustBar.eyebrow);
   });
 
   it("hero nie ma nagłówków (slajdy mają własne teksty)", () => {

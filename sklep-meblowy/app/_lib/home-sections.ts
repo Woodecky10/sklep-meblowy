@@ -39,13 +39,13 @@ export type LocalizedHomeSection = {
 };
 
 // Nagłówki domyślne ze słowników — jedno źródło prawdy z dotychczasowym UI.
-const deFull = de as PlShape;
+// Brak klucza DE → fallback PL (świadomie, zamiast castu całego słownika).
 export const DEFAULT_HOME_SECTIONS: HomeSectionRow[] = [
   { key: "hero", sort_order: 0, visible: true, heading: null, heading_de: null, subheading: null, subheading_de: null },
-  { key: "tiles", sort_order: 1, visible: true, heading: pl.home.collectionsHeading, heading_de: deFull.home.collectionsHeading, subheading: pl.home.collectionsEyebrow, subheading_de: deFull.home.collectionsEyebrow },
-  { key: "featured", sort_order: 2, visible: true, heading: pl.home.featuredHeading, heading_de: deFull.home.featuredHeading, subheading: null, subheading_de: null },
-  { key: "trust_bar", sort_order: 3, visible: true, heading: pl.trustBar.heading, heading_de: deFull.trustBar.heading, subheading: pl.trustBar.eyebrow, subheading_de: deFull.trustBar.eyebrow },
-  { key: "collections", sort_order: 4, visible: true, heading: pl.home.seriesHeading, heading_de: deFull.home.seriesHeading, subheading: pl.home.seriesEyebrow, subheading_de: deFull.home.seriesEyebrow },
+  { key: "tiles", sort_order: 1, visible: true, heading: pl.home.collectionsHeading, heading_de: de.home?.collectionsHeading ?? pl.home.collectionsHeading, subheading: pl.home.collectionsEyebrow, subheading_de: de.home?.collectionsEyebrow ?? pl.home.collectionsEyebrow },
+  { key: "featured", sort_order: 2, visible: true, heading: pl.home.featuredHeading, heading_de: de.home?.featuredHeading ?? pl.home.featuredHeading, subheading: null, subheading_de: null },
+  { key: "trust_bar", sort_order: 3, visible: true, heading: pl.trustBar.heading, heading_de: de.trustBar?.heading ?? pl.trustBar.heading, subheading: pl.trustBar.eyebrow, subheading_de: de.trustBar?.eyebrow ?? pl.trustBar.eyebrow },
+  { key: "collections", sort_order: 4, visible: true, heading: pl.home.seriesHeading, heading_de: de.home?.seriesHeading ?? pl.home.seriesHeading, subheading: pl.home.seriesEyebrow, subheading_de: de.home?.seriesEyebrow ?? pl.home.seriesEyebrow },
 ];
 
 // Scala wiersze z bazy z defaultami: nieznane klucze ignoruje, brakujące
@@ -54,13 +54,14 @@ export function mergeHomeSections(
   rows: HomeSectionRow[] | null | undefined
 ): HomeSectionRow[] {
   const byKey = new Map<HomeSectionKey, HomeSectionRow>(
-    DEFAULT_HOME_SECTIONS.map((s) => [s.key, s])
+    DEFAULT_HOME_SECTIONS.map((s) => [s.key, { ...s }])
   );
   for (const row of rows ?? []) {
     if (row && isHomeSectionKey(row.key)) {
       byKey.set(row.key, { ...byKey.get(row.key)!, ...row });
     }
   }
+  // Sortowanie po sort_order, w razie remisu — alfabetycznie po kluczu (gwarancja determinizmu).
   return [...byKey.values()].sort((a, b) => a.sort_order - b.sort_order || a.key.localeCompare(b.key));
 }
 
