@@ -6,7 +6,12 @@ import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
 import { invalidateFacetsCache } from "@/app/_lib/products";
 import { validateImageUpload } from "@/app/_lib/image-upload";
-import { buildNewProductPayload } from "@/app/_lib/new-product";
+import {
+  buildNewProductPayload,
+  buildDuplicatePayload,
+  type DuplicateSource,
+} from "@/app/_lib/new-product";
+import { imageUrlsToDelete } from "@/app/_lib/product-images";
 import { recordPriceHistory } from "@/app/_lib/price-history";
 import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-html";
 import { buildGroupKey, pickGroupKey } from "@/app/_lib/size-groups";
@@ -347,12 +352,24 @@ export async function deleteProduct(formData: FormData): Promise<ActionResult> {
 
   // 4. Posprzataj storage — best effort, nie blokujemy sukcesu jesli sie
   // nie uda (zdjecie sierota w buckecie to mniejszy problem niz wiszaca
-  // operacja). Zbieramy URL-e z globalnej galerii produktu.
-  const allImageUrls: string[] = [];
-  if (Array.isArray(productRow.images)) {
-    allImageUrls.push(...productRow.images.filter((u): u is string => typeof u === "string"));
+  // operacja). Duplikaty ofert WSPÓŁDZIELĄ te same URL-e zdjęć, więc kasujemy
+  // ze storage tylko te pliki, których nie używa żaden inny produkt
+  // (imageUrlsToDelete) — inaczej usunięcie jednego bliźniaka rozmiarowego
+  // skasowałoby zdjęcia wciąż pokazywane przez pozostałe.
+  const targetImages = Array.isArray(productRow.images)
+    ? productRow.images.filter((u): u is string => typeof u === "string")
+    : [];
+  if (targetImages.length > 0) {
+    const { data: others } = await supabase
+      .from("products")
+      .select("images")
+      .neq("id", id);
+    const otherImages = ((others ?? []) as { images: string[] | null }[]).map(
+      (r) => (Array.isArray(r.images) ? r.images : [])
+    );
+    const urlsToDelete = imageUrlsToDelete(targetImages, otherImages);
+    await Promise.all(urlsToDelete.map((url) => deleteStorageImage(url)));
   }
-  await Promise.all(allImageUrls.map((url) => deleteStorageImage(url)));
 
   revalidatePath("/admin/produkty");
   invalidateFacetsCache();
@@ -601,6 +618,65 @@ export async function createProduct(
   invalidateFacetsCache();
   revalidatePath("/sklep");
   return { ok: true, productId: (data as { id: string }).id };
+}
+
+// ============================================================
+// Duplikacja oferty — kopia produktu jako ukryty szkic w grupie rozmiarów
+// ============================================================
+// Oszczędza czas przy dodawaniu kilku rozmiarów: kopiuje całą ofertę (treść,
+// warianty, cechy, zdjęcia, tłumaczenia DE), tworzy ją jako UKRYTĄ (is_active=
+// false) i automatycznie dołącza do grupy rozmiarów oryginału. Zdjęcia są
+// współdzielone (te same URL-e) — deleteProduct nie skasuje plików wciąż
+// używanych przez oryginał (imageUrlsToDelete). Zwraca id kopii do redirectu.
+export async function duplicateProduct(
+  productId: string
+): Promise<{ ok: true; productId: string } | { ok: false; error: string }> {
+  await requireAdmin();
+
+  const sourceId = sanitize(productId);
+  if (!sourceId) return { ok: false, error: "Brak id produktu" };
+
+  const supabase = await createAdminClient();
+  const { data: source, error: fetchErr } = await supabase
+    .from("products")
+    .select("*")
+    .eq("id", sourceId)
+    .maybeSingle();
+  if (fetchErr) return { ok: false, error: fetchErr.message };
+  if (!source) return { ok: false, error: "Produkt nie istnieje" };
+
+  const payload = buildDuplicatePayload(source as unknown as DuplicateSource);
+
+  const { data: created, error: insertErr } = await supabase
+    .from("products")
+    .insert(payload as never)
+    .select("id")
+    .single();
+  if (insertErr || !created) {
+    return {
+      ok: false,
+      error: insertErr?.message ?? "Nie udało się utworzyć kopii",
+    };
+  }
+  const newId = (created as { id: string }).id;
+
+  // Dołącz kopię do grupy rozmiarów oryginału (linkSizeSibling tworzy grupę,
+  // gdy oryginał jej nie ma). Best-effort — kopia już istnieje, więc przy
+  // błędzie linkowania nie cofamy insertu; admin podłączy ręcznie w edytorze.
+  try {
+    const linkRes = await linkSizeSibling(sourceId, newId);
+    if (!linkRes.ok) {
+      console.error("[duplicate] linkSizeSibling nieudany:", linkRes.error);
+    }
+  } catch (err) {
+    console.error("[duplicate] linkSizeSibling wyjątek:", err);
+  }
+
+  await recordPriceHistory(newId);
+  revalidatePath("/admin/produkty");
+  invalidateFacetsCache();
+  revalidatePath("/sklep");
+  return { ok: true, productId: newId };
 }
 
 // ============================================================

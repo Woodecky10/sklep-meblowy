@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { buildNewProductPayload } from "@/app/_lib/new-product";
+import {
+  buildNewProductPayload,
+  buildDuplicatePayload,
+  type DuplicateSource,
+} from "@/app/_lib/new-product";
 import { DEFAULT_DELIVERY_TIME, DEFAULT_WARRANTY } from "@/app/_lib/spec-format";
 import { DELIVERY_TIME_DE, WARRANTY_DE } from "@/app/_lib/de-content-maps";
 
@@ -72,5 +76,103 @@ describe("buildNewProductPayload", () => {
   it("domyślne wartości mają tłumaczenia DE (spójność z mapami)", () => {
     expect(DELIVERY_TIME_DE[DEFAULT_DELIVERY_TIME]).toBeTruthy();
     expect(WARRANTY_DE[DEFAULT_WARRANTY]).toBeTruthy();
+  });
+});
+
+// Pełne źródło (jak wiersz z DB) — wszystkie pola niepuste, żeby test wykrył
+// zgubienie któregokolwiek przy kopiowaniu.
+const dupSource: DuplicateSource = {
+  name: "Łóżko Alice 140x200",
+  description: "<p>Opis</p>",
+  price: 1299.0,
+  sale_price: 999.0,
+  category: "lozka-tapicerowane",
+  images: ["https://x/1.jpg", "https://x/2.jpg"],
+  stock: 5,
+  color: "beżowy",
+  material: "welur",
+  dimensions: { width: 140, depth: 200, height: 100 },
+  weight: 60,
+  construction: "stelaż drewniany",
+  delivery_time: "21 dni roboczych",
+  warranty: "2 lata",
+  collection_id: "col-1",
+  features: [{ key: "Nóżki", value: "złote" }],
+  description_sections: [{ kind: "text", title: "Sekcja", body: "treść" }],
+  variants: { options: [{ name: "Tkanina", values: ["Sawana 21"] }] },
+  name_de: "Bett Alice 140x200",
+  description_de: "<p>Beschreibung</p>",
+  description_sections_de: [{ kind: "text", title: "Abschnitt", body: "text" }],
+  color_de: "beige",
+  material_de: "Velours",
+  needs_translation: false,
+  translated_at: "2026-07-01T00:00:00.000Z",
+  // pola resetowane — kopia NIE może ich odziedziczyć tak jak są:
+  size_group: "alice-ab12",
+  size_label: "140×200 cm",
+  omnibus_price: 950.0,
+};
+
+describe("buildDuplicatePayload", () => {
+  it("dodaje sufiks (kopia) do nazwy", () => {
+    expect(buildDuplicatePayload(dupSource).name).toBe("Łóżko Alice 140x200 (kopia)");
+  });
+
+  it("kopiuje pola treści 1:1", () => {
+    const p = buildDuplicatePayload(dupSource);
+    expect(p.description).toBe(dupSource.description);
+    expect(p.price).toBe(dupSource.price);
+    expect(p.category).toBe(dupSource.category);
+    expect(p.stock).toBe(dupSource.stock);
+    expect(p.color).toBe(dupSource.color);
+    expect(p.material).toBe(dupSource.material);
+    expect(p.dimensions).toEqual(dupSource.dimensions);
+    expect(p.weight).toBe(dupSource.weight);
+    expect(p.construction).toBe(dupSource.construction);
+    expect(p.delivery_time).toBe(dupSource.delivery_time);
+    expect(p.warranty).toBe(dupSource.warranty);
+    expect(p.collection_id).toBe(dupSource.collection_id);
+    expect(p.features).toEqual(dupSource.features);
+    expect(p.description_sections).toEqual(dupSource.description_sections);
+    expect(p.variants).toEqual(dupSource.variants);
+  });
+
+  it("współdzieli te same URL-e zdjęć (kopiuje tablicę images)", () => {
+    expect(buildDuplicatePayload(dupSource).images).toEqual(dupSource.images);
+  });
+
+  it("kopiuje wszystkie pola DE + needs_translation + translated_at", () => {
+    const p = buildDuplicatePayload(dupSource);
+    expect(p.name_de).toBe(dupSource.name_de);
+    expect(p.description_de).toBe(dupSource.description_de);
+    expect(p.description_sections_de).toEqual(dupSource.description_sections_de);
+    expect(p.color_de).toBe(dupSource.color_de);
+    expect(p.material_de).toBe(dupSource.material_de);
+    expect(p.needs_translation).toBe(false);
+    expect(p.translated_at).toBe(dupSource.translated_at);
+  });
+
+  it("kopiuje sale_price, ale RESETUJE omnibus_price (zgodność z Omnibusem)", () => {
+    const p = buildDuplicatePayload(dupSource);
+    expect(p.sale_price).toBe(dupSource.sale_price);
+    expect(p.omnibus_price).toBeNull();
+  });
+
+  it("tworzy się jako ukryty szkic (is_active=false, deactivation_source=manual)", () => {
+    const p = buildDuplicatePayload(dupSource);
+    expect(p.is_active).toBe(false);
+    expect(p.deactivation_source).toBe("manual");
+  });
+
+  it("czyści size_group i size_label (grupa przez linkowanie, rozmiar to nowy)", () => {
+    const p = buildDuplicatePayload(dupSource);
+    expect(p.size_group).toBeNull();
+    expect(p.size_label).toBeNull();
+  });
+
+  it("nie ustawia id ani created_at (zostawia defaulty DB)", () => {
+    const p = buildDuplicatePayload(dupSource) as Record<string, unknown>;
+    expect("id" in p).toBe(false);
+    expect("created_at" in p).toBe(false);
   });
 });
