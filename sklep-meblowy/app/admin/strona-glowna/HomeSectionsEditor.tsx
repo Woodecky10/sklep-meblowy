@@ -66,7 +66,7 @@ export default function HomeSectionsEditor({
   }
   const [expandedKey, setExpandedKey] = useState<HomeSectionKey | null>(null);
   const [toast, setToast] = useState<Toast>(null);
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   function showToast(t: Toast) {
@@ -150,7 +150,7 @@ export default function HomeSectionsEditor({
                   <button
                     type="button"
                     onClick={() => move(i, -1)}
-                    disabled={i === 0}
+                    disabled={i === 0 || isPending}
                     aria-label={`Przesuń sekcję ${meta.name} wyżej`}
                     className="w-7 h-7 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--fg)] disabled:opacity-30 hover:border-[var(--color-gold)]"
                   >
@@ -159,7 +159,7 @@ export default function HomeSectionsEditor({
                   <button
                     type="button"
                     onClick={() => move(i, 1)}
-                    disabled={i === sections.length - 1}
+                    disabled={i === sections.length - 1 || isPending}
                     aria-label={`Przesuń sekcję ${meta.name} niżej`}
                     className="w-7 h-7 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--fg)] disabled:opacity-30 hover:border-[var(--color-gold)]"
                   >
@@ -192,7 +192,8 @@ export default function HomeSectionsEditor({
                   aria-checked={s.visible}
                   aria-label={`Widoczność sekcji ${meta.name}`}
                   onClick={() => toggleVisible(s)}
-                  className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${s.visible ? "bg-[var(--color-gold)]" : "bg-[var(--border)]"}`}
+                  disabled={isPending}
+                  className={`relative w-11 h-6 rounded-full transition-colors shrink-0 disabled:opacity-60 ${s.visible ? "bg-[var(--color-gold)]" : "bg-[var(--border)]"}`}
                 >
                   <span
                     className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${s.visible ? "left-[22px]" : "left-0.5"}`}

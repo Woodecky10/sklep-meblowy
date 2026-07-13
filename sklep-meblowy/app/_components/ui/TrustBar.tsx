@@ -24,8 +24,10 @@ export default function TrustBar({
   eyebrow,
 }: Props) {
   const t = getDictionary(locale).trustBar;
-  const resolvedHeading = heading ?? t.heading;
-  const resolvedEyebrow = eyebrow ?? t.eyebrow;
+  // undefined = wywołanie bez propsa (karta produktu/stopka) → słownik;
+  // null/"" = świadomie wyczyszczone w adminie → element się nie renderuje.
+  const resolvedHeading = heading === undefined ? t.heading : heading;
+  const resolvedEyebrow = eyebrow === undefined ? t.eyebrow : eyebrow;
   const ink = "text-[var(--fg)]";
   const muted = "text-[var(--muted)]";
   const divide = "lg:divide-[var(--border)]";
