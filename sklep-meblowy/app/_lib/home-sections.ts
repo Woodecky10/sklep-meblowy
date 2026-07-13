@@ -2,10 +2,12 @@
 // /admin/strona-glowna (tabela home_sections, migracja 49). Defaulty w kodzie
 // odtwarzają dzisiejszy wygląd 1:1 (i są jednocześnie seedem migracji).
 
+import { cache } from "react";
+import { unstable_cache, revalidateTag } from "next/cache";
 import type { Locale } from "./i18n";
 import { pl } from "./dictionaries/pl";
-import type { PlShape } from "./dictionaries/pl";
 import { de } from "./dictionaries/de";
+import { createAdminClient } from "./supabase/server";
 
 export const HOME_SECTION_KEYS = [
   "hero",
@@ -78,4 +80,40 @@ export function localizeHomeSection(
     heading: pick(s.heading_de, s.heading),
     subheading: pick(s.subheading_de, s.subheading),
   };
+}
+
+export const HOME_SECTIONS_CACHE_TAG = "home-sections";
+
+// Cross-request cache (wzorzec slides.ts). Wewnątrz unstable_cache nie wolno
+// używać cookies() — createAdminClient (service-role) jest bez cookies, OK.
+// Błąd/pusta tabela → mergeHomeSections zwraca defaulty → strona wygląda jak
+// dziś (fail-open, sklep nigdy nie pada przez brak konfiguracji).
+const fetchHomeSections = unstable_cache(
+  async (): Promise<HomeSectionRow[]> => {
+    const supabase = await createAdminClient();
+    const { data, error } = await supabase
+      .from("home_sections")
+      .select("key, sort_order, visible, heading, heading_de, subheading, subheading_de")
+      .order("sort_order", { ascending: true });
+    if (error || !data) return mergeHomeSections(null);
+    return mergeHomeSections(data as HomeSectionRow[]);
+  },
+  ["home-sections"],
+  { tags: [HOME_SECTIONS_CACHE_TAG], revalidate: 60 }
+);
+
+export const getHomeSections = cache(fetchHomeSections);
+
+// Admin: świeży odczyt bez cache (po mutacji router.refresh() ma widzieć zmiany).
+export async function getAllHomeSections(): Promise<HomeSectionRow[]> {
+  const supabase = await createAdminClient();
+  const { data } = await supabase
+    .from("home_sections")
+    .select("key, sort_order, visible, heading, heading_de, subheading, subheading_de")
+    .order("sort_order", { ascending: true });
+  return mergeHomeSections((data ?? []) as HomeSectionRow[]);
+}
+
+export function invalidateHomeSectionsCache() {
+  revalidateTag(HOME_SECTIONS_CACHE_TAG, "max");
 }
