@@ -68,9 +68,9 @@ Pozycje paska zaufania — struktura zgodna z obecnym komponentem:
 duża ikona + złoty checkbox + pogrubiona etykieta + opcjonalna szara dopiska.
 
 - `id uuid primary key default gen_random_uuid()`
-- `icon text not null` — klucz z zestawu ikon w kodzie (istniejące 4:
-  `medal-pl`, `shield-check`, `truck-free`, `warranty-2y` + nowe generyczne:
-  ~`star`, `leaf`, `headset`, `wallet`, `hand-heart`, `clock`)
+- `icon text not null` — klucz z zestawu 10 ikon w kodzie (istniejące 4:
+  `medal-pl`, `shield-check`, `truck-free`, `warranty-2y` + 6 nowych
+  generycznych: `star`, `leaf`, `headset`, `wallet`, `hand-heart`, `clock`)
 - `label text not null`, `label_de text` — pogrubiona etykieta
 - `subline text`, `subline_de text` — szara dopiska (jak „na terenie całej Polski")
 - `position int not null`, `active boolean not null default true`
@@ -96,7 +96,7 @@ Krótkie teksty globalne, klucz → wartość.
 
 ### Presety kolorów
 
-Moduł `app/_lib/theme.ts` (+ typy). ~4 presety, każdy z KOMPLETEM tokenów
+Moduł `app/_lib/theme.ts` (+ typy). 4 presety, każdy z KOMPLETEM tokenów
 brand dla trybu jasnego i ciemnego:
 
 - tokeny: `--color-navy`, `--color-navy-light`, `--color-gold`,
