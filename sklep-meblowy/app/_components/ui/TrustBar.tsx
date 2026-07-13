@@ -27,7 +27,7 @@ export default async function TrustBar({
   const items = prepareTrustItems(rows, locale);
   if (items.length === 0) return null;
 
-  // undefined = wywołanie bez propsa (karta produktu/stopka) → słownik;
+  // undefined = wywołanie bez propsa (karta produktu) → słownik;
   // null/"" = świadomie wyczyszczone w adminie → element się nie renderuje.
   // (semantyka z fixu po final review kroku 1 — NIE zamieniać na `??`)
   const resolvedHeading = heading === undefined ? t.heading : heading;

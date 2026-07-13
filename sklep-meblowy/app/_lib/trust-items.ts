@@ -1,6 +1,6 @@
 // Pozycje paska zaufania (tabela trust_items, migracja 50) — edytowane
-// w /admin/strona-glowna, renderowane w TrustBar (home / karta produktu /
-// stopka). Fallback: null z fetcha (błąd/brak tabeli) → dzisiejsze 4 pozycje
+// w /admin/strona-glowna, renderowane w TrustBar (home / karta produktu).
+// Fallback: null z fetcha (błąd/brak tabeli) → dzisiejsze 4 pozycje
 // ze słowników; pusta lista (celowe usunięcie w adminie) → pusty pasek.
 
 import { cache } from "react";

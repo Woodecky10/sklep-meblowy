@@ -25,9 +25,9 @@ słownikach i18n — jego spec z 2026-07-06 świadomie odłożył admina),
 nagłówki/podtytuły sekcji (słowniki), kolejność i widoczność sekcji,
 slogan TopBaru, tagline stopki.
 
-`TrustBar` jest osadzony w TRZECH miejscach (home z nagłówkiem, karta
-produktu bez nagłówka, stopka bez nagłówka poza kartami produktu) — edycja
-z bazy obejmie automatycznie wszystkie trzy.
+`TrustBar` jest osadzony w DWÓCH miejscach (home z nagłówkiem, karta
+produktu bez nagłówka) — edycja z bazy obejmie automatycznie oba.
+Osadzenie w stopce usunięto z main 2026-07-06 (commit c72c5008).
 
 ## Zakres (decyzje użytkownika)
 
@@ -163,7 +163,7 @@ zdefiniowanie wszystkich par nie obciąża użytkownika.
 - Pobiera aktywne `trust_items` (cache, tag `trust-items`) posortowane po
   `position`; ikony mapowane po kluczu na SVG z zestawu w kodzie; nieznany
   klucz ikony → pomijany bezpiecznie. Fallback: obecne 4 zahardkodowane
-  pozycje. Zmiana obejmuje wszystkie 3 miejsca osadzenia.
+  pozycje. Zmiana obejmuje oba miejsca osadzenia.
 - Nagłówek paska na home (`withHeading`) przechodzi na `home_sections`
   (wiersz `trust_bar`).
 
