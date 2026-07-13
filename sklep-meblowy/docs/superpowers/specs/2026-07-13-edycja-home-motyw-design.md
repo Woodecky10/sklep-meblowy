@@ -53,7 +53,8 @@ service_role (akcje admina).
 Po jednym wierszu na sekcję strony głównej.
 
 - `key text primary key` — `hero` | `tiles` | `featured` | `trust_bar` | `collections`
-- `position int not null` — kolejność renderowania
+- `sort_order int not null` — kolejność renderowania (konwencja repo, jak
+  `home_slides`/`home_tiles`; atomowy reorder przez RPC jak w migracji 28)
 - `visible boolean not null default true`
 - `heading text`, `heading_de text` — nagłówek sekcji (H2)
 - `subheading text`, `subheading_de text` — eyebrow/podtytuł
@@ -73,7 +74,7 @@ duża ikona + złoty checkbox + pogrubiona etykieta + opcjonalna szara dopiska.
   generycznych: `star`, `leaf`, `headset`, `wallet`, `hand-heart`, `clock`)
 - `label text not null`, `label_de text` — pogrubiona etykieta
 - `subline text`, `subline_de text` — szara dopiska (jak „na terenie całej Polski")
-- `position int not null`, `active boolean not null default true`
+- `sort_order int not null`, `active boolean not null default true`
 - Seed: obecne 4 pozycje z tekstami PL i DE ze słowników.
 
 ### `site_texts` (migracja: create + seed)
@@ -105,8 +106,11 @@ brand dla trybu jasnego i ciemnego:
 - presety (nazwy robocze): `klasyczny` (obecny granat+złoto),
   `butelkowa-zielen` (zieleń+mosiądz), `bez-braz` (beż+ciepły brąz),
   `grafit-miedz` (grafit+miedź)
-- Zmienne semantyczne (`--bg`, `--fg`, `--card-bg`, `--border`, `--muted`)
-  pozostają neutralne i NIE są częścią presetu.
+- Presety definiują TAKŻE zmienne semantyczne (`--bg`, `--fg`, `--card-bg`,
+  `--border`, `--muted`) dla trybu jasnego i ciemnego — dziś `--bg` to
+  dosłownie krem, a `--card-bg` w dark mode to granat, więc bez tego motyw
+  byłby niespójny. Wartości semantyczne w presetach są dobrane ręcznie;
+  przy nadpisaniach własnych liczone automatycznie (pochodne od cream/navy).
 
 ### Nadpisania własne
 
