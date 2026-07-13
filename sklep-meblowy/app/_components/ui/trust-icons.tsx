@@ -33,7 +33,7 @@ export const TRUST_ICON_LABELS: Record<TrustIconKey, string> = {
   "medal-pl": "Medal PL",
   "shield-check": "Tarcza z ptaszkiem",
   "truck-free": "Ciężarówka (0 zł)",
-  "warranty-2y": 'Tarcza "2 lata"',
+  "warranty-2y": "Tarcza „2 lata”",
   star: "Gwiazdka",
   leaf: "Liść (eko)",
   headset: "Słuchawki (obsługa)",
