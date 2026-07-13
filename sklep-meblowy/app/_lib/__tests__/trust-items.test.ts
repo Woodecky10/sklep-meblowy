@@ -31,8 +31,8 @@ describe("prepareTrustItems", () => {
 
   it("defaulty po niemiecku dla locale de", () => {
     const items = prepareTrustItems(null, "de");
-    expect(items[3].label).toBe(de.trustBar!.warranty);
-    expect(items[2].subline).toBe(de.trustBar!.deliveryScope);
+    expect(items[3].label).toBe(de.trustBar?.warranty);
+    expect(items[2].subline).toBe(de.trustBar?.deliveryScope);
   });
 
   it("pusta lista z DB (admin usunął wszystko) → pusta lista, BEZ fallbacku", () => {

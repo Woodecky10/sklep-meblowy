@@ -30,12 +30,15 @@ export type LocalizedTrustItem = {
 };
 
 function defaultTrustItems(locale: Locale): LocalizedTrustItem[] {
-  const t = locale === "de" ? de.trustBar! : pl.trustBar;
+  // Brak klucza DE → fallback PL per pole (świadomie, zamiast asercji `!` —
+  // de jest DeepPartial i pole może legalnie zniknąć).
+  const p = pl.trustBar;
+  const d = locale === "de" ? de.trustBar : undefined;
   return [
-    { id: "default-producer", icon: "medal-pl", label: t.producer!, subline: null },
-    { id: "default-quality", icon: "shield-check", label: t.quality!, subline: null },
-    { id: "default-delivery", icon: "truck-free", label: t.delivery!, subline: t.deliveryScope! },
-    { id: "default-warranty", icon: "warranty-2y", label: t.warranty!, subline: null },
+    { id: "default-producer", icon: "medal-pl", label: d?.producer ?? p.producer, subline: null },
+    { id: "default-quality", icon: "shield-check", label: d?.quality ?? p.quality, subline: null },
+    { id: "default-delivery", icon: "truck-free", label: d?.delivery ?? p.delivery, subline: d?.deliveryScope ?? p.deliveryScope },
+    { id: "default-warranty", icon: "warranty-2y", label: d?.warranty ?? p.warranty, subline: null },
   ];
 }
 
