@@ -4,6 +4,7 @@ import { getPendingTranslationCount } from "@/app/_lib/translations";
 const CARDS = [
   { href: "/admin/zamowienia", title: "Zamówienia", cta: "Zarządzaj zamówieniami" },
   { href: "/admin/produkty", title: "Produkty", cta: "Edytuj produkty" },
+  { href: "/admin/strona-glowna", title: "Strona główna", cta: "Ułóż sekcje i nagłówki" },
   { href: "/admin/polecane", title: "Polecane produkty", cta: "Edytuj polecane" },
   { href: "/admin/slider", title: "Slider na stronie głównej", cta: "Edytuj slider" },
   { href: "/admin/kafelki", title: "Kafelki „Znajdź swój styl”", cta: "Edytuj kafelki" },
