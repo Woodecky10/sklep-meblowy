@@ -2,7 +2,7 @@ import { unstable_cache, revalidateTag } from "next/cache";
 import { createClient as createBareAnonClient } from "@supabase/supabase-js";
 import { createClient, createAdminClient } from "./supabase/server";
 import { getCategories } from "./categories";
-import { buildSearchOrFilter } from "./search-filter";
+import { buildSearchOrFilter, rankByNameMatch } from "./search-filter";
 import { sizeLabelOf } from "./size-groups";
 import { localizeProduct, buildLocalizedFacets } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
@@ -118,13 +118,15 @@ export async function getProducts(filters: ProductFilters = {}) {
     }
   }
 
-  if (search && search.trim()) {
-    // Sanityzacja + budowa filtra .or() w search-filter.ts (escape składni
-    // .or() i wildcardów ILIKE). null = po sanityzacji nic nie zostało.
-    // DE szuka po name_de/description_de (bez fallbacku — patrz search-filter).
-    const orFilter = buildSearchOrFilter(search, locale);
-    if (orFilter) query = query.or(orFilter);
-  }
+  // Sanityzacja + budowa filtra .or() w search-filter.ts (escape składni
+  // .or() i wildcardów ILIKE). null = po sanityzacji nic nie zostało.
+  // DE szuka po name_de/description_de (bez fallbacku — patrz search-filter).
+  const searchOrFilter =
+    search && search.trim() ? buildSearchOrFilter(search, locale) : null;
+  if (searchOrFilter) query = query.or(searchOrFilter);
+  // Aktywne wyszukiwanie zmienia tryb paginacji: ranking (nazwa > opis)
+  // wymaga całego zestawu dopasowań naraz, więc paginujemy w JS (patrz niżej).
+  const searchActive = searchOrFilter !== null;
 
   if (typeof priceMin === "number") query = query.gte("price", priceMin);
   if (typeof priceMax === "number") query = query.lte("price", priceMax);
@@ -177,6 +179,35 @@ export async function getProducts(filters: ProductFilters = {}) {
     query = query
       .order("name", { ascending: true })
       .order("created_at", { ascending: false });
+  }
+
+  // Wyszukiwanie: pobieramy CAŁY zestaw dopasowań (name+description, z sortem
+  // z DB), rankujemy w JS (trafienia w nazwie przed trafieniami tylko w opisie
+  // — np. „materac" wypycha materace nad łóżka kontynentalne, które mają
+  // „materac" w opisie) i dopiero wtedy paginujemy. PostgREST .order() nie
+  // wyrazi rankingu warunkowego (brak CASE), a katalog to ~dziesiątki pozycji
+  // (dopasowania to podzbiór) — koszt pobrania wszystkich naraz pomijalny.
+  // Przeglądanie bez frazy (częsty przypadek) zostaje paginowane w DB niżej.
+  if (searchActive) {
+    const { data, error } = await query;
+    if (error) throw error;
+    const ranked = rankByNameMatch(
+      (data ?? []) as Product[],
+      search!,
+      // DE dopasowuje name_de bez fallbacku do PL — spójnie z buildSearchOrFilter.
+      (p) =>
+        locale === "de"
+          ? (p as { name_de?: string | null }).name_de ?? ""
+          : p.name
+    );
+    const start = (safePage - 1) * safeLimit;
+    return {
+      products: ranked
+        .slice(start, start + safeLimit)
+        .map((p) => localizeProduct(p, locale)),
+      total: ranked.length,
+      pages: Math.ceil(ranked.length / safeLimit),
+    };
   }
 
   const from = (safePage - 1) * safeLimit;
