@@ -235,6 +235,25 @@ export async function isCategorySlug(
   return data.categories.some((c) => c.slug === value);
 }
 
+// Grupuje kategorie pod sekcjami do <select><optgroup> (np. formularz „Nowy
+// produkt"). Czysta i synchroniczna — caller podaje już pobrane/przefiltrowane
+// sekcje i kategorie (zwykle AKTYWNE: getSections()/getCategories()). Zachowuje
+// kolejność sekcji, pomija sekcje bez kategorii oraz kategorie-sieroty
+// (group_slug bez pasującej sekcji).
+export function groupCategoriesForSelect(
+  sections: { slug: string; label: string }[],
+  categories: { slug: string; label: string; group_slug: string }[]
+): { label: string; categories: { slug: string; label: string }[] }[] {
+  return sections
+    .map((s) => ({
+      label: s.label,
+      categories: categories
+        .filter((c) => c.group_slug === s.slug)
+        .map((c) => ({ slug: c.slug, label: c.label })),
+    }))
+    .filter((s) => s.categories.length > 0);
+}
+
 // ============================================================
 // Helpery dla admina (mutacje)
 // ============================================================
