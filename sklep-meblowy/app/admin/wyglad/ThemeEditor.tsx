@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type CSSProperties } from "react";
+import { useEffect, useRef, useState, useTransition, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { Card, Field, ToastView, type Toast } from "@/app/admin/_shared";
 import { useConfirm } from "@/app/_context/ConfirmContext";
@@ -53,14 +53,26 @@ export default function ThemeEditor({
   const [saving, startSave] = useTransition();
   const confirm = useConfirm();
   const router = useRouter();
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const settings: ThemeSettings = { preset, overrides, fontPair };
   const tokens = resolveThemeTokens(settings);
   const fonts = FONT_PAIRS[fontPair];
 
+  // Sprzątanie timera toasta przy odmontowaniu (brak setState po unmount).
+  useEffect(
+    () => () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    },
+    []
+  );
+
   function showToast(t: Toast) {
+    // Kasujemy poprzedni timer — inaczej szybki drugi toast bywa zamykany
+    // przedwcześnie przez timer poprzedniego.
+    if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast(t);
-    if (t) setTimeout(() => setToast(null), 4000);
+    if (t) toastTimer.current = setTimeout(() => setToast(null), 4000);
   }
 
   function save() {
@@ -83,6 +95,7 @@ export default function ThemeEditor({
     const ok = await confirm({
       title: "Przywrócić domyślny wygląd?",
       message: "Motyw, kolory i fonty wrócą do ustawień początkowych (granat + złoto, Inter + Playfair).",
+      danger: true,
     });
     if (!ok) return;
     startSave(async () => {
@@ -290,13 +303,14 @@ function PreviewPanel({
             <p className="text-xs text-[var(--muted)]">Tkanina · 3 rozmiary</p>
             <p className="text-sm font-bold text-[var(--color-gold-text)] mt-1">3 299 zł</p>
           </div>
-          {/* Przycisk */}
-          <button
-            type="button"
+          {/* Dekoracyjny przycisk makiety — nieinteraktywny (span), poza tabem
+              i pomijany przez czytniki (aria-hidden). */}
+          <span
+            aria-hidden="true"
             className="self-center px-5 py-2.5 bg-[var(--color-navy)] text-white text-xs uppercase tracking-widest rounded-full"
           >
             Przeglądaj kolekcję
-          </button>
+          </span>
         </div>
       </div>
     </div>

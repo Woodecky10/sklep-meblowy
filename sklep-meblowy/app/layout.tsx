@@ -52,8 +52,9 @@ const playfair = Playfair_Display({
 
 // Pary alternatywne dla /admin/wyglad. preload:false — przeglądarka pobiera
 // pliki fontu dopiero, gdy motyw faktycznie go używa (via --font-*-active);
-// preloadujemy tylko parę domyślną (inter/playfair wyżej). Lato i Cormorant
-// nie są variable fonts — wymagają jawnych wag (patrz docs next: font.md).
+// preloadujemy tylko parę domyślną (inter/playfair wyżej). Lato NIE jest
+// variable font → wymaga jawnych wag. Cormorant MA oś variable, ale podajemy
+// jawne wagi świadomie — ładujemy tylko 400/600/700 (patrz docs next: font.md).
 const lato = Lato({
   subsets: ["latin", "latin-ext"],
   weight: ["400", "700"],

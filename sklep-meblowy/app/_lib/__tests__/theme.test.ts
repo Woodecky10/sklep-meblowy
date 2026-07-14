@@ -100,6 +100,19 @@ describe("resolveThemeTokens — nadpisania z pochodnymi", () => {
     expect(dark.cardBg).toBe("#22304a");
     expect(relativeLuminance(dark.bg)).toBeLessThan(relativeLuminance(dark.cardBg));
   });
+
+  // Test kontrastu palet (wyżej) sprawdza ZAPISANE literały goldText, ale na
+  // produkcję trafia wynik resolveThemeTokens (goldText zawsze przeliczany).
+  // Tu asertujemy wartość FAKTYCZNIE emitowaną dla każdego presetu bez nadpisań.
+  it.each(Object.keys(THEME_PRESETS) as ThemePresetKey[])(
+    "%s: goldText po resolveThemeTokens (wartość emitowana) czytelny (>=4.5) w light i dark",
+    (key) => {
+      const { light, dark } = resolveThemeTokens({ ...DEFAULT_THEME_SETTINGS, preset: key });
+      expect(contrastRatio(light.goldText, light.bg)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(light.goldText, light.cardBg)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(dark.goldText, dark.bg)).toBeGreaterThanOrEqual(4.5);
+    }
+  );
 });
 
 describe("buildThemeCss", () => {
