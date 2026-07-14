@@ -7,6 +7,7 @@ import {
   CONTENT_BLOCK_DEFS,
   DEFAULT_HOME_BLOCKS,
   mergeHomeBlocks,
+  localizeBlock,
   type PageBlockRow,
 } from "@/app/_lib/blocks";
 
@@ -96,5 +97,80 @@ describe("mergeHomeBlocks", () => {
   it("ignoruje nieznane block_type (kompatybilność w przód)", () => {
     const out = mergeHomeBlocks([row({ block_type: "wideo" })]);
     expect(out.some((b) => b.block_type === "wideo")).toBe(false);
+  });
+});
+
+describe("localizeBlock — systemowe", () => {
+  it("PL bierze heading/subheading, DE per-pole z fallbackiem PL", () => {
+    const r = row({
+      block_type: "trust_bar",
+      content: { heading: "Dlaczego my?", heading_de: "Warum wir?", subheading: "MEBLE" },
+    });
+    const plB = localizeBlock(r, "pl")!;
+    const deB = localizeBlock(r, "de")!;
+    expect(plB).toMatchObject({ type: "trust_bar", heading: "Dlaczego my?", subheading: "MEBLE" });
+    expect(deB).toMatchObject({ heading: "Warum wir?", subheading: "MEBLE" });
+  });
+  it("brak klucza nagłówka = wyczyszczone (null), NIE fallback na słownik", () => {
+    const r = row({ block_type: "tiles", content: {} });
+    expect(localizeBlock(r, "pl")).toMatchObject({ heading: null, subheading: null });
+  });
+});
+
+describe("localizeBlock — treściowe", () => {
+  it("banner: pola per locale, layout waliduje się do left przy śmieciu", () => {
+    const r = row({
+      block_type: "banner",
+      content: {
+        heading: "Salon marzeń", heading_de: "Traumsalon",
+        body: "Opis", layout: "zle", image_url: "https://x/y.jpg",
+        cta_label: "Zobacz", cta_href: "/sklep",
+      },
+    });
+    const b = localizeBlock(r, "de")!;
+    expect(b).toMatchObject({
+      type: "banner",
+      content: { heading: "Traumsalon", body: "Opis", layout: "left", cta_label: "Zobacz", cta_href: "/sklep" },
+    });
+  });
+  it("gallery: odfiltrowuje wpisy bez url", () => {
+    const r = row({
+      block_type: "gallery",
+      content: { images: [{ url: "https://x/a.jpg", alt: "A" }, { alt: "bez url" }, "smiec"] },
+    });
+    const b = localizeBlock(r, "pl")!;
+    expect(b.type).toBe("gallery");
+    if (b.type === "gallery") expect(b.content.images).toEqual([{ url: "https://x/a.jpg", alt: "A" }]);
+  });
+  it("products: normalizuje source i limit (clamp 1..12, default 4)", () => {
+    const r = row({
+      block_type: "products",
+      content: { source: "collection", collection_slug: "lisbon", limit: 99 },
+    });
+    const b = localizeBlock(r, "pl")!;
+    if (b.type === "products") {
+      expect(b.content).toMatchObject({ source: "collection", collection_slug: "lisbon", limit: 12, product_ids: [] });
+    }
+    const bad = localizeBlock(row({ block_type: "products", content: { source: "x" } }), "pl")!;
+    if (bad.type === "products") expect(bad.content.source).toBe("manual");
+  });
+  it("faq/reviews: itemy z kompletem pól, DE per pole; puste odpadają", () => {
+    const r = row({
+      block_type: "faq",
+      content: { items: [
+        { question: "Q1", question_de: "F1", answer: "A1" },
+        { question: "", answer: "bez pytania" },
+      ] },
+    });
+    const b = localizeBlock(r, "de")!;
+    if (b.type === "faq") expect(b.content.items).toEqual([{ question: "F1", answer: "A1" }]);
+    const rv = localizeBlock(
+      row({ block_type: "reviews", content: { items: [{ quote: "Super!", author: "Anna" }] } }),
+      "pl"
+    )!;
+    if (rv.type === "reviews") expect(rv.content.items).toEqual([{ quote: "Super!", author: "Anna" }]);
+  });
+  it("nieznany typ → null", () => {
+    expect(localizeBlock(row({ block_type: "wideo" }), "pl")).toBeNull();
   });
 });

@@ -114,3 +114,152 @@ export function mergeHomeBlocks(rows: PageBlockRow[] | null): PageBlockRow[] {
     (a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id)
   );
 }
+
+// ── Lokalizacja ──────────────────────────────────────────────────────────
+export type BannerLayout = "left" | "right" | "background";
+export type LocalizedBannerContent = {
+  heading: string | null;
+  body: string | null;
+  image_url: string | null;
+  layout: BannerLayout;
+  cta_label: string | null;
+  cta_href: string | null;
+};
+export type LocalizedGalleryContent = {
+  heading: string | null;
+  images: { url: string; alt: string | null }[];
+};
+export type LocalizedProductsContent = {
+  heading: string | null;
+  source: "manual" | "collection" | "category";
+  product_ids: string[];
+  collection_slug: string | null;
+  category_slug: string | null;
+  limit: number;
+};
+export type LocalizedFaqContent = {
+  heading: string | null;
+  items: { question: string; answer: string }[];
+};
+export type LocalizedReviewsContent = {
+  heading: string | null;
+  items: { quote: string; author: string | null }[];
+};
+export type LocalizedSystemBlock = {
+  id: string;
+  visible: boolean;
+  type: SystemBlockType;
+  heading: string | null;
+  subheading: string | null;
+};
+export type LocalizedContentBlock = { id: string; visible: boolean } & (
+  | { type: "banner"; content: LocalizedBannerContent }
+  | { type: "gallery"; content: LocalizedGalleryContent }
+  | { type: "products"; content: LocalizedProductsContent }
+  | { type: "faq"; content: LocalizedFaqContent }
+  | { type: "reviews"; content: LocalizedReviewsContent }
+);
+export type LocalizedBlock = LocalizedSystemBlock | LocalizedContentBlock;
+
+// Bezpieczne czytanie z jsonb: string niepusty albo null.
+function s(v: unknown): string | null {
+  return typeof v === "string" && v.trim().length > 0 ? v : null;
+}
+
+// DE per pole z fallbackiem PL (idiom repo; NIE ?? na całości).
+function pickLoc(content: Record<string, unknown>, field: string, locale: Locale): string | null {
+  const deVal = s(content[`${field}_de`]);
+  return locale === "de" && deVal ? deVal : s(content[field]);
+}
+
+function clampLimit(v: unknown): number {
+  const n = typeof v === "number" && Number.isFinite(v) ? Math.floor(v) : 4;
+  return Math.min(12, Math.max(1, n));
+}
+
+export function localizeBlock(row: PageBlockRow, locale: Locale): LocalizedBlock | null {
+  const c = row.content ?? {};
+  const base = { id: row.id, visible: row.visible };
+  if (isSystemBlockType(row.block_type)) {
+    return {
+      ...base,
+      type: row.block_type,
+      heading: pickLoc(c, "heading", locale),
+      subheading: pickLoc(c, "subheading", locale),
+    };
+  }
+  switch (row.block_type) {
+    case "banner": {
+      const rawLayout = c.layout;
+      const layout: BannerLayout =
+        rawLayout === "right" || rawLayout === "background" ? rawLayout : "left";
+      return {
+        ...base,
+        type: "banner",
+        content: {
+          heading: pickLoc(c, "heading", locale),
+          body: pickLoc(c, "body", locale),
+          image_url: s(c.image_url),
+          layout,
+          cta_label: pickLoc(c, "cta_label", locale),
+          cta_href: s(c.cta_href),
+        },
+      };
+    }
+    case "gallery": {
+      const images = (Array.isArray(c.images) ? c.images : [])
+        .map((img) => {
+          if (typeof img !== "object" || img === null) return null;
+          const o = img as Record<string, unknown>;
+          const url = s(o.url);
+          return url ? { url, alt: s(o.alt) } : null;
+        })
+        .filter((x): x is { url: string; alt: string | null } => x !== null);
+      return { ...base, type: "gallery", content: { heading: pickLoc(c, "heading", locale), images } };
+    }
+    case "products": {
+      const source =
+        c.source === "collection" || c.source === "category" ? c.source : "manual";
+      const product_ids = (Array.isArray(c.product_ids) ? c.product_ids : []).filter(
+        (x): x is string => typeof x === "string" && x.length > 0
+      );
+      return {
+        ...base,
+        type: "products",
+        content: {
+          heading: pickLoc(c, "heading", locale),
+          source,
+          product_ids,
+          collection_slug: s(c.collection_slug),
+          category_slug: s(c.category_slug),
+          limit: clampLimit(c.limit),
+        },
+      };
+    }
+    case "faq": {
+      const items = (Array.isArray(c.items) ? c.items : [])
+        .map((it) => {
+          if (typeof it !== "object" || it === null) return null;
+          const o = it as Record<string, unknown>;
+          const question = pickLoc(o, "question", locale);
+          const answer = pickLoc(o, "answer", locale);
+          return question && answer ? { question, answer } : null;
+        })
+        .filter((x): x is { question: string; answer: string } => x !== null);
+      return { ...base, type: "faq", content: { heading: pickLoc(c, "heading", locale), items } };
+    }
+    case "reviews": {
+      const items = (Array.isArray(c.items) ? c.items : [])
+        .map((it) => {
+          if (typeof it !== "object" || it === null) return null;
+          const o = it as Record<string, unknown>;
+          const quote = pickLoc(o, "quote", locale);
+          return quote ? { quote, author: s(o.author) } : null;
+        })
+        .filter((x): x is { quote: string; author: string | null } => x !== null);
+      return { ...base, type: "reviews", content: { heading: pickLoc(c, "heading", locale), items } };
+    }
+    default:
+      return null; // nieznany typ — fail-open (kompatybilność w przód)
+  }
+}
