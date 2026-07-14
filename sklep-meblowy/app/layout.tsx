@@ -1,6 +1,14 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Inter, Playfair_Display } from "next/font/google";
+import {
+  Inter,
+  Playfair_Display,
+  Lato,
+  Cormorant_Garamond,
+  Montserrat,
+  Nunito_Sans,
+  Lora,
+} from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "./_components/layout/ThemeProvider";
 import TopBar from "./_components/layout/TopBar";
@@ -20,6 +28,8 @@ import { getEurRate } from "@/app/_lib/store-settings";
 import { RateProvider } from "@/app/_lib/rate-context";
 import { getFabricDeMap } from "@/app/_lib/fabrics";
 import { FabricLabelProvider } from "@/app/_lib/fabric-context";
+import { getThemeSettings } from "@/app/_lib/theme-settings";
+import { buildThemeCss } from "@/app/_lib/theme";
 
 const inter = Inter({
   subsets: ["latin", "latin-ext"],
@@ -38,6 +48,47 @@ const playfair = Playfair_Display({
   // domyślnie true od 13.2 — Next.js auto-generuje fallback z size-adjust.
   display: "swap",
   fallback: ["Georgia", "Times New Roman", "serif"],
+});
+
+// Pary alternatywne dla /admin/wyglad. preload:false — przeglądarka pobiera
+// pliki fontu dopiero, gdy motyw faktycznie go używa (via --font-*-active);
+// preloadujemy tylko parę domyślną (inter/playfair wyżej). Lato i Cormorant
+// nie są variable fonts — wymagają jawnych wag (patrz docs next: font.md).
+const lato = Lato({
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "700"],
+  variable: "--font-lato",
+  display: "swap",
+  preload: false,
+});
+
+const cormorant = Cormorant_Garamond({
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "600", "700"],
+  variable: "--font-cormorant",
+  display: "swap",
+  preload: false,
+});
+
+const montserrat = Montserrat({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-montserrat",
+  display: "swap",
+  preload: false,
+});
+
+const nunitoSans = Nunito_Sans({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-nunito",
+  display: "swap",
+  preload: false,
+});
+
+const lora = Lora({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-lora",
+  display: "swap",
+  preload: false,
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -75,13 +126,18 @@ export default async function RootLayout({
   const locale = await getLocale();
   const eurRate = await getEurRate();
   const fabricMap = await getFabricDeMap();
+  const themeSettings = await getThemeSettings();
   return (
     <html
       lang={locale}
-      className={`${inter.variable} ${playfair.variable}`}
+      className={`${inter.variable} ${playfair.variable} ${lato.variable} ${cormorant.variable} ${montserrat.variable} ${nunitoSans.variable} ${lora.variable}`}
       suppressHydrationWarning
     >
       <body className="min-h-screen flex flex-col antialiased">
+        {/* Motyw z /admin/wyglad — nadpisuje defaulty z globals.css
+            specyficznością :root:root. SSR = zero mignięcia. CSP: style-src
+            ma 'unsafe-inline' (csp.ts), nonce niepotrzebny. */}
+        <style dangerouslySetInnerHTML={{ __html: buildThemeCss(themeSettings) }} />
         <ThemeProvider nonce={nonce}>
           <RateProvider rate={eurRate}>
             <FabricLabelProvider map={fabricMap}>

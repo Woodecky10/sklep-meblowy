@@ -11,8 +11,12 @@
   --color-gold-light: #e0c070;
   --color-cream: #ece4d7;
 
-  --font-sans: var(--font-inter);
-  --font-display: var(--font-playfair);
+  /* Pośrednie zmienne -active: ustawia je blok motywu z layoutu
+     (/admin/wyglad). Fallback = dotychczasowa para Inter+Playfair.
+     @theme inline wkleja tę wartość do utilities font-sans/font-display,
+     więc podmiana -active działa w runtime bez rebuild-u. */
+  --font-sans: var(--font-sans-active, var(--font-inter));
+  --font-display: var(--font-display-active, var(--font-playfair));
 }
 
 :root {
