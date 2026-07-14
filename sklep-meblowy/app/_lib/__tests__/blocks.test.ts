@@ -8,6 +8,7 @@ import {
   DEFAULT_HOME_BLOCKS,
   mergeHomeBlocks,
   localizeBlock,
+  validateBlockContent,
   type PageBlockRow,
 } from "@/app/_lib/blocks";
 
@@ -172,5 +173,65 @@ describe("localizeBlock — treściowe", () => {
   });
   it("nieznany typ → null", () => {
     expect(localizeBlock(row({ block_type: "wideo" }), "pl")).toBeNull();
+  });
+});
+
+describe("validateBlockContent", () => {
+  it("banner: wymaga nagłówka; CTA wymaga pary etykieta+link; link tylko / lub https://", () => {
+    expect(validateBlockContent("banner", { heading: "  " }).ok).toBe(false);
+    expect(
+      validateBlockContent("banner", { heading: "H", cta_label: "Zobacz" }).ok
+    ).toBe(false);
+    expect(
+      validateBlockContent("banner", { heading: "H", cta_label: "Zobacz", cta_href: "javascript:x" }).ok
+    ).toBe(false);
+    const ok = validateBlockContent("banner", {
+      heading: " H ", heading_de: "", body: "B", layout: "right",
+      cta_label: "Zobacz", cta_href: "/sklep", image_url: "https://x/y.jpg",
+    });
+    expect(ok.ok).toBe(true);
+    if (ok.ok) {
+      expect(ok.content.heading).toBe("H");        // trim
+      expect(ok.content.heading_de).toBeUndefined(); // puste pola nie zaśmiecają jsonb
+      expect(ok.content.layout).toBe("right");
+    }
+  });
+  it("banner: zły layout odrzucony", () => {
+    expect(validateBlockContent("banner", { heading: "H", layout: "diag" }).ok).toBe(false);
+  });
+  it("gallery: wymaga ≥1 zdjęcia, max 24, url https:// lub /", () => {
+    expect(validateBlockContent("gallery", { images: [] }).ok).toBe(false);
+    expect(
+      validateBlockContent("gallery", { images: [{ url: "ftp://x" }] }).ok
+    ).toBe(false);
+    const many = { images: Array.from({ length: 25 }, (_, i) => ({ url: `https://x/${i}.jpg` })) };
+    expect(validateBlockContent("gallery", many).ok).toBe(false);
+    const ok = validateBlockContent("gallery", {
+      heading: "G", images: [{ url: "https://x/a.jpg", alt: " A " }],
+    });
+    expect(ok.ok).toBe(true);
+    if (ok.ok) expect((ok.content.images as { alt?: string }[])[0].alt).toBe("A");
+  });
+  it("products: manual wymaga ≥1 id (max 12); collection/category wymagają sluga", () => {
+    expect(validateBlockContent("products", { source: "manual", product_ids: [] }).ok).toBe(false);
+    expect(validateBlockContent("products", { source: "collection" }).ok).toBe(false);
+    const ok = validateBlockContent("products", {
+      heading: "P", source: "category", category_slug: "sofy", limit: 99,
+    });
+    expect(ok.ok).toBe(true);
+    if (ok.ok) expect(ok.content.limit).toBe(12); // clamp
+  });
+  it("faq/reviews: wymaga ≥1 kompletnego itemu, max 20; puste itemy czyszczone", () => {
+    expect(validateBlockContent("faq", { items: [{ question: "Q" }] }).ok).toBe(false);
+    const ok = validateBlockContent("faq", {
+      items: [{ question: " Q ", answer: "A" }, { question: "", answer: "" }],
+    });
+    expect(ok.ok).toBe(true);
+    if (ok.ok) expect(ok.content.items).toEqual([{ question: "Q", answer: "A" }]);
+    expect(validateBlockContent("reviews", { items: [] }).ok).toBe(false);
+    expect(validateBlockContent("reviews", { items: [{ quote: "Ok!", author: "" }] }).ok).toBe(true);
+  });
+  it("odrzuca nie-obiekt", () => {
+    expect(validateBlockContent("banner", "zupa").ok).toBe(false);
   });
 });

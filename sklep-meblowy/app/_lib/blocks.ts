@@ -263,3 +263,157 @@ export function localizeBlock(row: PageBlockRow, locale: Locale): LocalizedBlock
       return null; // nieznany typ — fail-open (kompatybilność w przód)
   }
 }
+
+// ── Walidacja treści (server actions) ────────────────────────────────────
+// Normalizuje treść z formularza admina do czystego jsonb: trim, obcięcia,
+// puste pola pomijane (bez kluczy-śmieci), itemy bez kompletu pól odpadają.
+// Komunikaty PO POLSKU — widzi je administratorka w toaście.
+type ValidationResult =
+  | { ok: true; content: Record<string, unknown> }
+  | { ok: false; error: string };
+
+const MAX_SHORT = 200;   // nagłówki, etykiety, autorzy
+const MAX_LONG = 2000;   // body, odpowiedzi, cytaty
+const MAX_IMAGES = 24;
+const MAX_ITEMS = 20;
+const MAX_PRODUCTS = 12;
+
+function cleanStr(v: unknown, max: number): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const t = v.trim().slice(0, max);
+  return t.length > 0 ? t : undefined;
+}
+function isSafeHref(href: string): boolean {
+  return href.startsWith("/") || href.startsWith("https://");
+}
+// Para PL+DE → obiekt tylko z istniejącymi kluczami.
+function locPair(o: Record<string, unknown>, field: string, max: number) {
+  const out: Record<string, string> = {};
+  const plV = cleanStr(o[field], max);
+  const deV = cleanStr(o[`${field}_de`], max);
+  if (plV) out[field] = plV;
+  if (deV) out[`${field}_de`] = deV;
+  return out;
+}
+
+export function validateBlockContent(
+  type: ContentBlockType,
+  raw: unknown
+): ValidationResult {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return { ok: false, error: "Nieprawidłowa treść sekcji" };
+  }
+  const o = raw as Record<string, unknown>;
+  switch (type) {
+    case "banner": {
+      const heading = cleanStr(o.heading, MAX_SHORT);
+      if (!heading) return { ok: false, error: "Nagłówek jest wymagany" };
+      const layout = o.layout ?? "left";
+      if (layout !== "left" && layout !== "right" && layout !== "background") {
+        return { ok: false, error: "Nieprawidłowy układ banera" };
+      }
+      const ctaLabel = cleanStr(o.cta_label, MAX_SHORT);
+      const ctaLabelDe = cleanStr(o.cta_label_de, MAX_SHORT);
+      const ctaHref = cleanStr(o.cta_href, 500);
+      if ((ctaLabel || ctaLabelDe) && !ctaHref) {
+        return { ok: false, error: "Przycisk ma etykietę, ale brakuje linku" };
+      }
+      if (ctaHref && !isSafeHref(ctaHref)) {
+        return { ok: false, error: "Link przycisku musi zaczynać się od / albo https://" };
+      }
+      if (ctaHref && !ctaLabel) {
+        return { ok: false, error: "Przycisk ma link, ale brakuje etykiety" };
+      }
+      const imageUrl = cleanStr(o.image_url, 1000);
+      if (imageUrl && !isSafeHref(imageUrl)) {
+        return { ok: false, error: "Adres zdjęcia musi zaczynać się od / albo https://" };
+      }
+      const headingPair = locPair(o, "heading", MAX_SHORT);
+      return {
+        ok: true,
+        content: {
+          heading,
+          ...(headingPair.heading_de ? { heading_de: headingPair.heading_de } : {}),
+          ...locPair(o, "body", MAX_LONG),
+          ...(imageUrl ? { image_url: imageUrl } : {}),
+          layout,
+          ...(ctaLabel ? { cta_label: ctaLabel } : {}),
+          ...(ctaLabelDe ? { cta_label_de: ctaLabelDe } : {}),
+          ...(ctaHref ? { cta_href: ctaHref } : {}),
+        },
+      };
+    }
+    case "gallery": {
+      const rawImages = Array.isArray(o.images) ? o.images : [];
+      const images = rawImages
+        .map((img) => {
+          if (typeof img !== "object" || img === null) return null;
+          const io = img as Record<string, unknown>;
+          const url = cleanStr(io.url, 1000);
+          if (!url || !isSafeHref(url)) return null;
+          const alt = cleanStr(io.alt, MAX_SHORT);
+          return { url, ...(alt ? { alt } : {}) };
+        })
+        .filter((x): x is { url: string; alt?: string } => x !== null);
+      if (images.length === 0) return { ok: false, error: "Dodaj przynajmniej jedno zdjęcie" };
+      if (images.length > MAX_IMAGES) {
+        return { ok: false, error: `Maksymalnie ${MAX_IMAGES} zdjęć w galerii` };
+      }
+      return { ok: true, content: { ...locPair(o, "heading", MAX_SHORT), images } };
+    }
+    case "products": {
+      const source =
+        o.source === "collection" || o.source === "category" ? o.source : "manual";
+      const content: Record<string, unknown> = {
+        ...locPair(o, "heading", MAX_SHORT),
+        source,
+        limit: clampLimit(o.limit),
+      };
+      if (source === "manual") {
+        const ids = (Array.isArray(o.product_ids) ? o.product_ids : [])
+          .filter((x): x is string => typeof x === "string" && x.length > 0)
+          .slice(0, MAX_PRODUCTS);
+        if (ids.length === 0) return { ok: false, error: "Wybierz przynajmniej jeden produkt" };
+        content.product_ids = ids;
+      } else if (source === "collection") {
+        const slug = cleanStr(o.collection_slug, MAX_SHORT);
+        if (!slug) return { ok: false, error: "Wybierz kolekcję" };
+        content.collection_slug = slug;
+      } else {
+        const slug = cleanStr(o.category_slug, MAX_SHORT);
+        if (!slug) return { ok: false, error: "Wybierz kategorię" };
+        content.category_slug = slug;
+      }
+      return { ok: true, content };
+    }
+    case "faq":
+    case "reviews": {
+      const isFaq = type === "faq";
+      const rawItems = Array.isArray(o.items) ? o.items : [];
+      const items = rawItems
+        .map((it) => {
+          if (typeof it !== "object" || it === null) return null;
+          const io = it as Record<string, unknown>;
+          if (isFaq) {
+            const q = locPair(io, "question", MAX_SHORT);
+            const a = locPair(io, "answer", MAX_LONG);
+            return q.question && a.answer ? { ...q, ...a } : null;
+          }
+          const quote = locPair(io, "quote", MAX_LONG);
+          const author = cleanStr(io.author, MAX_SHORT);
+          return quote.quote ? { ...quote, ...(author ? { author } : {}) } : null;
+        })
+        .filter((x): x is Record<string, string> => x !== null);
+      if (items.length === 0) {
+        return {
+          ok: false,
+          error: isFaq ? "Dodaj przynajmniej jedno pytanie z odpowiedzią" : "Dodaj przynajmniej jedną opinię",
+        };
+      }
+      if (items.length > MAX_ITEMS) {
+        return { ok: false, error: `Maksymalnie ${MAX_ITEMS} pozycji` };
+      }
+      return { ok: true, content: { ...locPair(o, "heading", MAX_SHORT), items } };
+    }
+  }
+}
