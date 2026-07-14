@@ -46,3 +46,19 @@ test("ponowny klik aktywnej opcji sortowania — pending znika", async ({ page }
   // pending może się pojawić, ale MUSI zniknąć po zakończeniu transition
   await expect(page.locator('div[aria-busy="true"]')).toHaveCount(0, { timeout: 5000 });
 });
+
+// Krok A (2026-07-14): filtr wymiarów — wpisanie zakresu nawiguję po debounce
+// (500 ms), URL niesie ?szer_od=, pending znika po zatwierdzeniu. Pill "Wymiary"
+// renderuje się tylko gdy jakiś produkt ma wymiary (dane żywej bazy) — gdy
+// brak, test się pomija zamiast fałszywie failować.
+test("filtr wymiarów — zakres trafia do URL, pending znika", async ({ page }) => {
+  await page.goto("/sklep");
+  const pill = page.getByRole("button", { name: "Wymiary", exact: false });
+  test.skip((await pill.count()) === 0, "brak produktów z wymiarami w bazie");
+  await pill.first().click();
+  // Jedyne widoczne inputy "od…" to panel wymiarów (panel ceny nie jest
+  // zamontowany, gdy zamknięty) — pierwszy input = "Szerokość od".
+  await page.getByPlaceholder(/^od/).first().fill("50");
+  await expect(page).toHaveURL(/szer_od=50/, { timeout: 10_000 });
+  await expect(page.locator('div[aria-busy="true"]')).toHaveCount(0, { timeout: 10_000 });
+});
