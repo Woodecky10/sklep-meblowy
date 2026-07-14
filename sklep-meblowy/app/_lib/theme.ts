@@ -103,7 +103,7 @@ export function isThemePresetKey(v: string): v is ThemePresetKey {
 
 export type ThemeOverrides = { navy?: string; gold?: string; cream?: string };
 
-const OVERRIDE_KEYS = ["navy", "gold", "cream"] as const;
+export const OVERRIDE_KEYS = ["navy", "gold", "cream"] as const;
 
 // Pary fontów: wartości = referencje do zmiennych next/font z layoutu.
 export const FONT_PAIRS = {
