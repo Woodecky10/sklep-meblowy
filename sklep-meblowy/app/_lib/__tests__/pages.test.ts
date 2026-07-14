@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readdirSync, statSync } from "node:fs";
+import path from "node:path";
 import {
   RESERVED_SLUGS,
   PAGE_SLUG_RE,
@@ -29,6 +31,13 @@ describe("slugifyTitle", () => {
   });
   it("tytuł bez znaków alfanumerycznych daje pusty slug", () => {
     expect(slugifyTitle("***")).toBe("");
+  });
+  it("obcina do 80 znaków bez wiszącego myślnika", () => {
+    const title = "a".repeat(79) + " " + "b".repeat(30);
+    const slug = slugifyTitle(title);
+    expect(slug.length).toBeLessThanOrEqual(80);
+    expect(slug.endsWith("-")).toBe(false);
+    expect(slug).toBe("a".repeat(79));
   });
 });
 
@@ -96,5 +105,34 @@ describe("canViewPage", () => {
     expect(canViewPage(true, true)).toBe(true);
     expect(canViewPage(false, true)).toBe(true);
     expect(canViewPage(false, false)).toBe(false);
+  });
+});
+
+describe("RESERVED_SLUGS — drift-guard tras top-level", () => {
+  it("każdy statyczny segment app/ (w tym grupy) jest zarezerwowany", () => {
+    const appDir = path.join(process.cwd(), "app");
+    const topLevel = readdirSync(appDir).filter((name) => {
+      if (name.startsWith("_") || name.startsWith("[")) return false;
+      return statSync(path.join(appDir, name)).isDirectory();
+    });
+    const segments: string[] = [];
+    for (const name of topLevel) {
+      if (name.startsWith("(") && name.endsWith(")")) {
+        // Grupa tras (np. (legal)) nie zmienia URL — liczą się jej dzieci.
+        for (const child of readdirSync(path.join(appDir, name))) {
+          if (statSync(path.join(appDir, name, child)).isDirectory()) {
+            segments.push(child);
+          }
+        }
+      } else {
+        segments.push(name);
+      }
+    }
+    for (const seg of segments) {
+      expect(
+        RESERVED_SLUGS.has(seg),
+        `Segment "app/${seg}" nie jest w RESERVED_SLUGS (pages.ts) — nowa trasa statyczna przykryłaby podstronę o tym slugu`
+      ).toBe(true);
+    }
   });
 });

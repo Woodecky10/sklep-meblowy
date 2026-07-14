@@ -20,9 +20,12 @@ create table if not exists public.pages (
 
 alter table public.pages enable row level security;
 
+-- Odczyt publiczny TYLKO opublikowanych — szkice niewidoczne anonimowym
+-- kluczem przez REST. Aplikacja (render, sitemap, admin, podgląd szkicu)
+-- czyta service_role (omija RLS), więc zero wpływu na jej ścieżki.
 drop policy if exists pages_read on public.pages;
 create policy pages_read on public.pages
-  for select using (true);
+  for select using (published);
 
 revoke insert, update, delete on public.pages from anon, authenticated;
 
@@ -33,3 +36,15 @@ alter table public.page_blocks
 alter table public.page_blocks
   add constraint page_blocks_page_id_fkey
   foreign key (page_id) references public.pages(id) on delete cascade;
+
+-- Zacieśnienie z final review kroku C: bloki SZKICÓW podstron też poza
+-- anonimowym odczytem REST (bloki home: page_id is null — bez zmian).
+drop policy if exists page_blocks_read on public.page_blocks;
+create policy page_blocks_read on public.page_blocks
+  for select using (
+    page_id is null
+    or exists (
+      select 1 from public.pages p
+      where p.id = page_blocks.page_id and p.published
+    )
+  );
