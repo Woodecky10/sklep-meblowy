@@ -1,20 +1,32 @@
-import { getAllHomeSections } from "@/app/_lib/home-sections";
+import { getAllHomeBlocksAdmin } from "@/app/_lib/blocks";
 import { getAllTrustItems } from "@/app/_lib/trust-items";
 import { getAllSiteTexts } from "@/app/_lib/site-texts";
-import HomeSectionsEditor from "./HomeSectionsEditor";
+import { getAvailableProductsForFeatured } from "@/app/_lib/featured";
+import { getAllCollections } from "@/app/_lib/collections";
+import { getCategories } from "@/app/_lib/categories";
+import BlocksEditor from "./BlocksEditor";
 
 // Panel admina jest PL-only. Guard admina w layoucie; akcje wołają requireAdmin().
 export default async function AdminHomePageSettings() {
-  const [sections, trustItems, siteTexts] = await Promise.all([
-    getAllHomeSections(),
-    getAllTrustItems(),
-    getAllSiteTexts(),
-  ]);
+  const [blocks, trustItems, siteTexts, products, collections, categories] =
+    await Promise.all([
+      getAllHomeBlocksAdmin(),
+      getAllTrustItems(),
+      getAllSiteTexts(),
+      getAvailableProductsForFeatured(),
+      getAllCollections(),
+      getCategories(),
+    ]);
   return (
-    <HomeSectionsEditor
-      initialSections={sections}
+    <BlocksEditor
+      initialBlocks={blocks}
       initialTrustItems={trustItems}
       initialSiteTexts={siteTexts}
+      picker={{
+        products: products.map((p) => ({ id: p.id, name: p.name })),
+        collections: collections.map((c) => ({ slug: c.slug, label: c.label })),
+        categories: categories.map((c) => ({ slug: c.slug, label: c.label })),
+      }}
     />
   );
 }
