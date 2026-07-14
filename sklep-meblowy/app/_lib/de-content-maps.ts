@@ -99,7 +99,7 @@ export const FEATURE_VALUE_DE: Record<string, string> = {
 export const VARIANT_OPTION_DE: Record<string, string> = {
   Kolor: "Farbe",
   "POWIERZCHNIA SPANIA": "LIEGEFLÄCHE",
-  ROZMIAR: "Größe",
+  ROZMIAR: "GRÖSSE",
   STELAŻ: "GESTELL",
   STRONA: "SEITE",
   "STRONA MEBLA": "SEITE DES MÖBELS",

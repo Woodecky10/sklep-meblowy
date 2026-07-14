@@ -95,8 +95,8 @@ describe("collectOptionFacets", () => {
       { variants: v([{ name: "Rozmiar", values: ["140x200"], filterable: true }]) },
       { variants: v([{ name: "ROZMIAR", values: ["160x200"], filterable: true }]) },
     ];
-    // "Rozmiar" nie ma wpisu w mapie, "ROZMIAR" → "GRÖSSE" → display "Größe"
-    expect(collectOptionFacets(rows)[0].name_de).toBe("Größe");
+    // "Rozmiar" nie ma wpisu w mapie, "ROZMIAR" → "GRÖSSE" (wartość mapy bez transformacji)
+    expect(collectOptionFacets(rows)[0].name_de).toBe("GRÖSSE");
   });
 
   it("etykieta wartości: override admina wygrywa, DE z VARIANT_VALUE_DE", () => {
@@ -137,7 +137,7 @@ describe("localizeOptionFacets", () => {
     {
       slug: "rozmiar",
       name: "Rozmiar",
-      name_de: "Größe",
+      name_de: "GRÖSSE",
       values: [
         { value: "DREWNIANY", label: "Drewniany", label_de: "HOLZ" },
         { value: "140x200", label: "140x200", label_de: null },
@@ -154,7 +154,7 @@ describe("localizeOptionFacets", () => {
   });
   it("DE: name_de/label_de z fallbackiem PL", () => {
     const [g] = localizeOptionFacets(groups, "de");
-    expect(g.label).toBe("Größe");
+    expect(g.label).toBe("GRÖSSE");
     expect(g.values).toEqual([
       { value: "DREWNIANY", label: "HOLZ" },
       { value: "140x200", label: "140x200" },

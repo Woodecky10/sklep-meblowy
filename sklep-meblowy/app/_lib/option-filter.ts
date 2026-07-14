@@ -70,8 +70,10 @@ export function collectOptionFacets(
         groups.set(slug, group);
       }
       if (group.name_de === null) {
+        // Wartość mapy bez transformacji — karta produktu na /de pokazuje
+        // te same nazwy (np. "GRÖSSE"), facet ma być z nią spójny.
         const de = VARIANT_OPTION_DE[opt.name.trim()];
-        if (de) group.name_de = displayOptionName(de);
+        if (de) group.name_de = de;
       }
       const overrides = row.variants?.overrides?.value_labels?.[opt.name];
       for (const raw of opt.values) {
