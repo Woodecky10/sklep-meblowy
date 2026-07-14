@@ -212,17 +212,22 @@ export async function addContentBlock(formData: FormData): Promise<ActionResult>
   if (typeof type !== "string" || !isContentBlockType(type)) {
     return { ok: false, error: "Nieznany typ sekcji" };
   }
+  // Krok C: blok może trafić na podstronę (page_id z FormData); brak/niepoprawny → home.
+  const pageIdRaw = formData.get("page_id");
+  const pageId =
+    typeof pageIdRaw === "string" && UUID_RE.test(pageIdRaw) ? pageIdRaw : null;
   const supabase = await createAdminClient();
-  const { data: maxRows } = await supabase
+  let maxQuery = supabase
     .from("page_blocks")
     .select("sort_order")
-    .is("page_id", null)
     .order("sort_order", { ascending: false })
     .limit(1);
+  maxQuery = pageId ? maxQuery.eq("page_id", pageId) : maxQuery.is("page_id", null);
+  const { data: maxRows } = await maxQuery;
   const nextOrder =
     ((maxRows?.[0] as { sort_order: number } | undefined)?.sort_order ?? -1) + 1;
   const { error } = await supabase.from("page_blocks").insert({
-    page_id: null,
+    page_id: pageId,
     block_type: type,
     sort_order: nextOrder,
     visible: false, // nowa sekcja ukryta — koleżanka wypełnia treść i włącza
