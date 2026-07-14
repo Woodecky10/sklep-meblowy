@@ -4,6 +4,7 @@ import { COMPANY } from "@/app/_lib/company";
 import { getCategories } from "@/app/_lib/categories";
 import { getAllCollections } from "@/app/_lib/collections";
 import { sitemapAlternates } from "@/app/_lib/sitemap-i18n";
+import { getPagesForSitemap } from "@/app/_lib/pages-server";
 
 // Sitemap dla Google. Renderowany przy każdym żądaniu (no caching) —
 // na razie OK przy małej liczbie produktów. Jeśli kiedyś będzie 10k+
@@ -107,7 +108,36 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       return entries;
     });
 
-    return [...staticRoutes, ...categoryRoutes, ...collectionRoutes, ...productRoutes];
+    // Podstrony (krok C): tylko opublikowane; DE tylko przy przetłumaczonym
+    // tytule (hasDe) — spójnie z wpisami produktów.
+    const pages = await getPagesForSitemap();
+    const pageRoutes: MetadataRoute.Sitemap = pages.flatMap((p) => {
+      const plPath = `/${p.slug}`;
+      const hasDe = !!p.title_de && p.title_de.trim().length > 0;
+      const lastModified = new Date(p.updated_at);
+      const alternates = sitemapAlternates(plPath, { hasDe }, BASE);
+      const entries: MetadataRoute.Sitemap = [
+        {
+          url: `${BASE}${plPath}`,
+          lastModified,
+          changeFrequency: "monthly",
+          priority: 0.5,
+          alternates,
+        },
+      ];
+      if (hasDe) {
+        entries.push({
+          url: `${BASE}/de${plPath}`,
+          lastModified,
+          changeFrequency: "monthly",
+          priority: 0.5,
+          alternates,
+        });
+      }
+      return entries;
+    });
+
+    return [...staticRoutes, ...categoryRoutes, ...collectionRoutes, ...productRoutes, ...pageRoutes];
   } catch (err) {
     // Kontrolne błędy Next (dynamic rendering, redirect itp.) mają lecieć
     // dalej — łapiemy wyłącznie realne awarie danych.
