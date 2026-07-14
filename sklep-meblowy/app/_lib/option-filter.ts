@@ -27,7 +27,7 @@ export function optionParamSlug(name: string): string {
   return normalizeOptionName(name)
     .replace(/ł/g, "l")
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
