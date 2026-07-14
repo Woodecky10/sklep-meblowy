@@ -3,7 +3,7 @@
 // wzorzec fabric-filter.ts. Nazwy opcji to wolne stringi admina z mieszanym
 // casingiem (ROZMIAR/Rozmiar), więc grupujemy po znormalizowanej nazwie.
 
-import type { ProductVariants } from "./types";
+import type { ProductVariants, ProductDimensions } from "./types";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE } from "./de-content-maps";
 import type { Locale } from "./i18n";
 
@@ -122,4 +122,107 @@ export function localizeOptionFacets(
       label: de && v.label_de ? v.label_de : v.label,
     })),
   }));
+}
+
+// selected: slug → wybrane wartości. Produkt pasuje, gdy dla KAŻDEJ grupy ma
+// opcję o tym slugu z ≥1 wybraną wartością (OR w grupie, AND między grupami —
+// jak kolor × tkanina). Flaga filterable NIE wpływa na dopasowanie (facety
+// i tak nie pokażą niewłączonych filtrów); brak opcji = brak dopasowania
+// (spójnie z filtrem tkaniny).
+export function productMatchesOptionFilters(
+  variants: ProductVariants | null | undefined,
+  selected: Record<string, string[]>
+): boolean {
+  for (const [slug, wanted] of Object.entries(selected)) {
+    if (wanted.length === 0) continue;
+    const values = new Set<string>();
+    for (const opt of variants?.options ?? []) {
+      if (optionParamSlug(opt.name) !== slug) continue;
+      for (const value of opt.values) values.add(value.trim());
+    }
+    if (!wanted.some((w) => values.has(w))) return false;
+  }
+  return true;
+}
+
+export type DimensionRanges = {
+  widthMin?: number;
+  widthMax?: number;
+  depthMin?: number;
+  depthMax?: number;
+  heightMin?: number;
+  heightMax?: number;
+};
+
+export function hasActiveDimensionRanges(ranges: DimensionRanges): boolean {
+  return Object.values(ranges).some((v) => typeof v === "number");
+}
+
+// Produkt bez wymiarów odpada przy aktywnym zakresie (brak danych = brak
+// dopasowania, jak tkanina). Uszkodzone/częściowe dane z JSONB traktujemy
+// jak brak wymiaru.
+export function productMatchesDimensions(
+  dimensions: ProductDimensions | null | undefined,
+  ranges: DimensionRanges
+): boolean {
+  if (!hasActiveDimensionRanges(ranges)) return true;
+  if (!dimensions) return false;
+  const checks: [number | undefined, number | undefined, unknown][] = [
+    [ranges.widthMin, ranges.widthMax, dimensions.width],
+    [ranges.depthMin, ranges.depthMax, dimensions.depth],
+    [ranges.heightMin, ranges.heightMax, dimensions.height],
+  ];
+  for (const [min, max, actual] of checks) {
+    const bounded = typeof min === "number" || typeof max === "number";
+    if (!bounded) continue;
+    if (typeof actual !== "number" || !Number.isFinite(actual)) return false;
+    if (typeof min === "number" && actual < min) return false;
+    if (typeof max === "number" && actual > max) return false;
+  }
+  return true;
+}
+
+export type DimensionBounds = {
+  width: { min: number; max: number } | null;
+  depth: { min: number; max: number } | null;
+  height: { min: number; max: number } | null;
+};
+
+// Min/max wymiarów aktywnych produktów — granice-podpowiedzi pól zakresu
+// w FilterBarze. null = żaden produkt nie ma tego wymiaru.
+export function collectDimensionBounds(
+  rows: { dimensions: ProductDimensions | null }[]
+): DimensionBounds {
+  const acc: DimensionBounds = { width: null, depth: null, height: null };
+  for (const row of rows) {
+    for (const key of ["width", "depth", "height"] as const) {
+      const v = row.dimensions?.[key];
+      if (typeof v !== "number" || !Number.isFinite(v) || v <= 0) continue;
+      const cur = acc[key];
+      acc[key] = cur
+        ? { min: Math.min(cur.min, v), max: Math.max(cur.max, v) }
+        : { min: v, max: v };
+    }
+  }
+  return acc;
+}
+
+// Parsuje searchParams strony: ?opcja_<slug>=w1,w2 → { slug: [w1, w2] }.
+// Niepoprawne slugi/puste wartości ignorowane — żaden URL nie wywoła błędu.
+export function parseOptionFilterParams(
+  sp: Record<string, string | string[] | undefined>
+): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const [key, raw] of Object.entries(sp)) {
+    if (!key.startsWith(OPTION_PARAM_PREFIX)) continue;
+    const slug = key.slice(OPTION_PARAM_PREFIX.length);
+    if (!/^[a-z0-9-]+$/.test(slug)) continue;
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    const values = (value ?? "")
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean);
+    if (values.length > 0) out[slug] = values;
+  }
+  return out;
 }

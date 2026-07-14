@@ -7,6 +7,11 @@ import {
   EXCLUDED_OPTION_SLUGS,
   collectOptionFacets,
   localizeOptionFacets,
+  productMatchesOptionFilters,
+  productMatchesDimensions,
+  hasActiveDimensionRanges,
+  collectDimensionBounds,
+  parseOptionFilterParams,
 } from "@/app/_lib/option-filter";
 import type { ProductVariants } from "@/app/_lib/types";
 
@@ -159,5 +164,93 @@ describe("localizeOptionFacets", () => {
       { value: "DREWNIANY", label: "HOLZ" },
       { value: "140x200", label: "140x200" },
     ]);
+  });
+});
+
+describe("productMatchesOptionFilters", () => {
+  const variants = v([
+    { name: "ROZMIAR", values: ["140x200", "160x200"] },
+    { name: "Stelaż", values: ["Drewniany"] },
+  ]);
+  it("OR wewnątrz grupy — jedna z wybranych wartości wystarczy", () => {
+    expect(
+      productMatchesOptionFilters(variants, { rozmiar: ["90x200", "140x200"] })
+    ).toBe(true);
+  });
+  it("AND między grupami — każda grupa musi pasować", () => {
+    expect(
+      productMatchesOptionFilters(variants, {
+        rozmiar: ["140x200"],
+        stelaz: ["Metalowy"],
+      })
+    ).toBe(false);
+  });
+  it("produkt bez danej opcji odpada", () => {
+    expect(productMatchesOptionFilters(variants, { kolor: ["Szary"] })).toBe(false);
+    expect(productMatchesOptionFilters(null, { rozmiar: ["140x200"] })).toBe(false);
+  });
+  it("dopasowuje niezależnie od flagi filterable (facet i tak nie pokaże niewłączonych)", () => {
+    // variants wyżej nie mają filterable — mimo to wartości dopasowują
+    expect(productMatchesOptionFilters(variants, { rozmiar: ["140x200"] })).toBe(true);
+  });
+  it("pusty wybór = brak filtra", () => {
+    expect(productMatchesOptionFilters(null, {})).toBe(true);
+    expect(productMatchesOptionFilters(variants, { rozmiar: [] })).toBe(true);
+  });
+});
+
+describe("wymiary", () => {
+  it("hasActiveDimensionRanges wykrywa dowolną granicę", () => {
+    expect(hasActiveDimensionRanges({})).toBe(false);
+    expect(hasActiveDimensionRanges({ widthMax: 220 })).toBe(true);
+  });
+  it("dopasowanie zakresów per wymiar", () => {
+    const dims = { width: 200, depth: 90, height: 85 };
+    expect(productMatchesDimensions(dims, { widthMin: 180, widthMax: 220 })).toBe(true);
+    expect(productMatchesDimensions(dims, { widthMax: 190 })).toBe(false);
+    expect(productMatchesDimensions(dims, { depthMin: 100 })).toBe(false);
+  });
+  it("produkt bez wymiarów odpada przy aktywnym zakresie, przechodzi bez", () => {
+    expect(productMatchesDimensions(null, { widthMin: 100 })).toBe(false);
+    expect(productMatchesDimensions(null, {})).toBe(true);
+  });
+  it("collectDimensionBounds liczy min/max, ignoruje braki i zera", () => {
+    const rows = [
+      { dimensions: { width: 200, depth: 90, height: 85 } },
+      { dimensions: { width: 140, depth: 200, height: 40 } },
+      { dimensions: null },
+    ];
+    expect(collectDimensionBounds(rows)).toEqual({
+      width: { min: 140, max: 200 },
+      depth: { min: 90, max: 200 },
+      height: { min: 40, max: 85 },
+    });
+    expect(collectDimensionBounds([{ dimensions: null }])).toEqual({
+      width: null,
+      depth: null,
+      height: null,
+    });
+  });
+});
+
+describe("parseOptionFilterParams", () => {
+  it("wyciąga opcja_* z CSV, ignoruje resztę i złe slugi", () => {
+    expect(
+      parseOptionFilterParams({
+        opcja_rozmiar: "140x200,160x200",
+        opcja_stelaz: "Drewniany",
+        "opcja_ZŁY SLUG": "x",
+        opcja_pusta: "",
+        kolor: "Szary",
+      })
+    ).toEqual({
+      rozmiar: ["140x200", "160x200"],
+      stelaz: ["Drewniany"],
+    });
+  });
+  it("tablicę parametrów redukuje do pierwszej wartości", () => {
+    expect(parseOptionFilterParams({ opcja_rozmiar: ["140x200", "90x200"] })).toEqual({
+      rozmiar: ["140x200"],
+    });
   });
 });
