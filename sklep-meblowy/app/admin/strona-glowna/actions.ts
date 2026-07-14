@@ -12,8 +12,8 @@ import {
   SYSTEM_BLOCK_TYPES,
   CONTENT_BLOCK_DEFS,
   validateBlockContent,
-  invalidatePageBlocksCache,
 } from "@/app/_lib/blocks";
+import { invalidatePageBlocksCache } from "@/app/_lib/blocks-server";
 
 function sanitize(input: unknown, max = 300): string {
   return typeof input === "string" ? input.trim().slice(0, max) : "";

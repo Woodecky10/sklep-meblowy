@@ -17,11 +17,8 @@ import { alternatesFor } from "./_lib/sitemap-i18n";
 import { getDictionary } from "./_lib/dictionaries";
 import ProductCard from "./_components/ui/ProductCard";
 import TrustBar from "./_components/ui/TrustBar";
-import {
-  getHomeBlocks,
-  localizeBlock,
-  type LocalizedBlock,
-} from "./_lib/blocks";
+import { localizeBlock, type LocalizedBlock } from "./_lib/blocks";
+import { getHomeBlocks } from "./_lib/blocks-server";
 import ContentBlock from "./_components/blocks/ContentBlock";
 
 // Home jest w pełni przetłumaczone przez słownik UI → DE zawsze (hasDe: true).

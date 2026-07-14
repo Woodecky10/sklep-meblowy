@@ -1,4 +1,4 @@
-import { getAllHomeBlocksAdmin } from "@/app/_lib/blocks";
+import { getAllHomeBlocksAdmin } from "@/app/_lib/blocks-server";
 import { getAllTrustItems } from "@/app/_lib/trust-items";
 import { getAllSiteTexts } from "@/app/_lib/site-texts";
 import { getAvailableProductsForFeatured } from "@/app/_lib/featured";

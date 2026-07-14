@@ -4,10 +4,11 @@
 // klocki dodawane przez admina (rejestr CONTENT_BLOCK_DEFS, render w
 // app/_components/blocks/). Defaulty w kodzie odtwarzają dzisiejszy wygląd
 // 1:1 (fail-open: brak tabeli/wierszy → strona jak dziś).
+//
+// Ten moduł jest CZYSTY (bez next/headers) — importują go wartościami
+// komponenty klienckie admina. Fetch z cache i inwalidacja żyją w
+// blocks-server.ts (wzorzec i18n.ts / i18n-server.ts).
 
-import { cache } from "react";
-import { unstable_cache, revalidateTag } from "next/cache";
-import { createAdminClient } from "./supabase/server";
 import type { Locale } from "./i18n";
 import { pl } from "./dictionaries/pl";
 import { de } from "./dictionaries/de";
@@ -419,46 +420,4 @@ export function validateBlockContent(
       return { ok: true, content: { ...locPair(o, "heading", MAX_SHORT), items } };
     }
   }
-}
-
-// ── Fetch z cache ────────────────────────────────────────────────────────
-export const PAGE_BLOCKS_CACHE_TAG = "page-blocks";
-
-// Cross-request cache (wzorzec home-sections/trust-items). Wewnątrz
-// unstable_cache nie wolno cookies() — createAdminClient jest bez cookies.
-// Błąd/brak tabeli → null → mergeHomeBlocks zwraca defaulty (fail-open,
-// sklep nigdy nie pada przez brak migracji 52).
-const fetchHomeBlocks = unstable_cache(
-  async (): Promise<PageBlockRow[] | null> => {
-    const supabase = await createAdminClient();
-    const { data, error } = await supabase
-      .from("page_blocks")
-      .select("id, page_id, block_type, sort_order, visible, content")
-      .is("page_id", null)
-      .order("sort_order", { ascending: true });
-    if (error || !data) return null;
-    return data as PageBlockRow[];
-  },
-  ["home-blocks"],
-  { tags: [PAGE_BLOCKS_CACHE_TAG], revalidate: 60 }
-);
-
-export const getHomeBlocks = cache(async (): Promise<PageBlockRow[]> =>
-  mergeHomeBlocks(await fetchHomeBlocks())
-);
-
-// Admin: świeży odczyt bez cache (po mutacji router.refresh() widzi zmiany).
-export async function getAllHomeBlocksAdmin(): Promise<PageBlockRow[]> {
-  const supabase = await createAdminClient();
-  const { data, error } = await supabase
-    .from("page_blocks")
-    .select("id, page_id, block_type, sort_order, visible, content")
-    .is("page_id", null)
-    .order("sort_order", { ascending: true });
-  if (error) console.error("getAllHomeBlocksAdmin:", error.message);
-  return mergeHomeBlocks(error ? null : ((data ?? []) as PageBlockRow[]));
-}
-
-export function invalidatePageBlocksCache(): void {
-  revalidateTag(PAGE_BLOCKS_CACHE_TAG, "max");
 }
