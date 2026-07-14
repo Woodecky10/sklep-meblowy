@@ -18,10 +18,11 @@ import { getDictionary } from "./_lib/dictionaries";
 import ProductCard from "./_components/ui/ProductCard";
 import TrustBar from "./_components/ui/TrustBar";
 import {
-  getHomeSections,
-  localizeHomeSection,
-  type LocalizedHomeSection,
-} from "./_lib/home-sections";
+  getHomeBlocks,
+  localizeBlock,
+  type LocalizedBlock,
+} from "./_lib/blocks";
+import ContentBlock from "./_components/blocks/ContentBlock";
 
 // Home jest w pełni przetłumaczone przez słownik UI → DE zawsze (hasDe: true).
 // generateMetadata na poziomie strony nadpisuje statyczne metadata z layoutu
@@ -61,7 +62,7 @@ function mosaicTileClass(total: number, index: number): string {
 export default async function HomePage() {
   const locale = await getLocale();
   const t = getDictionary(locale);
-  const [dbSlides, dbTiles, featured, allCategories, collectionsForHome, wishlistIds, rate, dbSections] =
+  const [dbSlides, dbTiles, featured, allCategories, collectionsForHome, wishlistIds, rate, dbBlocks] =
     await Promise.all([
       getActiveSlides(),
       getActiveTiles(),
@@ -70,9 +71,11 @@ export default async function HomePage() {
       getCollectionsForHome(locale),
       getUserWishlistIds(),
       getEurRate(),
-      getHomeSections(),
+      getHomeBlocks(),
     ]);
-  const sections = dbSections.map((s) => localizeHomeSection(s, locale));
+  const blocks = dbBlocks
+    .map((b) => localizeBlock(b, locale))
+    .filter((b): b is LocalizedBlock => b !== null);
   const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
   // Fallback gdy admin jeszcze nic nie dodał — żeby home nie była pusta.
   // localizeSlide/localizeTile tłumaczą treść (DB i fallback) na DE przez mapy.
@@ -84,7 +87,7 @@ export default async function HomePage() {
   );
 
   // Nagłówek+eyebrow sekcji z bazy; null/pusty → blok nagłówka pomijany.
-  function sectionHeader(s: LocalizedHomeSection) {
+  function sectionHeader(s: { heading: string | null; subheading: string | null }) {
     if (!s.heading && !s.subheading) return null;
     return (
       <div className="text-center mb-16">
@@ -102,8 +105,8 @@ export default async function HomePage() {
     );
   }
 
-  function renderSection(s: LocalizedHomeSection): ReactNode {
-    switch (s.key) {
+  function renderBlock(b: LocalizedBlock): ReactNode {
+    switch (b.type) {
       case "hero":
         // Hero — slider z auto-rotacją (6s) i nawigacją (strzałki + kropki)
         return <HomeHeroSlider slides={slides} />;
@@ -112,7 +115,7 @@ export default async function HomePage() {
         // Kategorie
         return (
           <section className="max-w-7xl mx-auto px-6 py-24">
-            {sectionHeader(s)}
+            {sectionHeader(b)}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {tiles.map((tile) => (
                 <LocalizedLink
@@ -165,9 +168,9 @@ export default async function HomePage() {
             <div className="max-w-7xl mx-auto px-6">
               <div className="flex items-end justify-between mb-16">
                 <div>
-                  {s.heading && (
+                  {b.heading && (
                     <h2 className="font-display text-4xl font-bold text-[var(--fg)]">
-                      {s.heading}
+                      {b.heading}
                     </h2>
                   )}
                 </div>
@@ -206,7 +209,7 @@ export default async function HomePage() {
         // Pasek zaufania — dlaczego warto kupować u nas (spec 2026-07-06)
         return (
           <section className="max-w-7xl mx-auto px-6 py-24">
-            <TrustBar withHeading locale={locale} heading={s.heading} eyebrow={s.subheading} />
+            <TrustBar withHeading locale={locale} heading={b.heading} eyebrow={b.subheading} />
           </section>
         );
 
@@ -215,7 +218,7 @@ export default async function HomePage() {
         if (collectionsForHome.length === 0) return null;
         return (
           <section className="max-w-7xl mx-auto px-6 py-24">
-            {sectionHeader(s)}
+            {sectionHeader(b)}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {collectionsForHome.map(({ collection, sampleProducts }) => (
                 <LocalizedLink
@@ -272,14 +275,17 @@ export default async function HomePage() {
           </section>
         );
     }
+
+    // Bloki treściowe — wspólny dispatcher.
+    return <ContentBlock block={b} locale={locale} />;
   }
 
   return (
     <>
-      {sections
-        .filter((s) => s.visible)
-        .map((s) => (
-          <Fragment key={s.key}>{renderSection(s)}</Fragment>
+      {blocks
+        .filter((b) => b.visible)
+        .map((b) => (
+          <Fragment key={b.id}>{renderBlock(b)}</Fragment>
         ))}
     </>
   );

@@ -11,7 +11,7 @@ import { TRUST_ICONS } from "./trust-icons";
 type Props = {
   locale: Locale;
   withHeading?: boolean;
-  // Nagłówek sekcji z home_sections (admin) — fallback na słownik.
+  // Nagłówek sekcji z page_blocks (admin) — fallback na słownik.
   heading?: string | null;
   eyebrow?: string | null;
 };
