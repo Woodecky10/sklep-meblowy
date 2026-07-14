@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/admin/zamowienia", label: "Zamówienia", icon: OrdersIcon },
   { href: "/admin/produkty", label: "Produkty", icon: ProductsIcon },
   { href: "/admin/strona-glowna", label: "Strona główna", icon: HomeIcon },
+  { href: "/admin/podstrony", label: "Podstrony", icon: PagesIcon },
   { href: "/admin/wyglad", label: "Wygląd", icon: PaletteIcon },
   { href: "/admin/polecane", label: "Polecane", icon: StarIcon },
   { href: "/admin/slider", label: "Slider", icon: SliderIcon },
@@ -274,6 +275,15 @@ function PaletteIcon() {
       <circle cx="7.5" cy="10.5" r="1" fill="currentColor" />
       <circle cx="12" cy="7" r="1" fill="currentColor" />
       <circle cx="16.5" cy="10.5" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function PagesIcon() {
+  return (
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6M9 13h6M9 17h4" />
     </svg>
   );
 }

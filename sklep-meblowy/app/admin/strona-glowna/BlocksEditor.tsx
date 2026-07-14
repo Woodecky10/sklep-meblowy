@@ -336,6 +336,26 @@ export default function BlocksEditor({
         + Dodaj sekcję
       </button>
 
+      <Card>
+        <div className="flex items-center gap-4">
+          <div className="flex-1 min-w-0">
+            <h2 className="font-display text-lg font-semibold text-[var(--fg)]">
+              Podstrony
+            </h2>
+            <p className="text-xs text-[var(--muted)]">
+              Własne strony (np. „Pielęgnacja mebli") składane z tych samych
+              sekcji co strona główna.
+            </p>
+          </div>
+          <Link
+            href="/admin/podstrony"
+            className="shrink-0 text-xs font-sans uppercase tracking-widest text-[var(--color-gold)] hover:underline"
+          >
+            Zarządzaj →
+          </Link>
+        </div>
+      </Card>
+
       <SiteTextsCard initialTexts={initialSiteTexts} onResult={handleResult} />
 
       {addOpen && <AddBlockModal onClose={() => setAddOpen(false)} onResult={handleResult} />}
