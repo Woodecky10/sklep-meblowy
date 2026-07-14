@@ -269,6 +269,9 @@ export async function updateProductVariants(
           }
         }
       }
+      if (opt.filterable !== undefined && typeof opt.filterable !== "boolean") {
+        return { ok: false, error: "Nieprawidłowa flaga filtra opcji" };
+      }
     }
     // Zapisujemy tylko opcje + overrides.
     variantsToSave = { options: variants.options, overrides: variants.overrides };
