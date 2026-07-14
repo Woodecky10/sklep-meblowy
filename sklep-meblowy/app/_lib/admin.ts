@@ -33,3 +33,13 @@ export async function requireAdmin(): Promise<User> {
 
   return user;
 }
+
+// Nie-przekierowujący wariant do stron publicznych: podgląd szkicu podstrony
+// (published=false renderuje się TYLKO adminowi, klient dostaje notFound()).
+export async function getIsAdmin(): Promise<boolean> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return isAdmin(user);
+}

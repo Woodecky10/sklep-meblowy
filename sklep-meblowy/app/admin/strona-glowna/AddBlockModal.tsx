@@ -13,15 +13,18 @@ import type { ActionResult } from "@/app/_lib/types";
 export default function AddBlockModal({
   onClose,
   onResult,
+  pageId,
 }: {
   onClose: () => void;
   onResult: (r: ActionResult) => void;
+  pageId?: string;
 }) {
   const [adding, startTransition] = useTransition();
 
   function add(type: ContentBlockType) {
     const fd = new FormData();
     fd.set("type", type);
+    if (pageId) fd.set("page_id", pageId);
     startTransition(async () => {
       const res = await addContentBlock(fd);
       onResult(res);
