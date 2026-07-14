@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/admin/zamowienia", label: "Zamówienia", icon: OrdersIcon },
   { href: "/admin/produkty", label: "Produkty", icon: ProductsIcon },
   { href: "/admin/strona-glowna", label: "Strona główna", icon: HomeIcon },
+  { href: "/admin/wyglad", label: "Wygląd", icon: PaletteIcon },
   { href: "/admin/polecane", label: "Polecane", icon: StarIcon },
   { href: "/admin/slider", label: "Slider", icon: SliderIcon },
   { href: "/admin/kafelki", label: "Kafelki", icon: TilesIcon },
@@ -262,6 +263,17 @@ function HomeIcon() {
   return (
     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
       <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1V10z" />
+    </svg>
+  );
+}
+
+function PaletteIcon() {
+  return (
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <path d="M12 2a10 10 0 0 0 0 20h1.5a2.5 2.5 0 0 0 0-5H12a2 2 0 0 1-2-2c0-1 .8-2 2-2h4a6 6 0 0 0 6-6c0-3-4-5-10-5z" />
+      <circle cx="7.5" cy="10.5" r="1" fill="currentColor" />
+      <circle cx="12" cy="7" r="1" fill="currentColor" />
+      <circle cx="16.5" cy="10.5" r="1" fill="currentColor" />
     </svg>
   );
 }
