@@ -44,12 +44,17 @@ export async function getThemeSettings(): Promise<ThemeSettings> {
 // Admin: świeży odczyt bez cache (formularz po zapisie ma widzieć stan z DB).
 export async function getThemeSettingsUncached(): Promise<ThemeSettings> {
   const supabase = await createAdminClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("store_settings")
     .select("theme_preset, theme_overrides, font_pair")
     .eq("id", true)
     .maybeSingle();
-  return normalizeThemeSettings(data ?? null);
+  // Loguj realny błąd zapytania — inaczej brak kolumn / błąd RLS jest
+  // nieodróżnialny od „nic jeszcze nie zapisano" (spójnie z getThemeSettings).
+  if (error) {
+    console.error("[theme-settings] getThemeSettingsUncached failed, using defaults", error);
+  }
+  return normalizeThemeSettings(data);
 }
 
 export function invalidateThemeCache() {
