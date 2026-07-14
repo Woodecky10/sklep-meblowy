@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { getProducts, getFilterFacets } from "@/app/_lib/products";
+import { parseOptionFilterParams } from "@/app/_lib/option-filter";
 import { getRatingsForProducts } from "@/app/_lib/reviews";
 import {
   getCategoryLabel,
@@ -38,19 +39,27 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-type SearchParams = Promise<{
-  kategoria?: string;
-  sekcja?: string;
-  sortuj?: string;
-  strona?: string;
-  q?: string;
-  cena_od?: string;
-  cena_do?: string;
-  dostepne?: string;
-  kolor?: string;
-  tkanina?: string;
-  kolekcja?: string;
-}>;
+type SearchParams = Promise<
+  {
+    kategoria?: string;
+    sekcja?: string;
+    sortuj?: string;
+    strona?: string;
+    q?: string;
+    cena_od?: string;
+    cena_do?: string;
+    dostepne?: string;
+    kolor?: string;
+    tkanina?: string;
+    kolekcja?: string;
+    szer_od?: string;
+    szer_do?: string;
+    gl_od?: string;
+    gl_do?: string;
+    wys_od?: string;
+    wys_do?: string;
+  } & Record<string, string | string[] | undefined>
+>;
 
 function parsePositiveNumber(value: string | undefined) {
   if (!value) return undefined;
@@ -81,6 +90,15 @@ export default async function SklepPage({
   const colors = sp.kolor?.split(",").filter(Boolean);
   const materials = sp.tkanina?.split(",").filter(Boolean);
   const collectionSlug = sp.kolekcja?.trim() || undefined;
+  const optionFilters = parseOptionFilterParams(sp);
+  const dimensionRanges = {
+    widthMin: parsePositiveNumber(sp.szer_od),
+    widthMax: parsePositiveNumber(sp.szer_do),
+    depthMin: parsePositiveNumber(sp.gl_od),
+    depthMax: parsePositiveNumber(sp.gl_do),
+    heightMin: parsePositiveNumber(sp.wys_od),
+    heightMax: parsePositiveNumber(sp.wys_do),
+  };
 
   const [
     { products, total, pages },
@@ -103,6 +121,8 @@ export default async function SklepPage({
       inStockOnly,
       colors,
       materials,
+      optionFilters,
+      dimensionRanges,
       collectionSlug,
       sectionSlug,
       locale,
@@ -135,6 +155,13 @@ export default async function SklepPage({
   if (sp.kolor) rawParams.kolor = sp.kolor;
   if (sp.tkanina) rawParams.tkanina = sp.tkanina;
   if (sp.kolekcja) rawParams.kolekcja = sp.kolekcja;
+  for (const k of ["szer_od", "szer_do", "gl_od", "gl_do", "wys_od", "wys_do"] as const) {
+    const v = sp[k];
+    if (typeof v === "string" && v) rawParams[k] = v;
+  }
+  for (const [k, val] of Object.entries(sp)) {
+    if (k.startsWith("opcja_") && typeof val === "string" && val) rawParams[k] = val;
+  }
 
   // Label sekcji z `sections` (np. "Narożniki" zamiast surowego slug "naroznik").
   const sectionLabel = sectionSlug
@@ -184,6 +211,8 @@ export default async function SklepPage({
         <FilterBar
           colors={facets.colors}
           materials={facets.materials}
+          optionFacets={facets.options}
+          dimensionBounds={facets.dimensions}
           sections={filterSections}
           collections={allCollections.map((c) => {
             const lc = localizeCollection(c, locale);

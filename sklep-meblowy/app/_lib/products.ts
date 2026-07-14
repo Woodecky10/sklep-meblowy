@@ -9,6 +9,17 @@ import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Category, Product } from "./types";
 import { deriveFabricFamilies, productMatchesFabric } from "./fabric-filter";
 import { getAllFabrics } from "./fabrics";
+import {
+  productMatchesOptionFilters,
+  productMatchesDimensions,
+  hasActiveDimensionRanges,
+  collectOptionFacets,
+  collectDimensionBounds,
+  localizeOptionFacets,
+  type DimensionRanges,
+  type OptionFacetGroup,
+  type DimensionBounds,
+} from "./option-filter";
 
 // Górny limit rozmiaru strony — broni przed ?limit=999999 (kosztowny request).
 export const PRODUCTS_PAGE_LIMIT_MAX = 100;
@@ -46,6 +57,11 @@ export type ProductFilters = {
   // Filtr tkanin (?tkanina=). Wartości: rodziny tkanin z katalogu fabrics
   // (dopasowywane do opcji wariantów) ∪ legacy wartości kolumny material.
   materials?: string[];
+  // Filtry opcji wariantów (?opcja_<slug>=w1,w2): slug → wybrane wartości.
+  // Parsowane w sklep/page.tsx przez parseOptionFilterParams.
+  optionFilters?: Record<string, string[]>;
+  // Zakresy wymiarów w cm (?szer_od= / ?szer_do= / gl / wys).
+  dimensionRanges?: DimensionRanges;
   // Slug kolekcji — filtruje produkty należące do konkretnej kolekcji
   // (np. ?kolekcja=lisbon w URL).
   collectionSlug?: string;
@@ -74,6 +90,8 @@ export async function getProducts(filters: ProductFilters = {}) {
     inStockOnly,
     colors,
     materials,
+    optionFilters,
+    dimensionRanges,
     collectionSlug,
     sectionSlug,
     locale = DEFAULT_LOCALE,
@@ -135,27 +153,39 @@ export async function getProducts(filters: ProductFilters = {}) {
 
   if (colors?.length) query = query.in("color", colors);
 
-  // Filtr tkanin: wartości pochodzą z rodzin tkanin w opcjach wariantów
-  // (katalog fabrics) W UNII z legacy kolumną material — tego nie da się
-  // wyrazić w .in() na kolumnie, więc liczymy pasujące id w JS (skala:
-  // dziesiątki produktów; RLS i tak ogranicza odczyt do aktywnych) i
-  // zawężamy główne zapytanie przez .in("id", ids). Paginacja/sort/AND z
-  // pozostałymi filtrami zostają w DB.
-  if (materials?.length) {
-    const [{ data: fabricRows }, fabrics] = await Promise.all([
+  // Filtry liczone w JS (tkanina / opcje wariantów / wymiary) — nie da się ich
+  // wyrazić w .in() na kolumnie (prawda żyje w JSONB variants/dimensions), więc
+  // liczymy pasujące id w JS (skala: dziesiątki produktów; RLS i tak ogranicza
+  // odczyt do aktywnych) i zawężamy główne zapytanie przez .in("id", ids).
+  // Paginacja/sort/AND z pozostałymi filtrami zostają w DB.
+  const optionFiltersActive = Object.values(optionFilters ?? {}).some(
+    (v) => v.length > 0
+  );
+  const dimensionsActive = hasActiveDimensionRanges(dimensionRanges ?? {});
+  if (materials?.length || optionFiltersActive || dimensionsActive) {
+    const [{ data: jsFilterRows }, fabrics] = await Promise.all([
       // Bez .limit() — świadomie (katalog ~dziesiątki produktów). Przy dużym wzroście katalogu PostgREST utnie wiersze i filtr/facety po cichu zgubią produkty — wtedy zdenormalizować rodziny do kolumny.
-      supabase.from("products").select("id, variants, material"),
-      getAllFabrics(),
+      supabase.from("products").select("id, variants, material, dimensions"),
+      materials?.length ? getAllFabrics() : Promise.resolve([]),
     ]);
     const familyNames = fabrics.map((f) => f.name);
     const ids = (
-      (fabricRows ?? []) as {
+      (jsFilterRows ?? []) as {
         id: string;
         variants: Product["variants"];
         material: string | null;
+        dimensions: Product["dimensions"];
       }[]
     )
-      .filter((r) => productMatchesFabric(r.variants, r.material, materials, familyNames))
+      .filter(
+        (r) =>
+          (!materials?.length ||
+            productMatchesFabric(r.variants, r.material, materials, familyNames)) &&
+          (!optionFiltersActive ||
+            productMatchesOptionFilters(r.variants, optionFilters!)) &&
+          (!dimensionsActive ||
+            productMatchesDimensions(r.dimensions, dimensionRanges!))
+      )
       .map((r) => r.id);
     if (ids.length === 0) {
       return { products: [], total: 0, pages: 0 };
@@ -379,6 +409,8 @@ const getFacetSource = unstable_cache(
   async (): Promise<{
     colorRows: { value: string | null; value_de: string | null }[];
     fabricFacetRows: { value: string | null; value_de: string | null }[];
+    optionGroups: OptionFacetGroup[];
+    dimensionBounds: DimensionBounds;
   }> => {
     const anon = createBareAnonClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -391,7 +423,7 @@ const getFacetSource = unstable_cache(
         // Bez .limit() — świadomie (katalog ~dziesiątki produktów). Przy dużym
         // wzroście katalogu PostgREST utnie wiersze i facety po cichu zgubią
         // produkty — wtedy zdenormalizować rodziny do kolumny.
-        anon.from("products").select("variants, material, material_de"),
+        anon.from("products").select("variants, material, material_de, dimensions"),
         admin
           .from("fabrics")
           .select("name, name_de")
@@ -411,6 +443,7 @@ const getFacetSource = unstable_cache(
       variants: Product["variants"];
       material: string | null;
       material_de: string | null;
+      dimensions: Product["dimensions"];
     }[];
     const fabrics = (fabricsData ?? []) as { name: string; name_de: string | null }[];
     const familyNames = fabrics.map((f) => f.name);
@@ -429,9 +462,14 @@ const getFacetSource = unstable_cache(
         .map((r) => ({ value: r.material, value_de: r.material_de })),
     ];
 
-    return { colorRows, fabricFacetRows };
+    // Facety opcji wariantów (filterable=true) + granice wymiarów — z tych
+    // samych wierszy co facet tkanin (jeden skan, ten sam cache).
+    const optionGroups = collectOptionFacets(fabricRows);
+    const dimensionBounds = collectDimensionBounds(fabricRows);
+
+    return { colorRows, fabricFacetRows, optionGroups, dimensionBounds };
   },
-  ["facet-source"],
+  ["facet-source-v2"],
   { tags: [FACETS_CACHE_TAG], revalidate: 300 }
 );
 
@@ -440,9 +478,12 @@ const getFacetSource = unstable_cache(
 // Decyzja historyczna: nie ograniczamy facets do bieżącego search/category
 // (pełna paleta zawsze; pusta lista po kliknięciu jest akceptowana).
 export async function getFilterFacets(locale: Locale = DEFAULT_LOCALE) {
-  const { colorRows, fabricFacetRows } = await getFacetSource();
+  const { colorRows, fabricFacetRows, optionGroups, dimensionBounds } =
+    await getFacetSource();
   return {
     colors: buildLocalizedFacets(colorRows, locale),
     materials: buildLocalizedFacets(fabricFacetRows, locale),
+    options: localizeOptionFacets(optionGroups, locale),
+    dimensions: dimensionBounds,
   };
 }
