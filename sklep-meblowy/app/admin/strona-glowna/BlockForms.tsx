@@ -144,7 +144,7 @@ export function BannerForm({ block, onResult }: BlockFormProps) {
           <div className="flex items-center gap-3 flex-wrap text-xs">
             <label className="cursor-pointer px-3 py-1.5 border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full uppercase tracking-widest hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors">
               {imageUrl ? "Zmień zdjęcie" : "Wybierz zdjęcie"}
-              <input className="hidden" {...upload.inputProps} />
+              <input className="hidden" {...upload.inputProps} multiple={false} />
             </label>
             {imageUrl && (
               <button type="button" onClick={() => setImageUrl("")} className="text-red-600 hover:underline">

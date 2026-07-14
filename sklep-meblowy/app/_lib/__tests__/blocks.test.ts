@@ -134,6 +134,14 @@ describe("localizeBlock — treściowe", () => {
       content: { heading: "Traumsalon", body: "Opis", layout: "left", cta_label: "Zobacz", cta_href: "/sklep" },
     });
   });
+  it("banner: niebezpieczny cta_href z DB odpada przy lokalizacji", () => {
+    const r = row({
+      block_type: "banner",
+      content: { heading: "H", cta_label: "X", cta_href: "javascript:alert(1)" },
+    });
+    const b = localizeBlock(r, "pl")!;
+    if (b.type === "banner") expect(b.content.cta_href).toBeNull();
+  });
   it("gallery: odfiltrowuje wpisy bez url", () => {
     const r = row({
       block_type: "gallery",

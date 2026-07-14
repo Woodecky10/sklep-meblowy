@@ -1,7 +1,9 @@
-import { getAllHomeBlocksAdmin } from "@/app/_lib/blocks-server";
+import {
+  getAllHomeBlocksAdmin,
+  getProductsForBlockPicker,
+} from "@/app/_lib/blocks-server";
 import { getAllTrustItems } from "@/app/_lib/trust-items";
 import { getAllSiteTexts } from "@/app/_lib/site-texts";
-import { getAvailableProductsForFeatured } from "@/app/_lib/featured";
 import { getAllCollections } from "@/app/_lib/collections";
 import { getCategories } from "@/app/_lib/categories";
 import BlocksEditor from "./BlocksEditor";
@@ -13,7 +15,7 @@ export default async function AdminHomePageSettings() {
       getAllHomeBlocksAdmin(),
       getAllTrustItems(),
       getAllSiteTexts(),
-      getAvailableProductsForFeatured(),
+      getProductsForBlockPicker(),
       getAllCollections(),
       getCategories(),
     ]);
@@ -23,7 +25,7 @@ export default async function AdminHomePageSettings() {
       initialTrustItems={trustItems}
       initialSiteTexts={siteTexts}
       picker={{
-        products: products.map((p) => ({ id: p.id, name: p.name })),
+        products,
         collections: collections.map((c) => ({ slug: c.slug, label: c.label })),
         categories: categories.map((c) => ({ slug: c.slug, label: c.label })),
       }}

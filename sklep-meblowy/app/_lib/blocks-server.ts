@@ -52,3 +52,23 @@ export async function getAllHomeBlocksAdmin(): Promise<PageBlockRow[]> {
 export function invalidatePageBlocksCache(): void {
   revalidateTag(PAGE_BLOCKS_CACHE_TAG, "max");
 }
+
+// Picker produktów dla bloku "products" w hubie admina. Dedykowany odczyt:
+// tylko aktywne (ukryte i tak nie wyrenderują się na sklepie — RLS anon),
+// BEZ wykluczania produktów z "Polecanych" (getAvailableProductsForFeatured
+// ma inną semantykę i tu nie pasuje).
+export async function getProductsForBlockPicker(): Promise<
+  { id: string; name: string }[]
+> {
+  const supabase = await createAdminClient();
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, name")
+    .eq("is_active", true)
+    .order("name", { ascending: true });
+  if (error) {
+    console.error("getProductsForBlockPicker:", error.message);
+    return [];
+  }
+  return (data ?? []) as { id: string; name: string }[];
+}

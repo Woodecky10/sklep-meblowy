@@ -206,7 +206,10 @@ export function localizeBlock(row: PageBlockRow, locale: Locale): LocalizedBlock
           image_url: s(c.image_url),
           layout,
           cta_label: pickLoc(c, "cta_label", locale),
-          cta_href: s(c.cta_href),
+          cta_href: (() => {
+            const href = s(c.cta_href);
+            return href && isSafeHref(href) ? href : null;
+          })(),
         },
       };
     }

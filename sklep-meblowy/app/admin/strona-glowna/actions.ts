@@ -256,11 +256,13 @@ export async function updateContentBlock(
   }
   const valid = validateBlockContent(blockType, rawContent);
   if (!valid.ok) return { ok: false, error: valid.error };
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("page_blocks")
     .update({ content: valid.content, updated_at: new Date().toISOString() } as never)
-    .eq("id", blockId);
+    .eq("id", blockId)
+    .select("id");
   if (error) return { ok: false, error: error.message };
+  if (!data || data.length === 0) return { ok: false, error: "Nie znaleziono sekcji" };
   revalidateHome();
   return { ok: true, message: "Zapisano treść sekcji" };
 }
