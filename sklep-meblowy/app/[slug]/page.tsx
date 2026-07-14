@@ -31,6 +31,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!PAGE_SLUG_RE.test(slug)) return {};
   const [page, locale] = await Promise.all([getPageBySlug(slug), getLocale()]);
   if (!page) return {};
+  // Szkic: metadata (tytuł/opis) tylko dla admina — anonim dostaje pusty
+  // head, zanim strona zrobi notFound() (bez wycieku treści do źródła 404).
+  if (!page.published && !(await getIsAdmin())) return {};
   const meta = localizePageMeta(page, locale);
   const plPath = `/${page.slug}`;
   return {
