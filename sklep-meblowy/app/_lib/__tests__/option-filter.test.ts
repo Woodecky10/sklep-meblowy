@@ -135,6 +135,23 @@ describe("collectOptionFacets", () => {
       "160x200",
     ]);
   });
+
+  it("pomija wartości z przecinkiem (nie przeżyją CSV w URL)", () => {
+    const rows = [
+      {
+        variants: v([
+          {
+            name: "Rozmiar",
+            values: ["140x200, z pojemnikiem", "160x200"],
+            filterable: true,
+          },
+        ]),
+      },
+    ];
+    expect(collectOptionFacets(rows)[0].values.map((x) => x.value)).toEqual([
+      "160x200",
+    ]);
+  });
 });
 
 describe("localizeOptionFacets", () => {
@@ -219,6 +236,7 @@ describe("wymiary", () => {
       { dimensions: { width: 200, depth: 90, height: 85 } },
       { dimensions: { width: 140, depth: 200, height: 40 } },
       { dimensions: null },
+      { dimensions: { width: 0, depth: -1, height: 0 } },
     ];
     expect(collectDimensionBounds(rows)).toEqual({
       width: { min: 140, max: 200 },

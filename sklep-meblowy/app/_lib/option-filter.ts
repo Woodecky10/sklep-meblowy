@@ -79,6 +79,9 @@ export function collectOptionFacets(
       for (const raw of opt.values) {
         const value = raw.trim();
         if (value.length === 0 || group.values.has(value)) continue;
+        // Wartość z przecinkiem nie przeżyje rundy przez CSV w URL
+        // (?opcja_x=a,b tnie się po przecinku) — nie staje się filtrem.
+        if (value.includes(",")) continue;
         group.values.set(value, {
           value,
           label: overrides?.[raw] ?? value,
