@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: "/admin", label: "Pulpit", icon: DashboardIcon },
   { href: "/admin/zamowienia", label: "Zamówienia", icon: OrdersIcon },
   { href: "/admin/produkty", label: "Produkty", icon: ProductsIcon },
+  { href: "/admin/strona-glowna", label: "Strona główna", icon: HomeIcon },
   { href: "/admin/polecane", label: "Polecane", icon: StarIcon },
   { href: "/admin/slider", label: "Slider", icon: SliderIcon },
   { href: "/admin/kafelki", label: "Kafelki", icon: TilesIcon },
@@ -253,6 +254,14 @@ function ComplaintsIcon() {
     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
       <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
       <path d="M12 9v4M12 17h.01" />
+    </svg>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1V10z" />
     </svg>
   );
 }
