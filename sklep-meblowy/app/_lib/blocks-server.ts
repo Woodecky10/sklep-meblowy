@@ -9,7 +9,7 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
-import { mergeHomeBlocks, type PageBlockRow } from "./blocks";
+import { isContentBlockType, mergeHomeBlocks, type PageBlockRow } from "./blocks";
 
 // ── Fetch z cache ────────────────────────────────────────────────────────
 export const PAGE_BLOCKS_CACHE_TAG = "page-blocks";
@@ -71,4 +71,42 @@ export async function getProductsForBlockPicker(): Promise<
     return [];
   }
   return (data ?? []) as { id: string; name: string }[];
+}
+
+// ── Bloki podstron (krok C) ──────────────────────────────────────────────
+// Wspólny tag page-blocks (świadome uproszczenie vs per-page tagi ze specu:
+// stron kilka, każda mutacja bloków woła invalidatePageBlocksCache()).
+// Podstrony nie mają bloków systemowych — bez merge'u z defaultami; nieznane
+// typy odpadają tutaj (fail-open, jak mergeHomeBlocks dla home).
+const fetchPageBlocks = unstable_cache(
+  async (pageId: string): Promise<PageBlockRow[]> => {
+    const supabase = await createAdminClient();
+    const { data, error } = await supabase
+      .from("page_blocks")
+      .select("id, page_id, block_type, sort_order, visible, content")
+      .eq("page_id", pageId)
+      .order("sort_order", { ascending: true });
+    if (error || !data) return [];
+    return (data as PageBlockRow[]).filter((b) => isContentBlockType(b.block_type));
+  },
+  ["page-blocks-by-page"],
+  { tags: [PAGE_BLOCKS_CACHE_TAG], revalidate: 60 }
+);
+
+export const getPageBlocks = cache(fetchPageBlocks);
+
+export async function getPageBlocksAdmin(pageId: string): Promise<PageBlockRow[]> {
+  const supabase = await createAdminClient();
+  const { data, error } = await supabase
+    .from("page_blocks")
+    .select("id, page_id, block_type, sort_order, visible, content")
+    .eq("page_id", pageId)
+    .order("sort_order", { ascending: true });
+  if (error) {
+    console.error("getPageBlocksAdmin:", error.message);
+    return [];
+  }
+  return ((data ?? []) as PageBlockRow[]).filter((b) =>
+    isContentBlockType(b.block_type)
+  );
 }
