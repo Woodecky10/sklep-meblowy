@@ -288,3 +288,325 @@ export function GalleryForm({ block, onResult }: BlockFormProps) {
     </form>
   );
 }
+
+// ── FAQ ──────────────────────────────────────────────────────────────────
+
+type FaqItem = { question: string; question_de: string; answer: string; answer_de: string };
+
+export function FaqForm({ block, onResult }: BlockFormProps) {
+  const c = block.content;
+  const [heading, setHeading] = useState(cs(c.heading));
+  const [headingDe, setHeadingDe] = useState(cs(c.heading_de));
+  const [items, setItems] = useState<FaqItem[]>(() =>
+    (Array.isArray(c.items) ? c.items : []).map((it) => {
+      const o = (typeof it === "object" && it !== null ? it : {}) as Record<string, unknown>;
+      return { question: cs(o.question), question_de: cs(o.question_de), answer: cs(o.answer), answer_de: cs(o.answer_de) };
+    })
+  );
+  const [saving, startTransition] = useTransition();
+
+  function setItem(i: number, patch: Partial<FaqItem>) {
+    setItems((prev) => prev.map((x, xi) => (xi === i ? { ...x, ...patch } : x)));
+  }
+  function moveItem(i: number, delta: -1 | 1) {
+    const t = i + delta;
+    if (t < 0 || t >= items.length) return;
+    const next = [...items];
+    [next[i], next[t]] = [next[t], next[i]];
+    setItems(next);
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    startTransition(async () => {
+      onResult(await updateContentBlock(block.id, { heading, heading_de: headingDe, items }));
+    });
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Nagłówek (opcjonalnie)">
+          <input value={heading} onChange={(e) => setHeading(e.target.value)} maxLength={200} className={inputCls} />
+        </Field>
+        <Field label="Nagłówek (DE)">
+          <input value={headingDe} onChange={(e) => setHeadingDe(e.target.value)} maxLength={200} className={inputCls} />
+        </Field>
+      </div>
+
+      {items.map((item, i) => (
+        <div key={i} className="border border-[var(--border)] rounded-xl p-4 flex gap-3">
+          <div className="flex flex-col gap-0.5 shrink-0">
+            <button type="button" onClick={() => moveItem(i, -1)} disabled={i === 0} aria-label="Przesuń pytanie wyżej" className="w-6 h-6 flex items-center justify-center rounded-full border border-[var(--border)] disabled:opacity-30 hover:border-[var(--color-gold)]">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m18 15-6-6-6 6" /></svg>
+            </button>
+            <button type="button" onClick={() => moveItem(i, 1)} disabled={i === items.length - 1} aria-label="Przesuń pytanie niżej" className="w-6 h-6 flex items-center justify-center rounded-full border border-[var(--border)] disabled:opacity-30 hover:border-[var(--color-gold)]">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
+            <Field label={`Pytanie ${i + 1}`} required>
+              <input value={item.question} onChange={(e) => setItem(i, { question: e.target.value })} maxLength={200} className={inputCls} />
+            </Field>
+            <Field label="Pytanie (DE)">
+              <input value={item.question_de} onChange={(e) => setItem(i, { question_de: e.target.value })} maxLength={200} className={inputCls} />
+            </Field>
+            <Field label="Odpowiedź" required>
+              <textarea value={item.answer} onChange={(e) => setItem(i, { answer: e.target.value })} rows={3} maxLength={2000} className={inputCls} />
+            </Field>
+            <Field label="Odpowiedź (DE)">
+              <textarea value={item.answer_de} onChange={(e) => setItem(i, { answer_de: e.target.value })} rows={3} maxLength={2000} className={inputCls} />
+            </Field>
+          </div>
+          <button
+            type="button"
+            onClick={() => setItems((prev) => prev.filter((_, xi) => xi !== i))}
+            aria-label={`Usuń pytanie ${i + 1}`}
+            className="self-start w-7 h-7 flex items-center justify-center rounded-full hover:bg-red-100 dark:hover:bg-red-950 text-red-600 shrink-0"
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        onClick={() => setItems((prev) => [...prev, { question: "", question_de: "", answer: "", answer_de: "" }])}
+        className="self-start px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
+      >
+        + Dodaj pytanie
+      </button>
+
+      <SaveButton saving={saving} />
+    </form>
+  );
+}
+
+// ── Opinie ───────────────────────────────────────────────────────────────
+
+type ReviewItem = { quote: string; quote_de: string; author: string };
+
+export function ReviewsForm({ block, onResult }: BlockFormProps) {
+  const c = block.content;
+  const [heading, setHeading] = useState(cs(c.heading));
+  const [headingDe, setHeadingDe] = useState(cs(c.heading_de));
+  const [items, setItems] = useState<ReviewItem[]>(() =>
+    (Array.isArray(c.items) ? c.items : []).map((it) => {
+      const o = (typeof it === "object" && it !== null ? it : {}) as Record<string, unknown>;
+      return { quote: cs(o.quote), quote_de: cs(o.quote_de), author: cs(o.author) };
+    })
+  );
+  const [saving, startTransition] = useTransition();
+
+  function setItem(i: number, patch: Partial<ReviewItem>) {
+    setItems((prev) => prev.map((x, xi) => (xi === i ? { ...x, ...patch } : x)));
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    startTransition(async () => {
+      onResult(await updateContentBlock(block.id, { heading, heading_de: headingDe, items }));
+    });
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Nagłówek (opcjonalnie)">
+          <input value={heading} onChange={(e) => setHeading(e.target.value)} maxLength={200} className={inputCls} />
+        </Field>
+        <Field label="Nagłówek (DE)">
+          <input value={headingDe} onChange={(e) => setHeadingDe(e.target.value)} maxLength={200} className={inputCls} />
+        </Field>
+      </div>
+
+      {items.map((item, i) => (
+        <div key={i} className="border border-[var(--border)] rounded-xl p-4 flex gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
+            <Field label={`Opinia ${i + 1}`} required>
+              <textarea value={item.quote} onChange={(e) => setItem(i, { quote: e.target.value })} rows={3} maxLength={2000} className={inputCls} />
+            </Field>
+            <Field label="Opinia (DE)">
+              <textarea value={item.quote_de} onChange={(e) => setItem(i, { quote_de: e.target.value })} rows={3} maxLength={2000} className={inputCls} />
+            </Field>
+            <Field label="Podpis (np. Anna z Warszawy)">
+              <input value={item.author} onChange={(e) => setItem(i, { author: e.target.value })} maxLength={200} className={inputCls} />
+            </Field>
+          </div>
+          <button
+            type="button"
+            onClick={() => setItems((prev) => prev.filter((_, xi) => xi !== i))}
+            aria-label={`Usuń opinię ${i + 1}`}
+            className="self-start w-7 h-7 flex items-center justify-center rounded-full hover:bg-red-100 dark:hover:bg-red-950 text-red-600 shrink-0"
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        onClick={() => setItems((prev) => [...prev, { quote: "", quote_de: "", author: "" }])}
+        className="self-start px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
+      >
+        + Dodaj opinię
+      </button>
+
+      <SaveButton saving={saving} />
+    </form>
+  );
+}
+
+// ── Sekcja produktowa ────────────────────────────────────────────────────
+
+export function ProductsForm({
+  block,
+  onResult,
+  picker,
+}: BlockFormProps & { picker: BlockPickerData }) {
+  const c = block.content;
+  const [heading, setHeading] = useState(cs(c.heading));
+  const [headingDe, setHeadingDe] = useState(cs(c.heading_de));
+  const [source, setSource] = useState<string>(
+    c.source === "collection" || c.source === "category" ? (c.source as string) : "manual"
+  );
+  const [productIds, setProductIds] = useState<string[]>(() =>
+    (Array.isArray(c.product_ids) ? c.product_ids : []).filter(
+      (x): x is string => typeof x === "string"
+    )
+  );
+  const [collectionSlug, setCollectionSlug] = useState(cs(c.collection_slug));
+  const [categorySlug, setCategorySlug] = useState(cs(c.category_slug));
+  const [limit, setLimit] = useState(
+    typeof c.limit === "number" && Number.isFinite(c.limit) ? String(c.limit) : "4"
+  );
+  const [search, setSearch] = useState("");
+  const [saving, startTransition] = useTransition();
+
+  const q = search.trim().toLowerCase();
+  const visibleProducts = q
+    ? picker.products.filter((p) => p.name.toLowerCase().includes(q))
+    : picker.products;
+
+  function toggleProduct(id: string) {
+    setProductIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    startTransition(async () => {
+      onResult(
+        await updateContentBlock(block.id, {
+          heading, heading_de: headingDe, source,
+          product_ids: productIds, collection_slug: collectionSlug,
+          category_slug: categorySlug, limit: Number(limit) || 4,
+        })
+      );
+    });
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Nagłówek (opcjonalnie)">
+          <input value={heading} onChange={(e) => setHeading(e.target.value)} maxLength={200} className={inputCls} />
+        </Field>
+        <Field label="Nagłówek (DE)">
+          <input value={headingDe} onChange={(e) => setHeadingDe(e.target.value)} maxLength={200} className={inputCls} />
+        </Field>
+      </div>
+
+      <Field label="Skąd brać produkty?">
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["manual", "Wybieram ręcznie"],
+              ["collection", "Cała kolekcja"],
+              ["category", "Cała kategoria"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setSource(value)}
+              aria-pressed={source === value}
+              className={`px-3 py-1.5 rounded-full text-xs font-sans transition-colors ${
+                source === value
+                  ? "bg-[var(--color-navy)] text-white"
+                  : "border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      {source === "manual" && (
+        <div className="flex flex-col gap-2">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Szukaj produktu…"
+            className={inputCls}
+          />
+          <div className="max-h-64 overflow-y-auto border border-[var(--border)] rounded-xl divide-y divide-[var(--border)]">
+            {visibleProducts.length === 0 && (
+              <p className="p-3 text-xs text-[var(--muted)] italic">Brak dopasowań</p>
+            )}
+            {visibleProducts.map((p) => (
+              <label key={p.id} className="flex items-center gap-3 p-2 cursor-pointer hover:bg-[var(--bg)]">
+                <input
+                  type="checkbox"
+                  checked={productIds.includes(p.id)}
+                  onChange={() => toggleProduct(p.id)}
+                  className="h-4 w-4 accent-[var(--color-gold)]"
+                />
+                <span className="text-sm text-[var(--fg)]">{p.name}</span>
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-[var(--muted)]">
+            Wybrano: {productIds.length} (max 12; kolejność = kolejność zaznaczania)
+          </p>
+        </div>
+      )}
+
+      {source === "collection" && (
+        <Field label="Kolekcja" required>
+          <select value={collectionSlug} onChange={(e) => setCollectionSlug(e.target.value)} className={inputCls}>
+            <option value="">— wybierz —</option>
+            {picker.collections.map((col) => (
+              <option key={col.slug} value={col.slug}>{col.label}</option>
+            ))}
+          </select>
+        </Field>
+      )}
+
+      {source === "category" && (
+        <Field label="Kategoria" required>
+          <select value={categorySlug} onChange={(e) => setCategorySlug(e.target.value)} className={inputCls}>
+            <option value="">— wybierz —</option>
+            {picker.categories.map((cat) => (
+              <option key={cat.slug} value={cat.slug}>{cat.label}</option>
+            ))}
+          </select>
+        </Field>
+      )}
+
+      {source !== "manual" && (
+        <Field label="Ile produktów pokazać (1–12)">
+          <input
+            type="number" min={1} max={12} inputMode="numeric"
+            value={limit} onChange={(e) => setLimit(e.target.value)}
+            className={`${inputCls} w-24`}
+          />
+        </Field>
+      )}
+
+      <SaveButton saving={saving} />
+    </form>
+  );
+}
