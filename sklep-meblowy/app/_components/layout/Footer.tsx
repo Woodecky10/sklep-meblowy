@@ -4,14 +4,17 @@ import { getSections, getCategories } from "@/app/_lib/categories";
 import { COMPANY, isFilled } from "@/app/_lib/company";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { getDictionary } from "@/app/_lib/dictionaries";
+import { getSiteTexts, siteText } from "@/app/_lib/site-texts";
 
 export default async function Footer() {
   const locale = await getLocale();
   const t = getDictionary(locale);
-  const [sections, categories] = await Promise.all([
+  const [sections, categories, texts] = await Promise.all([
     getSections(locale),
     getCategories(locale),
+    getSiteTexts(),
   ]);
+  const tagline = siteText(texts, "footer_tagline", locale, t.footer.tagline);
 
   const infoLinks: [string, string][] = [
     [t.footer.about, "/o-nas"],
@@ -41,7 +44,7 @@ export default async function Footer() {
             </p>
           </div>
           <p className="text-sm text-white/60 leading-relaxed max-w-xs mb-4">
-            {t.footer.tagline}
+            {tagline}
           </p>
           <p className="text-xs text-white/70 leading-relaxed">
             {COMPANY.email}

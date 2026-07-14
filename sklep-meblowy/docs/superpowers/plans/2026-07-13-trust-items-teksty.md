@@ -556,8 +556,11 @@ export default async function TrustBar({
   const items = prepareTrustItems(rows, locale);
   if (items.length === 0) return null;
 
-  const resolvedHeading = heading ?? t.heading;
-  const resolvedEyebrow = eyebrow ?? t.eyebrow;
+  // undefined = wywołanie bez propsa (karta produktu/stopka) → słownik;
+  // null/"" = świadomie wyczyszczone w adminie → element się nie renderuje.
+  // (semantyka z fixu po final review kroku 1 — NIE zamieniać na `??`)
+  const resolvedHeading = heading === undefined ? t.heading : heading;
+  const resolvedEyebrow = eyebrow === undefined ? t.eyebrow : eyebrow;
 
   // Liczba kolumn na lg dopasowana do liczby pozycji (Tailwind wymaga
   // literalnych klas — stąd mapa zamiast interpolacji).

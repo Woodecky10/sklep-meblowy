@@ -11,6 +11,10 @@ import {
   reorderHomeSections,
 } from "./actions";
 import type { ActionResult } from "@/app/_lib/types";
+import TrustItemsEditor from "./TrustItemsEditor";
+import SiteTextsCard from "./SiteTextsCard";
+import type { TrustItemRow } from "@/app/_lib/trust-items";
+import type { SiteTextsMap } from "@/app/_lib/site-texts";
 
 // Metadane prezentacyjne sekcji (PL-only, panel admina).
 const SECTION_META: Record<
@@ -54,8 +58,12 @@ const SECTION_META: Record<
 
 export default function HomeSectionsEditor({
   initialSections,
+  initialTrustItems,
+  initialSiteTexts,
 }: {
   initialSections: HomeSectionRow[];
+  initialTrustItems: TrustItemRow[];
+  initialSiteTexts: SiteTextsMap;
 }) {
   const [sections, setSections] = useState(initialSections);
   // Sync stanu z propów po router.refresh() (wzorzec TilesEditor).
@@ -215,12 +223,19 @@ export default function HomeSectionsEditor({
               </div>
 
               {expanded && meta.hasHeadings && (
-                <SectionHeadingsForm section={s} onResult={handleResult} />
+                <>
+                  <SectionHeadingsForm section={s} onResult={handleResult} />
+                  {s.key === "trust_bar" && (
+                    <TrustItemsEditor initialItems={initialTrustItems} onResult={handleResult} />
+                  )}
+                </>
               )}
             </Card>
           );
         })}
       </div>
+
+      <SiteTextsCard initialTexts={initialSiteTexts} onResult={handleResult} />
     </div>
   );
 }
