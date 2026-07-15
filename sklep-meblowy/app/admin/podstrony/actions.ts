@@ -8,6 +8,8 @@ import { createAdminClient } from "@/app/_lib/supabase/server";
 import { slugifyTitle, validatePageSlug } from "@/app/_lib/pages";
 import { invalidatePagesCache } from "@/app/_lib/pages-server";
 import { invalidatePageBlocksCache } from "@/app/_lib/blocks-server";
+import { isMenuLocation } from "@/app/_lib/menu";
+import { invalidateMenuCache } from "@/app/_lib/menu-server";
 import type { ActionResult } from "@/app/_lib/types";
 
 const UUID_RE =
@@ -32,6 +34,14 @@ function revalidatePages(slugs: (string | null | undefined)[]): void {
     revalidatePath(`/${slug}`);
     revalidatePath(`/de/${slug}`);
   }
+  revalidatePath("/admin/podstrony");
+}
+
+// Menu żyje w Navbarze/stopce na KAŻDEJ stronie → rewalidacja layoutu
+// (wzorzec revalidateHome ze strony głównej).
+function revalidateMenu(): void {
+  invalidateMenuCache();
+  revalidatePath("/", "layout");
   revalidatePath("/admin/podstrony");
 }
 
@@ -116,6 +126,7 @@ export async function togglePagePublished(
   const slug = (data as { slug: string }[] | null)?.[0]?.slug;
   if (!slug) return { ok: false, error: "Nie znaleziono strony" };
   revalidatePages([slug]);
+  invalidateMenuCache();
   return {
     ok: true,
     message: published ? "Strona opublikowana" : "Strona cofnięta do szkicu",
@@ -136,5 +147,109 @@ export async function deletePage(formData: FormData): Promise<ActionResult> {
   const slug = (data as { slug: string }[] | null)?.[0]?.slug;
   if (!slug) return { ok: false, error: "Nie znaleziono strony" };
   revalidatePages([slug]);
+  invalidateMenuCache();
   return { ok: true, message: "Usunięto stronę (razem z jej sekcjami)" };
+}
+
+// ============================================================
+// Pozycje menu (menu_items, migracja 54)
+// ============================================================
+
+export async function addMenuItem(formData: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  const pageId = sanitize(formData.get("page_id"), 40);
+  if (!UUID_RE.test(pageId)) return { ok: false, error: "Wybierz stronę" };
+  const location = sanitize(formData.get("location"), 20);
+  if (!isMenuLocation(location)) return { ok: false, error: "Nieznana lokalizacja menu" };
+  const supabase = await createAdminClient();
+  const { data: maxRows } = await supabase
+    .from("menu_items")
+    .select("sort_order")
+    .eq("location", location)
+    .order("sort_order", { ascending: false })
+    .limit(1);
+  const nextOrder =
+    ((maxRows?.[0] as { sort_order: number } | undefined)?.sort_order ?? -1) + 1;
+  const { error } = await supabase.from("menu_items").insert({
+    location,
+    page_id: pageId,
+    sort_order: nextOrder,
+    visible: true,
+  } as never);
+  if (error) {
+    if (error.code === "23503") return { ok: false, error: "Ta strona już nie istnieje" };
+    return { ok: false, error: error.message };
+  }
+  revalidateMenu();
+  return { ok: true, message: "Dodano do menu" };
+}
+
+export async function updateMenuItemLabel(formData: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  const id = sanitize(formData.get("id"), 40);
+  if (!UUID_RE.test(id)) return { ok: false, error: "Nie znaleziono pozycji menu" };
+  const supabase = await createAdminClient();
+  const { data, error } = await supabase
+    .from("menu_items")
+    .update({
+      label: emptyToNull(sanitize(formData.get("label"), 100)),
+      label_de: emptyToNull(sanitize(formData.get("label_de"), 100)),
+      updated_at: new Date().toISOString(),
+    } as never)
+    .eq("id", id)
+    .select("id");
+  if (error) return { ok: false, error: error.message };
+  if (!data || data.length === 0) return { ok: false, error: "Nie znaleziono pozycji menu" };
+  revalidateMenu();
+  return { ok: true, message: "Zapisano etykietę" };
+}
+
+export async function toggleMenuItemVisible(formData: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  const id = sanitize(formData.get("id"), 40);
+  if (!UUID_RE.test(id)) return { ok: false, error: "Nie znaleziono pozycji menu" };
+  const visible = formData.get("visible") === "1";
+  const supabase = await createAdminClient();
+  const { data, error } = await supabase
+    .from("menu_items")
+    .update({ visible, updated_at: new Date().toISOString() } as never)
+    .eq("id", id)
+    .select("id");
+  if (error) return { ok: false, error: error.message };
+  if (!data || data.length === 0) return { ok: false, error: "Nie znaleziono pozycji menu" };
+  revalidateMenu();
+  return { ok: true, message: visible ? "Pozycja widoczna" : "Pozycja ukryta" };
+}
+
+export async function deleteMenuItem(formData: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  const id = sanitize(formData.get("id"), 40);
+  if (!UUID_RE.test(id)) return { ok: false, error: "Nie znaleziono pozycji menu" };
+  const supabase = await createAdminClient();
+  const { data, error } = await supabase
+    .from("menu_items")
+    .delete()
+    .eq("id", id)
+    .select("id");
+  if (error) return { ok: false, error: error.message };
+  if (!data || data.length === 0) return { ok: false, error: "Nie znaleziono pozycji menu" };
+  revalidateMenu();
+  return { ok: true, message: "Usunięto pozycję menu (strona zostaje)" };
+}
+
+export async function reorderMenuItems(ids: string[]): Promise<ActionResult> {
+  await requireAdmin();
+  if (
+    !Array.isArray(ids) ||
+    ids.length === 0 ||
+    new Set(ids).size !== ids.length ||
+    !ids.every((id) => typeof id === "string" && UUID_RE.test(id))
+  ) {
+    return { ok: false, error: "Nieprawidłowa kolejność menu" };
+  }
+  const supabase = await createAdminClient();
+  const { error } = await supabase.rpc("reorder_menu_items", { p_ids: ids });
+  if (error) return { ok: false, error: `Reorder zawiódł: ${error.message}` };
+  revalidateMenu();
+  return { ok: true, message: "Zmieniono kolejność" };
 }
