@@ -18,6 +18,11 @@ create table if not exists public.menu_items (
 create index if not exists menu_items_location_sort_idx
   on public.menu_items (location, sort_order);
 
+-- Jedna strona może być w danej lokacji tylko raz (duplikat = 23505,
+-- mapowany w addMenuItem na polski komunikat).
+create unique index if not exists menu_items_location_page_idx
+  on public.menu_items (location, page_id);
+
 alter table public.menu_items enable row level security;
 
 -- Odczyt anonimowy tylko pozycji widocznych, wskazujących OPUBLIKOWANE

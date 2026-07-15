@@ -126,7 +126,7 @@ export async function togglePagePublished(
   const slug = (data as { slug: string }[] | null)?.[0]?.slug;
   if (!slug) return { ok: false, error: "Nie znaleziono strony" };
   revalidatePages([slug]);
-  invalidateMenuCache();
+  revalidateMenu();
   return {
     ok: true,
     message: published ? "Strona opublikowana" : "Strona cofnięta do szkicu",
@@ -147,7 +147,7 @@ export async function deletePage(formData: FormData): Promise<ActionResult> {
   const slug = (data as { slug: string }[] | null)?.[0]?.slug;
   if (!slug) return { ok: false, error: "Nie znaleziono strony" };
   revalidatePages([slug]);
-  invalidateMenuCache();
+  revalidateMenu();
   return { ok: true, message: "Usunięto stronę (razem z jej sekcjami)" };
 }
 
@@ -177,6 +177,9 @@ export async function addMenuItem(formData: FormData): Promise<ActionResult> {
     visible: true,
   } as never);
   if (error) {
+    if (error.code === "23505") {
+      return { ok: false, error: "Ta strona już jest w tym menu" };
+    }
     if (error.code === "23503") return { ok: false, error: "Ta strona już nie istnieje" };
     return { ok: false, error: error.message };
   }
