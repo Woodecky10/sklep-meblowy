@@ -5,16 +5,20 @@ import { COMPANY, isFilled } from "@/app/_lib/company";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { getSiteTexts, siteText } from "@/app/_lib/site-texts";
+import { getMenuItems } from "@/app/_lib/menu-server";
+import { prepareMenuItems } from "@/app/_lib/menu";
 
 export default async function Footer() {
   const locale = await getLocale();
   const t = getDictionary(locale);
-  const [sections, categories, texts] = await Promise.all([
+  const [sections, categories, texts, menuRows] = await Promise.all([
     getSections(locale),
     getCategories(locale),
     getSiteTexts(),
+    getMenuItems(),
   ]);
   const tagline = siteText(texts, "footer_tagline", locale, t.footer.tagline);
+  const footerItems = prepareMenuItems(menuRows, "footer", locale);
 
   const infoLinks: [string, string][] = [
     [t.footer.about, "/o-nas"],
@@ -88,6 +92,17 @@ export default async function Footer() {
               <li key={href}>
                 <LocalizedLink href={href} className="hover:text-[var(--color-gold)] transition-colors">
                   {label}
+                </LocalizedLink>
+              </li>
+            ))}
+            {/* Podstrony z menu stopki (admin: /admin/podstrony). */}
+            {footerItems.map((item) => (
+              <li key={item.id}>
+                <LocalizedLink
+                  href={item.href}
+                  className="hover:text-[var(--color-gold)] transition-colors"
+                >
+                  {item.label}
                 </LocalizedLink>
               </li>
             ))}

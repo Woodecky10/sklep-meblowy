@@ -1,14 +1,19 @@
 import type { Metadata } from "next";
 import { requireAdmin } from "@/app/_lib/admin";
 import { getAllPagesAdmin } from "@/app/_lib/pages-server";
+import { getAllMenuItemsAdmin } from "@/app/_lib/menu-server";
 import CreatePageForm from "./CreatePageForm";
 import PagesList from "./PagesList";
+import MenuCard from "./MenuCard";
 
 export const metadata: Metadata = { title: "Podstrony — panel admina" };
 
 export default async function AdminPagesPage() {
   await requireAdmin();
-  const pages = await getAllPagesAdmin();
+  const [pages, menuItems] = await Promise.all([
+    getAllPagesAdmin(),
+    getAllMenuItemsAdmin(),
+  ]);
   return (
     <div className="max-w-4xl mx-auto flex flex-col gap-8">
       <div>
@@ -24,6 +29,7 @@ export default async function AdminPagesPage() {
       </div>
       <CreatePageForm />
       <PagesList initialPages={pages} />
+      <MenuCard initialItems={menuItems} pages={pages} />
     </div>
   );
 }
