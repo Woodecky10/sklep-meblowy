@@ -11,6 +11,8 @@ export type MobileMenuSection = {
   categories: { slug: string; label: string }[];
 };
 
+export type PageLink = { id: string; href: string; label: string };
+
 export type MobileMenuLabels = {
   menu: string;
   allInSection: string;
@@ -26,11 +28,13 @@ export default function MobileMenu({
   isLoggedIn = false,
   isAdmin = false,
   sections = [],
+  pageLinks = [],
   labels,
 }: {
   isLoggedIn?: boolean;
   isAdmin?: boolean;
   sections?: MobileMenuSection[];
+  pageLinks?: PageLink[];
   labels: MobileMenuLabels;
 }) {
   const [open, setOpen] = useState(false);
@@ -105,6 +109,20 @@ export default function MobileMenu({
                 </div>
               );
             })}
+            {pageLinks.length > 0 && (
+              <div className="flex flex-col gap-1 pt-3 border-t border-[var(--border)]">
+                {pageLinks.map((item) => (
+                  <LocalizedLink
+                    key={item.id}
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    className="py-2 font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors"
+                  >
+                    {item.label}
+                  </LocalizedLink>
+                ))}
+              </div>
+            )}
             <div className="border-t border-[var(--border)] pt-4 mt-2 flex flex-col gap-4">
               {isLoggedIn ? (
                 <>
