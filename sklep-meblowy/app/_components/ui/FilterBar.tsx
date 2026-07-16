@@ -24,9 +24,24 @@ export type FilterBarFacet = {
   label: string;
 };
 
+// Facet opcji wariantu (?opcja_<slug>=): values jak kolor/tkanina.
+export type FilterBarOptionFacet = {
+  slug: string;
+  label: string;
+  values: FilterBarFacet[];
+};
+
+export type FilterBarDimensionBounds = {
+  width: { min: number; max: number } | null;
+  depth: { min: number; max: number } | null;
+  height: { min: number; max: number } | null;
+};
+
 type Props = {
   colors: FilterBarFacet[];
   materials: FilterBarFacet[];
+  optionFacets?: FilterBarOptionFacet[];
+  dimensionBounds?: FilterBarDimensionBounds;
   sections?: FilterBarSection[];
   collections?: FilterBarCollection[];
 };
@@ -38,11 +53,18 @@ type DropdownKey =
   | "collection"
   | "price"
   | "sort"
+  | "dimensions"
+  | `option:${string}`
   | null;
+
+// Parametry URL zakresów wymiarów (cm) — kolejność = kolejność pól w panelu.
+const DIM_KEYS = ["szer_od", "szer_do", "gl_od", "gl_do", "wys_od", "wys_do"] as const;
 
 export default function FilterBar({
   colors,
   materials,
+  optionFacets = [],
+  dimensionBounds,
   sections = [],
   collections = [],
 }: Props) {
@@ -96,8 +118,20 @@ export default function FilterBar({
   const selectedColors = (effectiveParams.get("kolor") ?? "").split(",").filter(Boolean);
   const selectedMaterials = (effectiveParams.get("tkanina") ?? "").split(",").filter(Boolean);
 
+  // Wybrane wartości per opcja (z URL — jak selectedMaterials).
+  const selectedOptions = new Map(
+    optionFacets.map((g) => [
+      g.slug,
+      (effectiveParams.get(`opcja_${g.slug}`) ?? "").split(",").filter(Boolean),
+    ])
+  );
+
   const [priceMin, setPriceMin] = useState(searchParams.get("cena_od") ?? "");
   const [priceMax, setPriceMax] = useState(searchParams.get("cena_do") ?? "");
+  // Zakresy wymiarów — lokalny stan + debounce, dokładnie jak cena.
+  const [dims, setDims] = useState<Record<string, string>>(() =>
+    Object.fromEntries(DIM_KEYS.map((k) => [k, searchParams.get(k) ?? ""]))
+  );
   const [openDropdown, setOpenDropdown] = useState<DropdownKey>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -155,6 +189,29 @@ export default function FilterBar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [priceMin, priceMax, router, searchParams, locale, pendingQuery]);
 
+  // Debounce zakresów wymiarów — bliźniak debounce'a ceny wyżej (uzasadnienie
+  // pominiętych deps identyczne).
+  const dimsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (dimsDebounceRef.current) clearTimeout(dimsDebounceRef.current);
+    dimsDebounceRef.current = setTimeout(() => {
+      const params = new URLSearchParams(pendingQuery ?? searchParams.toString());
+      let changed = false;
+      for (const k of DIM_KEYS) {
+        if (dims[k]) params.set(k, dims[k]);
+        else params.delete(k);
+        if ((searchParams.get(k) ?? "") !== dims[k]) changed = true;
+      }
+      if (!changed) return;
+      params.delete("strona");
+      navigate(params);
+    }, 500);
+    return () => {
+      if (dimsDebounceRef.current) clearTimeout(dimsDebounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dims, router, searchParams, locale, pendingQuery]);
+
   // Jedyna ścieżka nawigacji filtrów: ustawia optymistyczny stan i odpala
   // router.push w transition (isPending → pasek pending pod FilterBarem).
   function navigate(params: URLSearchParams) {
@@ -204,6 +261,12 @@ export default function FilterBar({
   const categoryCount = category ? 1 : 0;
   const collectionCount = collection ? 1 : 0;
   const priceCount = priceActive ? 1 : 0;
+  const optionCount = [...selectedOptions.values()].reduce((s, v) => s + v.length, 0);
+  const dimsActive = DIM_KEYS.some((k) => dims[k] !== "");
+  const hasDimensionBounds = !!(
+    dimensionBounds &&
+    (dimensionBounds.width || dimensionBounds.depth || dimensionBounds.height)
+  );
 
   const totalActiveFilters =
     categoryCount +
@@ -211,7 +274,9 @@ export default function FilterBar({
     selectedColors.length +
     selectedMaterials.length +
     priceCount +
-    (inStockOnly ? 1 : 0);
+    (inStockOnly ? 1 : 0) +
+    optionCount +
+    (dimsActive ? 1 : 0);
 
   const activeSort = SORTS.find((s) => s.value === sort) ?? SORTS[0];
 
@@ -223,6 +288,7 @@ export default function FilterBar({
     if (sort && sort !== "alphabetic") params.set("sortuj", sort);
     setPriceMin("");
     setPriceMax("");
+    setDims(Object.fromEntries(DIM_KEYS.map((k) => [k, ""])));
     setOpenDropdown(null);
     navigate(params);
   }
@@ -271,6 +337,23 @@ export default function FilterBar({
             count={selectedMaterials.length}
             open={openDropdown === "material"}
             onClick={() => toggleDropdown("material")}
+          />
+        )}
+        {optionFacets.map((g) => (
+          <FilterPill
+            key={g.slug}
+            label={g.label}
+            count={selectedOptions.get(g.slug)?.length ?? 0}
+            open={openDropdown === `option:${g.slug}`}
+            onClick={() => toggleDropdown(`option:${g.slug}`)}
+          />
+        ))}
+        {hasDimensionBounds && (
+          <FilterPill
+            label={t.filter.dimensions}
+            count={dimsActive ? 1 : 0}
+            open={openDropdown === "dimensions"}
+            onClick={() => toggleDropdown("dimensions")}
           />
         )}
         <FilterPill
@@ -440,6 +523,32 @@ export default function FilterBar({
         </DropdownPanel>
       )}
 
+      {optionFacets.map((g) =>
+        openDropdown === `option:${g.slug}` ? (
+          <DropdownPanel key={g.slug} align="left">
+            <div className="flex flex-wrap gap-1.5">
+              {g.values.map((val) => {
+                const selected = selectedOptions.get(g.slug) ?? [];
+                const active = selected.includes(val.value);
+                return (
+                  <button
+                    key={val.value}
+                    onClick={() => toggleMulti(`opcja_${g.slug}`, selected, val.value)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-sans capitalize transition-colors ${
+                      active
+                        ? "bg-[var(--color-gold)] text-white"
+                        : "border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
+                    }`}
+                  >
+                    {val.label}
+                  </button>
+                );
+              })}
+            </div>
+          </DropdownPanel>
+        ) : null
+      )}
+
       {openDropdown === "price" && (
         <DropdownPanel align="left">
           <p className="text-[10px] font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
@@ -466,6 +575,48 @@ export default function FilterBar({
               className="w-24 px-3 py-1.5 text-sm border border-[var(--border)] bg-[var(--bg)] rounded-full outline-none focus:border-[var(--color-gold)]"
             />
             <span className="text-[var(--muted)]">zł</span>
+          </div>
+        </DropdownPanel>
+      )}
+
+      {openDropdown === "dimensions" && (
+        <DropdownPanel align="left">
+          <div className="flex flex-col gap-3">
+            {(
+              [
+                { label: t.filter.dimWidth, from: "szer_od", to: "szer_do", bounds: dimensionBounds?.width },
+                { label: t.filter.dimDepth, from: "gl_od", to: "gl_do", bounds: dimensionBounds?.depth },
+                { label: t.filter.dimHeight, from: "wys_od", to: "wys_do", bounds: dimensionBounds?.height },
+              ] as const
+            ).map((row) => (
+              <div key={row.from}>
+                <p className="text-[10px] font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
+                  {row.label}
+                </p>
+                <div className="flex items-center gap-2 text-sm text-[var(--fg)]">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    placeholder={row.bounds ? `${t.filter.priceFrom} (${row.bounds.min})` : t.filter.priceFrom}
+                    value={dims[row.from]}
+                    onChange={(e) => setDims((d) => ({ ...d, [row.from]: e.target.value }))}
+                    className="w-24 px-3 py-1.5 text-sm border border-[var(--border)] bg-[var(--bg)] rounded-full outline-none focus:border-[var(--color-gold)]"
+                  />
+                  <span className="text-[var(--muted)]">—</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    placeholder={row.bounds ? `${t.filter.priceTo} (${row.bounds.max})` : t.filter.priceTo}
+                    value={dims[row.to]}
+                    onChange={(e) => setDims((d) => ({ ...d, [row.to]: e.target.value }))}
+                    className="w-24 px-3 py-1.5 text-sm border border-[var(--border)] bg-[var(--bg)] rounded-full outline-none focus:border-[var(--color-gold)]"
+                  />
+                  <span className="text-[var(--muted)]">cm</span>
+                </div>
+              </div>
+            ))}
           </div>
         </DropdownPanel>
       )}
@@ -534,6 +685,24 @@ export default function FilterBar({
               onRemove={() => toggleMulti("tkanina", selectedMaterials, m)}
             />
           ))}
+          {optionFacets.flatMap((g) => {
+            const selected = selectedOptions.get(g.slug) ?? [];
+            return selected.map((val) => (
+              <ActiveChip
+                key={`opt-${g.slug}-${val}`}
+                label={`${g.label}: ${g.values.find((x) => x.value === val)?.label ?? val}`}
+                removeLabel={t.filter.removeFilter}
+                onRemove={() => toggleMulti(`opcja_${g.slug}`, selected, val)}
+              />
+            ));
+          })}
+          {dimsActive && (
+            <ActiveChip
+              label={t.filter.dimensions}
+              removeLabel={t.filter.removeFilter}
+              onRemove={() => setDims(Object.fromEntries(DIM_KEYS.map((k) => [k, ""])))}
+            />
+          )}
           {priceActive && (
             <ActiveChip
               label={`${t.filter.price}: ${priceMin || "0"}–${priceMax || "∞"} zł`}

@@ -21,6 +21,9 @@ export type ProductOption = {
   name: string;
   values: string[];
   value_prices?: Record<string, number>;
+  // Admin zaznaczył „Filtr w sklepie" — opcja pojawia się jako filtr na /sklep
+  // (facety liczone w getFacetSource). Brak/false = opcja nie filtruje.
+  filterable?: boolean;
 };
 
 // Override-y wyswietlanych nazw — admin moze zmienic "Wariant" -> "Kolor"

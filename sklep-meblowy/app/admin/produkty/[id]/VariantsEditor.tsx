@@ -90,6 +90,16 @@ export default function VariantsEditor({
     setVariants({ ...variants, options: nextOptions });
   }
 
+  // Flaga „Filtr w sklepie": true → klucz w JSON, false → klucz znika
+  // (undefined wypada przy JSON.stringify — czysty JSONB bez filterable:false).
+  function setOptionFilterable(idx: number, filterable: boolean) {
+    if (!variants) return;
+    const nextOptions = variants.options.map((o, i) =>
+      i === idx ? { ...o, filterable: filterable || undefined } : o
+    );
+    setVariants({ ...variants, options: nextOptions });
+  }
+
   function addValue(optIdx: number, value: string) {
     if (!variants) return;
     const trimmed = value.trim();
@@ -174,7 +184,12 @@ export default function VariantsEditor({
               }
               if (Object.keys(kept).length > 0) value_prices = kept;
             }
-            return { name: o.name.trim(), values, ...(value_prices ? { value_prices } : {}) };
+            return {
+              name: o.name.trim(),
+              values,
+              ...(value_prices ? { value_prices } : {}),
+              ...(o.filterable ? { filterable: true } : {}),
+            };
           })
           .filter((o) => o.name && o.values.length > 0);
         if (cleanOptions.length === 0) {
@@ -308,6 +323,7 @@ export default function VariantsEditor({
             onRemoveValue={(v) => removeValue(i, v)}
             onSetValuePrice={(v, p) => setValuePrice(i, v, p)}
             onRemoveOption={() => removeOption(i)}
+            onToggleFilterable={(v) => setOptionFilterable(i, v)}
           />
         ))}
         <button
@@ -382,6 +398,7 @@ function OptionRow({
   onRemoveValue,
   onSetValuePrice,
   onRemoveOption,
+  onToggleFilterable,
 }: {
   option: ProductOption;
   onNameChange: (name: string) => void;
@@ -389,6 +406,7 @@ function OptionRow({
   onRemoveValue: (v: string) => void;
   onSetValuePrice: (value: string, price: number | null) => void;
   onRemoveOption: () => void;
+  onToggleFilterable: (v: boolean) => void;
 }) {
   const [newValue, setNewValue] = useState("");
   return (
@@ -411,6 +429,19 @@ function OptionRow({
           Usuń opcję
         </button>
       </div>
+
+      <label className="self-start flex items-center gap-2 text-sm text-[var(--fg)] cursor-pointer">
+        <input
+          type="checkbox"
+          checked={option.filterable === true}
+          onChange={(e) => onToggleFilterable(e.target.checked)}
+          className="h-4 w-4 accent-[var(--color-gold)]"
+        />
+        Filtr w sklepie
+        <span className="text-xs text-[var(--muted)]">
+          — klient może filtrować listę produktów po tej opcji
+        </span>
+      </label>
 
       <div className="flex flex-col gap-2">
         <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">

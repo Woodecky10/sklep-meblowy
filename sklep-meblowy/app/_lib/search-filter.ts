@@ -40,3 +40,30 @@ export function buildSearchOrFilter(
   const descCol = locale === "de" ? "description_de" : "description";
   return `${nameCol}.ilike.%${term}%,${descCol}.ilike.%${term}%`;
 }
+
+// Ranking wyników wyszukiwania: produkty z frazą w NAZWIE przed tymi, które
+// dopasowały się tylko przez opis. Wyszukiwarka szuka po name+description
+// (buildSearchOrFilter), więc np. „materac" łapie też łóżka kontynentalne
+// (boxspring z materacem w opisie). Ten ranking wypycha faktyczne materace na
+// górę, zachowując trafienia z opisu niżej — bez utraty wyszukiwania po treści.
+//
+// Kolejność wewnątrz każdej grupy jest zachowana (stabilna), więc sort z DB
+// (alfabetyczny/cena/nowość) pozostaje w mocy. Dopasowanie case-insensitive
+// (jak ILIKE) i po tej samej sanityzowanej frazie co filtr DB — bez
+// diakrytyko-niezależności (identycznie jak zapytanie). Fraza pusta po
+// sanityzacji → wejście bez zmian (nie ma czego rankować).
+export function rankByNameMatch<T>(
+  rows: T[],
+  raw: string,
+  getName: (row: T) => string | null | undefined
+): T[] {
+  const term = sanitizeSearchTerm(raw).toLowerCase();
+  if (!term) return rows;
+  const nameHits: T[] = [];
+  const rest: T[] = [];
+  for (const row of rows) {
+    if ((getName(row) ?? "").toLowerCase().includes(term)) nameHits.push(row);
+    else rest.push(row);
+  }
+  return [...nameHits, ...rest];
+}

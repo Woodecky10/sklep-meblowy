@@ -2,13 +2,24 @@ import { unstable_cache, revalidateTag } from "next/cache";
 import { createClient as createBareAnonClient } from "@supabase/supabase-js";
 import { createClient, createAdminClient } from "./supabase/server";
 import { getCategories } from "./categories";
-import { buildSearchOrFilter } from "./search-filter";
+import { buildSearchOrFilter, rankByNameMatch } from "./search-filter";
 import { sizeLabelOf } from "./size-groups";
 import { localizeProduct, buildLocalizedFacets } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Category, Product } from "./types";
 import { deriveFabricFamilies, productMatchesFabric } from "./fabric-filter";
 import { getAllFabrics } from "./fabrics";
+import {
+  productMatchesOptionFilters,
+  productMatchesDimensions,
+  hasActiveDimensionRanges,
+  collectOptionFacets,
+  collectDimensionBounds,
+  localizeOptionFacets,
+  type DimensionRanges,
+  type OptionFacetGroup,
+  type DimensionBounds,
+} from "./option-filter";
 
 // Górny limit rozmiaru strony — broni przed ?limit=999999 (kosztowny request).
 export const PRODUCTS_PAGE_LIMIT_MAX = 100;
@@ -46,6 +57,11 @@ export type ProductFilters = {
   // Filtr tkanin (?tkanina=). Wartości: rodziny tkanin z katalogu fabrics
   // (dopasowywane do opcji wariantów) ∪ legacy wartości kolumny material.
   materials?: string[];
+  // Filtry opcji wariantów (?opcja_<slug>=w1,w2): slug → wybrane wartości.
+  // Parsowane w sklep/page.tsx przez parseOptionFilterParams.
+  optionFilters?: Record<string, string[]>;
+  // Zakresy wymiarów w cm (?szer_od= / ?szer_do= / gl / wys).
+  dimensionRanges?: DimensionRanges;
   // Slug kolekcji — filtruje produkty należące do konkretnej kolekcji
   // (np. ?kolekcja=lisbon w URL).
   collectionSlug?: string;
@@ -74,6 +90,8 @@ export async function getProducts(filters: ProductFilters = {}) {
     inStockOnly,
     colors,
     materials,
+    optionFilters,
+    dimensionRanges,
     collectionSlug,
     sectionSlug,
     locale = DEFAULT_LOCALE,
@@ -118,13 +136,15 @@ export async function getProducts(filters: ProductFilters = {}) {
     }
   }
 
-  if (search && search.trim()) {
-    // Sanityzacja + budowa filtra .or() w search-filter.ts (escape składni
-    // .or() i wildcardów ILIKE). null = po sanityzacji nic nie zostało.
-    // DE szuka po name_de/description_de (bez fallbacku — patrz search-filter).
-    const orFilter = buildSearchOrFilter(search, locale);
-    if (orFilter) query = query.or(orFilter);
-  }
+  // Sanityzacja + budowa filtra .or() w search-filter.ts (escape składni
+  // .or() i wildcardów ILIKE). null = po sanityzacji nic nie zostało.
+  // DE szuka po name_de/description_de (bez fallbacku — patrz search-filter).
+  const searchOrFilter =
+    search && search.trim() ? buildSearchOrFilter(search, locale) : null;
+  if (searchOrFilter) query = query.or(searchOrFilter);
+  // Aktywne wyszukiwanie zmienia tryb paginacji: ranking (nazwa > opis)
+  // wymaga całego zestawu dopasowań naraz, więc paginujemy w JS (patrz niżej).
+  const searchActive = searchOrFilter !== null;
 
   if (typeof priceMin === "number") query = query.gte("price", priceMin);
   if (typeof priceMax === "number") query = query.lte("price", priceMax);
@@ -133,27 +153,39 @@ export async function getProducts(filters: ProductFilters = {}) {
 
   if (colors?.length) query = query.in("color", colors);
 
-  // Filtr tkanin: wartości pochodzą z rodzin tkanin w opcjach wariantów
-  // (katalog fabrics) W UNII z legacy kolumną material — tego nie da się
-  // wyrazić w .in() na kolumnie, więc liczymy pasujące id w JS (skala:
-  // dziesiątki produktów; RLS i tak ogranicza odczyt do aktywnych) i
-  // zawężamy główne zapytanie przez .in("id", ids). Paginacja/sort/AND z
-  // pozostałymi filtrami zostają w DB.
-  if (materials?.length) {
-    const [{ data: fabricRows }, fabrics] = await Promise.all([
+  // Filtry liczone w JS (tkanina / opcje wariantów / wymiary) — nie da się ich
+  // wyrazić w .in() na kolumnie (prawda żyje w JSONB variants/dimensions), więc
+  // liczymy pasujące id w JS (skala: dziesiątki produktów; RLS i tak ogranicza
+  // odczyt do aktywnych) i zawężamy główne zapytanie przez .in("id", ids).
+  // Paginacja/sort/AND z pozostałymi filtrami zostają w DB.
+  const optionFiltersActive = Object.values(optionFilters ?? {}).some(
+    (v) => v.length > 0
+  );
+  const dimensionsActive = hasActiveDimensionRanges(dimensionRanges ?? {});
+  if (materials?.length || optionFiltersActive || dimensionsActive) {
+    const [{ data: jsFilterRows }, fabrics] = await Promise.all([
       // Bez .limit() — świadomie (katalog ~dziesiątki produktów). Przy dużym wzroście katalogu PostgREST utnie wiersze i filtr/facety po cichu zgubią produkty — wtedy zdenormalizować rodziny do kolumny.
-      supabase.from("products").select("id, variants, material"),
-      getAllFabrics(),
+      supabase.from("products").select("id, variants, material, dimensions"),
+      materials?.length ? getAllFabrics() : Promise.resolve([]),
     ]);
     const familyNames = fabrics.map((f) => f.name);
     const ids = (
-      (fabricRows ?? []) as {
+      (jsFilterRows ?? []) as {
         id: string;
         variants: Product["variants"];
         material: string | null;
+        dimensions: Product["dimensions"];
       }[]
     )
-      .filter((r) => productMatchesFabric(r.variants, r.material, materials, familyNames))
+      .filter(
+        (r) =>
+          (!materials?.length ||
+            productMatchesFabric(r.variants, r.material, materials, familyNames)) &&
+          (!optionFiltersActive ||
+            productMatchesOptionFilters(r.variants, optionFilters!)) &&
+          (!dimensionsActive ||
+            productMatchesDimensions(r.dimensions, dimensionRanges!))
+      )
       .map((r) => r.id);
     if (ids.length === 0) {
       return { products: [], total: 0, pages: 0 };
@@ -177,6 +209,35 @@ export async function getProducts(filters: ProductFilters = {}) {
     query = query
       .order("name", { ascending: true })
       .order("created_at", { ascending: false });
+  }
+
+  // Wyszukiwanie: pobieramy CAŁY zestaw dopasowań (name+description, z sortem
+  // z DB), rankujemy w JS (trafienia w nazwie przed trafieniami tylko w opisie
+  // — np. „materac" wypycha materace nad łóżka kontynentalne, które mają
+  // „materac" w opisie) i dopiero wtedy paginujemy. PostgREST .order() nie
+  // wyrazi rankingu warunkowego (brak CASE), a katalog to ~dziesiątki pozycji
+  // (dopasowania to podzbiór) — koszt pobrania wszystkich naraz pomijalny.
+  // Przeglądanie bez frazy (częsty przypadek) zostaje paginowane w DB niżej.
+  if (searchActive) {
+    const { data, error } = await query;
+    if (error) throw error;
+    const ranked = rankByNameMatch(
+      (data ?? []) as Product[],
+      search!,
+      // DE dopasowuje name_de bez fallbacku do PL — spójnie z buildSearchOrFilter.
+      (p) =>
+        locale === "de"
+          ? (p as { name_de?: string | null }).name_de ?? ""
+          : p.name
+    );
+    const start = (safePage - 1) * safeLimit;
+    return {
+      products: ranked
+        .slice(start, start + safeLimit)
+        .map((p) => localizeProduct(p, locale)),
+      total: ranked.length,
+      pages: Math.ceil(ranked.length / safeLimit),
+    };
   }
 
   const from = (safePage - 1) * safeLimit;
@@ -348,6 +409,8 @@ const getFacetSource = unstable_cache(
   async (): Promise<{
     colorRows: { value: string | null; value_de: string | null }[];
     fabricFacetRows: { value: string | null; value_de: string | null }[];
+    optionGroups: OptionFacetGroup[];
+    dimensionBounds: DimensionBounds;
   }> => {
     const anon = createBareAnonClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -360,7 +423,7 @@ const getFacetSource = unstable_cache(
         // Bez .limit() — świadomie (katalog ~dziesiątki produktów). Przy dużym
         // wzroście katalogu PostgREST utnie wiersze i facety po cichu zgubią
         // produkty — wtedy zdenormalizować rodziny do kolumny.
-        anon.from("products").select("variants, material, material_de"),
+        anon.from("products").select("variants, material, material_de, dimensions"),
         admin
           .from("fabrics")
           .select("name, name_de")
@@ -380,6 +443,7 @@ const getFacetSource = unstable_cache(
       variants: Product["variants"];
       material: string | null;
       material_de: string | null;
+      dimensions: Product["dimensions"];
     }[];
     const fabrics = (fabricsData ?? []) as { name: string; name_de: string | null }[];
     const familyNames = fabrics.map((f) => f.name);
@@ -398,9 +462,14 @@ const getFacetSource = unstable_cache(
         .map((r) => ({ value: r.material, value_de: r.material_de })),
     ];
 
-    return { colorRows, fabricFacetRows };
+    // Facety opcji wariantów (filterable=true) + granice wymiarów — z tych
+    // samych wierszy co facet tkanin (jeden skan, ten sam cache).
+    const optionGroups = collectOptionFacets(fabricRows);
+    const dimensionBounds = collectDimensionBounds(fabricRows);
+
+    return { colorRows, fabricFacetRows, optionGroups, dimensionBounds };
   },
-  ["facet-source"],
+  ["facet-source-v2"],
   { tags: [FACETS_CACHE_TAG], revalidate: 300 }
 );
 
@@ -409,9 +478,12 @@ const getFacetSource = unstable_cache(
 // Decyzja historyczna: nie ograniczamy facets do bieżącego search/category
 // (pełna paleta zawsze; pusta lista po kliknięciu jest akceptowana).
 export async function getFilterFacets(locale: Locale = DEFAULT_LOCALE) {
-  const { colorRows, fabricFacetRows } = await getFacetSource();
+  const { colorRows, fabricFacetRows, optionGroups, dimensionBounds } =
+    await getFacetSource();
   return {
     colors: buildLocalizedFacets(colorRows, locale),
     materials: buildLocalizedFacets(fabricFacetRows, locale),
+    options: localizeOptionFacets(optionGroups, locale),
+    dimensions: dimensionBounds,
   };
 }

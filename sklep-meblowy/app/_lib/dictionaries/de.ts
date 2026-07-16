@@ -187,6 +187,10 @@ export const de: DeepPartial<PlShape> = {
     priceFrom: "von",
     priceTo: "bis",
     removeFilter: "Filter entfernen",
+    dimensions: "Abmessungen",
+    dimWidth: "Breite",
+    dimDepth: "Tiefe",
+    dimHeight: "Höhe",
   },
   cookies: {
     heading: "Wir schützen Ihre Privatsphäre",

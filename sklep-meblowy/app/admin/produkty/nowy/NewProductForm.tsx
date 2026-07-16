@@ -6,9 +6,10 @@ import Link from "next/link";
 import { Card, Field, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
 import { createProduct } from "../actions";
 
-type Props = { categories: { slug: string; label: string }[] };
+type SelectSection = { label: string; categories: { slug: string; label: string }[] };
+type Props = { sections: SelectSection[] };
 
-export default function NewProductForm({ categories }: Props) {
+export default function NewProductForm({ sections }: Props) {
   const router = useRouter();
   const [toast, setToast] = useState<Toast>(null);
   const [isPending, startTransition] = useTransition();
@@ -18,7 +19,7 @@ export default function NewProductForm({ categories }: Props) {
     if (t) setTimeout(() => setToast(null), 4000);
   }
 
-  if (categories.length === 0) {
+  if (sections.length === 0) {
     return (
       <div className="flex flex-col gap-4">
         <h1 className="font-display text-4xl font-bold text-[var(--fg)]">Nowy produkt</h1>
@@ -81,10 +82,14 @@ export default function NewProductForm({ categories }: Props) {
               <option value="" disabled>
                 — wybierz kategorię —
               </option>
-              {categories.map((c) => (
-                <option key={c.slug} value={c.slug}>
-                  {c.label}
-                </option>
+              {sections.map((s) => (
+                <optgroup key={s.label} label={s.label}>
+                  {s.categories.map((c) => (
+                    <option key={c.slug} value={c.slug}>
+                      {c.label}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </Field>

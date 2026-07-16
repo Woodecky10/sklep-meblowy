@@ -176,6 +176,10 @@ export type PlShape = {
     priceFrom: string;
     priceTo: string;
     removeFilter: string;
+    dimensions: string;
+    dimWidth: string;
+    dimDepth: string;
+    dimHeight: string;
   };
   cookies: {
     heading: string;
@@ -487,6 +491,10 @@ export const pl = {
     priceFrom: "od",
     priceTo: "do",
     removeFilter: "Usuń filtr",
+    dimensions: "Wymiary",
+    dimWidth: "Szerokość",
+    dimDepth: "Głębokość",
+    dimHeight: "Wysokość",
   },
   cookies: {
     heading: "Dbamy o Twoją prywatność",

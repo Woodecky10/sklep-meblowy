@@ -111,6 +111,25 @@ export function sortVariantValues(
   );
 }
 
+// Sortuje OPCJE wariantu (kategorie: „Kolor", „Rozmiar", „Tkanina"…) A-Z wg
+// NAZWY WYŚWIETLANEJ. displayNameOf uwzględnia override'y admina + tłumaczenie
+// DE, więc kolejność jest poprawna w języku klienta (spójnie z sortVariantValues,
+// które sortuje wartości po etykiecie). Ta sama collation: case-/diakrytyko-
+// niewrażliwa, z sortem numerycznym. Nie mutuje wejścia. Używane display-time
+// w VariantSelector — działa dla obecnych i przyszłych produktów bez zmian w bazie.
+export function sortVariantOptions(
+  options: ProductOption[],
+  displayNameOf: (optionName: string) => string,
+  locale: Locale = DEFAULT_LOCALE
+): ProductOption[] {
+  return [...options].sort((a, b) =>
+    displayNameOf(a.name).localeCompare(displayNameOf(b.name), locale, {
+      numeric: true,
+      sensitivity: "base",
+    })
+  );
+}
+
 // Deterministyczny klucz kombinacji (nazwy opcji posortowane). Współdzielony
 // z VariantsEditor i price-history, żeby kluczowanie było spójne.
 export function variantKey(values: Record<string, string>): string {
