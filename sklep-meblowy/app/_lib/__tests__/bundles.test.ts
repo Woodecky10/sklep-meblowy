@@ -67,6 +67,16 @@ describe("groupBundleUnits", () => {
     expect(g1.bundleId).toBe("b1");
     expect(g1.items.map((i) => i.productId).sort()).toEqual(["p1", "p2"]);
   });
+  it("ten sam unitKey ale różny bundle.id → dwie osobne grupy", () => {
+    const groups = groupBundleUnits([
+      { productId: "p1", quantity: 1, subtotal: 3000, bundle: { id: "b1", unitKey: "k1" } },
+      { productId: "p2", quantity: 1, subtotal: 2200, bundle: { id: "b2", unitKey: "k1" } },
+    ]);
+    expect(groups).toHaveLength(2);
+    expect(groups.map((g) => g.bundleId).sort()).toEqual(["b1", "b2"]);
+    // zwracany unitKey pozostaje czysty (bez prefiksu id)
+    expect(groups.every((g) => g.unitKey === "k1")).toBe(true);
+  });
 });
 
 describe("verifyBundleGroup", () => {

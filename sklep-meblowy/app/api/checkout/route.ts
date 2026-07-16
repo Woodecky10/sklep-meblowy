@@ -256,7 +256,7 @@ export async function POST(request: NextRequest) {
       const bundleIds = Array.from(new Set(bundleGroups.map((g) => g.bundleId)));
       const { data: bundleRows, error: bundleErr } = await admin
         .from("bundles")
-        .select("id, name, is_active, discount_type, discount_value, bundle_items(product_id)")
+        .select("id, name, name_de, is_active, discount_type, discount_value, bundle_items(product_id)")
         .in("id", bundleIds);
       if (bundleErr || !bundleRows) {
         return NextResponse.json(
@@ -267,6 +267,7 @@ export async function POST(request: NextRequest) {
       type BundleRowLite = {
         id: string;
         name: string;
+        name_de: string | null;
         is_active: boolean;
         discount_type: "percent" | "amount";
         discount_value: number;
@@ -305,7 +306,10 @@ export async function POST(request: NextRequest) {
           row!.discount_type,
           Number(row!.discount_value)
         );
-        infoByUnit.set(group.unitKey, { id: row!.id, label: row!.name });
+        infoByUnit.set(group.unitKey, {
+          id: row!.id,
+          label: isDe ? (row!.name_de ?? row!.name) : row!.name,
+        });
       }
       bundleDiscount = Math.round(bundleDiscount * 100) / 100;
 

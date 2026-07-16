@@ -18,7 +18,7 @@ export default async function AdminZestawyPage() {
   ]);
 
   return (
-    <div className="p-6 lg:p-10 max-w-5xl">
+    <>
       <h1 className="font-display text-3xl font-bold text-[var(--fg)] mb-2">Zestawy</h1>
       <p className="text-sm text-[var(--muted)] mb-8">
         Połącz 2 lub więcej mebli (np. fotel + narożnik) w zestaw z rabatem.
@@ -28,6 +28,6 @@ export default async function AdminZestawyPage() {
         bundles={bundles}
         products={((products ?? []) as PickerProduct[]).filter((p) => p.is_active)}
       />
-    </div>
+    </>
   );
 }

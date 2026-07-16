@@ -79,13 +79,17 @@ export function groupBundleUnits(
   const map = new Map<string, BundleGroup>();
   for (const it of items) {
     if (!it.bundle) continue;
-    const g = map.get(it.bundle.unitKey) ?? {
+    // Klucz Mapy jawnie łączy id zestawu z unitKey — payload z dwoma różnymi
+    // bundle.id pod tym samym unitKey daje osobne grupy (weryfikacja odrzuca
+    // niezgodny skład). Zwracany unitKey pozostaje czysty (używany downstream).
+    const mapKey = `${it.bundle.id}##${it.bundle.unitKey}`;
+    const g = map.get(mapKey) ?? {
       bundleId: it.bundle.id,
       unitKey: it.bundle.unitKey,
       items: [],
     };
     g.items.push({ productId: it.productId, quantity: it.quantity, subtotal: it.subtotal });
-    map.set(it.bundle.unitKey, g);
+    map.set(mapKey, g);
   }
   return Array.from(map.values());
 }
@@ -158,7 +162,10 @@ export function groupCartBundles<
   const map = new Map<string, CartBundleGroup<T>>();
   for (const it of items) {
     if (!it.bundle) continue;
-    const g = map.get(it.bundle.unitKey) ?? {
+    // Klucz Mapy jawnie łączy id zestawu z unitKey (patrz groupBundleUnits);
+    // zwracany unitKey pozostaje czysty (używany downstream w UI koszyka).
+    const mapKey = `${it.bundle.id}##${it.bundle.unitKey}`;
+    const g = map.get(mapKey) ?? {
       bundleId: it.bundle.id,
       unitKey: it.bundle.unitKey,
       name: it.bundle.name,
@@ -172,7 +179,7 @@ export function groupCartBundles<
     g.base += it.price * it.quantity;
     g.qty = it.quantity;
     g.items.push(it);
-    map.set(it.bundle.unitKey, g);
+    map.set(mapKey, g);
   }
   const groups = Array.from(map.values());
   for (const g of groups) {
