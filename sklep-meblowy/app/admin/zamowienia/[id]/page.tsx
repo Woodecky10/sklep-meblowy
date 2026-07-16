@@ -37,6 +37,7 @@ export default async function AdminOrderDetailPage({
   const items = order.items ?? [];
   const subtotal = items.reduce((s, i) => s + Number(i.price) * i.quantity, 0);
   const promoDiscount = Number(order.promo_discount ?? 0);
+  const bundleDiscount = Number(order.bundle_discount ?? 0);
   const s = ADMIN_STATUS_LABELS[order.status];
   const addr = order.shipping_address;
 
@@ -92,6 +93,9 @@ export default async function AdminOrderDetailPage({
                     >
                       {item.product?.name ?? "Produkt"}
                     </Link>
+                    {item.bundle_label && (
+                      <span className="text-xs text-[var(--color-gold-text)]"> (zestaw: {item.bundle_label})</span>
+                    )}
                     {item.variant_values && (
                       <p className="text-xs text-[var(--color-gold)] mt-0.5">
                         {formatVariantLabel(item.variant_values, "pl")}
@@ -118,6 +122,12 @@ export default async function AdminOrderDetailPage({
                 <dt>Produkty</dt>
                 <dd>{formatOrderAmount(subtotal, order.currency)}</dd>
               </div>
+              {bundleDiscount > 0 && (
+                <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
+                  <dt>Rabat za zestaw</dt>
+                  <dd>−{formatOrderAmount(bundleDiscount, order.currency)}</dd>
+                </div>
+              )}
               {promoDiscount > 0 && (
                 <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
                   <dt>

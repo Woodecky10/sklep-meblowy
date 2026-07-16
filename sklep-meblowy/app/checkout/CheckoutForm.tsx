@@ -12,6 +12,8 @@ import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { formatMoney } from "@/app/_lib/money";
 import { useEurRate } from "@/app/_lib/rate-context";
 import { useFabricLabels } from "@/app/_lib/fabric-context";
+import { groupCartBundles } from "@/app/_lib/bundles";
+import { getDictionary } from "@/app/_lib/dictionaries";
 import { isValidCodPhone } from "@/app/_lib/cod";
 import type { Address } from "@/app/_lib/types";
 
@@ -31,6 +33,7 @@ export default function CheckoutForm({
   const rate = useEurRate();
   const fabricMap = useFabricLabels();
   const de = locale === "de";
+  const t = getDictionary(locale);
   const { items, total, count, appliedPromo } = useCart();
 
   const c = de
@@ -150,7 +153,10 @@ export default function CheckoutForm({
   // cenę produktów (minus rabat). Pole delivery_cost w panelu admina zostaje
   // do ewentualnych rozliczeń wewnętrznych, ale klientowi nic nie doliczamy.
   const discount = appliedPromo?.discount ?? 0;
-  const grandTotal = Math.max(0, total - discount);
+  // Rabat zestawów liczony client-side jak w koszyku (Task 6); serwer i tak
+  // weryfikuje skład i przelicza kwotę autorytatywnie w /api/checkout.
+  const bundleDiscount = groupCartBundles(items).reduce((s, g) => s + g.discount, 0);
+  const grandTotal = Math.max(0, total - bundleDiscount - discount);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -183,6 +189,7 @@ export default function CheckoutForm({
             image: i.image,
             variantValues: i.variantValues,
             notes: i.notes,
+            bundle: i.bundle ? { id: i.bundle.id, unitKey: i.bundle.unitKey } : undefined,
           })),
           email,
           fullName,
@@ -456,6 +463,12 @@ export default function CheckoutForm({
               <span>{c.products}</span>
               <span>{formatMoney(total, locale, rate)}</span>
             </div>
+            {bundleDiscount > 0 && (
+              <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
+                <span>{t.bundle.discountLine}</span>
+                <span>−{formatMoney(bundleDiscount, locale, rate)}</span>
+              </div>
+            )}
             {appliedPromo && discount > 0 && (
               <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
                 <span className="font-mono">{appliedPromo.code}</span>
