@@ -48,7 +48,7 @@ export async function createOrder({
       shipping_address: shippingAddress as unknown as Record<string, unknown>,
       promo_code_id: promoCodeId ?? null,
       promo_discount: promoDiscount ?? 0,
-      bundle_discount: bundleDiscount ?? 0,
+      ...(bundleDiscount ? { bundle_discount: bundleDiscount } : {}),
       currency,
       fx_rate: fxRate,
       payment_method: paymentMethod,

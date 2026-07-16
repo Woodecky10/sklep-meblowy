@@ -1,3 +1,4 @@
+import { requireAdmin } from "@/app/_lib/admin";
 import { getAllBundlesAdmin } from "@/app/_lib/bundles-server";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import BundlesEditor, { type PickerProduct } from "./BundlesEditor";
@@ -5,6 +6,8 @@ import BundlesEditor, { type PickerProduct } from "./BundlesEditor";
 export const metadata = { title: "Zestawy — Admin" };
 
 export default async function AdminZestawyPage() {
+  await requireAdmin();
+
   const supabase = await createAdminClient();
   const [bundles, { data: products }] = await Promise.all([
     getAllBundlesAdmin(),

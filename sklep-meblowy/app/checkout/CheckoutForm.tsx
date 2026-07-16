@@ -423,7 +423,7 @@ export default function CheckoutForm({
 
           <div className="flex flex-col gap-4 max-h-64 overflow-y-auto">
             {items.map((item) => {
-              const key = cartItemKey(item.id, item.variantValues);
+              const key = cartItemKey(item.id, item.variantValues, item.bundle?.unitKey);
               return (
                 <div key={key} className="flex gap-3">
                   <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-stone-100 dark:bg-stone-800 shrink-0">
