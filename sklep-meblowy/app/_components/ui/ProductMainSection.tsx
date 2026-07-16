@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Product, ProductRating } from "@/app/_lib/types";
+import type { Product, ProductRating, BundleWithComponents } from "@/app/_lib/types";
 import {
   getVariantImages,
   getVariantPrice,
@@ -20,6 +20,7 @@ import SizeSelector from "./SizeSelector";
 import type { SizeOption } from "@/app/_lib/size-groups";
 import StarRating from "./StarRating";
 import InquiryModal from "./InquiryModal";
+import BundleOffer from "./BundleOffer";
 import LocalizedLink from "./LocalizedLink";
 
 // Client wrapper łączący galerię i akcje, żeby wybór wariantu mógł
@@ -36,6 +37,7 @@ export default function ProductMainSection({
   rating,
   specifications,
   sizeOptions,
+  bundles,
 }: {
   product: Product;
   categoryLabel: string | null;
@@ -44,6 +46,9 @@ export default function ProductMainSection({
   // plus dodatkowe features z importu. Renderowane w lewej kolumnie pod galerią.
   specifications: { label: string; value: string }[];
   sizeOptions: SizeOption[];
+  // Zestawy zawierające ten produkt — box „Kup w zestawie" pod akcjami (above
+  // the fold). Pusta lista = box się nie renderuje.
+  bundles: BundleWithComponents[];
 }) {
   const locale = useClientLocale();
   const rate = useEurRate();
@@ -153,6 +158,8 @@ export default function ProductMainSection({
           addToCartLabel={t.product.addToCart}
           selectVariantLabel={t.product.selectVariant}
         />
+
+        <BundleOffer bundles={bundles} currentProduct={product} selected={selected} />
 
         <InquiryModal
           productId={product.id}

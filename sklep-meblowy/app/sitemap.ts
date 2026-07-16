@@ -5,6 +5,7 @@ import { getCategories } from "@/app/_lib/categories";
 import { getAllCollections } from "@/app/_lib/collections";
 import { sitemapAlternates } from "@/app/_lib/sitemap-i18n";
 import { getPagesForSitemap } from "@/app/_lib/pages-server";
+import { getActiveBundleSlugs } from "@/app/_lib/bundles-server";
 
 // Sitemap dla Google. Renderowany przy każdym żądaniu (no caching) —
 // na razie OK przy małej liczbie produktów. Jeśli kiedyś będzie 10k+
@@ -137,7 +138,35 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       return entries;
     });
 
-    return [...staticRoutes, ...categoryRoutes, ...collectionRoutes, ...productRoutes, ...pageRoutes];
+    // Zestawy (spec 2026-07-16): strona /zestaw/[slug] jest w pełni tłumaczona
+    // (nazwa/opis z DB przez localizeBundle, UI przez słownik) — zawsze PL + DE
+    // z wzajemnymi alternates, jak home/sklep. getActiveBundleSlugs zwraca tylko
+    // aktywne, kompletne zestawy.
+    const bundleSlugs = await getActiveBundleSlugs();
+    const bundleRoutes: MetadataRoute.Sitemap = bundleSlugs.flatMap((slug) => {
+      const plPath = `/zestaw/${slug}`;
+      const alternates = {
+        languages: sitemapAlternates(plPath, { hasDe: true }, BASE).languages,
+      };
+      return [
+        {
+          url: `${BASE}${plPath}`,
+          lastModified: now,
+          changeFrequency: "weekly" as const,
+          priority: 0.7,
+          alternates,
+        },
+        {
+          url: `${BASE}/de${plPath}`,
+          lastModified: now,
+          changeFrequency: "weekly" as const,
+          priority: 0.7,
+          alternates,
+        },
+      ];
+    });
+
+    return [...staticRoutes, ...categoryRoutes, ...collectionRoutes, ...productRoutes, ...pageRoutes, ...bundleRoutes];
   } catch (err) {
     // Kontrolne błędy Next (dynamic rendering, redirect itp.) mają lecieć
     // dalej — łapiemy wyłącznie realne awarie danych.

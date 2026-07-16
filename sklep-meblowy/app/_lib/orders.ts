@@ -10,11 +10,14 @@ type CreateOrderInput = {
     price: number;
     variant_values?: Record<string, string> | null;
     notes?: string | null;
+    bundle_id?: string | null;
+    bundle_label?: string | null;
   }[];
   total: number;
   shippingAddress: Address;
   promoCodeId?: string | null;
   promoDiscount?: number;
+  bundleDiscount?: number;
   currency: "pln" | "eur";
   fxRate: number | null;
   paymentMethod: PaymentMethod;
@@ -28,6 +31,7 @@ export async function createOrder({
   shippingAddress,
   promoCodeId,
   promoDiscount,
+  bundleDiscount,
   currency,
   fxRate,
   paymentMethod,
@@ -44,6 +48,7 @@ export async function createOrder({
       shipping_address: shippingAddress as unknown as Record<string, unknown>,
       promo_code_id: promoCodeId ?? null,
       promo_discount: promoDiscount ?? 0,
+      ...(bundleDiscount ? { bundle_discount: bundleDiscount } : {}),
       currency,
       fx_rate: fxRate,
       payment_method: paymentMethod,

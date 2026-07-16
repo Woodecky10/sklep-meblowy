@@ -36,6 +36,7 @@ import { buildSizeOptions } from "@/app/_lib/size-groups";
 import { effectivePrice } from "@/app/_lib/pricing";
 import { getFabricImageMap } from "@/app/_lib/fabrics";
 import { FabricImageProvider } from "@/app/_lib/fabric-context";
+import { getBundlesForProduct } from "@/app/_lib/bundles-server";
 import type { Product } from "@/app/_lib/types";
 
 type Props = { params: Promise<{ id: string }> };
@@ -96,7 +97,7 @@ export default async function ProduktPage({ params }: Props) {
   const product = await getProduct(id, locale);
   if (!product) notFound();
 
-  const [sizeSiblings, related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell, wishlistIds, rate] =
+  const [sizeSiblings, related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell, wishlistIds, rate, bundles] =
     await Promise.all([
       // Selektor rozmiaru: rodzeństwo z tym samym size_group (osobne aukcje per rozmiar).
       product.size_group ? getSizeSiblings(product.size_group, locale) : Promise.resolve([]),
@@ -109,6 +110,8 @@ export default async function ProduktPage({ params }: Props) {
       getCrossSellProducts([product.category], [product.id], 4, locale),
       getUserWishlistIds(),
       getEurRate(),
+      // Zestawy zawierające ten produkt — box „Kup w zestawie" na karcie.
+      getBundlesForProduct(product.id, locale),
     ]);
   const sizeOptions = buildSizeOptions(sizeSiblings, product.id);
   // Mapa zdjęć próbek tkanin (wartość „Nazwa Numer" → URL) do próbek w selektorze.
@@ -277,6 +280,7 @@ export default async function ProduktPage({ params }: Props) {
           rating={rating}
           specifications={details}
           sizeOptions={sizeOptions}
+          bundles={bundles}
         />
       </FabricImageProvider>
 

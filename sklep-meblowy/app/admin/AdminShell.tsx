@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { href: "/admin/kafelki", label: "Kafelki", icon: TilesIcon },
   { href: "/admin/kategorie", label: "Kategorie", icon: CategoriesIcon },
   { href: "/admin/kolekcje", label: "Kolekcje", icon: CollectionsIcon },
+  { href: "/admin/zestawy", label: "Zestawy", icon: BundlesIcon },
   { href: "/admin/tkaniny", label: "Tkaniny", icon: FabricsIcon },
   { href: "/admin/kody-rabatowe", label: "Kody rabatowe", icon: TicketIcon },
   { href: "/admin/zapytania", label: "Zapytania", icon: InboxIcon },
@@ -210,6 +211,16 @@ function CollectionsIcon() {
       <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
       <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
       <line x1="12" y1="22.08" x2="12" y2="12" />
+    </svg>
+  );
+}
+
+function BundlesIcon() {
+  return (
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="9" width="9" height="11" rx="1" />
+      <rect x="13" y="5" width="8" height="15" rx="1" />
+      <path d="M3 13h9M13 9h8" />
     </svg>
   );
 }

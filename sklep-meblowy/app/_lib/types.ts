@@ -139,6 +139,26 @@ export type Collection = {
   updated_at: string;
 };
 
+// Zestaw mebli (spec 2026-07-16) — admin łączy 2+ produktów, rabat % lub
+// kwotowy od sumy cen efektywnych składników. Tabele bundles/bundle_items.
+export type Bundle = {
+  id: string;
+  slug: string;
+  name: string;
+  name_de?: string | null;
+  description: string | null;
+  description_de?: string | null;
+  discount_type: "percent" | "amount";
+  discount_value: number;
+  is_active: boolean;
+  created_at: string;
+};
+
+// Zestaw z dociągniętymi (aktywnymi, zlokalizowanymi) produktami-składnikami,
+// w kolejności position. Warstwa odczytu zwraca TYLKO komplety (>= 2 składniki,
+// wszystkie aktywne) — patrz bundles-server.ts.
+export type BundleWithComponents = Bundle & { components: Product[] };
+
 // Katalog tkanin (migracja 37) — reużywalny zbiór nazw używanych jako wartości
 // opcji wariantu „Tkanina". name_de null → na /de fallback do name.
 export type Fabric = {
@@ -201,6 +221,8 @@ export type Order = {
   payment_method: PaymentMethod;
   promo_code_id: string | null;
   promo_discount: number;
+  // Suma rabatów zestawów tego zamówienia, w walucie zamówienia (migracja 55).
+  bundle_discount: number;
   created_at: string;
   // Panel admina (migracja 31)
   order_number: number;
@@ -224,6 +246,9 @@ export type OrderItem = {
   price: number;
   variant_values: Record<string, string> | null;
   notes: string | null;
+  // Pozycja kupiona w zestawie: id (FK SET NULL) + nazwa z chwili zakupu.
+  bundle_id: string | null;
+  bundle_label: string | null;
   product?: Product;
 };
 
@@ -260,6 +285,8 @@ type OrderItemInsert = {
   price: number;
   variant_values?: Record<string, string> | null;
   notes?: string | null;
+  bundle_id?: string | null;
+  bundle_label?: string | null;
 };
 
 export type Database = {
