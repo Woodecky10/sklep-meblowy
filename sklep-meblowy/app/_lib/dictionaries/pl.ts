@@ -127,6 +127,22 @@ export type PlShape = {
     toastAdded: string;
     viewCart: string;
   };
+  bundle: {
+    badge: string;
+    savesFrom: string;
+    saves: string;
+    buy: string;
+    see: string;
+    withProducts: string;
+    togetherLabel: string;
+    bundleLabel: string;
+    addToCart: string;
+    chooseOptions: string;
+    cartGroupLabel: string;
+    removeBundle: string;
+    discountLine: string;
+    promoExcluded: string;
+  };
   common: {
     loading: string;
     filter: string;
@@ -439,6 +455,22 @@ export const pl = {
     crossSellHeading: "Może Cię zainteresować",
     toastAdded: "Dodano do koszyka",
     viewCart: "Zobacz koszyk",
+  },
+  bundle: {
+    badge: "W zestawie taniej",
+    savesFrom: "Oszczędzasz od",
+    saves: "Oszczędzasz",
+    buy: "Kup w zestawie",
+    see: "Zobacz zestaw",
+    withProducts: "Razem z:",
+    togetherLabel: "Razem osobno",
+    bundleLabel: "W zestawie",
+    addToCart: "Dodaj zestaw do koszyka",
+    chooseOptions: "Wybierz opcje dla każdego mebla",
+    cartGroupLabel: "Zestaw",
+    removeBundle: "Usuń zestaw",
+    discountLine: "Rabat za zestaw",
+    promoExcluded: "Kod rabatowy nie obejmuje produktów kupionych w zestawie",
   },
   common: {
     loading: "Ładowanie…",

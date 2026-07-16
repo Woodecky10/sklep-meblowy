@@ -5,6 +5,7 @@ import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import Image from "next/image";
 import { useCart, cartItemKey } from "@/app/_context/CartContext";
 import { formatVariantLabel } from "@/app/_lib/variants";
+import { groupCartBundles, eligiblePromoBase } from "@/app/_lib/bundles";
 import { applyPromoCodeAction, getCartCrossSellAction } from "./actions";
 import ProductCard from "@/app/_components/ui/ProductCard";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
@@ -26,16 +27,29 @@ export default function KoszykPage() {
     remove,
     updateQty,
     updateNotes,
+    removeBundle,
+    updateBundleQty,
     clear,
     appliedPromo,
     applyPromo,
     clearPromo,
   } = useCart();
 
+  // Zestawy: pozycje ze wspólnym bundle.unitKey renderujemy jako jedną kartę
+  // grupy (nad pozycjami solo). soloItems = zwykłe zakupy poza zestawami.
+  const soloItems = items.filter((i) => !i.bundle);
+  const bundleGroups = groupCartBundles(items);
+  const bundleDiscount = bundleGroups.reduce((s, g) => s + g.discount, 0);
+  // Kod rabatowy NIE obejmuje pozycji z zestawów (decyzja użytkownika) — jego
+  // podstawą jest suma subtotali pozycji spoza zestawów.
+  const eligibleBase = eligiblePromoBase(
+    items.map((i) => ({ subtotal: i.price * i.quantity, bundle: i.bundle ?? null }))
+  );
+
   // Koszt dostawy ustalany indywidualnie per zamówienie po kontakcie z klientem
   // — meble różnią się wagą i gabarytami. Stripe pobiera tylko cenę produktów.
   const discount = appliedPromo?.discount ?? 0;
-  const grandTotal = Math.max(0, total - discount);
+  const grandTotal = Math.max(0, total - bundleDiscount - discount);
 
   // Cross-sell — "Może Cię zainteresować".
   // UWAGA: wszystkie hooki muszą być PRZED wczesnym returnem pustego koszyka —
@@ -67,13 +81,14 @@ export default function KoszykPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.map((i) => i.id).join(",")]);
 
-  // Re-waliduj kod gdy zmieni się total (np. po dodaniu/usunięciu pozycji
-  // albo zmianie ilości). Server policzy nową kwotę zniżki (przy percent)
-  // albo wyrzuci kod (np. spadliśmy poniżej min_order_value).
+  // Re-waliduj kod gdy zmieni się kwalifikująca podstawa (np. po dodaniu/
+  // usunięciu pozycji albo zmianie ilości). Server policzy nową kwotę zniżki
+  // (przy percent) albo wyrzuci kod (np. spadliśmy poniżej min_order_value).
+  // Podstawą jest eligibleBase — pozycje z zestawów nie liczą się do kodu.
   useEffect(() => {
     if (!appliedPromo) return;
     let cancelled = false;
-    applyPromoCodeAction(appliedPromo.code, total).then((res) => {
+    applyPromoCodeAction(appliedPromo.code, eligibleBase).then((res) => {
       if (cancelled) return;
       if (res.ok) {
         if (res.discount !== appliedPromo.discount) {
@@ -93,7 +108,7 @@ export default function KoszykPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [total]);
+  }, [eligibleBase]);
 
   if (items.length === 0) {
     return (
@@ -137,7 +152,121 @@ export default function KoszykPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         {/* Lista produktów */}
         <div className="lg:col-span-2 flex flex-col gap-6">
-          {items.map((item) => {
+          {/* Zestawy — jedna karta na grupę (nad pozycjami solo) */}
+          {bundleGroups.map((g) => (
+            <div
+              key={g.unitKey}
+              className="p-6 bg-[var(--card-bg)] border-2 border-[var(--color-gold)]/40 rounded-2xl flex flex-col gap-4"
+            >
+              <div className="flex items-center justify-between gap-4">
+                <p className="font-sans text-xs uppercase tracking-[0.25em] text-[var(--color-gold-text)]">
+                  {t.bundle.cartGroupLabel}:{" "}
+                  <span className="text-[var(--fg)] normal-case tracking-normal font-semibold">
+                    {g.name}
+                  </span>
+                </p>
+                <button
+                  onClick={() => removeBundle(g.unitKey)}
+                  className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] hover:text-red-500 transition-colors shrink-0"
+                >
+                  {t.bundle.removeBundle}
+                </button>
+              </div>
+
+              {g.items.map((item) => (
+                <div
+                  key={cartItemKey(item.id, item.variantValues, item.bundle?.unitKey)}
+                  className="flex gap-4 items-start"
+                >
+                  {/* Zdjęcie (skopiowane z karty solo) */}
+                  <LocalizedLink href={`/produkt/${item.id}`} className="shrink-0">
+                    <div className="relative w-24 h-24 rounded-xl overflow-hidden bg-stone-100 dark:bg-stone-800">
+                      {item.image ? (
+                        <Image
+                          src={item.image}
+                          alt={item.name}
+                          fill
+                          className="object-cover"
+                          sizes="96px"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[var(--muted)] text-xs">
+                          {t.cart.noImage}
+                        </div>
+                      )}
+                    </div>
+                  </LocalizedLink>
+
+                  {/* Info: nazwa + wariant + uwagi (bez steppera i usuwania —
+                      zestaw ma jeden wspólny stepper i jedno usuwanie niżej) */}
+                  <div className="flex-1 min-w-0">
+                    <LocalizedLink href={`/produkt/${item.id}`}>
+                      <p className="font-display text-lg font-semibold text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors leading-snug mb-1">
+                        {item.name}
+                      </p>
+                    </LocalizedLink>
+                    {item.variantValues && (
+                      <p className="text-xs text-[var(--muted)] mb-3">
+                        {formatVariantLabel(item.variantValues, locale, fabricMap)}
+                      </p>
+                    )}
+                    <ItemNotes
+                      initial={item.notes ?? ""}
+                      onSave={(notes) =>
+                        updateNotes(item.id, notes, item.variantValues, item.bundle?.unitKey)
+                      }
+                      labels={{
+                        add: t.cart.addNotes,
+                        label: t.cart.notesLabel,
+                        placeholder: t.cart.notesPlaceholder,
+                        charsSuffix: t.cart.notesCharsSuffix,
+                        unsaved: t.cart.notesUnsaved,
+                        remove: t.cart.removeNotes,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+
+              {/* Jeden stepper ilości + cena całego zestawu */}
+              <div className="flex items-center justify-between border-t border-[var(--border)] pt-4">
+                <div className="flex items-center gap-3 border border-[var(--border)] rounded-full px-4 py-2">
+                  <button
+                    onClick={() =>
+                      g.qty > 1
+                        ? updateBundleQty(g.unitKey, g.qty - 1)
+                        : removeBundle(g.unitKey)
+                    }
+                    className="w-5 h-5 flex items-center justify-center text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors font-bold"
+                  >
+                    −
+                  </button>
+                  <span className="font-sans font-semibold text-sm text-[var(--fg)] w-4 text-center">
+                    {g.qty}
+                  </span>
+                  <button
+                    onClick={() => updateBundleQty(g.unitKey, g.qty + 1)}
+                    className="w-5 h-5 flex items-center justify-center text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors font-bold"
+                  >
+                    +
+                  </button>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-[var(--muted)] line-through">
+                    {formatMoney(g.base, locale, rate)}
+                  </p>
+                  <p className="font-sans font-bold text-[var(--fg)]">
+                    {formatMoney(g.base - g.discount, locale, rate)}
+                  </p>
+                  <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                    {t.bundle.saves} {formatMoney(g.discount, locale, rate)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {soloItems.map((item) => {
             const key = cartItemKey(item.id, item.variantValues);
             return (
               <div
@@ -244,26 +373,42 @@ export default function KoszykPage() {
               {t.cart.summary}
             </h2>
 
-            <PromoInput
-              cartTotal={total}
-              appliedPromo={appliedPromo}
-              onApply={applyPromo}
-              onClear={clearPromo}
-              labels={{
-                label: t.cart.promoLabel,
-                placeholder: t.cart.promoPlaceholder,
-                apply: t.cart.promoApply,
-                discountPercent: t.cart.promoDiscountPercent,
-                discountAmount: t.cart.promoDiscountAmount,
-                remove: t.cart.promoRemove,
-              }}
-            />
+            {eligibleBase === 0 && bundleGroups.length > 0 ? (
+              // Cały koszyk to zestawy — kod nie ma do czego się przyłożyć.
+              <p className="text-xs text-[var(--muted)]">{t.bundle.promoExcluded}</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <PromoInput
+                  cartTotal={eligibleBase}
+                  appliedPromo={appliedPromo}
+                  onApply={applyPromo}
+                  onClear={clearPromo}
+                  labels={{
+                    label: t.cart.promoLabel,
+                    placeholder: t.cart.promoPlaceholder,
+                    apply: t.cart.promoApply,
+                    discountPercent: t.cart.promoDiscountPercent,
+                    discountAmount: t.cart.promoDiscountAmount,
+                    remove: t.cart.promoRemove,
+                  }}
+                />
+                {bundleGroups.length > 0 && (
+                  <p className="text-xs text-[var(--muted)]">{t.bundle.promoExcluded}</p>
+                )}
+              </div>
+            )}
 
             <div className="flex flex-col gap-3 text-sm font-sans">
               <div className="flex justify-between text-[var(--muted)]">
                 <span>{t.cart.productsCount} ({count} {t.cart.pieces})</span>
                 <span>{formatMoney(total, locale, rate)}</span>
               </div>
+              {bundleDiscount > 0 && (
+                <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
+                  <span>{t.bundle.discountLine}</span>
+                  <span>−{formatMoney(bundleDiscount, locale, rate)}</span>
+                </div>
+              )}
               {appliedPromo && discount > 0 && (
                 <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
                   <span>{t.cart.discount} ({appliedPromo.code})</span>
