@@ -178,3 +178,23 @@ export function localizeReview<T extends ReviewLocalizable>(
   if (locale !== "de") return row;
   return { ...row, comment: pickNullable(row.comment, row.comment_de) };
 }
+
+type BundleLocalizable = {
+  name: string;
+  name_de?: string | null;
+  description: string | null;
+  description_de?: string | null;
+};
+
+// Zestaw: name (fallback PL) + description (nullable, jak kolekcja).
+export function localizeBundle<T extends BundleLocalizable>(
+  row: T,
+  locale: Locale
+): T {
+  if (locale !== "de") return row;
+  return {
+    ...row,
+    name: pickLocalized(row.name, row.name_de, locale),
+    description: pickNullable(row.description, row.description_de),
+  };
+}
