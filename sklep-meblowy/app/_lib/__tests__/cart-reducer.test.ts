@@ -98,6 +98,51 @@ describe("cartReducer — zestawy", () => {
     expect(s.items.find((i) => i.id === "p1" && i.bundle)?.notes).toBe("bundle-nota");
   });
 
+  it("UPDATE_BUNDLE_TERMS aktualizuje warunki wszystkich pozycji zestawu, nie rusza innych", () => {
+    // Zestaw b1 (2 pozycje) + inny zestaw b2 + pozycja solo.
+    const b2Meta = {
+      id: "b2",
+      name: "Zestaw Skandi",
+      unitKey: "b2##p3::||p4::",
+      discountType: "percent" as const,
+      discountValue: 5,
+    };
+    let s = cartReducer(empty, { type: "ADD_BUNDLE", items: bundleItems() });
+    s = cartReducer(s, {
+      type: "ADD_BUNDLE",
+      items: [
+        { id: "p3", name: "Stół", price: 1000, image: "", quantity: 1, bundle: b2Meta },
+        { id: "p4", name: "Krzesło", price: 500, image: "", quantity: 1, bundle: b2Meta },
+      ],
+    });
+    s = cartReducer(s, {
+      type: "ADD",
+      item: { id: "solo", name: "Puf", price: 400, image: "", quantity: 1 },
+    });
+
+    s = cartReducer(s, {
+      type: "UPDATE_BUNDLE_TERMS",
+      bundleId: "b1",
+      discountType: "amount",
+      discountValue: 500,
+    });
+
+    // Wszystkie pozycje b1 mają nowe warunki.
+    const b1Items = s.items.filter((i) => i.bundle?.id === "b1");
+    expect(b1Items).toHaveLength(2);
+    expect(b1Items.every((i) => i.bundle?.discountType === "amount")).toBe(true);
+    expect(b1Items.every((i) => i.bundle?.discountValue === 500)).toBe(true);
+
+    // Inny zestaw b2 bez zmian.
+    const b2Items = s.items.filter((i) => i.bundle?.id === "b2");
+    expect(b2Items.every((i) => i.bundle?.discountType === "percent")).toBe(true);
+    expect(b2Items.every((i) => i.bundle?.discountValue === 5)).toBe(true);
+
+    // Pozycja solo bez zmian (brak bundle).
+    const solo = s.items.find((i) => i.id === "solo");
+    expect(solo?.bundle).toBeUndefined();
+  });
+
   it("HYDRATE ze starymi wpisami bez bundle działa bez migracji", () => {
     const s = cartReducer(empty, {
       type: "HYDRATE",

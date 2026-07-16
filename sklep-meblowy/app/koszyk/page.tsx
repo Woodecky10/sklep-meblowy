@@ -6,7 +6,11 @@ import Image from "next/image";
 import { useCart, cartItemKey } from "@/app/_context/CartContext";
 import { formatVariantLabel } from "@/app/_lib/variants";
 import { groupCartBundles, eligiblePromoBase } from "@/app/_lib/bundles";
-import { applyPromoCodeAction, getCartCrossSellAction } from "./actions";
+import {
+  applyPromoCodeAction,
+  getCartCrossSellAction,
+  revalidateBundleTermsAction,
+} from "./actions";
 import ProductCard from "@/app/_components/ui/ProductCard";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
@@ -29,6 +33,7 @@ export default function KoszykPage() {
     updateNotes,
     removeBundle,
     updateBundleQty,
+    updateBundleTerms,
     clear,
     appliedPromo,
     applyPromo,
@@ -109,6 +114,28 @@ export default function KoszykPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eligibleBase]);
+
+  // Odśwież warunki rabatu zestawów — admin mógł je zmienić po dodaniu do
+  // koszyka (snapshot w localStorage). Zbieżny: po aktualizacji terms grupy
+  // przeliczają się na nowe wartości, dep się stabilizuje.
+  useEffect(() => {
+    const ids = Array.from(new Set(bundleGroups.map((g) => g.bundleId)));
+    if (ids.length === 0) return;
+    let cancelled = false;
+    revalidateBundleTermsAction(ids).then((terms) => {
+      if (cancelled) return;
+      for (const g of bundleGroups) {
+        const t = terms[g.bundleId];
+        if (t && (t.discountType !== g.discountType || t.discountValue !== g.discountValue)) {
+          updateBundleTerms(g.bundleId, t.discountType, t.discountValue);
+        }
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bundleGroups.map((g) => `${g.bundleId}:${g.discountType}:${g.discountValue}`).join(",")]);
 
   if (items.length === 0) {
     return (

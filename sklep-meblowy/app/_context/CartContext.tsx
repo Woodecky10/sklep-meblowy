@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useMemo, useReducer, useCallback, useState, useEffect } from "react";
-import type { CartItemBundle } from "@/app/_lib/bundles";
+import type { CartItemBundle, BundleDiscountType } from "@/app/_lib/bundles";
 
 export type CartItem = {
   id: string;
@@ -67,6 +67,12 @@ type CartAction =
   | { type: "ADD_BUNDLE"; items: CartItem[] }
   | { type: "REMOVE_BUNDLE"; unitKey: string }
   | { type: "UPDATE_BUNDLE_QTY"; unitKey: string; quantity: number }
+  | {
+      type: "UPDATE_BUNDLE_TERMS";
+      bundleId: string;
+      discountType: BundleDiscountType;
+      discountValue: number;
+    }
   | { type: "CLEAR" }
   | { type: "HYDRATE"; items: CartItem[]; appliedPromo: AppliedPromo | null }
   | { type: "APPLY_PROMO"; promo: AppliedPromo }
@@ -194,6 +200,24 @@ export function cartReducer(state: CartState, action: CartAction): CartState {
             : i
         ),
       };
+    case "UPDATE_BUNDLE_TERMS":
+      // Odświeżenie warunków rabatu zestawu (admin mógł zmienić po dodaniu do
+      // koszyka). Aktualizuje meta WSZYSTKICH pozycji danego bundle.id.
+      return {
+        ...state,
+        items: state.items.map((i) =>
+          i.bundle && i.bundle.id === action.bundleId
+            ? {
+                ...i,
+                bundle: {
+                  ...i.bundle,
+                  discountType: action.discountType,
+                  discountValue: action.discountValue,
+                },
+              }
+            : i
+        ),
+      };
     case "CLEAR":
       // Czyści też promo — rabat bez koszyka nie ma sensu (wcześniej robił
       // to osobny setAppliedPromo(null) w callbacku clear()).
@@ -242,6 +266,11 @@ type CartContextValue = {
   addBundle: (items: CartItem[]) => void;
   removeBundle: (unitKey: string) => void;
   updateBundleQty: (unitKey: string, quantity: number) => void;
+  updateBundleTerms: (
+    bundleId: string,
+    discountType: BundleDiscountType,
+    discountValue: number
+  ) => void;
   clear: () => void;
   dismissNotification: () => void;
   applyPromo: (promo: AppliedPromo) => void;
@@ -337,6 +366,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: "UPDATE_BUNDLE_QTY", unitKey, quantity }),
     []
   );
+  const updateBundleTerms = useCallback(
+    (bundleId: string, discountType: BundleDiscountType, discountValue: number) =>
+      dispatch({ type: "UPDATE_BUNDLE_TERMS", bundleId, discountType, discountValue }),
+    []
+  );
   const clear = useCallback(() => {
     // CLEAR w reducerze zeruje też appliedPromo.
     dispatch({ type: "CLEAR" });
@@ -371,12 +405,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       addBundle,
       removeBundle,
       updateBundleQty,
+      updateBundleTerms,
       clear,
       dismissNotification,
       applyPromo,
       clearPromo,
     };
-  }, [state.items, notification, appliedPromo, hydrated, add, remove, updateQty, updateNotes, addBundle, removeBundle, updateBundleQty, clear, dismissNotification, applyPromo, clearPromo]);
+  }, [state.items, notification, appliedPromo, hydrated, add, remove, updateQty, updateNotes, addBundle, removeBundle, updateBundleQty, updateBundleTerms, clear, dismissNotification, applyPromo, clearPromo]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

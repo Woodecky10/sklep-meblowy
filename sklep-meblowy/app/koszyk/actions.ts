@@ -39,6 +39,38 @@ export async function applyPromoCodeAction(
   };
 }
 
+export type BundleTermsResult = Record<
+  string,
+  { discountType: "percent" | "amount"; discountValue: number } | null
+>;
+
+// Aktualne warunki rabatu zestawów po id (do re-walidacji koszyka — koszyk
+// snapshotuje je w localStorage, admin mógł je zmienić). null = zestaw
+// nieaktywny lub usunięty (checkout i tak odrzuci, tu tylko sygnał do UI).
+export async function revalidateBundleTermsAction(
+  bundleIds: string[]
+): Promise<BundleTermsResult> {
+  const out: BundleTermsResult = {};
+  if (bundleIds.length === 0) return out;
+  const supabase = await createAdminClient();
+  const { data } = await supabase
+    .from("bundles")
+    .select("id, discount_type, discount_value, is_active")
+    .in("id", bundleIds);
+  for (const id of bundleIds) out[id] = null;
+  for (const b of (data ?? []) as {
+    id: string;
+    discount_type: "percent" | "amount";
+    discount_value: number;
+    is_active: boolean;
+  }[]) {
+    out[b.id] = b.is_active
+      ? { discountType: b.discount_type, discountValue: Number(b.discount_value) }
+      : null;
+  }
+  return out;
+}
+
 // ============================================================
 // Cross-sell dla koszyka — "Może Cię zainteresować"
 // ============================================================
