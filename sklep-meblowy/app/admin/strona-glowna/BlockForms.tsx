@@ -97,10 +97,10 @@ export function BannerForm({ block, onResult }: BlockFormProps) {
           <input value={headingDe} onChange={(e) => setHeadingDe(e.target.value)} maxLength={200} className={inputCls} />
         </Field>
         <Field label="Tekst">
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={4} maxLength={2000} className={inputCls} />
+          <RichTextEditor value={body} onChange={setBody} ariaLabel="Tekst banera (PL)" placeholder="Treść banera…" />
         </Field>
         <Field label="Tekst (DE)">
-          <textarea value={bodyDe} onChange={(e) => setBodyDe(e.target.value)} rows={4} maxLength={2000} className={inputCls} />
+          <RichTextEditor value={bodyDe} onChange={setBodyDe} ariaLabel="Tekst banera (DE)" />
         </Field>
       </div>
 
@@ -110,6 +110,8 @@ export function BannerForm({ block, onResult }: BlockFormProps) {
             [
               ["left", "Zdjęcie po lewej"],
               ["right", "Zdjęcie po prawej"],
+              ["center", "Zdjęcie na środku"],
+              ["full", "Zdjęcie na całą szerokość"],
               ["background", "Zdjęcie jako tło"],
             ] as const
           ).map(([value, label]) => (
