@@ -6,6 +6,7 @@ import { getLocale } from "@/app/_lib/i18n-server";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import BundleConfigurator from "@/app/_components/ui/BundleConfigurator";
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
+import { sanitizeRichHtml, extractShortDescription } from "@/app/_lib/product-html";
 
 // Prosta strona zestawu (spec 2026-07-16): nazwa + opis, składniki z linkami
 // do kart, konfigurator opcji obu mebli i dodanie do koszyka. Zdjęcia =
@@ -22,7 +23,7 @@ export async function generateMetadata({
   if (!bundle) return {};
   return {
     title: bundle.name,
-    description: bundle.description ?? undefined,
+    description: bundle.description ? extractShortDescription(bundle.description, 200) : undefined,
   };
 }
 
@@ -44,7 +45,10 @@ export default async function ZestawPage({
       </p>
       <h1 className="font-display text-4xl font-bold text-[var(--fg)] mb-4">{bundle.name}</h1>
       {bundle.description && (
-        <p className="text-[var(--muted)] mb-10 max-w-2xl">{bundle.description}</p>
+        <div
+          className="rich-text text-[var(--muted)] mb-10 max-w-2xl"
+          dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(bundle.description) }}
+        />
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
@@ -67,7 +71,7 @@ export default async function ZestawPage({
               )}
               <div>
                 <p className="font-display text-lg font-semibold text-[var(--fg)]">{p.name}</p>
-                <p className="text-sm text-[var(--muted)]">{p.description?.slice(0, 120)}</p>
+                <p className="text-sm text-[var(--muted)]">{p.description ? extractShortDescription(p.description, 120) : null}</p>
               </div>
             </LocalizedLink>
           ))}
