@@ -21,6 +21,7 @@ import {
   FaqForm,
   ReviewsForm,
   ProductsForm,
+  TextForm,
   cs,
   type BlockPickerData,
 } from "@/app/admin/strona-glowna/BlockForms";
@@ -266,6 +267,7 @@ export default function PageEditor({
                   {b.block_type === "faq" && <FaqForm block={b} onResult={handleResult} />}
                   {b.block_type === "reviews" && <ReviewsForm block={b} onResult={handleResult} />}
                   {b.block_type === "products" && <ProductsForm block={b} onResult={handleResult} picker={picker} />}
+                  {b.block_type === "text" && <TextForm block={b} onResult={handleResult} />}
                 </div>
               )}
             </Card>

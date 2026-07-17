@@ -13,6 +13,7 @@ import { useState, useTransition } from "react";
 import Image from "next/image";
 import { updateContentBlock } from "./actions";
 import { useImageUpload } from "@/app/admin/produkty/[id]/useImageUpload";
+import RichTextEditor from "@/app/admin/_shared/RichTextEditor";
 import type { PageBlockRow } from "@/app/_lib/blocks";
 import type { ActionResult } from "@/app/_lib/types";
 import { Field, inputCls } from "@/app/admin/_shared";
@@ -606,6 +607,34 @@ export function ProductsForm({
         </Field>
       )}
 
+      <SaveButton saving={saving} />
+    </form>
+  );
+}
+
+// ── Tekst (WYSIWYG) ──────────────────────────────────────────────────────
+
+export function TextForm({ block, onResult }: BlockFormProps) {
+  const c = block.content;
+  const [body, setBody] = useState(cs(c.body));
+  const [bodyDe, setBodyDe] = useState(cs(c.body_de));
+  const [saving, startTransition] = useTransition();
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    startTransition(async () => {
+      onResult(await updateContentBlock(block.id, { body, body_de: bodyDe }));
+    });
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <Field label="Treść" required>
+        <RichTextEditor value={body} onChange={setBody} ariaLabel="Treść (PL)" placeholder="Napisz treść…" />
+      </Field>
+      <Field label="Treść (DE)">
+        <RichTextEditor value={bodyDe} onChange={setBodyDe} ariaLabel="Treść (DE)" placeholder="Text auf Deutsch…" />
+      </Field>
       <SaveButton saving={saving} />
     </form>
   );
