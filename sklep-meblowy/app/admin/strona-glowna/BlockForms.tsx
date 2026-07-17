@@ -266,7 +266,7 @@ export function GalleryForm({ block, onResult }: BlockFormProps) {
                   onChange={(e) =>
                     setImages((prev) => prev.map((x, xi) => (xi === i ? { ...x, alt: e.target.value } : x)))
                   }
-                  placeholder="Opis zdjęcia (opcjonalnie)"
+                  placeholder="Podpis pod zdjęciem (widoczny, opcjonalnie)"
                   maxLength={200}
                   className={`${inputCls} flex-1`}
                 />

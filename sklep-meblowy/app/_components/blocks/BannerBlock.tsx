@@ -67,11 +67,21 @@ export default function BannerBlock({ content }: { content: LocalizedBannerConte
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16 items-center">
         {image_url && (
           <div
-            className={`relative aspect-[4/3] rounded-2xl overflow-hidden ${
+            className={`rounded-2xl overflow-hidden ${
               layout === "right" ? "md:order-2" : ""
             }`}
           >
-            <Image src={image_url} alt={heading ?? ""} fill className="object-cover" />
+            {/* Naturalne proporcje — zdjęcie w banerze nie jest przycinane (jak
+                w galerii). Zwykły <img> bo images.unoptimized=true; patrz
+                GalleryBlock. Wysokość dopasowuje się do zdjęcia. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={image_url}
+              alt={heading ?? ""}
+              loading="lazy"
+              decoding="async"
+              className="w-full h-auto"
+            />
           </div>
         )}
         {text}
