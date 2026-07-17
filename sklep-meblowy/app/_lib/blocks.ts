@@ -128,6 +128,8 @@ export function mergeHomeBlocks(rows: PageBlockRow[] | null): PageBlockRow[] {
 
 // ── Lokalizacja ──────────────────────────────────────────────────────────
 export type BannerLayout = "left" | "right" | "background";
+export type GalleryCaptionAlign = "left" | "center" | "right";
+export type GalleryColumns = "2" | "3" | "masonry";
 export type LocalizedBannerContent = {
   heading: string | null;
   body: string | null;
@@ -139,6 +141,8 @@ export type LocalizedBannerContent = {
 export type LocalizedGalleryContent = {
   heading: string | null;
   images: { url: string; alt: string | null }[];
+  caption_align: GalleryCaptionAlign;
+  columns: GalleryColumns;
 };
 export type LocalizedProductsContent = {
   heading: string | null;
@@ -191,6 +195,12 @@ function clampLimit(v: unknown): number {
   const n = typeof v === "number" && Number.isFinite(v) ? Math.floor(v) : 4;
   return Math.min(12, Math.max(1, n));
 }
+function galleryAlign(v: unknown): GalleryCaptionAlign {
+  return v === "left" || v === "right" ? v : "center";
+}
+function galleryColumns(v: unknown): GalleryColumns {
+  return v === "2" || v === "3" ? v : "masonry";
+}
 
 export function localizeBlock(row: PageBlockRow, locale: Locale): LocalizedBlock | null {
   const c = row.content ?? {};
@@ -233,7 +243,16 @@ export function localizeBlock(row: PageBlockRow, locale: Locale): LocalizedBlock
           return url ? { url, alt: s(o.alt) } : null;
         })
         .filter((x): x is { url: string; alt: string | null } => x !== null);
-      return { ...base, type: "gallery", content: { heading: pickLoc(c, "heading", locale), images } };
+      return {
+        ...base,
+        type: "gallery",
+        content: {
+          heading: pickLoc(c, "heading", locale),
+          images,
+          caption_align: galleryAlign(c.caption_align),
+          columns: galleryColumns(c.columns),
+        },
+      };
     }
     case "products": {
       const source =
@@ -394,7 +413,15 @@ export function validateBlockContent(
       if (images.length > MAX_IMAGES) {
         return { ok: false, error: `Maksymalnie ${MAX_IMAGES} zdjęć w galerii` };
       }
-      return { ok: true, content: { ...locPair(o, "heading", MAX_SHORT), images } };
+      return {
+        ok: true,
+        content: {
+          ...locPair(o, "heading", MAX_SHORT),
+          images,
+          caption_align: galleryAlign(o.caption_align),
+          columns: galleryColumns(o.columns),
+        },
+      };
     }
     case "products": {
       const source =

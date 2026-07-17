@@ -151,6 +151,34 @@ describe("localizeBlock — treściowe", () => {
     expect(b.type).toBe("gallery");
     if (b.type === "gallery") expect(b.content.images).toEqual([{ url: "https://x/a.jpg", alt: "A" }]);
   });
+  it("gallery: caption_align/columns — defaulty i clamp", () => {
+    const r = row({ block_type: "gallery", content: { images: [{ url: "https://x/a.jpg" }] } });
+    const b = localizeBlock(r, "pl")!;
+    if (b.type === "gallery") {
+      expect(b.content.caption_align).toBe("center");
+      expect(b.content.columns).toBe("masonry");
+    }
+    const r2 = row({ block_type: "gallery", content: { images: [{ url: "https://x/a.jpg" }], caption_align: "left", columns: "2" } });
+    const b2 = localizeBlock(r2, "pl")!;
+    if (b2.type === "gallery") {
+      expect(b2.content.caption_align).toBe("left");
+      expect(b2.content.columns).toBe("2");
+    }
+    const r3 = row({ block_type: "gallery", content: { images: [{ url: "https://x/a.jpg" }], caption_align: "zle", columns: "9" } });
+    const b3 = localizeBlock(r3, "pl")!;
+    if (b3.type === "gallery") {
+      expect(b3.content.caption_align).toBe("center");
+      expect(b3.content.columns).toBe("masonry");
+    }
+  });
+  it("gallery validate: zapisuje caption_align/columns (default przy braku)", () => {
+    const ok = validateBlockContent("gallery", { images: [{ url: "https://x/a.jpg" }] });
+    expect(ok.ok).toBe(true);
+    if (ok.ok) {
+      expect(ok.content.caption_align).toBe("center");
+      expect(ok.content.columns).toBe("masonry");
+    }
+  });
   it("products: normalizuje source i limit (clamp 1..12, default 4)", () => {
     const r = row({
       block_type: "products",
