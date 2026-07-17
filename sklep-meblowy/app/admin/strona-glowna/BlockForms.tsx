@@ -193,6 +193,12 @@ export function GalleryForm({ block, onResult }: BlockFormProps) {
       })
       .filter((img) => img.url.length > 0)
   );
+  const [captionAlign, setCaptionAlign] = useState(
+    c.caption_align === "left" || c.caption_align === "right" ? (c.caption_align as string) : "center"
+  );
+  const [columns, setColumns] = useState(
+    c.columns === "2" || c.columns === "3" ? (c.columns as string) : "masonry"
+  );
   const [saving, startTransition] = useTransition();
 
   const upload = useImageUpload({
@@ -216,7 +222,7 @@ export function GalleryForm({ block, onResult }: BlockFormProps) {
     e.preventDefault();
     startTransition(async () => {
       onResult(
-        await updateContentBlock(block.id, { heading, heading_de: headingDe, images })
+        await updateContentBlock(block.id, { heading, heading_de: headingDe, images, caption_align: captionAlign, columns })
       );
     });
   }
@@ -231,6 +237,58 @@ export function GalleryForm({ block, onResult }: BlockFormProps) {
           <input value={headingDe} onChange={(e) => setHeadingDe(e.target.value)} maxLength={200} className={inputCls} />
         </Field>
       </div>
+
+      <Field label="Podpisy">
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["left", "Do lewej"],
+              ["center", "Wyśrodkuj"],
+              ["right", "Do prawej"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setCaptionAlign(value)}
+              aria-pressed={captionAlign === value}
+              className={`px-3 py-1.5 rounded-full text-xs font-sans transition-colors ${
+                captionAlign === value
+                  ? "bg-[var(--color-navy)] text-white"
+                  : "border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      <Field label="Kolumny">
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["2", "2 kolumny"],
+              ["3", "3 kolumny"],
+              ["masonry", "Masonry (auto)"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setColumns(value)}
+              aria-pressed={columns === value}
+              className={`px-3 py-1.5 rounded-full text-xs font-sans transition-colors ${
+                columns === value
+                  ? "bg-[var(--color-navy)] text-white"
+                  : "border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </Field>
 
       <div
         {...upload.dropProps}
