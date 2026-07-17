@@ -22,7 +22,7 @@ export default async function AdminPagesPage() {
         </p>
         <h1 className="font-display text-3xl font-bold text-[var(--fg)]">Podstrony</h1>
         <p className="text-sm text-[var(--muted)] mt-2 max-w-2xl">
-          Własne strony sklepu (np. „Pielęgnacja mebli") składane z tych samych
+          Własne strony sklepu (np. „Pielęgnacja mebli”) składane z tych samych
           sekcji co strona główna. Nowa strona zaczyna jako szkic — publikujesz
           ją, gdy będzie gotowa.
         </p>
