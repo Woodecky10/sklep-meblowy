@@ -20,7 +20,7 @@ type RichTextEditorProps = {
   ariaLabel: string;
   placeholder?: string;
   enableImage?: boolean;
-  uploadImage?: (file: File) => Promise<string | null>;
+  uploadImage?: (file: File) => Promise<{ ok: true; url: string } | { ok: false; error: string }>;
 };
 
 // Stała paleta kolorów tekstu (UI ogranicza wybór; sanitizer i tak waliduje wartość).
@@ -97,9 +97,9 @@ export default function RichTextEditor({
     setUploadingImg(true);
     try {
       const compressed = await compressIfNeeded(file);
-      const url = await uploadImage(compressed);
-      if (!url) { showToast("Upload nieudany", "error"); return; }
-      editor.chain().focus().setImage({ src: url, alt: "" }).run();
+      const result = await uploadImage(compressed);
+      if (!result.ok) { showToast("Upload nieudany: " + result.error, "error"); return; }
+      editor.chain().focus().setImage({ src: result.url, alt: "" }).run();
     } finally {
       setUploadingImg(false);
     }

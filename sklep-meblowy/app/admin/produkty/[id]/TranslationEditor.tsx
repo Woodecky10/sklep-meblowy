@@ -3,9 +3,9 @@
 import { useMemo, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { saveProductDe, uploadProductImage } from "../actions";
+import { saveProductDe } from "../actions";
 import type { ProductDescriptionSection } from "@/app/_lib/types";
-import { CollapsibleSection, Field, inputClass, type Toast } from "./_shared";
+import { CollapsibleSection, Field, inputClass, uploadProductImageFile, type Toast } from "./_shared";
 import RichTextEditor from "@/app/admin/_shared/RichTextEditor";
 
 // Surowe pola tłumaczenia DE produktu (niezlokalizowane — patrz page.tsx).
@@ -225,12 +225,7 @@ export default function TranslationEditor({
             ariaLabel="Niemiecki opis produktu"
             placeholder="Niemiecki opis produktu"
             enableImage
-            uploadImage={async (file) => {
-              const fd = new FormData();
-              fd.set("image", file, file.name);
-              const res = await uploadProductImage(fd);
-              return res.ok ? ((res.data as { url: string } | undefined)?.url ?? null) : null;
-            }}
+            uploadImage={uploadProductImageFile}
           />
         </Field>
 
@@ -373,12 +368,7 @@ function TextSectionTranslator({
             ariaLabel="Niemiecka treść sekcji"
             placeholder="Niemiecka treść sekcji"
             enableImage
-            uploadImage={async (file) => {
-              const fd = new FormData();
-              fd.set("image", file, file.name);
-              const res = await uploadProductImage(fd);
-              return res.ok ? ((res.data as { url: string } | undefined)?.url ?? null) : null;
-            }}
+            uploadImage={uploadProductImageFile}
           />
         </Field>
       </div>

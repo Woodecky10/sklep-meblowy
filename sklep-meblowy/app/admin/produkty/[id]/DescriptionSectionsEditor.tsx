@@ -2,9 +2,9 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
-import { updateProductDescriptionSections, uploadProductImage } from "../actions";
+import { updateProductDescriptionSections } from "../actions";
 import type { ProductDescriptionSection } from "@/app/_lib/types";
-import { CollapsibleSection, IconBtn, inputClass, type Toast } from "./_shared";
+import { CollapsibleSection, IconBtn, inputClass, uploadProductImageFile, type Toast } from "./_shared";
 import { useImageUpload } from "./useImageUpload";
 import RichTextEditor from "@/app/admin/_shared/RichTextEditor";
 import { useConfirm } from "@/app/_context/ConfirmContext";
@@ -395,12 +395,7 @@ function TextSectionRow({
               ariaLabel="Nadpisz treść sekcji"
               placeholder={section.body.slice(0, 80) || "Wpisz treść, by nadpisać import"}
               enableImage
-              uploadImage={async (file) => {
-                const fd = new FormData();
-                fd.set("image", file, file.name);
-                const res = await uploadProductImage(fd);
-                return res.ok ? ((res.data as { url: string } | undefined)?.url ?? null) : null;
-              }}
+              uploadImage={uploadProductImageFile}
             />
           </div>
           <label className="flex items-center gap-2 text-xs text-[var(--fg)] cursor-pointer">
@@ -543,12 +538,7 @@ function CustomTextSectionRow({
           ariaLabel="Treść własnej sekcji opisu"
           placeholder="Napisz opis — użyj paska do pogrubień, list i nagłówków."
           enableImage
-          uploadImage={async (file) => {
-            const fd = new FormData();
-            fd.set("image", file, file.name);
-            const res = await uploadProductImage(fd);
-            return res.ok ? ((res.data as { url: string } | undefined)?.url ?? null) : null;
-          }}
+          uploadImage={uploadProductImageFile}
         />
       </div>
       <div className="flex flex-col gap-1 shrink-0">
