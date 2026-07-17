@@ -11,7 +11,7 @@ import {
   buildDuplicatePayload,
   type DuplicateSource,
 } from "@/app/_lib/new-product";
-import { imageUrlsToDelete } from "@/app/_lib/product-images";
+import { imageUrlsToDelete, cleanValueImages } from "@/app/_lib/product-images";
 import { recordPriceHistory } from "@/app/_lib/price-history";
 import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-html";
 import { buildGroupKey, pickGroupKey } from "@/app/_lib/size-groups";
@@ -269,12 +269,28 @@ export async function updateProductVariants(
           }
         }
       }
+      if (opt.value_images !== undefined) {
+        if (
+          typeof opt.value_images !== "object" ||
+          opt.value_images === null ||
+          Array.isArray(opt.value_images)
+        ) {
+          return { ok: false, error: "Nieprawidłowa struktura zdjęć wartości" };
+        }
+      }
       if (opt.filterable !== undefined && typeof opt.filterable !== "boolean") {
         return { ok: false, error: "Nieprawidłowa flaga filtra opcji" };
       }
     }
-    // Zapisujemy tylko opcje + overrides.
-    variantsToSave = { options: variants.options, overrides: variants.overrides };
+    // Zapisujemy tylko opcje + overrides. value_images czyszczone serwerowo:
+    // tylko istniejące wartości, tylko URL-e http(s), bez pustych tablic —
+    // klient wysyła stan edytora, akcja jest źródłem prawdy.
+    const cleanedOptions = variants.options.map((opt) => {
+      const { value_images: rawValueImages, ...rest } = opt;
+      const value_images = cleanValueImages(opt.values, rawValueImages);
+      return { ...rest, ...(value_images ? { value_images } : {}) };
+    });
+    variantsToSave = { options: cleanedOptions, overrides: variants.overrides };
   }
 
   const { error } = await supabase
