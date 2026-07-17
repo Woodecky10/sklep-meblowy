@@ -21,6 +21,7 @@ import {
   hasCornerSideOption,
   isCornerCategorySlug,
 } from "@/app/_lib/corner-side";
+import ValueImagesPanel from "./ValueImagesPanel";
 
 // ============================================================
 // Komponent
@@ -115,13 +116,16 @@ export default function VariantsEditor({
     if (!variants) return;
     const nextOptions = variants.options.map((o, i) => {
       if (i !== optIdx) return o;
-      // Usuń też ewentualną dopłatę tej wartości.
+      // Usuń też ewentualną dopłatę i zdjęcia tej wartości.
       const nextPrices = { ...(o.value_prices ?? {}) };
       delete nextPrices[value];
+      const nextImages = { ...(o.value_images ?? {}) };
+      delete nextImages[value];
       return {
         ...o,
         values: o.values.filter((v) => v !== value),
         value_prices: Object.keys(nextPrices).length > 0 ? nextPrices : undefined,
+        value_images: Object.keys(nextImages).length > 0 ? nextImages : undefined,
       };
     });
     setVariants({ ...variants, options: nextOptions });
@@ -138,6 +142,35 @@ export default function VariantsEditor({
       return {
         ...o,
         value_prices: Object.keys(nextPrices).length > 0 ? nextPrices : undefined,
+      };
+    });
+    setVariants({ ...variants, options: nextOptions });
+  }
+
+  // Dodaj wgrane zdjęcia do wartości opcji (dopisywane na koniec, bez duplikatów).
+  function addValueImages(optIdx: number, value: string, urls: string[]) {
+    if (!variants) return;
+    const nextOptions = variants.options.map((o, i) => {
+      if (i !== optIdx) return o;
+      const current = o.value_images?.[value] ?? [];
+      const merged = [...current, ...urls.filter((u) => !current.includes(u))];
+      return { ...o, value_images: { ...(o.value_images ?? {}), [value]: merged } };
+    });
+    setVariants({ ...variants, options: nextOptions });
+  }
+
+  // Usuń zdjęcie wartości (pusta lista → wpis znika; pusta mapa → klucz znika).
+  function removeValueImage(optIdx: number, value: string, url: string) {
+    if (!variants) return;
+    const nextOptions = variants.options.map((o, i) => {
+      if (i !== optIdx) return o;
+      const nextImages = { ...(o.value_images ?? {}) };
+      const kept = (nextImages[value] ?? []).filter((u) => u !== url);
+      if (kept.length > 0) nextImages[value] = kept;
+      else delete nextImages[value];
+      return {
+        ...o,
+        value_images: Object.keys(nextImages).length > 0 ? nextImages : undefined,
       };
     });
     setVariants({ ...variants, options: nextOptions });
@@ -184,10 +217,20 @@ export default function VariantsEditor({
               }
               if (Object.keys(kept).length > 0) value_prices = kept;
             }
+            let value_images: Record<string, string[]> | undefined;
+            if (o.value_images) {
+              const keptImages: Record<string, string[]> = {};
+              for (const v of values) {
+                const imgs = o.value_images[v];
+                if (Array.isArray(imgs) && imgs.length > 0) keptImages[v] = imgs;
+              }
+              if (Object.keys(keptImages).length > 0) value_images = keptImages;
+            }
             return {
               name: o.name.trim(),
               values,
               ...(value_prices ? { value_prices } : {}),
+              ...(value_images ? { value_images } : {}),
               ...(o.filterable ? { filterable: true } : {}),
             };
           })
@@ -299,7 +342,7 @@ export default function VariantsEditor({
           kontener DOM, do którego mamy dostęp. */}
       <div data-guard-section className="flex flex-col gap-6">
       <p className="text-sm text-[var(--muted)] max-w-2xl">
-        Dodaj opcje (np. „Kolor”, „Tkanina”, „Strona”) i ich wartości — klient wybiera po jednej wartości z każdej opcji. Przy wartości możesz ustawić dopłatę „+zł” (np. droższa tkanina). Stan magazynowy, cena promocyjna i zdjęcia są wspólne dla całego produktu — ustawiasz je w „Podstawowych danych” i „Zdjęciach produktu” wyżej.
+        Dodaj opcje (np. „Kolor”, „Tkanina”, „Strona”) i ich wartości — klient wybiera po jednej wartości z każdej opcji. Przy wartości możesz ustawić dopłatę „+zł” (np. droższa tkanina) oraz zdjęcia (📷) — pokażą się na początku galerii, gdy klient wybierze tę wartość. Stan magazynowy i cena promocyjna są wspólne dla całego produktu — ustawiasz je w „Podstawowych danych”; globalna galeria w „Zdjęciach produktu” wyżej.
       </p>
 
       {/* ============================================================
@@ -324,6 +367,9 @@ export default function VariantsEditor({
             onSetValuePrice={(v, p) => setValuePrice(i, v, p)}
             onRemoveOption={() => removeOption(i)}
             onToggleFilterable={(v) => setOptionFilterable(i, v)}
+            onAddValueImages={(v, urls) => addValueImages(i, v, urls)}
+            onRemoveValueImage={(v, url) => removeValueImage(i, v, url)}
+            onToast={onToast}
           />
         ))}
         <button
@@ -399,6 +445,9 @@ function OptionRow({
   onSetValuePrice,
   onRemoveOption,
   onToggleFilterable,
+  onAddValueImages,
+  onRemoveValueImage,
+  onToast,
 }: {
   option: ProductOption;
   onNameChange: (name: string) => void;
@@ -407,8 +456,12 @@ function OptionRow({
   onSetValuePrice: (value: string, price: number | null) => void;
   onRemoveOption: () => void;
   onToggleFilterable: (v: boolean) => void;
+  onAddValueImages: (value: string, urls: string[]) => void;
+  onRemoveValueImage: (value: string, url: string) => void;
+  onToast: (t: Toast) => void;
 }) {
   const [newValue, setNewValue] = useState("");
+  const [imagesFor, setImagesFor] = useState<string | null>(null);
   return (
     <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl p-4 flex flex-col gap-3">
       <div className="flex items-center gap-3">
@@ -455,40 +508,65 @@ function OptionRow({
           {option.values.length === 0 && (
             <span className="text-xs text-[var(--muted)] italic">Brak wartości — dodaj poniżej.</span>
           )}
-          {option.values.map((v) => (
-            <div
-              key={v}
-              className="flex items-center gap-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-lg px-3 py-1.5"
-            >
-              <span className="flex-1 text-sm truncate">{v}</span>
-              <div className="flex items-center gap-1 shrink-0">
-                <span className="text-xs text-[var(--muted)]">+</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  inputMode="decimal"
-                  value={option.value_prices?.[v] ?? ""}
-                  onChange={(e) =>
-                    onSetValuePrice(v, e.target.value === "" ? null : Number(e.target.value))
-                  }
-                  placeholder="0"
-                  aria-label={`Dopłata za ${v} (zł)`}
-                  className="w-20 px-2 py-1 bg-[var(--bg)] border border-[var(--border)] rounded text-sm text-right focus:border-[var(--color-gold)] focus:outline-none"
-                />
-                <span className="text-xs text-[var(--muted)]">zł</span>
+          {option.values.map((v) => {
+            const imgCount = option.value_images?.[v]?.length ?? 0;
+            return (
+              <div key={v} className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-lg px-3 py-1.5">
+                  <span className="flex-1 text-sm truncate">{v}</span>
+                  <button
+                    type="button"
+                    onClick={() => setImagesFor(imagesFor === v ? null : v)}
+                    aria-expanded={imagesFor === v}
+                    aria-label={`Zdjęcia wartości ${v} (${imgCount})`}
+                    title="Zdjęcia tej wartości"
+                    className={`shrink-0 px-2 py-1 text-[11px] font-sans rounded-full border transition-colors ${
+                      imagesFor === v || imgCount > 0
+                        ? "border-[var(--color-gold)] text-[var(--color-gold-text)]"
+                        : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold-text)]"
+                    }`}
+                  >
+                    📷{imgCount > 0 ? ` ${imgCount}` : ""}
+                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xs text-[var(--muted)]">+</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      inputMode="decimal"
+                      value={option.value_prices?.[v] ?? ""}
+                      onChange={(e) =>
+                        onSetValuePrice(v, e.target.value === "" ? null : Number(e.target.value))
+                      }
+                      placeholder="0"
+                      aria-label={`Dopłata za ${v} (zł)`}
+                      className="w-20 px-2 py-1 bg-[var(--bg)] border border-[var(--border)] rounded text-sm text-right focus:border-[var(--color-gold)] focus:outline-none"
+                    />
+                    <span className="text-xs text-[var(--muted)]">zł</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onRemoveValue(v)}
+                    aria-label={`Usuń ${v}`}
+                    className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-100 dark:hover:bg-red-950 text-red-600 shrink-0"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                {imagesFor === v && (
+                  <ValueImagesPanel
+                    value={v}
+                    urls={option.value_images?.[v] ?? []}
+                    onAdd={(urls) => onAddValueImages(v, urls)}
+                    onRemove={(url) => onRemoveValueImage(v, url)}
+                    onToast={onToast}
+                  />
+                )}
               </div>
-              <button
-                type="button"
-                onClick={() => onRemoveValue(v)}
-                aria-label={`Usuń ${v}`}
-                className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-100 dark:hover:bg-red-950 text-red-600 shrink-0"
-              >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <div className="flex gap-2">
           <input

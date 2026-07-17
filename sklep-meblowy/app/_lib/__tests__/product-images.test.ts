@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { imageUrlsToDelete } from "@/app/_lib/product-images";
+import {
+  imageUrlsToDelete,
+  cleanValueImages,
+  collectProductImageUrls,
+} from "@/app/_lib/product-images";
 
 describe("imageUrlsToDelete — kasuj ze storage tylko URL-e nieużywane gdzie indziej", () => {
   it("URL współdzielony z innym produktem NIE jest kasowany", () => {
@@ -34,5 +38,64 @@ describe("imageUrlsToDelete — kasuj ze storage tylko URL-e nieużywane gdzie i
 
   it("brak innych produktów → kasujemy wszystkie własne", () => {
     expect(imageUrlsToDelete(["a.jpg", "b.jpg"], [])).toEqual(["a.jpg", "b.jpg"]);
+  });
+});
+
+describe("cleanValueImages — czyszczenie zdjęć wartości przy zapisie wariantów", () => {
+  it("zostawia tylko wpisy dla istniejących wartości (pruning)", () => {
+    expect(
+      cleanValueImages(["A"], { A: ["https://x/a.jpg"], B: ["https://x/b.jpg"] })
+    ).toEqual({ A: ["https://x/a.jpg"] });
+  });
+  it("odrzuca nie-stringi, puste stringi i URL-e bez http(s)", () => {
+    expect(
+      cleanValueImages(["A"], {
+        A: ["https://x/a.jpg", "", 123, "javascript:alert(1)", "ftp://x/z.jpg"],
+      })
+    ).toEqual({ A: ["https://x/a.jpg"] });
+  });
+  it("puste tablice znikają; nic nie zostało → undefined", () => {
+    expect(cleanValueImages(["A"], { A: [] })).toBeUndefined();
+    expect(cleanValueImages(["A"], {})).toBeUndefined();
+    expect(cleanValueImages(["A"], { B: ["https://x/b.jpg"] })).toBeUndefined();
+  });
+  it("śmieciowe wejście (nie-obiekt / tablica / undefined) → undefined", () => {
+    expect(cleanValueImages(["A"], undefined)).toBeUndefined();
+    expect(cleanValueImages(["A"], "x")).toBeUndefined();
+    expect(cleanValueImages(["A"], ["https://x/a.jpg"])).toBeUndefined();
+    expect(cleanValueImages(["A"], null)).toBeUndefined();
+  });
+  it("wartość z tablicą zawierającą śmieci → zostają tylko poprawne URL-e", () => {
+    expect(
+      cleanValueImages(["A", "B"], { A: ["https://x/a.jpg"], B: "nie-tablica" })
+    ).toEqual({ A: ["https://x/a.jpg"] });
+  });
+});
+
+describe("collectProductImageUrls — galeria + zdjęcia wartości opcji", () => {
+  it("łączy galerię i value_images wszystkich opcji (kolejność: galeria, potem opcje)", () => {
+    expect(
+      collectProductImageUrls(["g.jpg"], {
+        options: [
+          { name: "Tkanina", values: ["A"], value_images: { A: ["a1.jpg", "a2.jpg"] } },
+          { name: "Strona", values: ["L"], value_images: { L: ["l.jpg"] } },
+        ],
+      })
+    ).toEqual(["g.jpg", "a1.jpg", "a2.jpg", "l.jpg"]);
+  });
+  it("znosi śmieciowe kształty (null / nie-tablice / nie-stringi)", () => {
+    expect(collectProductImageUrls(null, null)).toEqual([]);
+    expect(
+      collectProductImageUrls([42, "g.jpg"], {
+        options: [{ name: "X", values: ["A"], value_images: { A: "nope" } }],
+      })
+    ).toEqual(["g.jpg"]);
+  });
+  it("variants bez value_images → sama galeria", () => {
+    expect(
+      collectProductImageUrls(["g.jpg"], {
+        options: [{ name: "Kolor", values: ["Beż"] }],
+      })
+    ).toEqual(["g.jpg"]);
   });
 });

@@ -7,6 +7,7 @@ import {
   verifyBundleGroup,
   eligiblePromoBase,
   minBundleSavings,
+  minBundlePricing,
   groupCartBundles,
 } from "../bundles";
 
@@ -158,5 +159,36 @@ describe("groupCartBundles", () => {
     expect(groups[0].base).toBe(10400);
     expect(groups[0].discount).toBe(1040);
     expect(groups[0].items).toHaveLength(2);
+  });
+});
+
+describe("minBundlePricing", () => {
+  it("percent: baza, cena po rabacie i oszczędność", () => {
+    expect(minBundlePricing([3000, 2200], "percent", 10)).toEqual({
+      base: 5200,
+      discounted: 4680,
+      savings: 520,
+    });
+  });
+  it("amount: rabat kwotowy z clampem do bazy (cena nie spada poniżej 0)", () => {
+    expect(minBundlePricing([300, 200], "amount", 10000)).toEqual({
+      base: 500,
+      discounted: 0,
+      savings: 500,
+    });
+  });
+  it("grosze zaokrąglane do 2 miejsc", () => {
+    // Jednoelementowa baza — bez sumowania floatów w asercie (99.99+100
+    // w double nie musi być dokładnie 199.99).
+    expect(minBundlePricing([199.99], "percent", 33)).toEqual({
+      base: 199.99,
+      discounted: 133.99,
+      savings: 66,
+    });
+  });
+  it("spójny z minBundleSavings", () => {
+    expect(minBundlePricing([3000, 2200], "percent", 10).savings).toBe(
+      minBundleSavings([3000, 2200], "percent", 10)
+    );
   });
 });
