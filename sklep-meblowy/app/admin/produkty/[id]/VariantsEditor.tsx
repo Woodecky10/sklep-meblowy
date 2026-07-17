@@ -546,7 +546,10 @@ function OptionRow({
                   </div>
                   <button
                     type="button"
-                    onClick={() => onRemoveValue(v)}
+                    onClick={() => {
+                      if (imagesFor === v) setImagesFor(null);
+                      onRemoveValue(v);
+                    }}
                     aria-label={`Usuń ${v}`}
                     className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-100 dark:hover:bg-red-950 text-red-600 shrink-0"
                   >
