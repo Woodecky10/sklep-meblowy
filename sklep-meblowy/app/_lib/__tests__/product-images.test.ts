@@ -98,4 +98,11 @@ describe("collectProductImageUrls — galeria + zdjęcia wartości opcji", () =>
       })
     ).toEqual(["g.jpg"]);
   });
+  it("dedupuje URL powtórzony w galerii i w value_images", () => {
+    expect(
+      collectProductImageUrls(["g.jpg", "shared.jpg"], {
+        options: [{ name: "Kolor", values: ["A"], value_images: { A: ["shared.jpg", "a.jpg"] } }],
+      })
+    ).toEqual(["g.jpg", "shared.jpg", "a.jpg"]);
+  });
 });

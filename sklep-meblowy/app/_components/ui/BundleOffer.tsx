@@ -106,7 +106,7 @@ export default function BundleOffer({
                     ) : (
                       <LocalizedLink
                         href={`/produkt/${p.id}`}
-                        aria-label={p.name}
+                        aria-label={`${p.name} — ${formatMoney(price, locale, rate)}`}
                         className="block rounded-lg -mx-2 px-2 hover:bg-[var(--bg)] transition-colors"
                       >
                         {row}

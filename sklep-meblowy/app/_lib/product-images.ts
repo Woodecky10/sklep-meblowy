@@ -60,7 +60,8 @@ export function cleanValueImages(
 // Wszystkie URL-e zdjęć produktu: galeria (images) + zdjęcia wartości opcji
 // (variants.options[].value_images). Do czyszczenia Storage przy usuwaniu
 // produktu (deleteProduct). Przyjmuje unknown — dane prosto z DB (JSONB może
-// mieć dowolny kształt), śmieci są pomijane.
+// mieć dowolny kształt), śmieci są pomijane. Output jest zdeduplikowany
+// (pierwsze wystąpienie wygrywa).
 export function collectProductImageUrls(
   images: unknown,
   variants: unknown
@@ -84,5 +85,5 @@ export function collectProductImageUrls(
       }
     }
   }
-  return out;
+  return [...new Set(out)];
 }
