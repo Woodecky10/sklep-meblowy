@@ -11,7 +11,11 @@ import {
   buildDuplicatePayload,
   type DuplicateSource,
 } from "@/app/_lib/new-product";
-import { imageUrlsToDelete, cleanValueImages } from "@/app/_lib/product-images";
+import {
+  imageUrlsToDelete,
+  cleanValueImages,
+  collectProductImageUrls,
+} from "@/app/_lib/product-images";
 import { recordPriceHistory } from "@/app/_lib/price-history";
 import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-html";
 import { buildGroupKey, pickGroupKey } from "@/app/_lib/size-groups";
@@ -360,6 +364,7 @@ export async function deleteProduct(formData: FormData): Promise<ActionResult> {
   const productRow = product as {
     name: string;
     images: string[] | null;
+    variants: unknown;
   };
 
   const { error: deleteErr } = await supabase
@@ -375,17 +380,15 @@ export async function deleteProduct(formData: FormData): Promise<ActionResult> {
   // ze storage tylko te pliki, których nie używa żaden inny produkt
   // (imageUrlsToDelete) — inaczej usunięcie jednego bliźniaka rozmiarowego
   // skasowałoby zdjęcia wciąż pokazywane przez pozostałe.
-  const targetImages = Array.isArray(productRow.images)
-    ? productRow.images.filter((u): u is string => typeof u === "string")
-    : [];
+  const targetImages = collectProductImageUrls(productRow.images, productRow.variants);
   if (targetImages.length > 0) {
     const { data: others } = await supabase
       .from("products")
-      .select("images")
+      .select("images, variants")
       .neq("id", id);
-    const otherImages = ((others ?? []) as { images: string[] | null }[]).map(
-      (r) => (Array.isArray(r.images) ? r.images : [])
-    );
+    const otherImages = (
+      (others ?? []) as { images: string[] | null; variants: unknown }[]
+    ).map((r) => collectProductImageUrls(r.images, r.variants));
     const urlsToDelete = imageUrlsToDelete(targetImages, otherImages);
     await Promise.all(urlsToDelete.map((url) => deleteStorageImage(url)));
   }

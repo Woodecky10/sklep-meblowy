@@ -56,3 +56,33 @@ export function cleanValueImages(
   }
   return Object.keys(out).length > 0 ? out : undefined;
 }
+
+// Wszystkie URL-e zdjęć produktu: galeria (images) + zdjęcia wartości opcji
+// (variants.options[].value_images). Do czyszczenia Storage przy usuwaniu
+// produktu (deleteProduct). Przyjmuje unknown — dane prosto z DB (JSONB może
+// mieć dowolny kształt), śmieci są pomijane.
+export function collectProductImageUrls(
+  images: unknown,
+  variants: unknown
+): string[] {
+  const out: string[] = [];
+  if (Array.isArray(images)) {
+    for (const u of images) {
+      if (typeof u === "string" && u) out.push(u);
+    }
+  }
+  const options = (variants as { options?: unknown } | null)?.options;
+  if (Array.isArray(options)) {
+    for (const opt of options) {
+      const vi = (opt as { value_images?: unknown } | null)?.value_images;
+      if (typeof vi !== "object" || vi === null || Array.isArray(vi)) continue;
+      for (const urls of Object.values(vi)) {
+        if (!Array.isArray(urls)) continue;
+        for (const u of urls) {
+          if (typeof u === "string" && u) out.push(u);
+        }
+      }
+    }
+  }
+  return out;
+}
