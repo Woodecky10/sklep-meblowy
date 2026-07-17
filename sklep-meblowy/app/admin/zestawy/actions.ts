@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
 import { invalidateBundlesCache } from "@/app/_lib/bundles-server";
+import { sanitizeRichHtml } from "@/app/_lib/product-html";
 
 export type ActionResult =
   | { ok: true; message?: string; data?: unknown }
@@ -15,6 +16,16 @@ function sanitize(input: unknown, max = 500): string {
 
 function emptyToNull(v: string): string | null {
   return v === "" ? null : v;
+}
+
+const MAX_RICH = 20000;
+// Sanityzuje HTML z edytora, obcina do limitu, zwraca null gdy po usunięciu
+// tagów nie ma treści (np. puste <p></p>).
+function cleanRich(input: unknown): string | null {
+  if (typeof input !== "string") return null;
+  const html = sanitizeRichHtml(input).slice(0, MAX_RICH);
+  const text = html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, "").trim();
+  return text.length > 0 ? html : null;
 }
 
 function toSlug(input: string): string {
@@ -54,8 +65,8 @@ function parseBundleForm(formData: FormData, productIds: string[]):
     ok: true,
     name,
     nameDe: emptyToNull(sanitize(formData.get("name_de"), 200)),
-    description: emptyToNull(sanitize(formData.get("description"), 2000)),
-    descriptionDe: emptyToNull(sanitize(formData.get("description_de"), 2000)),
+    description: cleanRich(formData.get("description")),
+    descriptionDe: cleanRich(formData.get("description_de")),
     discountType,
     discountValue,
     isActive: formData.get("is_active") === "on" || formData.get("is_active") === "true",

@@ -16,6 +16,7 @@ import {
   FaqForm,
   ReviewsForm,
   ProductsForm,
+  TextForm,
   type BlockPickerData,
   cs,
 } from "./BlockForms";
@@ -321,6 +322,9 @@ export default function BlocksEditor({
                   {contentMeta && b.block_type === "products" && (
                     <ProductsForm block={b} onResult={handleResult} picker={picker} />
                   )}
+                  {contentMeta && b.block_type === "text" && (
+                    <TextForm block={b} onResult={handleResult} />
+                  )}
                 </>
               )}
             </Card>
@@ -343,7 +347,7 @@ export default function BlocksEditor({
               Podstrony
             </h2>
             <p className="text-xs text-[var(--muted)]">
-              Własne strony (np. „Pielęgnacja mebli") składane z tych samych
+              Własne strony (np. „Pielęgnacja mebli”) składane z tych samych
               sekcji co strona główna.
             </p>
           </div>

@@ -12,6 +12,7 @@
 import type { Locale } from "./i18n";
 import { pl } from "./dictionaries/pl";
 import { de } from "./dictionaries/de";
+import { sanitizeRichHtml } from "./product-html";
 
 export const SYSTEM_BLOCK_TYPES = [
   "hero",
@@ -28,6 +29,7 @@ export const CONTENT_BLOCK_TYPES = [
   "products",
   "faq",
   "reviews",
+  "text",
 ] as const;
 export type ContentBlockType = (typeof CONTENT_BLOCK_TYPES)[number];
 
@@ -83,6 +85,11 @@ export const CONTENT_BLOCK_DEFS: Record<
     description: "Cytaty klientów z podpisem, w kartach obok siebie.",
     defaultContent: () => ({ heading: "", items: [] }),
   },
+  text: {
+    name: "Tekst",
+    description: "Sformatowany tekst (nagłówki, listy, pogrubienie, link, wyrównanie).",
+    defaultContent: () => ({ body: "" }),
+  },
 };
 
 // Defaulty systemowe = dzisiejszy wygląd 1:1 (te same wartości co seed
@@ -120,7 +127,9 @@ export function mergeHomeBlocks(rows: PageBlockRow[] | null): PageBlockRow[] {
 }
 
 // ── Lokalizacja ──────────────────────────────────────────────────────────
-export type BannerLayout = "left" | "right" | "background";
+export type BannerLayout = "left" | "right" | "background" | "center" | "full";
+export type GalleryCaptionAlign = "left" | "center" | "right";
+export type GalleryColumns = "2" | "3" | "masonry";
 export type LocalizedBannerContent = {
   heading: string | null;
   body: string | null;
@@ -132,6 +141,8 @@ export type LocalizedBannerContent = {
 export type LocalizedGalleryContent = {
   heading: string | null;
   images: { url: string; alt: string | null }[];
+  caption_align: GalleryCaptionAlign;
+  columns: GalleryColumns;
 };
 export type LocalizedProductsContent = {
   heading: string | null;
@@ -149,6 +160,9 @@ export type LocalizedReviewsContent = {
   heading: string | null;
   items: { quote: string; author: string | null }[];
 };
+export type LocalizedTextContent = {
+  body: string | null;
+};
 export type LocalizedSystemBlock = {
   id: string;
   visible: boolean;
@@ -162,6 +176,7 @@ export type LocalizedContentBlock = { id: string; visible: boolean } & (
   | { type: "products"; content: LocalizedProductsContent }
   | { type: "faq"; content: LocalizedFaqContent }
   | { type: "reviews"; content: LocalizedReviewsContent }
+  | { type: "text"; content: LocalizedTextContent }
 );
 export type LocalizedBlock = LocalizedSystemBlock | LocalizedContentBlock;
 
@@ -180,6 +195,12 @@ function clampLimit(v: unknown): number {
   const n = typeof v === "number" && Number.isFinite(v) ? Math.floor(v) : 4;
   return Math.min(12, Math.max(1, n));
 }
+function galleryAlign(v: unknown): GalleryCaptionAlign {
+  return v === "left" || v === "right" ? v : "center";
+}
+function galleryColumns(v: unknown): GalleryColumns {
+  return v === "2" || v === "3" ? v : "masonry";
+}
 
 export function localizeBlock(row: PageBlockRow, locale: Locale): LocalizedBlock | null {
   const c = row.content ?? {};
@@ -196,13 +217,17 @@ export function localizeBlock(row: PageBlockRow, locale: Locale): LocalizedBlock
     case "banner": {
       const rawLayout = c.layout;
       const layout: BannerLayout =
-        rawLayout === "right" || rawLayout === "background" ? rawLayout : "left";
+        rawLayout === "right" || rawLayout === "background" ||
+        rawLayout === "center" || rawLayout === "full"
+          ? rawLayout
+          : "left";
+      const bodyRaw = pickLoc(c, "body", locale);
       return {
         ...base,
         type: "banner",
         content: {
           heading: pickLoc(c, "heading", locale),
-          body: pickLoc(c, "body", locale),
+          body: bodyRaw ? sanitizeRichHtml(bodyRaw) : null,
           image_url: s(c.image_url),
           layout,
           cta_label: pickLoc(c, "cta_label", locale),
@@ -222,7 +247,16 @@ export function localizeBlock(row: PageBlockRow, locale: Locale): LocalizedBlock
           return url ? { url, alt: s(o.alt) } : null;
         })
         .filter((x): x is { url: string; alt: string | null } => x !== null);
-      return { ...base, type: "gallery", content: { heading: pickLoc(c, "heading", locale), images } };
+      return {
+        ...base,
+        type: "gallery",
+        content: {
+          heading: pickLoc(c, "heading", locale),
+          images,
+          caption_align: galleryAlign(c.caption_align),
+          columns: galleryColumns(c.columns),
+        },
+      };
     }
     case "products": {
       const source =
@@ -266,6 +300,14 @@ export function localizeBlock(row: PageBlockRow, locale: Locale): LocalizedBlock
         .filter((x): x is { quote: string; author: string | null } => x !== null);
       return { ...base, type: "reviews", content: { heading: pickLoc(c, "heading", locale), items } };
     }
+    case "text": {
+      const bodyRaw = pickLoc(c, "body", locale);
+      return {
+        ...base,
+        type: "text",
+        content: { body: bodyRaw ? sanitizeRichHtml(bodyRaw) : null },
+      };
+    }
     default:
       return null; // nieznany typ — fail-open (kompatybilność w przód)
   }
@@ -281,6 +323,7 @@ type ValidationResult =
 
 const MAX_SHORT = 200;   // nagłówki, etykiety, autorzy
 const MAX_LONG = 2000;   // body, odpowiedzi, cytaty
+const MAX_RICH = 20000; // HTML pól WYSIWYG (text.body, banner.body)
 const MAX_IMAGES = 24;
 const MAX_ITEMS = 20;
 const MAX_PRODUCTS = 12;
@@ -289,6 +332,14 @@ function cleanStr(v: unknown, max: number): string | undefined {
   if (typeof v !== "string") return undefined;
   const t = v.trim().slice(0, max);
   return t.length > 0 ? t : undefined;
+}
+// Sanityzuje HTML z edytora, obcina do max, zwraca undefined gdy pusto po
+// wyczyszczeniu tagów (żeby pusty <p></p> nie liczył się jako treść).
+function cleanRich(v: unknown, max: number): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const html = sanitizeRichHtml(v).slice(0, max);
+  const textOnly = html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, "").trim();
+  return textOnly.length > 0 ? html : undefined;
 }
 function isSafeHref(href: string): boolean {
   return href.startsWith("/") || href.startsWith("https://");
@@ -316,7 +367,7 @@ export function validateBlockContent(
       const heading = cleanStr(o.heading, MAX_SHORT);
       if (!heading) return { ok: false, error: "Nagłówek jest wymagany" };
       const layout = o.layout ?? "left";
-      if (layout !== "left" && layout !== "right" && layout !== "background") {
+      if (!["left", "right", "background", "center", "full"].includes(layout as string)) {
         return { ok: false, error: "Nieprawidłowy układ banera" };
       }
       const ctaLabel = cleanStr(o.cta_label, MAX_SHORT);
@@ -336,12 +387,15 @@ export function validateBlockContent(
         return { ok: false, error: "Adres zdjęcia musi zaczynać się od / albo https://" };
       }
       const headingPair = locPair(o, "heading", MAX_SHORT);
+      const bodyClean = cleanRich(o.body, MAX_RICH);
+      const bodyDeClean = cleanRich(o.body_de, MAX_RICH);
       return {
         ok: true,
         content: {
           heading,
           ...(headingPair.heading_de ? { heading_de: headingPair.heading_de } : {}),
-          ...locPair(o, "body", MAX_LONG),
+          ...(bodyClean ? { body: bodyClean } : {}),
+          ...(bodyDeClean ? { body_de: bodyDeClean } : {}),
           ...(imageUrl ? { image_url: imageUrl } : {}),
           layout,
           ...(ctaLabel ? { cta_label: ctaLabel } : {}),
@@ -366,7 +420,15 @@ export function validateBlockContent(
       if (images.length > MAX_IMAGES) {
         return { ok: false, error: `Maksymalnie ${MAX_IMAGES} zdjęć w galerii` };
       }
-      return { ok: true, content: { ...locPair(o, "heading", MAX_SHORT), images } };
+      return {
+        ok: true,
+        content: {
+          ...locPair(o, "heading", MAX_SHORT),
+          images,
+          caption_align: galleryAlign(o.caption_align),
+          columns: galleryColumns(o.columns),
+        },
+      };
     }
     case "products": {
       const source =
@@ -421,6 +483,15 @@ export function validateBlockContent(
         return { ok: false, error: `Maksymalnie ${MAX_ITEMS} pozycji` };
       }
       return { ok: true, content: { ...locPair(o, "heading", MAX_SHORT), items } };
+    }
+    case "text": {
+      const body = cleanRich(o.body, MAX_RICH);
+      if (!body) return { ok: false, error: "Treść jest wymagana" };
+      const bodyDe = cleanRich(o.body_de, MAX_RICH);
+      return {
+        ok: true,
+        content: { body, ...(bodyDe ? { body_de: bodyDe } : {}) },
+      };
     }
   }
 }

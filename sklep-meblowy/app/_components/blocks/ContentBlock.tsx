@@ -3,6 +3,7 @@ import GalleryBlock from "./GalleryBlock";
 import ProductsBlock from "./ProductsBlock";
 import FaqBlock from "./FaqBlock";
 import ReviewsBlock from "./ReviewsBlock";
+import TextBlock from "./TextBlock";
 import type { LocalizedContentBlock } from "@/app/_lib/blocks";
 import type { Locale } from "@/app/_lib/i18n";
 
@@ -26,5 +27,7 @@ export default function ContentBlock({
       return <FaqBlock content={block.content} />;
     case "reviews":
       return <ReviewsBlock content={block.content} />;
+    case "text":
+      return <TextBlock content={block.content} />;
   }
 }

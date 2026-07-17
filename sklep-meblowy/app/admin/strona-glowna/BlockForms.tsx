@@ -13,6 +13,7 @@ import { useState, useTransition } from "react";
 import Image from "next/image";
 import { updateContentBlock } from "./actions";
 import { useImageUpload } from "@/app/admin/produkty/[id]/useImageUpload";
+import RichTextEditor from "@/app/admin/_shared/RichTextEditor";
 import type { PageBlockRow } from "@/app/_lib/blocks";
 import type { ActionResult } from "@/app/_lib/types";
 import { Field, inputCls } from "@/app/admin/_shared";
@@ -96,10 +97,10 @@ export function BannerForm({ block, onResult }: BlockFormProps) {
           <input value={headingDe} onChange={(e) => setHeadingDe(e.target.value)} maxLength={200} className={inputCls} />
         </Field>
         <Field label="Tekst">
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={4} maxLength={2000} className={inputCls} />
+          <RichTextEditor value={body} onChange={setBody} ariaLabel="Tekst banera (PL)" placeholder="Treść banera…" />
         </Field>
         <Field label="Tekst (DE)">
-          <textarea value={bodyDe} onChange={(e) => setBodyDe(e.target.value)} rows={4} maxLength={2000} className={inputCls} />
+          <RichTextEditor value={bodyDe} onChange={setBodyDe} ariaLabel="Tekst banera (DE)" />
         </Field>
       </div>
 
@@ -109,6 +110,8 @@ export function BannerForm({ block, onResult }: BlockFormProps) {
             [
               ["left", "Zdjęcie po lewej"],
               ["right", "Zdjęcie po prawej"],
+              ["center", "Zdjęcie na środku"],
+              ["full", "Zdjęcie na całą szerokość"],
               ["background", "Zdjęcie jako tło"],
             ] as const
           ).map(([value, label]) => (
@@ -190,6 +193,12 @@ export function GalleryForm({ block, onResult }: BlockFormProps) {
       })
       .filter((img) => img.url.length > 0)
   );
+  const [captionAlign, setCaptionAlign] = useState(
+    c.caption_align === "left" || c.caption_align === "right" ? (c.caption_align as string) : "center"
+  );
+  const [columns, setColumns] = useState(
+    c.columns === "2" || c.columns === "3" ? (c.columns as string) : "masonry"
+  );
   const [saving, startTransition] = useTransition();
 
   const upload = useImageUpload({
@@ -213,7 +222,7 @@ export function GalleryForm({ block, onResult }: BlockFormProps) {
     e.preventDefault();
     startTransition(async () => {
       onResult(
-        await updateContentBlock(block.id, { heading, heading_de: headingDe, images })
+        await updateContentBlock(block.id, { heading, heading_de: headingDe, images, caption_align: captionAlign, columns })
       );
     });
   }
@@ -228,6 +237,58 @@ export function GalleryForm({ block, onResult }: BlockFormProps) {
           <input value={headingDe} onChange={(e) => setHeadingDe(e.target.value)} maxLength={200} className={inputCls} />
         </Field>
       </div>
+
+      <Field label="Podpisy">
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["left", "Do lewej"],
+              ["center", "Wyśrodkuj"],
+              ["right", "Do prawej"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setCaptionAlign(value)}
+              aria-pressed={captionAlign === value}
+              className={`px-3 py-1.5 rounded-full text-xs font-sans transition-colors ${
+                captionAlign === value
+                  ? "bg-[var(--color-navy)] text-white"
+                  : "border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      <Field label="Kolumny">
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["2", "2 kolumny"],
+              ["3", "3 kolumny"],
+              ["masonry", "Masonry (auto)"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setColumns(value)}
+              aria-pressed={columns === value}
+              className={`px-3 py-1.5 rounded-full text-xs font-sans transition-colors ${
+                columns === value
+                  ? "bg-[var(--color-navy)] text-white"
+                  : "border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </Field>
 
       <div
         {...upload.dropProps}
@@ -606,6 +667,34 @@ export function ProductsForm({
         </Field>
       )}
 
+      <SaveButton saving={saving} />
+    </form>
+  );
+}
+
+// ── Tekst (WYSIWYG) ──────────────────────────────────────────────────────
+
+export function TextForm({ block, onResult }: BlockFormProps) {
+  const c = block.content;
+  const [body, setBody] = useState(cs(c.body));
+  const [bodyDe, setBodyDe] = useState(cs(c.body_de));
+  const [saving, startTransition] = useTransition();
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    startTransition(async () => {
+      onResult(await updateContentBlock(block.id, { body, body_de: bodyDe }));
+    });
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <Field label="Treść" required>
+        <RichTextEditor value={body} onChange={setBody} ariaLabel="Treść (PL)" placeholder="Napisz treść…" />
+      </Field>
+      <Field label="Treść (DE)">
+        <RichTextEditor value={bodyDe} onChange={setBodyDe} ariaLabel="Treść (DE)" placeholder="Text auf Deutsch…" />
+      </Field>
       <SaveButton saving={saving} />
     </form>
   );

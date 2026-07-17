@@ -302,3 +302,7 @@ export function sanitizeSectionsHtml(
     return next;
   });
 }
+
+// Alias współdzielony: ten sam sanitizer używany przez bloki treści (strony)
+// i inne miejsca poza produktami. Zachowanie identyczne — jedna whitelist.
+export const sanitizeRichHtml = sanitizeProductHtml;

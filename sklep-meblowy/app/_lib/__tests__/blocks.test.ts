@@ -119,20 +119,20 @@ describe("localizeBlock — systemowe", () => {
 });
 
 describe("localizeBlock — treściowe", () => {
-  it("banner: pola per locale, layout waliduje się do left przy śmieciu", () => {
+  it("banner: body sanityzowany, layout center/full akceptowany", () => {
     const r = row({
       block_type: "banner",
-      content: {
-        heading: "Salon marzeń", heading_de: "Traumsalon",
-        body: "Opis", layout: "zle", image_url: "https://x/y.jpg",
-        cta_label: "Zobacz", cta_href: "/sklep",
-      },
+      content: { heading: "H", body: "<p>Opis<script>x</script></p>", layout: "center" },
     });
-    const b = localizeBlock(r, "de")!;
-    expect(b).toMatchObject({
-      type: "banner",
-      content: { heading: "Traumsalon", body: "Opis", layout: "left", cta_label: "Zobacz", cta_href: "/sklep" },
-    });
+    const b = localizeBlock(r, "pl")!;
+    if (b.type === "banner") {
+      expect(b.content.body).toBe("<p>Opis</p>");
+      expect(b.content.layout).toBe("center");
+    }
+    const full = localizeBlock(row({ block_type: "banner", content: { heading: "H", layout: "full" } }), "pl")!;
+    if (full.type === "banner") expect(full.content.layout).toBe("full");
+    const bad = localizeBlock(row({ block_type: "banner", content: { heading: "H", layout: "zle" } }), "pl")!;
+    if (bad.type === "banner") expect(bad.content.layout).toBe("left");
   });
   it("banner: niebezpieczny cta_href z DB odpada przy lokalizacji", () => {
     const r = row({
@@ -150,6 +150,34 @@ describe("localizeBlock — treściowe", () => {
     const b = localizeBlock(r, "pl")!;
     expect(b.type).toBe("gallery");
     if (b.type === "gallery") expect(b.content.images).toEqual([{ url: "https://x/a.jpg", alt: "A" }]);
+  });
+  it("gallery: caption_align/columns — defaulty i clamp", () => {
+    const r = row({ block_type: "gallery", content: { images: [{ url: "https://x/a.jpg" }] } });
+    const b = localizeBlock(r, "pl")!;
+    if (b.type === "gallery") {
+      expect(b.content.caption_align).toBe("center");
+      expect(b.content.columns).toBe("masonry");
+    }
+    const r2 = row({ block_type: "gallery", content: { images: [{ url: "https://x/a.jpg" }], caption_align: "left", columns: "2" } });
+    const b2 = localizeBlock(r2, "pl")!;
+    if (b2.type === "gallery") {
+      expect(b2.content.caption_align).toBe("left");
+      expect(b2.content.columns).toBe("2");
+    }
+    const r3 = row({ block_type: "gallery", content: { images: [{ url: "https://x/a.jpg" }], caption_align: "zle", columns: "9" } });
+    const b3 = localizeBlock(r3, "pl")!;
+    if (b3.type === "gallery") {
+      expect(b3.content.caption_align).toBe("center");
+      expect(b3.content.columns).toBe("masonry");
+    }
+  });
+  it("gallery validate: zapisuje caption_align/columns (default przy braku)", () => {
+    const ok = validateBlockContent("gallery", { images: [{ url: "https://x/a.jpg" }] });
+    expect(ok.ok).toBe(true);
+    if (ok.ok) {
+      expect(ok.content.caption_align).toBe("center");
+      expect(ok.content.columns).toBe("masonry");
+    }
   });
   it("products: normalizuje source i limit (clamp 1..12, default 4)", () => {
     const r = row({
@@ -204,6 +232,14 @@ describe("validateBlockContent", () => {
       expect(ok.content.layout).toBe("right");
     }
   });
+  it("banner validate: body HTML sanityzowany, center OK", () => {
+    const ok = validateBlockContent("banner", { heading: "H", body: "<p>a<script>x</script></p>", layout: "center" });
+    expect(ok.ok).toBe(true);
+    if (ok.ok) {
+      expect(ok.content.body).toBe("<p>a</p>");
+      expect(ok.content.layout).toBe("center");
+    }
+  });
   it("banner: zły layout odrzucony", () => {
     expect(validateBlockContent("banner", { heading: "H", layout: "diag" }).ok).toBe(false);
   });
@@ -241,5 +277,34 @@ describe("validateBlockContent", () => {
   });
   it("odrzuca nie-obiekt", () => {
     expect(validateBlockContent("banner", "zupa").ok).toBe(false);
+  });
+});
+
+describe("blok text", () => {
+  it("jest typem tresciowym z wpisem w rejestrze", () => {
+    expect(isContentBlockType("text")).toBe(true);
+    expect(CONTENT_BLOCK_DEFS.text.name.length).toBeGreaterThan(0);
+    expect(CONTENT_BLOCK_DEFS.text.defaultContent()).toEqual({ body: "" });
+  });
+  it("localizeBlock: body PL, DE per-locale z fallbackiem", () => {
+    const r = row({ block_type: "text", content: { body: "<p>PL</p>", body_de: "<p>DE</p>" } });
+    expect(localizeBlock(r, "pl")).toMatchObject({ type: "text", content: { body: "<p>PL</p>" } });
+    expect(localizeBlock(r, "de")).toMatchObject({ type: "text", content: { body: "<p>DE</p>" } });
+    const noDe = row({ block_type: "text", content: { body: "<p>PL</p>" } });
+    expect(localizeBlock(noDe, "de")).toMatchObject({ content: { body: "<p>PL</p>" } });
+  });
+  it("localizeBlock: sanityzuje HTML z DB (script wyciety)", () => {
+    const r = row({ block_type: "text", content: { body: "<p>ok</p><script>x</script>" } });
+    const b = localizeBlock(r, "pl")!;
+    if (b.type === "text") expect(b.content.body).toBe("<p>ok</p>");
+  });
+  it("validateBlockContent: wymaga tresci; sanityzuje; puste DE pomijane", () => {
+    expect(validateBlockContent("text", { body: "   " }).ok).toBe(false);
+    const ok = validateBlockContent("text", { body: "<p>Cze<script>x</script>sc</p>", body_de: "" });
+    expect(ok.ok).toBe(true);
+    if (ok.ok) {
+      expect(ok.content.body).toBe("<p>Czesc</p>");
+      expect(ok.content.body_de).toBeUndefined();
+    }
   });
 });
