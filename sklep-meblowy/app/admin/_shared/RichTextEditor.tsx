@@ -1,4 +1,3 @@
-// app/admin/produkty/[id]/RichTextEditor.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -13,14 +12,15 @@ import Highlight from "@tiptap/extension-highlight";
 import Image from "@tiptap/extension-image";
 import { normalizeEditorHtml } from "@/app/_lib/rich-text";
 import { FONT_OPTIONS } from "@/app/_lib/description-fonts";
-import { uploadProductImage } from "../actions";
-import { compressIfNeeded } from "./_shared";
+import { compressIfNeeded } from "@/app/_lib/image-compress";
 
 type RichTextEditorProps = {
   value: string;
   onChange: (html: string) => void;
   ariaLabel: string;
   placeholder?: string;
+  enableImage?: boolean;
+  uploadImage?: (file: File) => Promise<string | null>;
 };
 
 // Stała paleta kolorów tekstu (UI ogranicza wybór; sanitizer i tak waliduje wartość).
@@ -40,6 +40,8 @@ export default function RichTextEditor({
   onChange,
   ariaLabel,
   placeholder,
+  enableImage = false,
+  uploadImage,
 }: RichTextEditorProps) {
   const showToast = useToast();
   const editor = useEditor({
@@ -91,16 +93,12 @@ export default function RichTextEditor({
   async function handleInsertImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (!file || !editor) return;
+    if (!file || !editor || !uploadImage) return;
     setUploadingImg(true);
     try {
       const compressed = await compressIfNeeded(file);
-      const fd = new FormData();
-      fd.set("image", compressed, compressed.name);
-      const res = await uploadProductImage(fd);
-      if (!res.ok) { showToast("Upload nieudany: " + res.error, "error"); return; }
-      const url = (res.data as { url: string } | undefined)?.url;
-      if (!url) { showToast("Brak URL po uploadzie", "error"); return; }
+      const url = await uploadImage(compressed);
+      if (!url) { showToast("Upload nieudany", "error"); return; }
       editor.chain().focus().setImage({ src: url, alt: "" }).run();
     } finally {
       setUploadingImg(false);
@@ -198,8 +196,12 @@ export default function RichTextEditor({
         <span className="w-px h-5 bg-[var(--border)] mx-1" />
         {/* Link i obraz */}
         <button type="button" onClick={addLink} className={btn(editor.isActive("link"))} aria-label="Wstaw link">🔗</button>
-        <button type="button" onClick={() => fileRef.current?.click()} disabled={uploadingImg} className={btn(false)} aria-label="Wstaw obraz">{uploadingImg ? "…" : "🖼"}</button>
-        <input ref={fileRef} type="file" accept="image/*" onChange={handleInsertImage} className="hidden" />
+        {enableImage && uploadImage && (
+          <>
+            <button type="button" onClick={() => fileRef.current?.click()} disabled={uploadingImg} className={btn(false)} aria-label="Wstaw obraz">{uploadingImg ? "…" : "🖼"}</button>
+            <input ref={fileRef} type="file" accept="image/*" onChange={handleInsertImage} className="hidden" />
+          </>
+        )}
         <span className="w-px h-5 bg-[var(--border)] mx-1" />
         {/* Historia i reset */}
         <button type="button" onClick={() => editor.chain().focus().undo().run()} className={btn(false)} aria-label="Cofnij">↶</button>

@@ -3,10 +3,10 @@
 import { useMemo, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { saveProductDe } from "../actions";
+import { saveProductDe, uploadProductImage } from "../actions";
 import type { ProductDescriptionSection } from "@/app/_lib/types";
 import { CollapsibleSection, Field, inputClass, type Toast } from "./_shared";
-import RichTextEditor from "./RichTextEditor";
+import RichTextEditor from "@/app/admin/_shared/RichTextEditor";
 
 // Surowe pola tłumaczenia DE produktu (niezlokalizowane — patrz page.tsx).
 // Wszystkie treści DE wpisuje admin RĘCZNIE (nie ma już DeepL): krótkie pola
@@ -224,6 +224,13 @@ export default function TranslationEditor({
             onChange={setDescriptionDe}
             ariaLabel="Niemiecki opis produktu"
             placeholder="Niemiecki opis produktu"
+            enableImage
+            uploadImage={async (file) => {
+              const fd = new FormData();
+              fd.set("image", file, file.name);
+              const res = await uploadProductImage(fd);
+              return res.ok ? ((res.data as { url: string } | undefined)?.url ?? null) : null;
+            }}
           />
         </Field>
 
@@ -365,6 +372,13 @@ function TextSectionTranslator({
             onChange={onBodyChange}
             ariaLabel="Niemiecka treść sekcji"
             placeholder="Niemiecka treść sekcji"
+            enableImage
+            uploadImage={async (file) => {
+              const fd = new FormData();
+              fd.set("image", file, file.name);
+              const res = await uploadProductImage(fd);
+              return res.ok ? ((res.data as { url: string } | undefined)?.url ?? null) : null;
+            }}
           />
         </Field>
       </div>
