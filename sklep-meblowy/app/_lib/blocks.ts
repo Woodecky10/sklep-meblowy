@@ -127,7 +127,7 @@ export function mergeHomeBlocks(rows: PageBlockRow[] | null): PageBlockRow[] {
 }
 
 // ── Lokalizacja ──────────────────────────────────────────────────────────
-export type BannerLayout = "left" | "right" | "background";
+export type BannerLayout = "left" | "right" | "background" | "center" | "full";
 export type GalleryCaptionAlign = "left" | "center" | "right";
 export type GalleryColumns = "2" | "3" | "masonry";
 export type LocalizedBannerContent = {
@@ -217,13 +217,17 @@ export function localizeBlock(row: PageBlockRow, locale: Locale): LocalizedBlock
     case "banner": {
       const rawLayout = c.layout;
       const layout: BannerLayout =
-        rawLayout === "right" || rawLayout === "background" ? rawLayout : "left";
+        rawLayout === "right" || rawLayout === "background" ||
+        rawLayout === "center" || rawLayout === "full"
+          ? rawLayout
+          : "left";
+      const bodyRaw = pickLoc(c, "body", locale);
       return {
         ...base,
         type: "banner",
         content: {
           heading: pickLoc(c, "heading", locale),
-          body: pickLoc(c, "body", locale),
+          body: bodyRaw ? sanitizeRichHtml(bodyRaw) : null,
           image_url: s(c.image_url),
           layout,
           cta_label: pickLoc(c, "cta_label", locale),
@@ -363,7 +367,7 @@ export function validateBlockContent(
       const heading = cleanStr(o.heading, MAX_SHORT);
       if (!heading) return { ok: false, error: "Nagłówek jest wymagany" };
       const layout = o.layout ?? "left";
-      if (layout !== "left" && layout !== "right" && layout !== "background") {
+      if (!["left", "right", "background", "center", "full"].includes(layout as string)) {
         return { ok: false, error: "Nieprawidłowy układ banera" };
       }
       const ctaLabel = cleanStr(o.cta_label, MAX_SHORT);
@@ -383,12 +387,15 @@ export function validateBlockContent(
         return { ok: false, error: "Adres zdjęcia musi zaczynać się od / albo https://" };
       }
       const headingPair = locPair(o, "heading", MAX_SHORT);
+      const bodyClean = cleanRich(o.body, MAX_RICH);
+      const bodyDeClean = cleanRich(o.body_de, MAX_RICH);
       return {
         ok: true,
         content: {
           heading,
           ...(headingPair.heading_de ? { heading_de: headingPair.heading_de } : {}),
-          ...locPair(o, "body", MAX_LONG),
+          ...(bodyClean ? { body: bodyClean } : {}),
+          ...(bodyDeClean ? { body_de: bodyDeClean } : {}),
           ...(imageUrl ? { image_url: imageUrl } : {}),
           layout,
           ...(ctaLabel ? { cta_label: ctaLabel } : {}),

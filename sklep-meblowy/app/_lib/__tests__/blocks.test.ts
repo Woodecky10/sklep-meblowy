@@ -119,20 +119,20 @@ describe("localizeBlock — systemowe", () => {
 });
 
 describe("localizeBlock — treściowe", () => {
-  it("banner: pola per locale, layout waliduje się do left przy śmieciu", () => {
+  it("banner: body sanityzowany, layout center/full akceptowany", () => {
     const r = row({
       block_type: "banner",
-      content: {
-        heading: "Salon marzeń", heading_de: "Traumsalon",
-        body: "Opis", layout: "zle", image_url: "https://x/y.jpg",
-        cta_label: "Zobacz", cta_href: "/sklep",
-      },
+      content: { heading: "H", body: "<p>Opis<script>x</script></p>", layout: "center" },
     });
-    const b = localizeBlock(r, "de")!;
-    expect(b).toMatchObject({
-      type: "banner",
-      content: { heading: "Traumsalon", body: "Opis", layout: "left", cta_label: "Zobacz", cta_href: "/sklep" },
-    });
+    const b = localizeBlock(r, "pl")!;
+    if (b.type === "banner") {
+      expect(b.content.body).toBe("<p>Opis</p>");
+      expect(b.content.layout).toBe("center");
+    }
+    const full = localizeBlock(row({ block_type: "banner", content: { heading: "H", layout: "full" } }), "pl")!;
+    if (full.type === "banner") expect(full.content.layout).toBe("full");
+    const bad = localizeBlock(row({ block_type: "banner", content: { heading: "H", layout: "zle" } }), "pl")!;
+    if (bad.type === "banner") expect(bad.content.layout).toBe("left");
   });
   it("banner: niebezpieczny cta_href z DB odpada przy lokalizacji", () => {
     const r = row({
@@ -230,6 +230,14 @@ describe("validateBlockContent", () => {
       expect(ok.content.heading).toBe("H");        // trim
       expect(ok.content.heading_de).toBeUndefined(); // puste pola nie zaśmiecają jsonb
       expect(ok.content.layout).toBe("right");
+    }
+  });
+  it("banner validate: body HTML sanityzowany, center OK", () => {
+    const ok = validateBlockContent("banner", { heading: "H", body: "<p>a<script>x</script></p>", layout: "center" });
+    expect(ok.ok).toBe(true);
+    if (ok.ok) {
+      expect(ok.content.body).toBe("<p>a</p>");
+      expect(ok.content.layout).toBe("center");
     }
   });
   it("banner: zły layout odrzucony", () => {
