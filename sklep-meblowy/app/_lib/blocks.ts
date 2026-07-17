@@ -12,6 +12,7 @@
 import type { Locale } from "./i18n";
 import { pl } from "./dictionaries/pl";
 import { de } from "./dictionaries/de";
+import { sanitizeRichHtml } from "./product-html";
 
 export const SYSTEM_BLOCK_TYPES = [
   "hero",
@@ -28,6 +29,7 @@ export const CONTENT_BLOCK_TYPES = [
   "products",
   "faq",
   "reviews",
+  "text",
 ] as const;
 export type ContentBlockType = (typeof CONTENT_BLOCK_TYPES)[number];
 
@@ -82,6 +84,11 @@ export const CONTENT_BLOCK_DEFS: Record<
     name: "Opinie klientów",
     description: "Cytaty klientów z podpisem, w kartach obok siebie.",
     defaultContent: () => ({ heading: "", items: [] }),
+  },
+  text: {
+    name: "Tekst",
+    description: "Sformatowany tekst (nagłówki, listy, pogrubienie, link, wyrównanie).",
+    defaultContent: () => ({ body: "" }),
   },
 };
 
@@ -149,6 +156,9 @@ export type LocalizedReviewsContent = {
   heading: string | null;
   items: { quote: string; author: string | null }[];
 };
+export type LocalizedTextContent = {
+  body: string | null;
+};
 export type LocalizedSystemBlock = {
   id: string;
   visible: boolean;
@@ -162,6 +172,7 @@ export type LocalizedContentBlock = { id: string; visible: boolean } & (
   | { type: "products"; content: LocalizedProductsContent }
   | { type: "faq"; content: LocalizedFaqContent }
   | { type: "reviews"; content: LocalizedReviewsContent }
+  | { type: "text"; content: LocalizedTextContent }
 );
 export type LocalizedBlock = LocalizedSystemBlock | LocalizedContentBlock;
 
@@ -266,6 +277,14 @@ export function localizeBlock(row: PageBlockRow, locale: Locale): LocalizedBlock
         .filter((x): x is { quote: string; author: string | null } => x !== null);
       return { ...base, type: "reviews", content: { heading: pickLoc(c, "heading", locale), items } };
     }
+    case "text": {
+      const bodyRaw = pickLoc(c, "body", locale);
+      return {
+        ...base,
+        type: "text",
+        content: { body: bodyRaw ? sanitizeRichHtml(bodyRaw) : null },
+      };
+    }
     default:
       return null; // nieznany typ — fail-open (kompatybilność w przód)
   }
@@ -281,6 +300,7 @@ type ValidationResult =
 
 const MAX_SHORT = 200;   // nagłówki, etykiety, autorzy
 const MAX_LONG = 2000;   // body, odpowiedzi, cytaty
+const MAX_RICH = 20000; // HTML pól WYSIWYG (text.body, banner.body)
 const MAX_IMAGES = 24;
 const MAX_ITEMS = 20;
 const MAX_PRODUCTS = 12;
@@ -289,6 +309,14 @@ function cleanStr(v: unknown, max: number): string | undefined {
   if (typeof v !== "string") return undefined;
   const t = v.trim().slice(0, max);
   return t.length > 0 ? t : undefined;
+}
+// Sanityzuje HTML z edytora, obcina do max, zwraca undefined gdy pusto po
+// wyczyszczeniu tagów (żeby pusty <p></p> nie liczył się jako treść).
+function cleanRich(v: unknown, max: number): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const html = sanitizeRichHtml(v).slice(0, max);
+  const textOnly = html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, "").trim();
+  return textOnly.length > 0 ? html : undefined;
 }
 function isSafeHref(href: string): boolean {
   return href.startsWith("/") || href.startsWith("https://");
@@ -421,6 +449,15 @@ export function validateBlockContent(
         return { ok: false, error: `Maksymalnie ${MAX_ITEMS} pozycji` };
       }
       return { ok: true, content: { ...locPair(o, "heading", MAX_SHORT), items } };
+    }
+    case "text": {
+      const body = cleanRich(o.body, MAX_RICH);
+      if (!body) return { ok: false, error: "Treść jest wymagana" };
+      const bodyDe = cleanRich(o.body_de, MAX_RICH);
+      return {
+        ok: true,
+        content: { body, ...(bodyDe ? { body_de: bodyDe } : {}) },
+      };
     }
   }
 }

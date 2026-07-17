@@ -243,3 +243,32 @@ describe("validateBlockContent", () => {
     expect(validateBlockContent("banner", "zupa").ok).toBe(false);
   });
 });
+
+describe("blok text", () => {
+  it("jest typem tresciowym z wpisem w rejestrze", () => {
+    expect(isContentBlockType("text")).toBe(true);
+    expect(CONTENT_BLOCK_DEFS.text.name.length).toBeGreaterThan(0);
+    expect(CONTENT_BLOCK_DEFS.text.defaultContent()).toEqual({ body: "" });
+  });
+  it("localizeBlock: body PL, DE per-locale z fallbackiem", () => {
+    const r = row({ block_type: "text", content: { body: "<p>PL</p>", body_de: "<p>DE</p>" } });
+    expect(localizeBlock(r, "pl")).toMatchObject({ type: "text", content: { body: "<p>PL</p>" } });
+    expect(localizeBlock(r, "de")).toMatchObject({ type: "text", content: { body: "<p>DE</p>" } });
+    const noDe = row({ block_type: "text", content: { body: "<p>PL</p>" } });
+    expect(localizeBlock(noDe, "de")).toMatchObject({ content: { body: "<p>PL</p>" } });
+  });
+  it("localizeBlock: sanityzuje HTML z DB (script wyciety)", () => {
+    const r = row({ block_type: "text", content: { body: "<p>ok</p><script>x</script>" } });
+    const b = localizeBlock(r, "pl")!;
+    if (b.type === "text") expect(b.content.body).toBe("<p>ok</p>");
+  });
+  it("validateBlockContent: wymaga tresci; sanityzuje; puste DE pomijane", () => {
+    expect(validateBlockContent("text", { body: "   " }).ok).toBe(false);
+    const ok = validateBlockContent("text", { body: "<p>Cze<script>x</script>sc</p>", body_de: "" });
+    expect(ok.ok).toBe(true);
+    if (ok.ok) {
+      expect(ok.content.body).toBe("<p>Czesc</p>");
+      expect(ok.content.body_de).toBeUndefined();
+    }
+  });
+});
