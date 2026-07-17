@@ -152,6 +152,8 @@ export const de: DeepPartial<PlShape> = {
     removeBundle: "Set entfernen",
     discountLine: "Set-Rabatt",
     promoExcluded: "Der Rabattcode gilt nicht für Produkte im Set",
+    thisProduct: "dieses Produkt",
+    bundlePriceFrom: "Set-Preis: ab",
   },
   common: {
     loading: "Wird geladen…",
