@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - **Zero nowych tabel** — tylko nowe kolumny na `store_settings` (migracja 56, addytywna). RLS dziedziczona (odczyt publiczny anon, zapis service_role) — bez zmian w politykach.
-- **Split pure/server (KRYTYCZNE):** moduł importowany przez komponent kliencki NIE może zawierać fetchy serwerowych (`unstable_cache`, `createAdminClient`, `import "server-only"`) — inaczej `next/headers`/server-only trafia do bundla klienta i **build pada** (tsc/vitest tego NIE łapią). Dlatego: `promo.ts`/`contact.ts` = pure (klient je importuje), `promo-server.ts`/`contact-server.ts` = server. Wzorzec: `bundles.ts`/`bundles-server.ts`, `blocks.ts`/`blocks-server.ts`.
+- **Split pure/server (KRYTYCZNE):** moduł importowany przez komponent kliencki NIE może zawierać fetchy serwerowych (`unstable_cache`, `createAdminClient`, `import "server-only"`) — inaczej `next/headers`/server-only trafia do bundla klienta i **build pada** (tsc/vitest tego NIE łapią). Dlatego: `promo-banner.ts`/`contact.ts` = pure (klient je importuje), `promo-banner-server.ts`/`contact-server.ts` = server. Wzorzec: `bundles.ts`/`bundles-server.ts`, `blocks.ts`/`blocks-server.ts`.
 - **Fallback do `COMPANY`:** puste pole kontaktu w adminie = NULL w DB = wartość z `app/_lib/company.ts`. Dane rejestrowe (NIP/adres/legalName) i konteksty P24/faktur zostają na `COMPANY` — poza zakresem.
 - **Kolory promo:** dokładnie `'gold' | 'navy' | 'red'` (check w migracji + walidacja w akcji, kolor spoza listy → `'gold'`).
 - **`store_settings` to jeden wiersz** czytany/pisany przez `.eq("id", true)`.
@@ -229,12 +229,12 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 ---
 
-### Task 3: Warstwa odczytu promo (`promo.ts` pure + `promo-server.ts`)
+### Task 3: Warstwa odczytu promo (`promo-banner.ts` pure + `promo-banner-server.ts`)
 
 **Files:**
-- Create: `app/_lib/promo.ts`
-- Create: `app/_lib/promo-server.ts`
-- Test: `app/_lib/__tests__/promo.test.ts`
+- Create: `app/_lib/promo-banner.ts`
+- Create: `app/_lib/promo-banner-server.ts`
+- Test: `app/_lib/__tests__/promo-banner.test.ts`
 
 **Interfaces:**
 - Consumes: kolumny promo z Taska 1.
@@ -246,11 +246,11 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
   - (pure) `PROMO_COLOR_CLASSES: Record<PromoColor, string>`
   - (server) `getPromoBanner(): Promise<PromoBannerData>` — Task 4 (layout) tego używa.
   - (server) `PROMO_CACHE_TAG = "promo"`, `invalidatePromoCache(): void` — Task 6 (akcja) tego używa.
-  - `promo.ts` jest importowany przez `PromoBanner.tsx` (klient) — MUSI być pure (bez server-only).
+  - `promo-banner.ts` jest importowany przez `PromoBanner.tsx` (klient) — MUSI być pure (bez server-only).
 
 - [ ] **Step 1: Napisz failing test**
 
-`app/_lib/__tests__/promo.test.ts`:
+`app/_lib/__tests__/promo-banner.test.ts`:
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -259,7 +259,7 @@ import {
   promoKey,
   PROMO_COLOR_CLASSES,
   PROMO_COLORS,
-} from "@/app/_lib/promo";
+} from "@/app/_lib/promo-banner";
 
 describe("normalizePromo", () => {
   it("pełny wiersz → znormalizowane pola", () => {
@@ -320,16 +320,16 @@ describe("PROMO_COLOR_CLASSES", () => {
 
 - [ ] **Step 2: Uruchom — RED**
 
-Run: `npx vitest run app/_lib/__tests__/promo.test.ts`
+Run: `npx vitest run app/_lib/__tests__/promo-banner.test.ts`
 Expected: FAIL — brak modułu `promo`.
 
-- [ ] **Step 3: Zaimplementuj pure `promo.ts`**
+- [ ] **Step 3: Zaimplementuj pure `promo-banner.ts`**
 
-`app/_lib/promo.ts`:
+`app/_lib/promo-banner.ts`:
 
 ```ts
 // Czysta logika banera promocyjnego (bez server-only) — importowalna przez
-// klienta (PromoBanner.tsx). Serwerowy odczyt z DB: promo-server.ts.
+// klienta (PromoBanner.tsx). Serwerowy odczyt z DB: promo-banner-server.ts.
 
 export type PromoColor = "gold" | "navy" | "red";
 export const PROMO_COLORS: readonly PromoColor[] = ["gold", "navy", "red"];
@@ -384,18 +384,18 @@ export function promoKey(text: string | null): string {
 
 - [ ] **Step 4: Uruchom — GREEN**
 
-Run: `npx vitest run app/_lib/__tests__/promo.test.ts`
+Run: `npx vitest run app/_lib/__tests__/promo-banner.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Zaimplementuj serwerowy `promo-server.ts`**
+- [ ] **Step 5: Zaimplementuj serwerowy `promo-banner-server.ts`**
 
-`app/_lib/promo-server.ts`:
+`app/_lib/promo-banner-server.ts`:
 
 ```ts
 import "server-only";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createClient as createBareAnonClient } from "@supabase/supabase-js";
-import { normalizePromo, type PromoBannerData } from "./promo";
+import { normalizePromo, type PromoBannerData } from "./promo-banner";
 
 export const PROMO_CACHE_TAG = "promo";
 
@@ -424,7 +424,7 @@ export async function getPromoBanner(): Promise<PromoBannerData> {
   try {
     return await fetchPromo();
   } catch (err) {
-    console.error("[promo-server] getPromoBanner failed, banner off", err);
+    console.error("[promo-banner-server] getPromoBanner failed, banner off", err);
     return { enabled: false, text: null, text_de: null, link: null, color: "gold" };
   }
 }
@@ -443,7 +443,7 @@ Expected: zielono.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add app/_lib/promo.ts app/_lib/promo-server.ts app/_lib/__tests__/promo.test.ts
+git add app/_lib/promo-banner.ts app/_lib/promo-banner-server.ts app/_lib/__tests__/promo-banner.test.ts
 git commit -m "feat(pasek): warstwa odczytu promo (normalizePromo/promoKey/kolory + getPromoBanner)
 
 Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
@@ -458,10 +458,10 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Modify: `app/layout.tsx`
 
 **Interfaces:**
-- Consumes: `PromoBannerData`, `PROMO_COLOR_CLASSES`, `promoKey` z `promo.ts` (Task 3, pure); `getPromoBanner` z `promo-server.ts` (Task 3); istniejące `LocalizedLink`, `getDictionary`, `getLocale`, `HideOnAdmin`.
+- Consumes: `PromoBannerData`, `PROMO_COLOR_CLASSES`, `promoKey` z `promo-banner.ts` (Task 3, pure); `getPromoBanner` z `promo-banner-server.ts` (Task 3); istniejące `LocalizedLink`, `getDictionary`, `getLocale`, `HideOnAdmin`.
 - Produces: baner renderowany nad topbarem (ukryty na `/admin`).
 
-To task UI — repo nie testuje jednostkowo komponentów React (logika pokryta w `promo.ts`). Weryfikacja = `tsc` + `npm test` zielone + `npm run build` zielony.
+To task UI — repo nie testuje jednostkowo komponentów React (logika pokryta w `promo-banner.ts`). Weryfikacja = `tsc` + `npm test` zielone + `npm run build` zielony.
 
 - [ ] **Step 1: Utwórz `PromoBanner.tsx`**
 
@@ -477,7 +477,7 @@ import {
   type PromoBannerData,
   PROMO_COLOR_CLASSES,
   promoKey,
-} from "@/app/_lib/promo";
+} from "@/app/_lib/promo-banner";
 
 // Baner promocyjny nad topbarem. Dane z serwera (layout). Tekst wg locale
 // (DE z fallbackiem na PL). Zamknięcie (X) zapamiętane w localStorage kluczem
@@ -562,7 +562,7 @@ export default function PromoBanner({
 
 ```ts
 import PromoBanner from "./_components/layout/PromoBanner";
-import { getPromoBanner } from "@/app/_lib/promo-server";
+import { getPromoBanner } from "@/app/_lib/promo-banner-server";
 ```
 
 (b) W `RootLayout`, po `const themeSettings = await getThemeSettings();` dodaj:
@@ -595,7 +595,7 @@ import { getPromoBanner } from "@/app/_lib/promo-server";
 
 Run: `npx tsc --noEmit`
 Run: `npm test`
-Run: `npm run build` (KLUCZOWE — łapie ewentualny przeciek server-only do bundla klienta; `PromoBanner` importuje tylko `promo.ts` pure + `LocalizedLink`).
+Run: `npm run build` (KLUCZOWE — łapie ewentualny przeciek server-only do bundla klienta; `PromoBanner` importuje tylko `promo-banner.ts` pure + `LocalizedLink`).
 Expected: wszystko zielone.
 
 - [ ] **Step 4: Commit**
@@ -710,7 +710,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Modify: `app/admin/strona-glowna/BlocksEditor.tsx` (render karty)
 
 **Interfaces:**
-- Consumes: `PROMO_COLORS`, `PromoColor` z `promo.ts` (Task 3); `invalidateContactCache` (Task 2), `invalidatePromoCache` (Task 3); istniejące `Card`, `Field`, `inputCls` z `@/app/admin/_shared`, `requireAdmin`, `createAdminClient`, `ActionResult`, `COMPANY`.
+- Consumes: `PROMO_COLORS`, `PromoColor` z `promo-banner.ts` (Task 3); `invalidateContactCache` (Task 2), `invalidatePromoCache` (Task 3); istniejące `Card`, `Field`, `inputCls` z `@/app/admin/_shared`, `requireAdmin`, `createAdminClient`, `ActionResult`, `COMPANY`.
 - Produces:
   - (pure) `parseTopBarSettings(input): TopBarSettingsRow`
   - (server action) `updateTopBarSettings(formData): Promise<ActionResult>`
@@ -791,8 +791,8 @@ Expected: FAIL — brak modułu.
 ```ts
 // Czysty parser ustawień górnego paska (FormData → wiersz store_settings).
 // Wydzielony z akcji, żeby był testowalny bez Supabase. Importuje tylko
-// pure promo.ts (lista kolorów) — bezpieczny.
-import { PROMO_COLORS, type PromoColor } from "./promo";
+// pure promo-banner.ts (lista kolorów) — bezpieczny.
+import { PROMO_COLORS, type PromoColor } from "./promo-banner";
 
 export type TopBarSettingsRow = {
   contact_phone: string | null;
@@ -843,7 +843,7 @@ W `app/admin/strona-glowna/actions.ts`:
 ```ts
 import { parseTopBarSettings, type TopBarSettingsRow } from "@/app/_lib/topbar-settings";
 import { invalidateContactCache } from "@/app/_lib/contact-server";
-import { invalidatePromoCache } from "@/app/_lib/promo-server";
+import { invalidatePromoCache } from "@/app/_lib/promo-banner-server";
 ```
 
 (b) Na końcu pliku dodaj reader (uncached, dla formularza) i akcję:
