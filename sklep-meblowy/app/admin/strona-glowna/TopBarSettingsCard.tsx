@@ -54,7 +54,7 @@ export default function TopBarSettingsCard({
             Pokaż baner promocyjny na górze strony
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Tekst promocji">
+            <Field label="Tekst promocji" hint="Wymagany — bez tekstu baner się nie pokaże, nawet przy zaznaczonym „Pokaż”.">
               <input name="promo_text" defaultValue={initial?.promo_text ?? ""} placeholder="np. -20% na wszystko do niedzieli!" className={inputCls} />
             </Field>
             <Field label="Tekst promocji DE">
