@@ -1,9 +1,9 @@
 import { Suspense } from "react";
-import { COMPANY } from "@/app/_lib/company";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { getSiteTexts, siteText } from "@/app/_lib/site-texts";
+import { getContactInfo } from "@/app/_lib/contact-server";
 
 // Cienki pasek nad headerem z kontaktem i krótką informacją o dostawie.
 // Ciemne tło (navy) + jasny tekst — identyczny wygląd w light i dark mode.
@@ -11,6 +11,7 @@ export default async function TopBar() {
   const locale = await getLocale();
   const t = getDictionary(locale);
   const texts = await getSiteTexts();
+  const contact = await getContactInfo();
   const slogan = siteText(texts, "topbar_slogan", locale, t.topbar.slogan);
   return (
     <div className="bg-[var(--color-navy)] text-white/80 text-xs">
@@ -18,7 +19,7 @@ export default async function TopBar() {
         {/* Kontakt */}
         <div className="flex items-center gap-5">
           <a
-            href={`mailto:${COMPANY.email}`}
+            href={`mailto:${contact.email}`}
             className="flex items-center gap-1.5 hover:text-[var(--color-gold)] transition-colors"
           >
             <svg
@@ -34,13 +35,13 @@ export default async function TopBar() {
               <rect x="2" y="4" width="20" height="16" rx="2" />
               <path d="m22 7-10 5L2 7" />
             </svg>
-            <span className="hidden sm:inline">{COMPANY.email}</span>
+            <span className="hidden sm:inline">{contact.email}</span>
             <span className="sm:hidden">E-mail</span>
           </a>
 
-          {COMPANY.phone && (
+          {contact.phone && (
             <a
-              href={`tel:${COMPANY.phone.replace(/\s/g, "")}`}
+              href={`tel:${contact.phone.replace(/\s/g, "")}`}
               className="flex items-center gap-1.5 hover:text-[var(--color-gold)] transition-colors"
             >
               <svg
@@ -55,7 +56,7 @@ export default async function TopBar() {
               >
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
               </svg>
-              <span>{COMPANY.phone}</span>
+              <span>{contact.phone}</span>
             </a>
           )}
         </div>

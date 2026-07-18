@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { COMPANY, formatFullAddress, isFilled } from "@/app/_lib/company";
+import { getContactInfo } from "@/app/_lib/contact-server";
 import { localizeHref } from "@/app/_lib/i18n";
 import { getLocale } from "@/app/_lib/i18n-server";
 
@@ -21,6 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function KontaktPage() {
   const locale = await getLocale();
   const de = locale === "de";
+  const contact = await getContactInfo();
 
   const c = de
     ? {
@@ -112,7 +114,7 @@ export default async function KontaktPage() {
             {c.emailLabel}
           </p>
           <a
-            href={`mailto:${COMPANY.email}`}
+            href={`mailto:${contact.email}`}
             style={{
               fontSize: "1.1rem",
               fontWeight: 600,
@@ -120,11 +122,11 @@ export default async function KontaktPage() {
               textDecoration: "none",
             }}
           >
-            {COMPANY.email}
+            {contact.email}
           </a>
         </div>
 
-        {COMPANY.phone && (
+        {contact.phone && (
           <div
             style={{
               background: "var(--card-bg)",
@@ -146,7 +148,7 @@ export default async function KontaktPage() {
               {c.phoneLabel}
             </p>
             <a
-              href={`tel:${COMPANY.phone.replace(/\s/g, "")}`}
+              href={`tel:${contact.phone.replace(/\s/g, "")}`}
               style={{
                 fontSize: "1.1rem",
                 fontWeight: 600,
@@ -154,7 +156,7 @@ export default async function KontaktPage() {
                 textDecoration: "none",
               }}
             >
-              {COMPANY.phone}
+              {contact.phone}
             </a>
             <p
               style={{
