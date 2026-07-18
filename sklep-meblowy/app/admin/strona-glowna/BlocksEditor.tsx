@@ -22,6 +22,7 @@ import {
 } from "./BlockForms";
 import TrustItemsEditor from "./TrustItemsEditor";
 import SiteTextsCard from "./SiteTextsCard";
+import TopBarSettingsCard from "./TopBarSettingsCard";
 import {
   CONTENT_BLOCK_DEFS,
   isSystemBlockType,
@@ -31,6 +32,7 @@ import {
 } from "@/app/_lib/blocks";
 import type { TrustItemRow } from "@/app/_lib/trust-items";
 import type { SiteTextsMap } from "@/app/_lib/site-texts";
+import type { TopBarSettingsRow } from "@/app/_lib/topbar-settings";
 import type { ActionResult } from "@/app/_lib/types";
 import { Card, Field, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
 import { useConfirm } from "@/app/_context/ConfirmContext";
@@ -80,11 +82,15 @@ export default function BlocksEditor({
   initialBlocks,
   initialTrustItems,
   initialSiteTexts,
+  initialTopBar,
+  contactDefaults,
   picker,
 }: {
   initialBlocks: PageBlockRow[];
   initialTrustItems: TrustItemRow[];
   initialSiteTexts: SiteTextsMap;
+  initialTopBar: TopBarSettingsRow | null;
+  contactDefaults: { phone: string; email: string };
   picker: BlockPickerData;
 }) {
   const router = useRouter();
@@ -359,6 +365,8 @@ export default function BlocksEditor({
           </Link>
         </div>
       </Card>
+
+      <TopBarSettingsCard initial={initialTopBar} contactDefaults={contactDefaults} onResult={handleResult} />
 
       <SiteTextsCard initialTexts={initialSiteTexts} onResult={handleResult} />
 
