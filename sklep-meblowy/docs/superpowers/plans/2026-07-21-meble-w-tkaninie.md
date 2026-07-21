@@ -694,24 +694,29 @@ Usuniety stary model (upload zdjec + lightbox tej sekcji)."
   - `/tkaniny/[slug]` (PL) → sekcja „Meble w tej tkaninie" pokazuje 2 kafelki (główne zdjęcie + nazwa); klik → `/produkt/[id]`.
   - `/de/tkaniny/[slug]` → nagłówek „Möbel in diesem Stoff", nazwy produktów po DE (fallback PL).
   - Tkanina bez wybranych produktów → sekcja się nie renderuje.
-- [ ] **Step 2: Utwórz PR** (`gh`, konto Woodecky10) z gałęzi `feat/meble-w-tkaninie` do `main`. W opisie: streszczenie, checklista klik-testów dla Mikołaja na prodzie, przypomnienie o migracji 59 (Step 3 poniżej).
+- [ ] **Step 2: Utwórz PR** (`gh`, konto Woodecky10) z gałęzi `feat/meble-w-tkaninie` do `main`. W opisie: streszczenie, checklista klik-testów dla Mikołaja na prodzie, oraz kolejność migracji expand/contract (Task 4).
 
 ---
 
-## Task 4: Migracja 59 na prodzie (Supabase MCP) — przy/po merge, z potwierdzeniem
+## Task 4: Migracje na prodzie (Supabase MCP) — expand/contract, z potwierdzeniem
 
 **Wykonywane w głównej pętli (nie subagent), bo dotyka ŻYWEJ bazy = PROD.** Model: pokaż SQL → potwierdź z użytkownikiem → wykonaj. Wymaga aktywnego połączenia MCP (`/mcp` authenticate jeśli trzeba).
 
-- [ ] **Step 1: Pre-check danych** — przez `mcp__supabase__execute_sql`:
+⚠️ **Dlaczego split** (uwaga z whole-branch review): migr. 59 tylko DODAJE `featured_product_ids`, migr. 60 dopiero USUWA `production_photos`. Nowy kod nie odwołuje się do `production_photos`, więc stara kolumna może chwilowo zostać. Gdyby ADD i DROP były razem, byłoby okno, w którym zapisy admina trafiają w nieistniejącą kolumnę (stary kod pisze `production_photos`, nowy pisze `featured_product_ids`). Czyste reads są odporne (`?? []`), więc frontu publicznego to nie dotyka.
+
+- [ ] **Step 1 (EXPAND): Zastosuj migr. 59** — `mcp__supabase__apply_migration` z treścią `59_fabric_featured_products.sql` (ADD only, idempotentnie). Bezpieczne dla starego i nowego kodu. Może iść **przed lub przy merge**.
+- [ ] **Step 2: Weryfikacja 59** — `mcp__supabase__list_tables` (lub `execute_sql` na `information_schema.columns`): `fabrics` MA `featured_product_ids`.
+- [ ] **Step 3: Merge PR → auto-deploy Vercel.** Poczekaj aż nowy kod będzie **na żywo na prodzie** (nowy kod pisze/czyta `featured_product_ids`).
+- [ ] **Step 4 (CONTRACT): Pre-check danych `production_photos`** — dopiero teraz, przed dropem, przez `mcp__supabase__execute_sql`:
   ```sql
-  select count(*) filter (where production_photos is not null
-    and production_photos <> '[]'::jsonb) as z_danymi
-  from public.fabrics;
+  select id, name, production_photos
+  from public.fabrics
+  where production_photos is not null and production_photos <> '[]'::jsonb;
   ```
-  Jeśli `z_danymi > 0` → zgłoś użytkownikowi PRZED dropem (stary model miał realne dane; potwierdź świadome wycofanie). Jeśli kolumna `production_photos` nie istnieje (migr. 58 nie doszła) — zapytanie rzuci błąd; wtedy pomiń pre-check.
-- [ ] **Step 2: Zastosuj migrację** — `mcp__supabase__apply_migration` z treścią `59_fabric_featured_products.sql` (idempotentnie).
-- [ ] **Step 3: Weryfikacja** — `mcp__supabase__list_tables` (lub `execute_sql` na `information_schema.columns`): potwierdź, że `fabrics` ma `featured_product_ids` i NIE ma `production_photos`.
-- [ ] **Step 4:** Zaktualizuj pamięć (memory) o stanie migracji 59 na prodzie i statusie PR.
+  Jeśli zwróci wiersze → pokaż je użytkownikowi PRZED dropem (stary model miał realne dane; drop jest nieodwracalny — potwierdź świadome wycofanie; danych nie da się automatycznie zmigrować, bo to URL-e zdjęć bez odpowiednika w nowym modelu). Jeśli kolumna `production_photos` nie istnieje (migr. 58 nie doszła na prod) — zapytanie rzuci błąd; wtedy migr. 60 i tak jest no-op (`drop … if exists`).
+- [ ] **Step 5 (CONTRACT): Zastosuj migr. 60** — `mcp__supabase__apply_migration` z treścią `60_drop_fabric_production_photos.sql` (DROP, idempotentnie). Po potwierdzeniu ze Step 4.
+- [ ] **Step 6: Weryfikacja 60** — `fabrics` NIE ma już `production_photos`.
+- [ ] **Step 7:** Zaktualizuj pamięć (memory) o stanie migracji 59/60 na prodzie i statusie PR.
 
 ---
 
