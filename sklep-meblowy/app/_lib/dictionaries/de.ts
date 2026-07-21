@@ -95,6 +95,22 @@ export const de: DeepPartial<PlShape> = {
     reviewGuardNotPurchased:
       "Eine Bewertung können Sie nach dem Kauf dieses Produkts abgeben. Wir prüfen die Echtheit der Bewertungen anhand des Bestellverlaufs.",
   },
+  fabrics: {
+    eyebrow: "Mollien",
+    heading: "Stoffe",
+    intro: "Entdecken Sie die Stoffe unserer Möbel — nach Preisgruppen geordnet. Klicken Sie auf einen Stoff, um Beschreibung und Farbmuster zu sehen.",
+    groupNoSurcharge: "ohne Aufpreis",
+    colorsOne: "Farbe",
+    colorsFew: "Farben",
+    colorsMany: "Farben",
+    swatchHeading: "Farbmuster",
+    seeProducts: "Produkte mit diesem Stoff ansehen",
+    typeLabel: "Typ",
+    groupLabel: "Preisgruppe",
+    detailsLink: "Details",
+    otherGroupLabel: "Sonstige",
+    notFoundTitle: "Stoff nicht gefunden",
+  },
   cart: {
     empty: "Ihr Warenkorb ist leer",
     emptyHint: "Legen Sie Produkte in den Warenkorb, um mit dem Einkauf fortzufahren.",
