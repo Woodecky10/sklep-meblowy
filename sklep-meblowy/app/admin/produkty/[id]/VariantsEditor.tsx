@@ -6,11 +6,13 @@ import type {
   ProductOption,
   ProductVariants,
   Fabric,
+  FabricPriceGroup,
 } from "@/app/_lib/types";
 import { CollapsibleSection, Field, inputClass, type Toast } from "./_shared";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import {
   applyFabricSelection,
+  buildGroupSurchargeMap,
   expandFabrics,
   fabricValueBelongsTo,
   FABRIC_OPTION_NAME,
@@ -31,12 +33,14 @@ export default function VariantsEditor({
   initial,
   categorySlug,
   fabrics,
+  fabricGroups,
   onToast,
 }: {
   productId: string;
   initial: ProductVariants | null;
   categorySlug: string;
   fabrics: Fabric[];
+  fabricGroups: FabricPriceGroup[];
   onToast: (t: Toast) => void;
 }) {
   const [variants, setVariants] = useState<ProductVariants | null>(initial);
@@ -148,7 +152,8 @@ export default function VariantsEditor({
   function applyFabrics(selectedFabrics: Fabric[], keptOrphanValues: string[]) {
     const base = variants ?? { options: [] };
     const { values, valuePrices } = expandFabrics(
-      selectedFabrics.map((f) => ({ name: f.name, colors: f.colors ?? [], price: f.price ?? 0 }))
+      selectedFabrics.map((f) => ({ name: f.name, colors: f.colors ?? [], price: f.price ?? 0, group_id: f.group_id })),
+      buildGroupSurchargeMap(fabricGroups)
     );
     // Zachowaj doplaty istniejacych wartosci-sierot (spoza katalogu).
     const currentVP =
@@ -375,6 +380,7 @@ export default function VariantsEditor({
       {fabricPickerOpen && (
         <FabricPicker
           fabrics={fabrics}
+          priceGroups={fabricGroups}
           initiallySelectedValues={
             variants?.options.find((o) => o.name === FABRIC_OPTION_NAME)?.values ?? []
           }
@@ -523,16 +529,21 @@ function OptionRow({
 
 function FabricPicker({
   fabrics,
+  priceGroups,
   initiallySelectedValues,
   onApply,
   onCancel,
 }: {
   fabrics: Fabric[];
+  // Grupy cenowe (Standard/Premium/…) — INNY byt niż lokalne `groups` (grupowanie
+  // po kategorii do sekcji pickera, z groupFabricsByCategory poniżej).
+  priceGroups: FabricPriceGroup[];
   initiallySelectedValues: string[];
   onApply: (selectedFabrics: Fabric[], keptOrphanValues: string[]) => void;
   onCancel: () => void;
 }) {
-  const toLite = (f: Fabric) => ({ name: f.name, colors: f.colors ?? [], price: f.price ?? 0 });
+  const toLite = (f: Fabric) => ({ name: f.name, colors: f.colors ?? [], price: f.price ?? 0, group_id: f.group_id });
+  const surchargeById = buildGroupSurchargeMap(priceGroups);
 
   const [selectedNames, setSelectedNames] = useState<string[]>(() =>
     fabrics
@@ -596,7 +607,7 @@ function FabricPicker({
   }
 
   const selectedFabrics = fabrics.filter((f) => selectedNames.includes(f.name));
-  const { values: previewValues } = expandFabrics(selectedFabrics.map(toLite));
+  const { values: previewValues } = expandFabrics(selectedFabrics.map(toLite), surchargeById);
   const totalValues =
     previewValues.length + keptOrphans.filter((v) => !previewValues.includes(v)).length;
 
@@ -716,7 +727,10 @@ function FabricPicker({
                               <span className="text-sm text-[var(--fg)]">{f.name}</span>
                               <span className="text-[10px] text-[var(--muted)] ml-auto text-right">
                                 {colorCount > 0 ? `${colorCount} kol.` : "bez kolorów"}
-                                {f.price > 0 && ` · +${f.price.toFixed(2)} zł`}
+                                {(() => {
+                                  const eff = (surchargeById[f.group_id] ?? 0) + (f.price ?? 0);
+                                  return eff > 0 ? ` · +${eff.toFixed(2)} zł` : "";
+                                })()}
                               </span>
                             </label>
                           </li>
