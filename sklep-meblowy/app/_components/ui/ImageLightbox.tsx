@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useModal } from "@/app/_lib/useModal";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
@@ -44,7 +45,11 @@ export default function ImageLightbox({
   if (index === null || !images[index]) return null;
   const current = images[index];
 
-  return (
+  // Portal do document.body: overlay renderuje się poza poddrzewem <main>, więc
+  // jego z-[100] działa w root stacking-context — nad banerem cookies (z-50),
+  // który jest rodzeństwem <main>, nie potomkiem. Bez portalu numer z-index nie
+  // wystarcza (overlay uwięziony w kontekście <main>).
+  const overlay = (
     <div
       ref={ref}
       role="dialog"
@@ -112,4 +117,6 @@ export default function ImageLightbox({
       </button>
     </div>
   );
+
+  return typeof document === "undefined" ? null : createPortal(overlay, document.body);
 }
