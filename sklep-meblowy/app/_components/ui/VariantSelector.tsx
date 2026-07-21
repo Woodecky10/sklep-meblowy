@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import type { Product, ProductVariants } from "@/app/_lib/types";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "@/app/_lib/de-content-maps";
-import type { Locale } from "@/app/_lib/i18n";
-import { useFabricLabels, useFabricImages } from "@/app/_lib/fabric-context";
+import { localizeHref, pickLocalized, type Locale } from "@/app/_lib/i18n";
+import { useFabricLabels, useFabricImages, useFabricMeta } from "@/app/_lib/fabric-context";
 import { FABRIC_OPTION_NAME, sortVariantValues, sortVariantOptions } from "@/app/_lib/variants";
 import {
   cornerSideOf,
@@ -156,9 +157,10 @@ export default function VariantSelector({
 // Ile próbek pokazać zanim „Zobacz więcej" (jak na referencji dealmeble).
 const SWATCH_LIMIT = 5;
 
-// Opcja „Tkanina" jako okrągłe próbki ze zdjęciem + podpis + cena. Po SWATCH_LIMIT
-// kafelek „Zobacz więcej (+N)" rozwija resztę w miejscu; po rozwinięciu ten sam
-// kafelek staje się „Zobacz mniej" i zwija listę z powrotem.
+// Widok kompaktowy: pierwsze SWATCH_LIMIT próbek + „Zobacz więcej (+N)".
+// Po rozwinięciu: próbki pogrupowane w rozwijane karty GRUP CENOWYCH
+// (spec 2026-07-21), w karcie podsekcje per tkanina z linkiem „szczegóły"
+// do /tkaniny/[slug]. Wartości spoza katalogu → karta „Pozostałe".
 function FabricSwatchGroup({
   values,
   current,
@@ -178,69 +180,180 @@ function FabricSwatchGroup({
   rate: number;
   onPick: (v: string) => void;
 }) {
+  const meta = useFabricMeta();
+  const t = getDictionary(locale);
   const [expanded, setExpanded] = useState(false);
-  const shown = expanded ? values : values.slice(0, SWATCH_LIMIT);
-  const hidden = values.length - shown.length;
+  const [openGroups, setOpenGroups] = useState<Set<string> | null>(null);
+
+  const swatch = (v: string) => {
+    const active = current === v;
+    const img = images[v];
+    const surcharge = valuePrices?.[v] ?? 0;
+    const label = labelOf(v);
+    return (
+      <button
+        key={v}
+        type="button"
+        onClick={() => onPick(v)}
+        aria-pressed={active}
+        className="flex flex-col items-center gap-1.5 text-center group"
+      >
+        <span
+          className={`relative w-16 h-16 rounded-full overflow-hidden border-2 transition-colors ${
+            active
+              ? "border-[var(--color-gold)]"
+              : "border-[var(--border)] group-hover:border-[var(--color-gold)]"
+          }`}
+        >
+          {img ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={img} alt={label} loading="lazy" className="w-full h-full object-cover" />
+          ) : (
+            <span className="w-full h-full flex items-center justify-center bg-[var(--bg)] text-[10px] text-[var(--muted)]">
+              {v.split(" ").pop()}
+            </span>
+          )}
+        </span>
+        <span
+          className={`text-xs leading-tight ${
+            active ? "text-[var(--color-gold)] font-semibold" : "text-[var(--fg)]"
+          }`}
+        >
+          {label}
+        </span>
+        <span className="text-[11px] text-[var(--muted)]">
+          {surcharge > 0 ? `+${formatMoney(surcharge, locale, rate)}` : formatMoney(0, locale, rate)}
+        </span>
+      </button>
+    );
+  };
+
+  // ── Widok kompaktowy (jak dotąd) ──
+  if (!expanded) {
+    const shown = values.slice(0, SWATCH_LIMIT);
+    const hidden = values.length - shown.length;
+    return (
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+        {shown.map(swatch)}
+        {hidden > 0 && (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            aria-expanded={false}
+            className="flex flex-col items-center justify-center gap-0.5 min-h-[4rem] p-2 rounded-2xl border border-[var(--border)] text-[var(--color-gold)] hover:border-[var(--color-gold)] hover:bg-[var(--color-gold)]/5 transition-colors"
+          >
+            <span className="text-xs font-sans">
+              {locale === "de" ? "Mehr anzeigen" : "Zobacz więcej"}
+            </span>
+            <span className="text-[11px] text-[var(--muted)]">(+{hidden})</span>
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // ── Widok rozwinięty: karty grup cenowych ──
+  type GroupBucket = {
+    code: string;
+    label: string;
+    surcharge: number;
+    sort: number;
+    fabrics: Map<string, { slug: string | null; values: string[] }>;
+  };
+  const buckets = new Map<string, GroupBucket>();
+  for (const v of values) {
+    const m = meta[v];
+    const code = m?.groupCode ?? "__other";
+    let bucket = buckets.get(code);
+    if (!bucket) {
+      bucket = m
+        ? {
+            code,
+            label: pickLocalized(m.groupName, m.groupNameDe, locale),
+            surcharge: m.groupSurcharge,
+            sort: m.groupSort,
+            fabrics: new Map(),
+          }
+        : {
+            code: "__other",
+            label: t.fabrics.otherGroupLabel,
+            surcharge: 0,
+            sort: Number.MAX_SAFE_INTEGER,
+            fabrics: new Map(),
+          };
+      buckets.set(code, bucket);
+    }
+    const fabricName = m?.fabricName ?? v;
+    const entry = bucket.fabrics.get(fabricName);
+    if (entry) entry.values.push(v);
+    else bucket.fabrics.set(fabricName, { slug: m?.slug ?? null, values: [v] });
+  }
+  const ordered = [...buckets.values()].sort((a, b) => a.sort - b.sort);
+  const currentGroup = current ? meta[current]?.groupCode ?? "__other" : null;
+  const open = openGroups ?? new Set([currentGroup ?? ordered[0]?.code]);
+
+  function toggleGroup(code: string) {
+    const next = new Set(open);
+    if (next.has(code)) next.delete(code);
+    else next.add(code);
+    setOpenGroups(next);
+  }
 
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-      {shown.map((v) => {
-        const active = current === v;
-        const img = images[v];
-        const surcharge = valuePrices?.[v] ?? 0;
-        const label = labelOf(v);
+    <div className="flex flex-col gap-3">
+      {ordered.map((g) => {
+        const isOpen = open.has(g.code);
+        const count = g.fabrics.size;
         return (
-          <button
-            key={v}
-            type="button"
-            onClick={() => onPick(v)}
-            aria-pressed={active}
-            className="flex flex-col items-center gap-1.5 text-center group"
-          >
-            <span
-              className={`relative w-16 h-16 rounded-full overflow-hidden border-2 transition-colors ${
-                active
-                  ? "border-[var(--color-gold)]"
-                  : "border-[var(--border)] group-hover:border-[var(--color-gold)]"
-              }`}
+          <div key={g.code} className="border border-[var(--border)] rounded-2xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => toggleGroup(g.code)}
+              aria-expanded={isOpen}
+              className="w-full flex items-center gap-3 px-4 py-3 bg-[var(--card-bg)] hover:bg-[var(--color-gold)]/5 transition-colors text-left"
             >
-              {img ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={img} alt={label} loading="lazy" className="w-full h-full object-cover" />
-              ) : (
-                <span className="w-full h-full flex items-center justify-center bg-[var(--bg)] text-[10px] text-[var(--muted)]">
-                  {v.split(" ").pop()}
-                </span>
-              )}
-            </span>
-            <span
-              className={`text-xs leading-tight ${
-                active ? "text-[var(--color-gold)] font-semibold" : "text-[var(--fg)]"
-              }`}
-            >
-              {label}
-            </span>
-            <span className="text-[11px] text-[var(--muted)]">
-              {surcharge > 0 ? `+${formatMoney(surcharge, locale, rate)}` : formatMoney(0, locale, rate)}
-            </span>
-          </button>
+              <span className="font-sans text-sm font-semibold text-[var(--fg)]">{g.label}</span>
+              <span className="text-xs text-[var(--color-gold-text)] font-semibold">
+                {g.code !== "__other" &&
+                  (g.surcharge > 0
+                    ? `+${formatMoney(g.surcharge, locale, rate)}`
+                    : t.fabrics.groupNoSurcharge)}
+              </span>
+              <span className="text-xs text-[var(--muted)] ml-auto">{count}</span>
+              <span className="text-[var(--muted)]">{isOpen ? "▾" : "▸"}</span>
+            </button>
+            {isOpen && (
+              <div className="p-4 flex flex-col gap-5 border-t border-[var(--border)]">
+                {[...g.fabrics.entries()].map(([fabricName, entry]) => (
+                  <div key={fabricName}>
+                    <p className="text-xs font-sans text-[var(--muted)] mb-2 flex items-center gap-2">
+                      <span className="font-semibold text-[var(--fg)]">{fabricName}</span>
+                      {entry.slug && (
+                        <Link
+                          href={localizeHref(`/tkaniny/${entry.slug}`, locale)}
+                          className="text-[var(--color-gold)] underline underline-offset-2 hover:no-underline"
+                        >
+                          {t.fabrics.detailsLink}
+                        </Link>
+                      )}
+                    </p>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                      {entry.values.map(swatch)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         );
       })}
-      {values.length > SWATCH_LIMIT && (
-        <button
-          type="button"
-          onClick={() => setExpanded((e) => !e)}
-          aria-expanded={expanded}
-          className="flex flex-col items-center justify-center gap-0.5 min-h-[4rem] p-2 rounded-2xl border border-[var(--border)] text-[var(--color-gold)] hover:border-[var(--color-gold)] hover:bg-[var(--color-gold)]/5 transition-colors"
-        >
-          <span className="text-xs font-sans">
-            {expanded
-              ? locale === "de" ? "Weniger anzeigen" : "Zobacz mniej"
-              : locale === "de" ? "Mehr anzeigen" : "Zobacz więcej"}
-          </span>
-          {!expanded && <span className="text-[11px] text-[var(--muted)]">(+{hidden})</span>}
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => setExpanded(false)}
+        className="self-start px-4 py-2 text-xs font-sans rounded-full border border-[var(--border)] text-[var(--color-gold)] hover:border-[var(--color-gold)] transition-colors"
+      >
+        {locale === "de" ? "Weniger anzeigen" : "Zobacz mniej"}
+      </button>
     </div>
   );
 }

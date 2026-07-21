@@ -34,8 +34,8 @@ import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { buildSizeOptions } from "@/app/_lib/size-groups";
 import { effectivePrice } from "@/app/_lib/pricing";
-import { getFabricImageMap } from "@/app/_lib/fabrics";
-import { FabricImageProvider } from "@/app/_lib/fabric-context";
+import { getFabricImageMap, getFabricMetaMap } from "@/app/_lib/fabrics";
+import { FabricImageProvider, FabricMetaProvider } from "@/app/_lib/fabric-context";
 import { getBundlesForProduct } from "@/app/_lib/bundles-server";
 import type { Product } from "@/app/_lib/types";
 
@@ -116,6 +116,9 @@ export default async function ProduktPage({ params }: Props) {
   const sizeOptions = buildSizeOptions(sizeSiblings, product.id);
   // Mapa zdjęć próbek tkanin (wartość „Nazwa Numer" → URL) do próbek w selektorze.
   const fabricImageMap = await getFabricImageMap();
+  // Mapa wartość wariantu → metadane tkaniny (slug, grupa cenowa) — selektor
+  // grupuje próbki w rozwijane karty grup + link „szczegóły" do /tkaniny/[slug].
+  const fabricMetaMap = await getFabricMetaMap();
 
   // Etykieta cross-sell pochodzi z LABELA pierwszej cross_sell_categories tej
   // kategorii — np. dla łóżek pokaże "Polecane materace".
@@ -274,14 +277,16 @@ export default async function ProduktPage({ params }: Props) {
           Specyfikacja przeniesiona z osobnej sekcji do ProductMainSection
           żeby wypełniała pustą przestrzeń pod galerią. */}
       <FabricImageProvider map={fabricImageMap}>
-        <ProductMainSection
-          product={product}
-          categoryLabel={categoryLabel ?? null}
-          rating={rating}
-          specifications={details}
-          sizeOptions={sizeOptions}
-          bundles={bundles}
-        />
+        <FabricMetaProvider map={fabricMetaMap}>
+          <ProductMainSection
+            product={product}
+            categoryLabel={categoryLabel ?? null}
+            rating={rating}
+            specifications={details}
+            sizeOptions={sizeOptions}
+            bundles={bundles}
+          />
+        </FabricMetaProvider>
       </FabricImageProvider>
 
       {/* Sekcja: opis produktu.
