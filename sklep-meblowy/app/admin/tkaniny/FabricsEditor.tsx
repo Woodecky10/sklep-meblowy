@@ -7,7 +7,7 @@ import RichTextEditor from "@/app/admin/_shared/RichTextEditor";
 import { createFabric, updateFabric, deleteFabric, type ActionResult } from "./actions";
 import { uploadProductImage } from "@/app/admin/produkty/actions";
 import { compressIfNeeded } from "@/app/_lib/image-compress";
-import { normalizeSearchText } from "@/app/_lib/search-normalize";
+import { searchMatches } from "@/app/_lib/search-normalize";
 import { MAX_FEATURED_PRODUCTS } from "@/app/_lib/fabric-featured-products";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import FabricGroupsPanel from "./FabricGroupsPanel";
@@ -239,11 +239,10 @@ function FabricForm({
     () => new Map(pickerProducts.map((p) => [p.id, p])),
     [pickerProducts]
   );
-  const filteredProducts = useMemo(() => {
-    const q = normalizeSearchText(productQuery);
-    if (!q) return pickerProducts;
-    return pickerProducts.filter((p) => normalizeSearchText(p.name).includes(q));
-  }, [pickerProducts, productQuery]);
+  const filteredProducts = useMemo(
+    () => pickerProducts.filter((p) => searchMatches(p.name, productQuery)),
+    [pickerProducts, productQuery]
+  );
   function toggleProduct(id: string) {
     setSelectedIds((prev) =>
       prev.includes(id)

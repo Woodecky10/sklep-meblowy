@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeSearchText } from "@/app/_lib/search-normalize";
+import { normalizeSearchText, searchMatches } from "@/app/_lib/search-normalize";
 
 describe("normalizeSearchText — normalizacja frazy wyszukiwania", () => {
   it("zdejmuje polskie diakrytyki (w tym ł, które nie ma dekompozycji NFD)", () => {
@@ -13,5 +13,25 @@ describe("normalizeSearchText — normalizacja frazy wyszukiwania", () => {
   it("nie zmienia zwykłego ASCII i obsługuje pusty string", () => {
     expect(normalizeSearchText("fotel 123")).toBe("fotel 123");
     expect(normalizeSearchText("")).toBe("");
+  });
+});
+
+describe("searchMatches — spacje i kolejność słów bez znaczenia", () => {
+  it("dowolna kolejność słów", () => {
+    expect(searchMatches("Narożnik VEGAS L", "vegas narożnik")).toBe(true);
+  });
+  it("spacje całkowicie ignorowane (obie strony)", () => {
+    expect(searchMatches("Chill Me", "chillme")).toBe(true);
+    expect(searchMatches("Chillme", "chill me")).toBe(true);
+  });
+  it("diakrytyki nieczułe", () => {
+    expect(searchMatches("Łóżko Sawana", "lozko")).toBe(true);
+  });
+  it("wszystkie słowa muszą wystąpić", () => {
+    expect(searchMatches("Sofa Modena", "sofa xyz")).toBe(false);
+  });
+  it("pusta / sama-spacja fraza → true (nie zawęża)", () => {
+    expect(searchMatches("cokolwiek", "")).toBe(true);
+    expect(searchMatches("cokolwiek", "   ")).toBe(true);
   });
 });
