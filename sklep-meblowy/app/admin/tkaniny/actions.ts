@@ -76,10 +76,16 @@ function parseRichHtml(input: unknown): string | null {
   return clean === "" ? null : clean;
 }
 
+// Ile zapisów produktów leci równolegle w jednej porcji. Zamienia setki
+// sekwencyjnych round-tripów na kilka równoległych porcji, zdejmując ryzyko
+// timeoutu funkcji serverless przy zmianie grupy dotykającej wielu produktów.
+const PRODUCT_WRITE_CONCURRENCY = 20;
+
 // Propagacja dopłat: przelicza value_prices opcji „Tkanina" we WSZYSTKICH
 // produktach wg aktualnego katalogu (grupa + korekta). Zapisuje tylko
-// faktycznie zmienione. Wołane po każdej zmianie tkaniny/grupy — bez diffowania
-// co się zmieniło (tanio i zawsze poprawnie; skala sklepu: setki produktów).
+// faktycznie zmienione, w porcjach po PRODUCT_WRITE_CONCURRENCY równolegle.
+// Wołane po każdej zmianie tkaniny/grupy — bez diffowania co się zmieniło
+// (tanio i zawsze poprawnie; skala sklepu: setki produktów).
 async function recomputeFabricSurchargesOnProducts(): Promise<{ updated: number }> {
   const supabase = await createAdminClient();
   const [{ data: fabricRows }, { data: groupRows }, { data: productRows }] = await Promise.all([
@@ -91,19 +97,43 @@ async function recomputeFabricSurchargesOnProducts(): Promise<{ updated: number 
   const surcharges = buildGroupSurchargeMap(
     (groupRows ?? []) as { id: string; surcharge: number }[]
   );
-  let updated = 0;
+
+  // Faza 1 (czysta, bez I/O): policz produkty, które faktycznie się zmieniają.
+  const changed: { id: string; variants: ProductVariants }[] = [];
   for (const row of productRows ?? []) {
     const p = row as { id: string; variants: ProductVariants | null };
     const res = rebuildFabricValuePrices(p.variants, fabrics, surcharges);
-    if (!res || !res.changed) continue;
-    const { error } = await supabase
-      .from("products")
-      .update({ variants: res.variants } as never)
-      .eq("id", p.id);
-    if (!error) {
-      updated++;
-      revalidatePath(`/produkt/${p.id}`);
-    }
+    if (res && res.changed) changed.push({ id: p.id, variants: res.variants });
+  }
+
+  // Faza 2: zapis wsadowy z ograniczoną współbieżnością. Błąd per produkt jest
+  // logowany i pomijany (licznik liczy tylko udane) — częściowy fail nie wywala
+  // całej akcji ani nie fałszuje liczby.
+  let updated = 0;
+  for (let i = 0; i < changed.length; i += PRODUCT_WRITE_CONCURRENCY) {
+    const batch = changed.slice(i, i + PRODUCT_WRITE_CONCURRENCY);
+    const results = await Promise.all(
+      batch.map(async (c) => {
+        try {
+          const { error } = await supabase
+            .from("products")
+            .update({ variants: c.variants } as never)
+            .eq("id", c.id);
+          if (error) {
+            console.error(`[recomputeFabricSurcharges] update ${c.id}:`, error.message);
+            return false;
+          }
+          revalidatePath(`/produkt/${c.id}`);
+          return true;
+        } catch (e) {
+          // Sieciowy/nieoczekiwany błąd pojedynczego zapisu nie może wywalić
+          // całej porcji — logujemy i pomijamy (jak przy błędzie zapytania).
+          console.error(`[recomputeFabricSurcharges] update ${c.id} threw:`, e);
+          return false;
+        }
+      })
+    );
+    updated += results.filter(Boolean).length;
   }
   if (updated > 0) {
     invalidateFacetsCache();
