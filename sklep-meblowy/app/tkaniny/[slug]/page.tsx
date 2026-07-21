@@ -57,7 +57,7 @@ export default async function TkaninaPage({ params }: Props) {
   // Wybrane produkty („Meble w tej tkaninie"): defensywne ?? [] (stary cache
   // bez kolumny). Dociągnięcie jednym zapytaniem, tylko aktywne; kolejność wg
   // zapisanej listy, nieznane/nieaktywne pominięte.
-  const featuredIds = fabric.featured_product_ids ?? [];
+  const featuredIds = [...new Set(fabric.featured_product_ids ?? [])];
   let featuredProducts: { id: string; name: string; image: string | null }[] = [];
   if (featuredIds.length > 0) {
     const supabase = await createAdminClient();
