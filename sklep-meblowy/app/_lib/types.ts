@@ -177,14 +177,6 @@ export type FabricPriceGroup = {
   created_at: string;
 };
 
-// Zdjęcie z produkcji na stronie tkaniny (migracja 58) — mebel uszyty w tej
-// tkaninie. product_id opcjonalnie linkuje do produktu (klikalna karta);
-// null / produkt nieaktywny → samo zdjęcie bez linku.
-export type FabricProductionPhoto = {
-  url: string;
-  product_id: string | null;
-};
-
 // Katalog tkanin (migracja 37) — reużywalny zbiór nazw używanych jako wartości
 // opcji wariantu „Tkanina". name_de null → na /de fallback do name.
 export type Fabric = {
@@ -207,8 +199,10 @@ export type Fabric = {
   // Opis na stronę tkaniny (sanityzowany HTML). description_de null → fallback PL.
   description: string | null;
   description_de: string | null;
-  // Zdjęcia z produkcji (kolejność = kolejność w tablicy; max 20 w adminie).
-  production_photos: FabricProductionPhoto[];
+  // Wybrane produkty pokazywane w sekcji „Meble w tej tkaninie" na stronie
+  // tkaniny (kolejność = kolejność w tablicy; max 20 w adminie). Nieznane/
+  // nieaktywne id pomijane przy renderze.
+  featured_product_ids: string[];
   created_at: string;
 };
 

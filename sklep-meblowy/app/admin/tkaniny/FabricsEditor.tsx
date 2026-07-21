@@ -1,19 +1,20 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card, EmptyState, Field, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
 import RichTextEditor from "@/app/admin/_shared/RichTextEditor";
 import { createFabric, updateFabric, deleteFabric, type ActionResult } from "./actions";
 import { uploadProductImage } from "@/app/admin/produkty/actions";
-import { uploadProductImageFile } from "@/app/admin/produkty/[id]/_shared";
 import { compressIfNeeded } from "@/app/_lib/image-compress";
+import { normalizeSearchText } from "@/app/_lib/search-normalize";
+import { MAX_FEATURED_PRODUCTS } from "@/app/_lib/fabric-featured-products";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import FabricGroupsPanel from "./FabricGroupsPanel";
-import type { Fabric, FabricPriceGroup, FabricProductionPhoto } from "@/app/_lib/types";
+import type { Fabric, FabricPriceGroup } from "@/app/_lib/types";
 
-// Produkt w pickerze zdjęć z produkcji (lista z page.tsx — tylko aktywne).
-export type FabricPickerProduct = { id: string; name: string };
+// Produkt w pickerze „Meble w tej tkaninie" (lista z page.tsx — tylko aktywne).
+export type FabricPickerProduct = { id: string; name: string; image: string | null };
 
 export default function FabricsEditor({
   initialFabrics,
@@ -230,49 +231,27 @@ function FabricForm({
     }
   }
 
-  type PhotoRow = { url: string; productQuery: string; productId: string | null };
-  const [photoRows, setPhotoRows] = useState<PhotoRow[]>(() =>
-    (initial?.production_photos ?? []).map((p: FabricProductionPhoto) => ({
-      url: p.url,
-      productId: p.product_id,
-      productQuery: p.product_id
-        ? pickerProducts.find((x) => x.id === p.product_id)?.name ?? ""
-        : "",
-    }))
+  const [selectedIds, setSelectedIds] = useState<string[]>(
+    initial?.featured_product_ids ?? []
   );
-  const [uploadingPhotoIdx, setUploadingPhotoIdx] = useState<number | null>(null);
-  const [photoError, setPhotoError] = useState<string | null>(null);
-  const productListId = `fabric-photo-products-${initial?.id ?? "new"}`;
-
-  function addPhotoRow() {
-    setPhotoRows((r) => [...r, { url: "", productQuery: "", productId: null }]);
-  }
-  function removePhotoRow(i: number) {
-    setPhotoRows((r) => r.filter((_, idx) => idx !== i));
-  }
-  // Dokładne dopasowanie nazwy z datalisty → productId; inaczej null.
-  function setPhotoProduct(i: number, query: string) {
-    const match = pickerProducts.find((p) => p.name === query) ?? null;
-    setPhotoRows((r) =>
-      r.map((row, idx) =>
-        idx === i ? { ...row, productQuery: query, productId: match?.id ?? null } : row
-      )
+  const [productQuery, setProductQuery] = useState("");
+  const productById = useMemo(
+    () => new Map(pickerProducts.map((p) => [p.id, p])),
+    [pickerProducts]
+  );
+  const filteredProducts = useMemo(() => {
+    const q = normalizeSearchText(productQuery);
+    if (!q) return pickerProducts;
+    return pickerProducts.filter((p) => normalizeSearchText(p.name).includes(q));
+  }, [pickerProducts, productQuery]);
+  function toggleProduct(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id)
+        ? prev.filter((x) => x !== id)
+        : prev.length >= MAX_FEATURED_PRODUCTS
+          ? prev
+          : [...prev, id]
     );
-  }
-  async function uploadPhotoForRow(i: number, file: File) {
-    setUploadingPhotoIdx(i);
-    setPhotoError(null);
-    try {
-      const toSend = await compressIfNeeded(file);
-      const res = await uploadProductImageFile(toSend);
-      if (res.ok) {
-        setPhotoRows((r) => r.map((row, idx) => (idx === i ? { ...row, url: res.url } : row)));
-      } else {
-        setPhotoError(res.error);
-      }
-    } finally {
-      setUploadingPhotoIdx(null);
-    }
   }
 
   return (
@@ -432,105 +411,113 @@ function FabricForm({
         </button>
       </div>
 
-      {/* Zdjęcia z produkcji — mebel uszyty w tej tkaninie, opcjonalnie
-          podpięty produkt (strona tkaniny: klikalna karta → /produkt/[id]). */}
+      {/* Meble w tej tkaninie — wybór produktów (bez wgrywania zdjęć). Strona
+          tkaniny pokazuje je jako siatkę kafelków → /produkt/[id]. */}
       <div className="flex flex-col gap-2">
         <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
-          Zdjęcia z produkcji
+          Meble w tej tkaninie
         </span>
         <p className="text-[11px] text-[var(--muted)] -mt-1">
-          Prawdziwe zdjęcia mebli w tej tkaninie (sekcja &bdquo;Ta tkanina na
-          naszych meblach&rdquo; na stronie tkaniny). Produkt opcjonalny — z
-          produktem zdjęcie jest klikalne. Max 20.
+          Wybierz produkty pokazywane w sekcji &bdquo;Meble w tej tkaninie&rdquo;
+          na stronie tkaniny (główne zdjęcie + nazwa, klik → karta produktu).
+          Kolejność = kolejność dodawania. Max {MAX_FEATURED_PRODUCTS}.
         </p>
         <input
           type="hidden"
-          name="production_photos_json"
+          name="featured_product_ids_json"
           readOnly
-          value={JSON.stringify(
-            photoRows
-              .filter((r) => r.url)
-              .map((r) => ({ url: r.url, product_id: r.productId }))
-          )}
+          value={JSON.stringify(selectedIds)}
         />
-        {photoError && <p className="text-xs text-red-600">{photoError}</p>}
-        {photoRows.length === 0 && (
+
+        {/* Wybrane (w kolejności wyświetlania) */}
+        {selectedIds.length === 0 ? (
           <span className="text-xs text-[var(--muted)] italic">
-            Brak zdjęć — dodaj pierwsze.
+            Nie wybrano produktów.
           </span>
-        )}
-        <datalist id={productListId}>
-          {pickerProducts.map((p) => (
-            <option key={p.id} value={p.name} />
-          ))}
-        </datalist>
-        <div className="flex flex-col gap-2">
-          {photoRows.map((row, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-3 bg-[var(--bg)] border border-[var(--border)] rounded-lg p-2 flex-wrap"
-            >
-              <span className="relative w-16 h-12 shrink-0 rounded-lg overflow-hidden border border-[var(--border)] bg-[var(--card-bg)]">
-                {row.url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={row.url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="w-full h-full flex items-center justify-center text-[10px] text-[var(--muted)]">
-                    brak
+        ) : (
+          <div className="flex flex-col gap-2">
+            {selectedIds.map((id) => {
+              const p = productById.get(id);
+              return (
+                <div
+                  key={id}
+                  className="flex items-center gap-3 bg-[var(--bg)] border border-[var(--border)] rounded-lg p-2"
+                >
+                  <span className="relative w-16 h-12 shrink-0 rounded-lg overflow-hidden border border-[var(--border)] bg-[var(--card-bg)]">
+                    {p?.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.image} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="w-full h-full flex items-center justify-center text-[10px] text-[var(--muted)]">
+                        brak
+                      </span>
+                    )}
                   </span>
-                )}
-              </span>
-              <label className="shrink-0 px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors cursor-pointer">
-                {uploadingPhotoIdx === i ? "Wgrywam…" : row.url ? "Zmień" : "Zdjęcie"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  disabled={uploadingPhotoIdx !== null}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    e.target.value = "";
-                    if (f) uploadPhotoForRow(i, f);
-                  }}
-                />
-              </label>
-              <div className="flex-1 min-w-[12rem]">
-                <input
-                  value={row.productQuery}
-                  onChange={(e) => setPhotoProduct(i, e.target.value)}
-                  list={productListId}
-                  placeholder="produkt na zdjęciu (opcjonalnie)"
-                  className={inputCls}
-                />
-                <p className="text-[10px] mt-0.5 text-[var(--muted)]">
-                  {row.productId
-                    ? "✓ podpięty produkt"
-                    : row.productQuery
-                      ? "— nie rozpoznano (wybierz z listy)"
-                      : "bez produktu"}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => removePhotoRow(i)}
-                aria-label="Usuń zdjęcie"
-                className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={addPhotoRow}
-          disabled={photoRows.length >= 20}
-          className="self-start px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors disabled:opacity-50"
-        >
-          + Dodaj zdjęcie
-        </button>
+                  <span className="flex-1 min-w-0 truncate text-sm text-[var(--fg)]">
+                    {p?.name ?? "(produkt nieaktywny lub usunięty)"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => toggleProduct(id)}
+                    aria-label="Usuń produkt"
+                    className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Szukaj i dodaj */}
+        <input
+          value={productQuery}
+          onChange={(e) => setProductQuery(e.target.value)}
+          placeholder="Szukaj produktu do dodania…"
+          className={`${inputCls} mt-1`}
+        />
+        <ul className="max-h-72 overflow-y-auto border border-[var(--border)] rounded-xl divide-y divide-[var(--border)]">
+          {filteredProducts.map((p) => {
+            const active = selectedIds.includes(p.id);
+            const atLimit = selectedIds.length >= MAX_FEATURED_PRODUCTS;
+            return (
+              <li key={p.id}>
+                <label
+                  className={`flex items-center gap-3 p-2 transition-colors ${
+                    active
+                      ? "bg-[var(--color-gold)]/10 cursor-pointer"
+                      : atLimit
+                        ? "opacity-50 cursor-not-allowed"
+                        : "cursor-pointer hover:bg-[var(--bg)]"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={active}
+                    disabled={!active && atLimit}
+                    onChange={() => toggleProduct(p.id)}
+                    className="h-4 w-4 accent-[var(--color-gold)]"
+                  />
+                  <span className="relative w-10 h-10 shrink-0 rounded-lg overflow-hidden bg-[var(--card-bg)] border border-[var(--border)]">
+                    {p.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.image} alt="" className="w-full h-full object-cover" />
+                    ) : null}
+                  </span>
+                  <span className="flex-1 min-w-0 truncate text-sm text-[var(--fg)]">
+                    {p.name}
+                  </span>
+                </label>
+              </li>
+            );
+          })}
+          {filteredProducts.length === 0 && (
+            <li className="p-4 text-xs text-[var(--muted)] italic">Brak dopasowań</li>
+          )}
+        </ul>
       </div>
 
       <div className="flex gap-2 pt-2">
