@@ -17,7 +17,8 @@
 - **Limit:** max 20 wybranych produktów (`MAX_FEATURED_PRODUCTS`), dedupe, kolejność = kolejność dodawania.
 - **Nagłówek sekcji:** PL „Meble w tej tkaninie", DE „Möbel in diesem Stoff".
 - **Testy:** `npm test` = Vitest. `npx tsc --noEmit` musi być zielone. Build: `npm run build`.
-- **Git:** praca na gałęzi `feat/meble-w-tkaninie` (już utworzona, spec już zacommitowany). Konto gh do PR: Woodecky10.
+- **Git:** praca na gałęzi `feat/meble-w-tkaninie` (już utworzona, spec + plan już zacommitowane). Konto gh do PR: Woodecky10.
+- **⚠️ Git root = katalog domowy** (`C:/Users/wood1`); projekt to podkatalog `sklep-meblowy/`. W repo są dziesiątki nieśledzonych plików domowych (Desktop, Documents, NTUSER.DAT…). **NIGDY nie używaj `git add -A` ani `git add .`** — commituj WYŁĄCZNIE jawnymi ścieżkami plików taska. Komendy git uruchamiaj z katalogu roboczego `C:/Users/wood1/sklep-meblowy` (ścieżki względne działają).
 - **Spec:** `docs/superpowers/specs/2026-07-21-meble-w-tkaninie-design.md`.
 
 ---
@@ -663,10 +664,17 @@ Expected: wszystkie testy PASS (w tym `fabric-featured-products` i `fabric-group
 Run: `npm run build`
 Expected: build zielony.
 
-- [ ] **Step 13: Commit**
+- [ ] **Step 13: Commit** (JAWNE ścieżki — nigdy `git add -A`; deletiony z kroku 10 są już zastage'owane przez `git rm`)
 
 ```bash
-git add -A
+git add supabase/migrations/59_fabric_featured_products.sql \
+        app/_components/ui/FabricFeaturedProducts.tsx \
+        app/_lib/types.ts \
+        app/_lib/dictionaries/pl.ts app/_lib/dictionaries/de.ts \
+        app/admin/tkaniny/actions.ts app/admin/tkaniny/page.tsx \
+        app/admin/tkaniny/FabricsEditor.tsx \
+        app/tkaniny/ \
+        app/_lib/__tests__/fabric-groups.test.ts
 git commit -m "feat(tkaniny): 'Meble w tej tkaninie' — wybor produktow zamiast zdjec z produkcji
 
 Kolumna featured_product_ids (migr. 59) zastepuje production_photos. Admin
