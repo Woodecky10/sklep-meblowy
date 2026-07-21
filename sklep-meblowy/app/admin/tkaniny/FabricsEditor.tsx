@@ -3,14 +3,23 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card, EmptyState, Field, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
+import RichTextEditor from "@/app/admin/_shared/RichTextEditor";
 import { createFabric, updateFabric, deleteFabric, type ActionResult } from "./actions";
 import { uploadProductImage } from "@/app/admin/produkty/actions";
 import { compressIfNeeded } from "@/app/_lib/image-compress";
 import { useConfirm } from "@/app/_context/ConfirmContext";
-import type { Fabric } from "@/app/_lib/types";
+import FabricGroupsPanel from "./FabricGroupsPanel";
+import type { Fabric, FabricPriceGroup } from "@/app/_lib/types";
 
-export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabric[] }) {
+export default function FabricsEditor({
+  initialFabrics,
+  groups,
+}: {
+  initialFabrics: Fabric[];
+  groups: FabricPriceGroup[];
+}) {
   const confirm = useConfirm();
+  const groupById = new Map(groups.map((g) => [g.id, g]));
   const [fabrics, setFabrics] = useState<Fabric[]>(initialFabrics);
   const [prevInitial, setPrevInitial] = useState(initialFabrics);
   if (initialFabrics !== prevInitial) {
@@ -69,6 +78,8 @@ export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabr
         </button>
       </div>
 
+      <FabricGroupsPanel groups={groups} onResult={(res) => handleResult(res)} />
+
       {toast && <ToastView toast={toast} onClose={() => setToast(null)} />}
 
       {creating && (
@@ -76,6 +87,7 @@ export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabr
           <FabricForm
             mode="create"
             categories={categories}
+            groups={groups}
             onCancel={() => setCreating(false)}
             onSubmit={async (fd) => {
               const res = await createFabric(fd);
@@ -105,8 +117,9 @@ export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabr
                   <p className="text-xs text-[var(--muted)] mt-0.5">
                     DE: {f.name_de ?? "—"} · kolejność: {f.sort_order} ·{" "}
                     {f.colors?.length ? `${f.colors.length} kolor${f.colors.length < 5 ? "y" : "ów"}` : "bez kolorów"}
+                    {" · "}{groupById.get(f.group_id)?.name ?? "?"}
                     {f.category && ` · ${f.category}`}
-                    {f.price > 0 && ` · +${f.price.toFixed(2)} zł`}
+                    {f.price > 0 && ` · korekta +${f.price.toFixed(2)} zł`}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -137,6 +150,7 @@ export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabr
                     mode="update"
                     initial={f}
                     categories={categories}
+                    groups={groups}
                     onCancel={() => setEditingId(null)}
                     onSubmit={async (fd) => {
                       const res = await updateFabric(fd);
@@ -160,12 +174,14 @@ function FabricForm({
   mode,
   initial,
   categories,
+  groups,
   onSubmit,
   onCancel,
 }: {
   mode: "create" | "update";
   initial?: Fabric;
   categories: string[];
+  groups: FabricPriceGroup[];
   onSubmit: (fd: FormData) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -174,6 +190,8 @@ function FabricForm({
     (initial?.colors ?? []).map((c) => ({ code: c, image: initial?.color_images?.[c] ?? "" }))
   );
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [descriptionDe, setDescriptionDe] = useState(initial?.description_de ?? "");
   const catListId = `fabric-categories-${initial?.id ?? "new"}`;
 
   function addRow() {
@@ -240,17 +258,24 @@ function FabricForm({
         />
       </Field>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <Field label="Dopłata (zł)" hint="Doliczana do ceny, gdy wybrana ta tkanina. 0 = bez dopłaty.">
-          <input
-            name="price"
-            type="number"
-            step="0.01"
-            min="0"
-            defaultValue={initial?.price ?? 0}
+        <Field label="Grupa cenowa" required>
+          <select
+            name="group_id"
+            defaultValue={initial?.group_id ?? groups.find((g) => g.code === "standard")?.id ?? groups[0]?.id}
             className={inputCls}
-          />
+          >
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+                {g.surcharge > 0 ? ` (+${g.surcharge.toFixed(2)} zł)` : " (bez dopłaty)"}
+              </option>
+            ))}
+          </select>
         </Field>
-        <Field label="Kategoria / typ" hint="Do grupowania przy wyborze (np. welur, sztruks). Puste = bez kategorii." className="md:col-span-2">
+        <Field label="Korekta ceny (zł)" hint="Doliczana PONAD dopłatę grupy. Zwykle 0.">
+          <input name="price" type="number" step="0.01" min="0" defaultValue={initial?.price ?? 0} className={inputCls} />
+        </Field>
+        <Field label="Kategoria / typ" hint="Do grupowania przy wyborze (np. welur, sztruks). Puste = bez kategorii.">
           <input
             name="category"
             list={catListId}
@@ -266,6 +291,14 @@ function FabricForm({
           </datalist>
         </Field>
       </div>
+      <Field label="Opis" hint="Pokazywany na stronie tkaniny (/tkaniny). Obsługuje formatowanie.">
+        <input type="hidden" name="description" value={description} />
+        <RichTextEditor value={description} onChange={setDescription} ariaLabel="Opis tkaniny (PL)" placeholder="Opis tkaniny…" />
+      </Field>
+      <Field label="Opis (DE)" hint="Puste → na /de pokaże się opis PL.">
+        <input type="hidden" name="description_de" value={descriptionDe} />
+        <RichTextEditor value={descriptionDe} onChange={setDescriptionDe} ariaLabel="Opis tkaniny (DE)" />
+      </Field>
 
       {/* Kolory (numery) + zdjęcia próbek widoczne dla klienta */}
       <div className="flex flex-col gap-2">
