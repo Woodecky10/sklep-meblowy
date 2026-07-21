@@ -17,6 +17,7 @@ import RichTextEditor from "@/app/admin/_shared/RichTextEditor";
 import type { PageBlockRow } from "@/app/_lib/blocks";
 import type { ActionResult } from "@/app/_lib/types";
 import { Field, inputCls } from "@/app/admin/_shared";
+import { searchMatches } from "@/app/_lib/search-normalize";
 
 export type BlockFormProps = {
   block: PageBlockRow;
@@ -546,7 +547,7 @@ export function ProductsForm({
 
   const q = search.trim().toLowerCase();
   const visibleProducts = q
-    ? picker.products.filter((p) => p.name.toLowerCase().includes(q))
+    ? picker.products.filter((p) => searchMatches(p.name, search))
     : picker.products;
 
   function toggleProduct(id: string) {

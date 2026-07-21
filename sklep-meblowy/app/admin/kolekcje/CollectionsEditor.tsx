@@ -12,6 +12,7 @@ import {
   type ActionResult,
 } from "./actions";
 import { useConfirm } from "@/app/_context/ConfirmContext";
+import { searchMatches } from "@/app/_lib/search-normalize";
 import type { Collection, Product } from "@/app/_lib/types";
 
 export default function CollectionsEditor({
@@ -248,7 +249,7 @@ function CollectionForm({
   }
 
   const filtered = search.trim()
-    ? allProducts.filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()))
+    ? allProducts.filter((p) => searchMatches(p.name, search))
     : allProducts;
 
   return (
