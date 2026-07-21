@@ -32,12 +32,12 @@ export default function FabricSwatchGrid({
           const img = images[code];
           const idx = indexByCode.get(code);
           const tile = (
-            <span className="relative w-full aspect-square rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--bg)]">
+            <span className="relative block w-full aspect-square rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--bg)]">
               {img ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={img} alt={`${name} ${code}`} loading="lazy" className="w-full h-full object-cover" />
+                <img src={img} alt={`${name} ${code}`} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
               ) : (
-                <span className="w-full h-full flex items-center justify-center text-sm text-[var(--muted)]">
+                <span className="absolute inset-0 flex items-center justify-center text-sm text-[var(--muted)]">
                   {code}
                 </span>
               )}

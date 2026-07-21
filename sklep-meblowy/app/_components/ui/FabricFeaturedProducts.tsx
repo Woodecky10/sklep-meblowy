@@ -16,17 +16,17 @@ export default function FabricFeaturedProducts({
           href={`/produkt/${p.id}`}
           className="group flex flex-col gap-3"
         >
-          <span className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--bg)]">
+          <span className="relative block aspect-[4/3] rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--bg)]">
             {p.image ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={p.image}
                 alt=""
                 loading="lazy"
-                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
               />
             ) : (
-              <span className="w-full h-full flex items-center justify-center text-xs text-[var(--muted)]">
+              <span className="absolute inset-0 flex items-center justify-center text-xs text-[var(--muted)]">
                 {p.name.slice(0, 2).toUpperCase()}
               </span>
             )}

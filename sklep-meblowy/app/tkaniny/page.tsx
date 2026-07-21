@@ -83,12 +83,12 @@ export default async function TkaninyPage() {
                   href={`/tkaniny/${f.slug}`}
                   className="group flex flex-col gap-3 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-4 hover:border-[var(--color-gold)] transition-colors"
                 >
-                  <span className="relative aspect-square rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--bg)]">
+                  <span className="relative block aspect-square rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--bg)]">
                     {thumb ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={thumb} alt={pickLocalized(f.name, f.name_de, locale)} loading="lazy" className="w-full h-full object-cover" />
+                      <img src={thumb} alt={pickLocalized(f.name, f.name_de, locale)} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
                     ) : (
-                      <span className="w-full h-full flex items-center justify-center text-xs text-[var(--muted)]">
+                      <span className="absolute inset-0 flex items-center justify-center text-xs text-[var(--muted)]">
                         {f.name.slice(0, 2).toUpperCase()}
                       </span>
                     )}
