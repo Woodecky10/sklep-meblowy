@@ -6,17 +6,23 @@ import { Card, EmptyState, Field, ToastView, inputCls, type Toast } from "@/app/
 import RichTextEditor from "@/app/admin/_shared/RichTextEditor";
 import { createFabric, updateFabric, deleteFabric, type ActionResult } from "./actions";
 import { uploadProductImage } from "@/app/admin/produkty/actions";
+import { uploadProductImageFile } from "@/app/admin/produkty/[id]/_shared";
 import { compressIfNeeded } from "@/app/_lib/image-compress";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import FabricGroupsPanel from "./FabricGroupsPanel";
-import type { Fabric, FabricPriceGroup } from "@/app/_lib/types";
+import type { Fabric, FabricPriceGroup, FabricProductionPhoto } from "@/app/_lib/types";
+
+// Produkt w pickerze zdjęć z produkcji (lista z page.tsx — tylko aktywne).
+export type FabricPickerProduct = { id: string; name: string };
 
 export default function FabricsEditor({
   initialFabrics,
   groups,
+  pickerProducts,
 }: {
   initialFabrics: Fabric[];
   groups: FabricPriceGroup[];
+  pickerProducts: FabricPickerProduct[];
 }) {
   const confirm = useConfirm();
   const groupById = new Map(groups.map((g) => [g.id, g]));
@@ -88,6 +94,7 @@ export default function FabricsEditor({
             mode="create"
             categories={categories}
             groups={groups}
+            pickerProducts={pickerProducts}
             onCancel={() => setCreating(false)}
             onSubmit={async (fd) => {
               const res = await createFabric(fd);
@@ -151,6 +158,7 @@ export default function FabricsEditor({
                     initial={f}
                     categories={categories}
                     groups={groups}
+                    pickerProducts={pickerProducts}
                     onCancel={() => setEditingId(null)}
                     onSubmit={async (fd) => {
                       const res = await updateFabric(fd);
@@ -175,6 +183,7 @@ function FabricForm({
   initial,
   categories,
   groups,
+  pickerProducts,
   onSubmit,
   onCancel,
 }: {
@@ -182,6 +191,7 @@ function FabricForm({
   initial?: Fabric;
   categories: string[];
   groups: FabricPriceGroup[];
+  pickerProducts: FabricPickerProduct[];
   onSubmit: (fd: FormData) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -217,6 +227,51 @@ function FabricForm({
       if (url) setRowImage(i, url);
     } finally {
       setUploadingIdx(null);
+    }
+  }
+
+  type PhotoRow = { url: string; productQuery: string; productId: string | null };
+  const [photoRows, setPhotoRows] = useState<PhotoRow[]>(() =>
+    (initial?.production_photos ?? []).map((p: FabricProductionPhoto) => ({
+      url: p.url,
+      productId: p.product_id,
+      productQuery: p.product_id
+        ? pickerProducts.find((x) => x.id === p.product_id)?.name ?? ""
+        : "",
+    }))
+  );
+  const [uploadingPhotoIdx, setUploadingPhotoIdx] = useState<number | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const productListId = `fabric-photo-products-${initial?.id ?? "new"}`;
+
+  function addPhotoRow() {
+    setPhotoRows((r) => [...r, { url: "", productQuery: "", productId: null }]);
+  }
+  function removePhotoRow(i: number) {
+    setPhotoRows((r) => r.filter((_, idx) => idx !== i));
+  }
+  // Dokładne dopasowanie nazwy z datalisty → productId; inaczej null.
+  function setPhotoProduct(i: number, query: string) {
+    const match = pickerProducts.find((p) => p.name === query) ?? null;
+    setPhotoRows((r) =>
+      r.map((row, idx) =>
+        idx === i ? { ...row, productQuery: query, productId: match?.id ?? null } : row
+      )
+    );
+  }
+  async function uploadPhotoForRow(i: number, file: File) {
+    setUploadingPhotoIdx(i);
+    setPhotoError(null);
+    try {
+      const toSend = await compressIfNeeded(file);
+      const res = await uploadProductImageFile(toSend);
+      if (res.ok) {
+        setPhotoRows((r) => r.map((row, idx) => (idx === i ? { ...row, url: res.url } : row)));
+      } else {
+        setPhotoError(res.error);
+      }
+    } finally {
+      setUploadingPhotoIdx(null);
     }
   }
 
@@ -376,6 +431,108 @@ function FabricForm({
           + Dodaj kolor
         </button>
       </div>
+
+      {/* Zdjęcia z produkcji — mebel uszyty w tej tkaninie, opcjonalnie
+          podpięty produkt (strona tkaniny: klikalna karta → /produkt/[id]). */}
+      <div className="flex flex-col gap-2">
+        <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
+          Zdjęcia z produkcji
+        </span>
+        <p className="text-[11px] text-[var(--muted)] -mt-1">
+          Prawdziwe zdjęcia mebli w tej tkaninie (sekcja &bdquo;Ta tkanina na
+          naszych meblach&rdquo; na stronie tkaniny). Produkt opcjonalny — z
+          produktem zdjęcie jest klikalne. Max 20.
+        </p>
+        <input
+          type="hidden"
+          name="production_photos_json"
+          readOnly
+          value={JSON.stringify(
+            photoRows
+              .filter((r) => r.url)
+              .map((r) => ({ url: r.url, product_id: r.productId }))
+          )}
+        />
+        {photoError && <p className="text-xs text-red-600">{photoError}</p>}
+        {photoRows.length === 0 && (
+          <span className="text-xs text-[var(--muted)] italic">
+            Brak zdjęć — dodaj pierwsze.
+          </span>
+        )}
+        <datalist id={productListId}>
+          {pickerProducts.map((p) => (
+            <option key={p.id} value={p.name} />
+          ))}
+        </datalist>
+        <div className="flex flex-col gap-2">
+          {photoRows.map((row, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-3 bg-[var(--bg)] border border-[var(--border)] rounded-lg p-2 flex-wrap"
+            >
+              <span className="relative w-16 h-12 shrink-0 rounded-lg overflow-hidden border border-[var(--border)] bg-[var(--card-bg)]">
+                {row.url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={row.url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="w-full h-full flex items-center justify-center text-[10px] text-[var(--muted)]">
+                    brak
+                  </span>
+                )}
+              </span>
+              <label className="shrink-0 px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors cursor-pointer">
+                {uploadingPhotoIdx === i ? "Wgrywam…" : row.url ? "Zmień" : "Zdjęcie"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploadingPhotoIdx !== null}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (f) uploadPhotoForRow(i, f);
+                  }}
+                />
+              </label>
+              <div className="flex-1 min-w-[12rem]">
+                <input
+                  value={row.productQuery}
+                  onChange={(e) => setPhotoProduct(i, e.target.value)}
+                  list={productListId}
+                  placeholder="produkt na zdjęciu (opcjonalnie)"
+                  className={inputCls}
+                />
+                <p className="text-[10px] mt-0.5 text-[var(--muted)]">
+                  {row.productId
+                    ? "✓ podpięty produkt"
+                    : row.productQuery
+                      ? "— nie rozpoznano (wybierz z listy)"
+                      : "bez produktu"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => removePhotoRow(i)}
+                aria-label="Usuń zdjęcie"
+                className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={addPhotoRow}
+          disabled={photoRows.length >= 20}
+          className="self-start px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors disabled:opacity-50"
+        >
+          + Dodaj zdjęcie
+        </button>
+      </div>
+
       <div className="flex gap-2 pt-2">
         <button
           type="submit"

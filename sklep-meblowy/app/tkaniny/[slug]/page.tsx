@@ -9,9 +9,11 @@ import { getEurRate } from "@/app/_lib/store-settings";
 import { formatMoney } from "@/app/_lib/money";
 import { sanitizeRichHtml, extractShortDescription } from "@/app/_lib/product-html";
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
+import { createAdminClient } from "@/app/_lib/supabase/server";
 
 // Strona tkaniny (spec 2026-07-21): opis + wzornik (siatka kolorów z
-// color_images) + plakietka grupy cenowej + link do /sklep z filtrem tkaniny.
+// color_images) + plakietka grupy cenowej + zdjęcia z produkcji (linkujące
+// do podpiętych aktywnych produktów, gdy dostępne).
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -49,6 +51,25 @@ export default async function TkaninaPage({ params }: Props) {
   const effective = (group?.surcharge ?? 0) + (fabric.price ?? 0);
   const description = pickLocalized(fabric.description ?? "", fabric.description_de, locale);
   const colors = (fabric.colors ?? []).map((c) => c.trim()).filter(Boolean);
+
+  // Zdjęcia z produkcji: defensywne ?? [] (stary cache bez kolumny) + tylko
+  // http(s). Podpięte produkty jednym zapytaniem; nieaktywne/nieznane → bez linku.
+  const photos = ((fabric.production_photos ?? []) as typeof fabric.production_photos).filter(
+    (p) => /^https?:\/\//.test(p.url)
+  );
+  const linkedIds = [...new Set(photos.map((p) => p.product_id).filter((x): x is string => !!x))];
+  let linkedProducts = new Map<string, { id: string; name: string; name_de: string | null }>();
+  if (linkedIds.length > 0) {
+    const supabase = await createAdminClient();
+    const { data } = await supabase
+      .from("products")
+      .select("id, name, name_de")
+      .eq("is_active", true)
+      .in("id", linkedIds);
+    linkedProducts = new Map(
+      ((data ?? []) as { id: string; name: string; name_de: string | null }[]).map((p) => [p.id, p])
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-16">
@@ -125,12 +146,43 @@ export default async function TkaninaPage({ params }: Props) {
         </section>
       )}
 
-      <LocalizedLink
-        href={`/sklep?tkanina=${encodeURIComponent(fabric.name)}`}
-        className="inline-block px-6 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
-      >
-        {t.fabrics.seeProducts}
-      </LocalizedLink>
+      {photos.length > 0 && (
+        <section>
+          <h2 className="font-display text-2xl font-bold text-[var(--fg)] mb-6">
+            {t.fabrics.productionHeading}
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+            {photos.map((p, i) => {
+              const product = p.product_id ? linkedProducts.get(p.product_id) : undefined;
+              const alt = product
+                ? pickLocalized(product.name, product.name_de, locale)
+                : pickLocalized(fabric.name, fabric.name_de, locale);
+              const img = (
+                <span className="relative block aspect-[4/3] rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--bg)]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.url} alt={alt} loading="lazy" className="w-full h-full object-cover" />
+                </span>
+              );
+              return product ? (
+                <LocalizedLink
+                  key={i}
+                  href={`/produkt/${product.id}`}
+                  className="group flex flex-col gap-2"
+                >
+                  {img}
+                  <span className="text-sm font-sans text-[var(--fg)] group-hover:text-[var(--color-gold)] transition-colors">
+                    {pickLocalized(product.name, product.name_de, locale)}
+                  </span>
+                </LocalizedLink>
+              ) : (
+                <div key={i} className="flex flex-col gap-2">
+                  {img}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
