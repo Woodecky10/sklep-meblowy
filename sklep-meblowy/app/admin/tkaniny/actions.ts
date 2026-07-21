@@ -79,14 +79,17 @@ function parseRichHtml(input: unknown): string | null {
 }
 
 // Walidacja serwerowa product_id w zdjęciach z produkcji: jedno zapytanie
-// in(); nieznane id → null (zdjęcie zostaje, link nie). Mutuje kopię wejścia.
+// in(); nieznane id → null (zdjęcie zostaje, link nie). Zwraca nową tablicę
+// (bez mutacji wejścia); przy błędzie zapytania zwraca zdjęcia bez zmian, żeby
+// przejściowy błąd DB nie wyzerował wszystkich istniejących linków.
 async function validatePhotoProducts(
   supabase: Awaited<ReturnType<typeof createAdminClient>>,
   photos: FabricProductionPhoto[]
 ): Promise<FabricProductionPhoto[]> {
   const ids = [...new Set(photos.map((p) => p.product_id).filter((x): x is string => !!x))];
   if (ids.length === 0) return photos;
-  const { data } = await supabase.from("products").select("id").in("id", ids);
+  const { data, error } = await supabase.from("products").select("id").in("id", ids);
+  if (error) return photos;
   const known = new Set(((data ?? []) as { id: string }[]).map((r) => r.id));
   return photos.map((p) =>
     p.product_id && !known.has(p.product_id) ? { ...p, product_id: null } : p
