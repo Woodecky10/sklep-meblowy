@@ -9,6 +9,8 @@ import { getEurRate } from "@/app/_lib/store-settings";
 import { formatMoney } from "@/app/_lib/money";
 import { sanitizeRichHtml, extractShortDescription } from "@/app/_lib/product-html";
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
+import FabricSwatchGrid from "@/app/_components/ui/FabricSwatchGrid";
+import FabricProductionPhotos from "@/app/_components/ui/FabricProductionPhotos";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 
 // Strona tkaniny (spec 2026-07-21): opis + wzornik (siatka kolorów z
@@ -71,6 +73,14 @@ export default async function TkaninaPage({ params }: Props) {
     );
   }
 
+  const productionPhotos = photos.map((p) => {
+    const prod = p.product_id ? linkedProducts.get(p.product_id) : undefined;
+    return {
+      url: p.url,
+      product: prod ? { id: prod.id, name: pickLocalized(prod.name, prod.name_de, locale) } : null,
+    };
+  });
+
   return (
     <div className="max-w-5xl mx-auto px-6 py-16">
       {/* Breadcrumb */}
@@ -123,26 +133,11 @@ export default async function TkaninaPage({ params }: Props) {
           <h2 className="font-display text-2xl font-bold text-[var(--fg)] mb-6">
             {t.fabrics.swatchHeading}
           </h2>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
-            {colors.map((code) => {
-              const img = fabric.color_images?.[code];
-              return (
-                <figure key={code} className="flex flex-col items-center gap-2 text-center">
-                  <span className="relative w-full aspect-square rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--bg)]">
-                    {img ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={img} alt={`${fabric.name} ${code}`} loading="lazy" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="w-full h-full flex items-center justify-center text-sm text-[var(--muted)]">
-                        {code}
-                      </span>
-                    )}
-                  </span>
-                  <figcaption className="text-xs text-[var(--muted)]">{code}</figcaption>
-                </figure>
-              );
-            })}
-          </div>
+          <FabricSwatchGrid
+            colors={colors}
+            images={fabric.color_images ?? {}}
+            name={pickLocalized(fabric.name, fabric.name_de, locale)}
+          />
         </section>
       )}
 
@@ -151,36 +146,10 @@ export default async function TkaninaPage({ params }: Props) {
           <h2 className="font-display text-2xl font-bold text-[var(--fg)] mb-6">
             {t.fabrics.productionHeading}
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-            {photos.map((p, i) => {
-              const product = p.product_id ? linkedProducts.get(p.product_id) : undefined;
-              const alt = product
-                ? pickLocalized(product.name, product.name_de, locale)
-                : pickLocalized(fabric.name, fabric.name_de, locale);
-              const img = (
-                <span className="relative block aspect-[4/3] rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--bg)]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.url} alt={alt} loading="lazy" className="w-full h-full object-cover" />
-                </span>
-              );
-              return product ? (
-                <LocalizedLink
-                  key={i}
-                  href={`/produkt/${product.id}`}
-                  className="group flex flex-col gap-2"
-                >
-                  {img}
-                  <span className="text-sm font-sans text-[var(--fg)] group-hover:text-[var(--color-gold)] transition-colors">
-                    {pickLocalized(product.name, product.name_de, locale)}
-                  </span>
-                </LocalizedLink>
-              ) : (
-                <div key={i} className="flex flex-col gap-2">
-                  {img}
-                </div>
-              );
-            })}
-          </div>
+          <FabricProductionPhotos
+            photos={productionPhotos}
+            fabricName={pickLocalized(fabric.name, fabric.name_de, locale)}
+          />
         </section>
       )}
     </div>
