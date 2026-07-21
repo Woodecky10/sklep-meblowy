@@ -27,6 +27,7 @@ function fab(name: string, category: string | null): Fabric {
     slug: slugify(name),
     description: null,
     description_de: null,
+    production_photos: [],
     created_at: "",
   };
 }
