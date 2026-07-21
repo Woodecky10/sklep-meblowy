@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
+import type { FabricValueMeta } from "./variants";
 
 // Mapa PL→DE nazw tkanin, seedowana z serwera w root layout (getFabricDeMap).
 // Komponenty klienckie renderujące wartość wariantu „Tkanina" biorą ją stąd.
@@ -36,4 +37,22 @@ export function FabricImageProvider({
 
 export function useFabricImages(): Record<string, string> {
   return useContext(FabricImageContext);
+}
+
+// Mapa wartość wariantu → metadane tkaniny (slug, grupa cenowa) — seed na
+// karcie produktu (getFabricMetaMap). Selektor grupuje próbki w karty grup.
+const FabricMetaContext = createContext<Record<string, FabricValueMeta>>({});
+
+export function FabricMetaProvider({
+  map,
+  children,
+}: {
+  map: Record<string, FabricValueMeta>;
+  children: ReactNode;
+}) {
+  return <FabricMetaContext.Provider value={map}>{children}</FabricMetaContext.Provider>;
+}
+
+export function useFabricMeta(): Record<string, FabricValueMeta> {
+  return useContext(FabricMetaContext);
 }

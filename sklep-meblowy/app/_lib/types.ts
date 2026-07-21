@@ -163,6 +163,20 @@ export type Bundle = {
 // wszystkie aktywne) — patrz bundles-server.ts.
 export type BundleWithComponents = Bundle & { components: Product[] };
 
+// Grupa cenowa tkanin (migracja 56) — 3 stałe wpisy (code niezmienny), nazwy
+// i kwota dopłaty edytowalne w adminie. Dopłata efektywna tkaniny =
+// surcharge grupy + fabrics.price (korekta). UWAGA: to INNY byt niż
+// FabricGroup z fabric-groups.ts (grupowanie po category w pickerze).
+export type FabricPriceGroup = {
+  id: string;
+  code: string;
+  name: string;
+  name_de: string | null;
+  surcharge: number;
+  sort_order: number;
+  created_at: string;
+};
+
 // Katalog tkanin (migracja 37) — reużywalny zbiór nazw używanych jako wartości
 // opcji wariantu „Tkanina". name_de null → na /de fallback do name.
 export type Fabric = {
@@ -178,6 +192,13 @@ export type Fabric = {
   sort_order: number;
   // Kategoria/typ do grupowania w pickerze wariantów (np. "welur"). Null = bez kategorii.
   category: string | null;
+  // Grupa cenowa (FK fabric_groups.id, NOT NULL — migracja 56).
+  group_id: string;
+  // Adres strony /tkaniny/[slug] — generowany z nazwy przy tworzeniu, stabilny.
+  slug: string;
+  // Opis na stronę tkaniny (sanityzowany HTML). description_de null → fallback PL.
+  description: string | null;
+  description_de: string | null;
   created_at: string;
 };
 

@@ -86,6 +86,21 @@ export type PlShape = {
     reviewGuardLoggedOutSuffix: string;
     reviewGuardNotPurchased: string;
   };
+  fabrics: {
+    eyebrow: string;
+    heading: string;
+    intro: string;
+    groupNoSurcharge: string;
+    colorsOne: string;
+    colorsFew: string;
+    colorsMany: string;
+    swatchHeading: string;
+    seeProducts: string;
+    typeLabel: string;
+    detailsLink: string;
+    otherGroupLabel: string;
+    notFoundTitle: string;
+  };
   cart: {
     empty: string;
     emptyHint: string;
@@ -415,6 +430,21 @@ export const pl = {
       ", a jeśli ten produkt jest w Twoich zamówieniach, zobaczysz tu formularz.",
     reviewGuardNotPurchased:
       "Opinię możesz dodać po dokonaniu zakupu tego produktu. Weryfikujemy autentyczność opinii na podstawie historii zamówień.",
+  },
+  fabrics: {
+    eyebrow: "Mollien",
+    heading: "Tkaniny",
+    intro: "Poznaj tkaniny dostępne w naszych meblach — pogrupowane według grup cenowych. Kliknij tkaninę, aby zobaczyć opis i pełny wzornik kolorów.",
+    groupNoSurcharge: "bez dopłaty",
+    colorsOne: "kolor",
+    colorsFew: "kolory",
+    colorsMany: "kolorów",
+    swatchHeading: "Wzornik kolorów",
+    seeProducts: "Zobacz produkty z tą tkaniną",
+    typeLabel: "Typ",
+    detailsLink: "szczegóły",
+    otherGroupLabel: "Pozostałe",
+    notFoundTitle: "Tkanina nie znaleziona",
   },
   cart: {
     empty: "Koszyk jest pusty",

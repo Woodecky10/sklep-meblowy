@@ -23,6 +23,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Dodajemy osobne wpisy /de i /de/sklep + wzajemne alternates na obu wpisach.
   const homeAlts = sitemapAlternates("/", { hasDe: true }, BASE).languages;
   const sklepAlts = sitemapAlternates("/sklep", { hasDe: true }, BASE).languages;
+  const tkaninyAlts = sitemapAlternates("/tkaniny", { hasDe: true }, BASE).languages;
 
   // Statyczne strony publiczne — kolejność = priorytet wizualny.
   // Info/legal (o-nas, kontakt, dostawa, zwroty, regulamin, prywatnosc) NIE
@@ -32,6 +33,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/de`,          lastModified: now, changeFrequency: "daily",   priority: 1.0, alternates: { languages: homeAlts } },
     { url: `${BASE}/sklep`,       lastModified: now, changeFrequency: "daily",   priority: 0.9, alternates: { languages: sklepAlts } },
     { url: `${BASE}/de/sklep`,    lastModified: now, changeFrequency: "daily",   priority: 0.9, alternates: { languages: sklepAlts } },
+    { url: `${BASE}/tkaniny`,     lastModified: now, changeFrequency: "weekly",  priority: 0.7, alternates: { languages: tkaninyAlts } },
+    { url: `${BASE}/de/tkaniny`,  lastModified: now, changeFrequency: "weekly",  priority: 0.7, alternates: { languages: tkaninyAlts } },
     { url: `${BASE}/o-nas`,       lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${BASE}/kontakt`,     lastModified: now, changeFrequency: "monthly", priority: 0.6 },
     { url: `${BASE}/dostawa`,     lastModified: now, changeFrequency: "monthly", priority: 0.5 },
@@ -166,7 +169,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ];
     });
 
-    return [...staticRoutes, ...categoryRoutes, ...collectionRoutes, ...productRoutes, ...pageRoutes, ...bundleRoutes];
+    // Tkaniny (spec 2026-07-21): strona /tkaniny/[slug]. DE tylko gdy name_de
+    // uzupełnione (opis i tak fallbackuje do PL — nie indeksujemy pół-polskich).
+    const { data: fabricRows } = await supabase
+      .from("fabrics")
+      .select("slug, name_de, created_at");
+    const fabricRoutes: MetadataRoute.Sitemap = (fabricRows ?? []).flatMap((f) => {
+      const fabric = f as { slug: string; name_de: string | null; created_at: string };
+      const plPath = `/tkaniny/${fabric.slug}`;
+      const hasDe = !!fabric.name_de && fabric.name_de.trim().length > 0;
+      const lastModified = new Date(fabric.created_at);
+      const alternates = { languages: sitemapAlternates(plPath, { hasDe }, BASE).languages };
+      const entries: MetadataRoute.Sitemap = [
+        { url: `${BASE}${plPath}`, lastModified, changeFrequency: "monthly", priority: 0.5, alternates },
+      ];
+      if (hasDe) {
+        entries.push({ url: `${BASE}/de${plPath}`, lastModified, changeFrequency: "monthly", priority: 0.5, alternates });
+      }
+      return entries;
+    });
+
+    return [...staticRoutes, ...categoryRoutes, ...collectionRoutes, ...productRoutes, ...pageRoutes, ...bundleRoutes, ...fabricRoutes];
   } catch (err) {
     // Kontrolne błędy Next (dynamic rendering, redirect itp.) mają lecieć
     // dalej — łapiemy wyłącznie realne awarie danych.
