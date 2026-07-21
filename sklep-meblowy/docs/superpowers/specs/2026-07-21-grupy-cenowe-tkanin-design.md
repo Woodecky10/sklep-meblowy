@@ -39,7 +39,7 @@ grup +250/+400 stałoby się realnym błędem.
 
 ## Model danych
 
-**Migracja `supabase/migrations/44_fabric_groups.sql`** (aplikowana automatycznie
+**Migracja `supabase/migrations/56_fabric_groups.sql`** (aplikowana automatycznie
 przy deployu; NIE aplikować ręcznie przez MCP — podłączony projekt = produkcja):
 
 - Nowa tabela `public.fabric_groups`:
@@ -158,7 +158,7 @@ revalidate 300) + `invalidateFabricGroupsCache`; `getFabricBySlug` = lookup w wy
 
 ## Pliki dotknięte
 
-- **Nowe:** `supabase/migrations/44_fabric_groups.sql`; `app/tkaniny/page.tsx`;
+- **Nowe:** `supabase/migrations/56_fabric_groups.sql`; `app/tkaniny/page.tsx`;
   `app/tkaniny/[slug]/page.tsx` (+ ewentualne wspólne komponenty katalogu).
 - **Edycja:** `app/_lib/types.ts` (`FabricPriceGroup`, rozszerzenie `Fabric`);
   `app/_lib/fabrics.ts` (grupy + slug lookup); `app/_lib/variants.ts`
