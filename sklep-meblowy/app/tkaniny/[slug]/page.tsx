@@ -14,8 +14,8 @@ import FabricFeaturedProducts from "@/app/_components/ui/FabricFeaturedProducts"
 import { createAdminClient } from "@/app/_lib/supabase/server";
 
 // Strona tkaniny (spec 2026-07-21): opis + wzornik (siatka kolorów z
-// color_images) + plakietka grupy cenowej + zdjęcia z produkcji (linkujące
-// do podpiętych aktywnych produktów, gdy dostępne).
+// color_images) + plakietka grupy cenowej + sekcja „Meble w tej tkaninie"
+// (wybrane produkty jako kafelki → /produkt/[id], gdy dostępne).
 
 type Props = { params: Promise<{ slug: string }> };
 
