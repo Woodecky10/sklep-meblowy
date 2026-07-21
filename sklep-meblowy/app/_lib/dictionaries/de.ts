@@ -104,7 +104,7 @@ export const de: DeepPartial<PlShape> = {
     colorsFew: "Farben",
     colorsMany: "Farben",
     swatchHeading: "Farbmuster",
-    productionHeading: "Dieser Stoff auf unseren Möbeln",
+    productionHeading: "Möbel in diesem Stoff",
     typeLabel: "Typ",
     detailsLink: "Details",
     otherGroupLabel: "Sonstige",

@@ -10,12 +10,12 @@ import { formatMoney } from "@/app/_lib/money";
 import { sanitizeRichHtml, extractShortDescription } from "@/app/_lib/product-html";
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import FabricSwatchGrid from "@/app/_components/ui/FabricSwatchGrid";
-import FabricProductionPhotos from "@/app/_components/ui/FabricProductionPhotos";
+import FabricFeaturedProducts from "@/app/_components/ui/FabricFeaturedProducts";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 
 // Strona tkaniny (spec 2026-07-21): opis + wzornik (siatka kolorów z
-// color_images) + plakietka grupy cenowej + zdjęcia z produkcji (linkujące
-// do podpiętych aktywnych produktów, gdy dostępne).
+// color_images) + plakietka grupy cenowej + sekcja „Meble w tej tkaninie"
+// (wybrane produkty jako kafelki → /produkt/[id], gdy dostępne).
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -54,32 +54,37 @@ export default async function TkaninaPage({ params }: Props) {
   const description = pickLocalized(fabric.description ?? "", fabric.description_de, locale);
   const colors = (fabric.colors ?? []).map((c) => c.trim()).filter(Boolean);
 
-  // Zdjęcia z produkcji: defensywne ?? [] (stary cache bez kolumny) + tylko
-  // http(s). Podpięte produkty jednym zapytaniem; nieaktywne/nieznane → bez linku.
-  const photos = ((fabric.production_photos ?? []) as typeof fabric.production_photos).filter(
-    (p) => /^https?:\/\//.test(p.url)
-  );
-  const linkedIds = [...new Set(photos.map((p) => p.product_id).filter((x): x is string => !!x))];
-  let linkedProducts = new Map<string, { id: string; name: string; name_de: string | null }>();
-  if (linkedIds.length > 0) {
+  // Wybrane produkty („Meble w tej tkaninie"): defensywne ?? [] (stary cache
+  // bez kolumny). Dociągnięcie jednym zapytaniem, tylko aktywne; kolejność wg
+  // zapisanej listy, nieznane/nieaktywne pominięte.
+  const featuredIds = [...new Set(fabric.featured_product_ids ?? [])];
+  let featuredProducts: { id: string; name: string; image: string | null }[] = [];
+  if (featuredIds.length > 0) {
     const supabase = await createAdminClient();
     const { data } = await supabase
       .from("products")
-      .select("id, name, name_de")
+      .select("id, name, name_de, images")
       .eq("is_active", true)
-      .in("id", linkedIds);
-    linkedProducts = new Map(
-      ((data ?? []) as { id: string; name: string; name_de: string | null }[]).map((p) => [p.id, p])
+      .in("id", featuredIds);
+    const byId = new Map(
+      (
+        (data ?? []) as {
+          id: string;
+          name: string;
+          name_de: string | null;
+          images: string[] | null;
+        }[]
+      ).map((p) => [p.id, p])
     );
+    featuredProducts = featuredIds
+      .map((id) => byId.get(id))
+      .filter((p): p is NonNullable<typeof p> => !!p)
+      .map((p) => ({
+        id: p.id,
+        name: pickLocalized(p.name, p.name_de, locale),
+        image: p.images?.[0] ?? null,
+      }));
   }
-
-  const productionPhotos = photos.map((p) => {
-    const prod = p.product_id ? linkedProducts.get(p.product_id) : undefined;
-    return {
-      url: p.url,
-      product: prod ? { id: prod.id, name: pickLocalized(prod.name, prod.name_de, locale) } : null,
-    };
-  });
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-16">
@@ -141,15 +146,12 @@ export default async function TkaninaPage({ params }: Props) {
         </section>
       )}
 
-      {photos.length > 0 && (
+      {featuredProducts.length > 0 && (
         <section>
           <h2 className="font-display text-2xl font-bold text-[var(--fg)] mb-6">
             {t.fabrics.productionHeading}
           </h2>
-          <FabricProductionPhotos
-            photos={productionPhotos}
-            fabricName={pickLocalized(fabric.name, fabric.name_de, locale)}
-          />
+          <FabricFeaturedProducts products={featuredProducts} />
         </section>
       )}
     </div>

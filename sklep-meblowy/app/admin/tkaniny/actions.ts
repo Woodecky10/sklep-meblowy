@@ -13,8 +13,7 @@ import {
   type FabricLite,
 } from "@/app/_lib/variants";
 import type { ProductVariants } from "@/app/_lib/types";
-import { parseProductionPhotos } from "@/app/_lib/fabric-production-photos";
-import type { FabricProductionPhoto } from "@/app/_lib/types";
+import { parseFeaturedProductIds } from "@/app/_lib/fabric-featured-products";
 
 export type ActionResult =
   | { ok: true; message?: string; data?: unknown }
@@ -78,22 +77,18 @@ function parseRichHtml(input: unknown): string | null {
   return clean === "" ? null : clean;
 }
 
-// Walidacja serwerowa product_id w zdjęciach z produkcji: jedno zapytanie
-// in(); nieznane id → null (zdjęcie zostaje, link nie). Zwraca nową tablicę
-// (bez mutacji wejścia); przy błędzie zapytania zwraca zdjęcia bez zmian, żeby
-// przejściowy błąd DB nie wyzerował wszystkich istniejących linków.
-async function validatePhotoProducts(
+// Walidacja serwerowa wybranych produktów: jedno zapytanie in(); zostają tylko
+// istniejące id (kolejność zachowana). Przy błędzie zapytania zwraca ids bez
+// zmian, żeby przejściowy błąd DB nie wyzerował wyboru admina.
+async function validateFeaturedProducts(
   supabase: Awaited<ReturnType<typeof createAdminClient>>,
-  photos: FabricProductionPhoto[]
-): Promise<FabricProductionPhoto[]> {
-  const ids = [...new Set(photos.map((p) => p.product_id).filter((x): x is string => !!x))];
-  if (ids.length === 0) return photos;
+  ids: string[]
+): Promise<string[]> {
+  if (ids.length === 0) return ids;
   const { data, error } = await supabase.from("products").select("id").in("id", ids);
-  if (error) return photos;
+  if (error) return ids;
   const known = new Set(((data ?? []) as { id: string }[]).map((r) => r.id));
-  return photos.map((p) =>
-    p.product_id && !known.has(p.product_id) ? { ...p, product_id: null } : p
-  );
+  return ids.filter((id) => known.has(id));
 }
 
 // Ile zapisów produktów leci równolegle w jednej porcji. Zamienia setki
@@ -175,10 +170,10 @@ export async function createFabric(formData: FormData): Promise<ActionResult> {
   if (!groupId) return { ok: false, error: "Wybierz grupę cenową" };
   const description = parseRichHtml(formData.get("description"));
   const descriptionDe = parseRichHtml(formData.get("description_de"));
-  const rawPhotos = parseProductionPhotos(formData.get("production_photos_json"));
+  const rawFeatured = parseFeaturedProductIds(formData.get("featured_product_ids_json"));
 
   const supabase = await createAdminClient();
-  const productionPhotos = await validatePhotoProducts(supabase, rawPhotos);
+  const featuredProductIds = await validateFeaturedProducts(supabase, rawFeatured);
   const { data: slugRows } = await supabase.from("fabrics").select("slug");
   const taken = new Set(
     ((slugRows ?? []) as { slug: string | null }[]).map((r) => r.slug ?? "")
@@ -190,7 +185,7 @@ export async function createFabric(formData: FormData): Promise<ActionResult> {
     .insert({
       name, name_de: nameDe, sort_order: sortOrder, colors, color_images, price, category,
       group_id: groupId, slug, description, description_de: descriptionDe,
-      production_photos: productionPhotos,
+      featured_product_ids: featuredProductIds,
     } as never)
     .select()
     .single();
@@ -223,16 +218,16 @@ export async function updateFabric(formData: FormData): Promise<ActionResult> {
   if (!groupId) return { ok: false, error: "Wybierz grupę cenową" };
   const description = parseRichHtml(formData.get("description"));
   const descriptionDe = parseRichHtml(formData.get("description_de"));
-  const rawPhotos = parseProductionPhotos(formData.get("production_photos_json"));
+  const rawFeatured = parseFeaturedProductIds(formData.get("featured_product_ids_json"));
 
   const supabase = await createAdminClient();
-  const productionPhotos = await validatePhotoProducts(supabase, rawPhotos);
+  const featuredProductIds = await validateFeaturedProducts(supabase, rawFeatured);
   const { error } = await supabase
     .from("fabrics")
     .update({
       name, name_de: nameDe, sort_order: sortOrder, colors, color_images, price, category,
       group_id: groupId, description, description_de: descriptionDe,
-      production_photos: productionPhotos,
+      featured_product_ids: featuredProductIds,
     } as never)
     .eq("id", id);
 

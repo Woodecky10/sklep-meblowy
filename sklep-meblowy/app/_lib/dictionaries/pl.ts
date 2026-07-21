@@ -440,7 +440,7 @@ export const pl = {
     colorsFew: "kolory",
     colorsMany: "kolorów",
     swatchHeading: "Wzornik kolorów",
-    productionHeading: "Ta tkanina na naszych meblach",
+    productionHeading: "Meble w tej tkaninie",
     typeLabel: "Typ",
     detailsLink: "szczegóły",
     otherGroupLabel: "Pozostałe",
