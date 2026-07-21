@@ -37,28 +37,32 @@ update public.fabrics
 alter table public.fabrics alter column group_id set not null;
 
 -- Slug: lower + polskie znaki + [^a-z0-9]+ → '-'; kolizje → sufiks -2, -3…
--- (ta sama semantyka co slugifyTitle w app/_lib/pages.ts).
+-- (ta sama semantyka co fabricSlug w app/_lib/fabric-slug.ts — bazowy slug,
+-- fallback 'tkanina' dla pustego, sufiks -2/-3… omijający KAŻDY już użyty
+-- slug w tabeli, globalnie unikalny, a nie tylko w obrębie tej samej bazy).
 alter table public.fabrics add column if not exists slug text;
 
-with base as (
-  select id,
-    trim(both '-' from regexp_replace(
-      translate(lower(name), 'ąćęłńóśźż', 'acelnoszz'),
-      '[^a-z0-9]+', '-', 'g'
-    )) as b
-  from public.fabrics
-), numbered as (
-  select id, b, row_number() over (partition by b order by id) as rn
-  from base
-)
-update public.fabrics f
-set slug = case
-  when n.b = ''    then 'tkanina-' || n.rn
-  when n.rn = 1    then n.b
-  else                  n.b || '-' || n.rn
-end
-from numbered n
-where n.id = f.id and f.slug is null;
+do $$
+declare
+  r record;
+  base text;
+  candidate text;
+  n int;
+begin
+  for r in select id, name from public.fabrics where slug is null order by id loop
+    base := trim(both '-' from regexp_replace(
+      translate(lower(r.name), 'ąćęłńóśźż', 'acelnoszz'),
+      '[^a-z0-9]+', '-', 'g'));
+    if base = '' then base := 'tkanina'; end if;
+    candidate := base;
+    n := 2;
+    while exists (select 1 from public.fabrics where slug = candidate) loop
+      candidate := base || '-' || n;
+      n := n + 1;
+    end loop;
+    update public.fabrics set slug = candidate where id = r.id;
+  end loop;
+end $$;
 
 alter table public.fabrics alter column slug set not null;
 create unique index if not exists fabrics_slug_key on public.fabrics (slug);

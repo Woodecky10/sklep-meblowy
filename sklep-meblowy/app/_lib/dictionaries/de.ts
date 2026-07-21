@@ -106,7 +106,6 @@ export const de: DeepPartial<PlShape> = {
     swatchHeading: "Farbmuster",
     seeProducts: "Produkte mit diesem Stoff ansehen",
     typeLabel: "Typ",
-    groupLabel: "Preisgruppe",
     detailsLink: "Details",
     otherGroupLabel: "Sonstige",
     notFoundTitle: "Stoff nicht gefunden",

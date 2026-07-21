@@ -97,7 +97,6 @@ export type PlShape = {
     swatchHeading: string;
     seeProducts: string;
     typeLabel: string;
-    groupLabel: string;
     detailsLink: string;
     otherGroupLabel: string;
     notFoundTitle: string;
@@ -441,7 +440,6 @@ export const pl = {
     swatchHeading: "Wzornik kolorów",
     seeProducts: "Zobacz produkty z tą tkaniną",
     typeLabel: "Typ",
-    groupLabel: "Grupa cenowa",
     detailsLink: "szczegóły",
     otherGroupLabel: "Pozostałe",
     notFoundTitle: "Tkanina nie znaleziona",
