@@ -6,6 +6,7 @@ import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import type { Product } from "@/app/_lib/types";
 import { effectivePrice } from "@/app/_lib/pricing";
+import { getVariantImages } from "@/app/_lib/variants";
 
 type Props = {
   product: Product;
@@ -52,7 +53,9 @@ export default function AddToCartButton({
       id: product.id,
       name: product.name,
       price,
-      image: product.images?.[0] ?? "",
+      // Zdjęcie pozycji = pierwsze zdjęcie aktualnej galerii (wariantowe, gdy
+      // wybrana wartość ma value_images; inaczej pierwsze zdjęcie produktu).
+      image: getVariantImages(product, selectedValues ?? {})[0] ?? "",
       quantity: 1,
       variantValues: hasSelection ? selectedValues : undefined,
       category: product.category,

@@ -21,6 +21,10 @@ export type ProductOption = {
   name: string;
   values: string[];
   value_prices?: Record<string, number>;
+  // Zdjęcia per wartość opcji (np. mebel w danej tkaninie) — po wyborze
+  // wartości idą na początek galerii na karcie produktu (getVariantImages).
+  // Brak wpisu = brak zdjęć wariantowych. Puste tablice nie są zapisywane.
+  value_images?: Record<string, string[]>;
   // Admin zaznaczył „Filtr w sklepie" — opcja pojawia się jako filtr na /sklep
   // (facety liczone w getFacetSource). Brak/false = opcja nie filtruje.
   filterable?: boolean;

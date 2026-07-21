@@ -157,6 +157,8 @@ export type PlShape = {
     removeBundle: string;
     discountLine: string;
     promoExcluded: string;
+    thisProduct: string;
+    bundlePriceFrom: string;
   };
   common: {
     loading: string;
@@ -501,6 +503,8 @@ export const pl = {
     removeBundle: "Usuń zestaw",
     discountLine: "Rabat za zestaw",
     promoExcluded: "Kod rabatowy nie obejmuje produktów kupionych w zestawie",
+    thisProduct: "ten produkt",
+    bundlePriceFrom: "Cena zestawu: od",
   },
   common: {
     loading: "Ładowanie…",

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { COMPANY, formatFullAddress } from "@/app/_lib/company";
+import { getContactInfo } from "@/app/_lib/contact-server";
 import { getLocale } from "@/app/_lib/i18n-server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -21,6 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ZwrotyPage() {
   const locale = await getLocale();
   const de = locale === "de";
+  const contact = await getContactInfo();
 
   const c = de
     ? {
@@ -72,7 +74,7 @@ export default async function ZwrotyPage() {
         formIntroAfter: " oder per Post an die Adresse des Verkäufers senden:",
         formTemplate: `An: ${COMPANY.legalName}
 ${formatFullAddress(locale)}
-E-Mail: ${COMPANY.email}
+E-Mail: ${contact.email}
 
 Ich/Wir, der/die Unterzeichnende [VOR- UND NACHNAME], teile/teilen hiermit den Widerruf des Kaufvertrags über folgende Produkte mit:
 
@@ -138,7 +140,7 @@ Unterschrift (nur bei Übermittlung des Formulars in Papierform): ..............
         formIntroAfter: " lub pocztą na adres Sprzedawcy:",
         formTemplate: `Do: ${COMPANY.legalName}
 ${formatFullAddress(locale)}
-E-mail: ${COMPANY.email}
+E-mail: ${contact.email}
 
 Ja, niżej podpisany/a [IMIĘ I NAZWISKO], niniejszym informuję o odstąpieniu od umowy sprzedaży następujących produktów:
 
@@ -173,7 +175,7 @@ Podpis (tylko jeżeli formularz jest przesyłany w wersji papierowej): .........
       <ol>
         <li>
           {c.howStep1Before}
-          <strong>{COMPANY.email}</strong>
+          <strong>{contact.email}</strong>
           {c.howStep1After}
           <a href="#wzor-odstapienia">{c.howStep1Link}</a>
           {c.howStep1End}
@@ -209,7 +211,7 @@ Podpis (tylko jeżeli formularz jest przesyłany w wersji papierowej): .........
       <ol>
         <li>
           {c.complaintStep1Before}
-          <strong>{COMPANY.email}</strong>
+          <strong>{contact.email}</strong>
           {c.complaintStep1After}
         </li>
         <li>{c.complaintStep2}</li>
@@ -223,7 +225,7 @@ Podpis (tylko jeżeli formularz jest przesyłany w wersji papierowej): .........
       <h2 id="wzor-odstapienia">{c.h2Form}</h2>
       <p>
         {c.formIntroBefore}
-        <strong>{COMPANY.email}</strong>
+        <strong>{contact.email}</strong>
         {c.formIntroAfter}
       </p>
       <div

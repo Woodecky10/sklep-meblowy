@@ -7,6 +7,7 @@ import { getDictionary } from "@/app/_lib/dictionaries";
 import { getSiteTexts, siteText } from "@/app/_lib/site-texts";
 import { getMenuItems } from "@/app/_lib/menu-server";
 import { prepareMenuItems } from "@/app/_lib/menu";
+import { getContactInfo } from "@/app/_lib/contact-server";
 
 export default async function Footer() {
   const locale = await getLocale();
@@ -17,6 +18,7 @@ export default async function Footer() {
     getSiteTexts(),
     getMenuItems(),
   ]);
+  const contact = await getContactInfo();
   const tagline = siteText(texts, "footer_tagline", locale, t.footer.tagline);
   const footerItems = prepareMenuItems(menuRows, "footer", locale);
 
@@ -51,11 +53,11 @@ export default async function Footer() {
             {tagline}
           </p>
           <p className="text-xs text-white/70 leading-relaxed">
-            {COMPANY.email}
-            {COMPANY.phone && (
+            {contact.email}
+            {contact.phone && (
               <>
                 <br />
-                {COMPANY.phone}
+                {contact.phone}
               </>
             )}
           </p>

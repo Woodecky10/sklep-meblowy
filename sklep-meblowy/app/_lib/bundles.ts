@@ -131,15 +131,31 @@ export function eligiblePromoBase(
   return items.reduce((s, i) => (i.bundle ? s : s + i.subtotal), 0);
 }
 
-// „Oszczędzasz od X zł" na kartach produktów: minimalny rabat liczony od sumy
-// bazowych cen efektywnych składników (bez dopłat opcji), qty = 1.
+// Cennik zestawu na kartę produktu: suma bazowych cen efektywnych składników
+// (bez dopłat opcji, qty=1 — stąd „od" w UI), cena po rabacie i oszczędność.
+// discounted zaokrąglone do groszy (savings zaokrągla computeBundleDiscount).
+export function minBundlePricing(
+  componentBasePrices: number[],
+  type: BundleDiscountType,
+  value: number
+): { base: number; discounted: number; savings: number } {
+  const base = componentBasePrices.reduce((s, p) => s + p, 0);
+  const savings = computeBundleDiscount(base, 1, type, value);
+  return {
+    base,
+    discounted: Math.round((base - savings) * 100) / 100,
+    savings,
+  };
+}
+
+// „Oszczędzasz od X zł" na kartach produktów: minimalny rabat od sumy
+// bazowych cen efektywnych składników (patrz minBundlePricing).
 export function minBundleSavings(
   componentBasePrices: number[],
   type: BundleDiscountType,
   value: number
 ): number {
-  const base = componentBasePrices.reduce((s, p) => s + p, 0);
-  return computeBundleDiscount(base, 1, type, value);
+  return minBundlePricing(componentBasePrices, type, value).savings;
 }
 
 export type CartBundleGroup<T> = {

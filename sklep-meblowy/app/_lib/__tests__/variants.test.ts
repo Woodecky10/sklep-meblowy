@@ -212,3 +212,50 @@ describe("rebuildFabricValuePrices", () => {
     expect(res.variants.options[0].value_prices).toBeUndefined();
   });
 });
+
+// Produkt ze zdjęciami per wartość opcji (value_images) — galeria wariantowa.
+const productWithValueImages = {
+  id: "p2", name: "Sofa", price: 2000, stock: 5,
+  sale_price: null, omnibus_price: null, images: ["prod1.jpg", "prod2.jpg"],
+  variants: {
+    options: [
+      {
+        name: "Tkanina",
+        values: ["Sawana 21", "Riviera 16"],
+        value_images: { "Riviera 16": ["riv1.jpg", "riv2.jpg"] },
+      },
+      {
+        name: "Strona",
+        values: ["Lewa", "Prawa"],
+        value_images: { Lewa: ["lewa.jpg", "prod1.jpg"] },
+      },
+    ],
+  },
+} as unknown as Product;
+
+describe("getVariantImages — zdjęcia per wartość opcji (value_images)", () => {
+  it("brak wyboru → galeria produktu", () => {
+    expect(getVariantImages(productWithValueImages, {})).toEqual([
+      "prod1.jpg", "prod2.jpg",
+    ]);
+  });
+  it("wybrana wartość ze zdjęciami → zdjęcia wariantu na początku + galeria produktu", () => {
+    expect(
+      getVariantImages(productWithValueImages, { Tkanina: "Riviera 16" })
+    ).toEqual(["riv1.jpg", "riv2.jpg", "prod1.jpg", "prod2.jpg"]);
+  });
+  it("wybrana wartość bez zdjęć → galeria produktu jak dotychczas", () => {
+    expect(
+      getVariantImages(productWithValueImages, { Tkanina: "Sawana 21" })
+    ).toEqual(["prod1.jpg", "prod2.jpg"]);
+  });
+  it("dwie opcje ze zdjęciami → kolejność wg kolejności opcji + dedup z galerią", () => {
+    expect(
+      getVariantImages(productWithValueImages, { Tkanina: "Riviera 16", Strona: "Lewa" })
+    ).toEqual(["riv1.jpg", "riv2.jpg", "lewa.jpg", "prod1.jpg", "prod2.jpg"]);
+  });
+  it("produkt bez variants → galeria produktu", () => {
+    const p = { ...productWithValueImages, variants: null } as unknown as Product;
+    expect(getVariantImages(p, {})).toEqual(["prod1.jpg", "prod2.jpg"]);
+  });
+});

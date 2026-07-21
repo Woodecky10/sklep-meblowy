@@ -65,12 +65,33 @@ export function formatVariantLabel(
     .join(", ");
 }
 
-// Zdjęcia do pokazania klientowi: galeria produktu (model produktowy).
+// Zdjęcia do pokazania klientowi: zdjęcia wybranych wartości opcji
+// (value_images, w kolejności opcji) na początku, po nich galeria produktu;
+// deduplikacja URL-i (pierwsze wystąpienie wygrywa). Brak wyboru / brak zdjęć
+// wariantowych → galeria produktu jak dotychczas.
 export function getVariantImages(
   product: Product,
-  _selectedValues: Record<string, string>
+  selectedValues: Record<string, string>
 ): string[] {
-  return product.images ?? [];
+  const variantImages: string[] = [];
+  for (const opt of product.variants?.options ?? []) {
+    const v = selectedValues[opt.name];
+    if (v == null) continue;
+    const imgs = opt.value_images?.[v];
+    if (!Array.isArray(imgs)) continue;
+    for (const url of imgs) {
+      if (typeof url === "string" && url) variantImages.push(url);
+    }
+  }
+  if (variantImages.length === 0) return product.images ?? [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const url of [...variantImages, ...(product.images ?? [])]) {
+    if (seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+  }
+  return out;
 }
 
 // Display name opcji — jeśli admin nadpisał ("Wariant" → "Kolor"), użyj override.
