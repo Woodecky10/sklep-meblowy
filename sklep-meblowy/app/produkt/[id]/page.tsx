@@ -184,6 +184,13 @@ export default async function ProduktPage({ params }: Props) {
     if (DEDICATED_KEYS.has(f.key.toLowerCase().trim())) continue;
     details.push({ label: f.key, value: f.value });
   }
+  // Cała specyfikacja alfabetycznie A-Z po etykiecie (pola stałe + parametry
+  // razem). Collation "pl", nieczuła na wielkość liter/diakrytyki, z sortem
+  // numerycznym (spójnie z sortVariantValues). Nie mutuje danych źródłowych —
+  // `details` to lokalna tablica budowana w tym renderze.
+  details.sort((a, b) =>
+    a.label.localeCompare(b.label, "pl", { numeric: true, sensitivity: "base" })
+  );
 
   // Structured data dla Google (schema.org/Product) — rich snippets w SERP-ach:
   // cena, dostępność, gwiazdki/ocena prosto w wynikach wyszukiwania.
