@@ -364,20 +364,28 @@ export default function ProductEditor({
             <div className="flex flex-col gap-2">
               {featureRows.map((row, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <input
-                    value={row.key}
-                    onChange={(e) => setFeatureKey(i, e.target.value)}
-                    placeholder="np. Wypełnienie"
-                    maxLength={100}
-                    className={`${inputClass} w-2/5`}
-                  />
-                  <input
-                    value={row.value}
-                    onChange={(e) => setFeatureValue(i, e.target.value)}
-                    placeholder="np. Pianka HR"
-                    maxLength={300}
-                    className={`${inputClass} flex-1`}
-                  />
+                  {/* Wrappery nadają szerokość; input zostaje z inputClass (w-full)
+                      i wypełnia wrapper. Bez tego w-full z inputClass kłóciło się
+                      z w-2/5/flex-1 na inpucie → pole wartości zapadało się do ~25px
+                      i wpisany tekst był niewidoczny. min-w-0 pozwala flex-1 zwężać. */}
+                  <div className="w-2/5">
+                    <input
+                      value={row.key}
+                      onChange={(e) => setFeatureKey(i, e.target.value)}
+                      placeholder="np. Wypełnienie"
+                      maxLength={100}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <input
+                      value={row.value}
+                      onChange={(e) => setFeatureValue(i, e.target.value)}
+                      placeholder="np. Pianka HR"
+                      maxLength={300}
+                      className={inputClass}
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={() => removeFeatureRow(i)}
