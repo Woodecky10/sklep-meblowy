@@ -16,6 +16,7 @@ import DescriptionFieldEditor from "./DescriptionFieldEditor";
 import TranslationEditor, { type ProductDeFields } from "./TranslationEditor";
 import SizeGroupEditor from "./SizeGroupEditor";
 import type { SizeGroupMember } from "@/app/_lib/products";
+import { MAX_FEATURES } from "@/app/_lib/product-features";
 
 export default function ProductEditor({
   product,
@@ -37,6 +38,25 @@ export default function ProductEditor({
   // sukcesie. Bez tego imagesDirty liczone względem propa product.images
   // (niezmiennego bez reloadu) wisiało jako true po zapisie (audyt LOW).
   const [savedImages, setSavedImages] = useState<string[]>(product.images ?? []);
+  // Parametry produktu (specyfikacja) — wiersze klucz→wartość, seed z
+  // product.features (importowane nie giną); serializacja do hidden
+  // features_json w formularzu „Podstawowe dane" (wspólny przycisk zapisu).
+  type FeatureRow = { key: string; value: string };
+  const [featureRows, setFeatureRows] = useState<FeatureRow[]>(() =>
+    (product.features ?? []).map((f) => ({ key: f.key, value: f.value }))
+  );
+  function addFeatureRow() {
+    setFeatureRows((r) => [...r, { key: "", value: "" }]);
+  }
+  function removeFeatureRow(i: number) {
+    setFeatureRows((r) => r.filter((_, idx) => idx !== i));
+  }
+  function setFeatureKey(i: number, key: string) {
+    setFeatureRows((r) => r.map((row, idx) => (idx === i ? { ...row, key } : row)));
+  }
+  function setFeatureValue(i: number, value: string) {
+    setFeatureRows((r) => r.map((row, idx) => (idx === i ? { ...row, value } : row)));
+  }
   const [toast, setToast] = useState<Toast>(null);
   const [savingBasics, startBasicsTransition] = useTransition();
   const [savingImages, startImagesTransition] = useTransition();
@@ -316,6 +336,70 @@ export default function ProductEditor({
               className={`${inputClass} resize-y`}
             />
           </Field>
+
+          {/* Parametry produktu — dowolne pary klucz→wartość doklejane do
+              sekcji „Specyfikacja" pod zdjęciem (kolumna products.features). */}
+          <div className="md:col-span-2 flex flex-col gap-2 pt-2 border-t border-[var(--border)]">
+            <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
+              Parametry produktu
+            </span>
+            <p className="text-[11px] text-[var(--muted)] -mt-1">
+              Wyświetlane w sekcji &bdquo;Specyfikacja&rdquo; pod zdjęciem. Nazwy: Kolor,
+              Materiał, Wymiary, Waga, Konstrukcja, Czas realizacji, Gwarancja są na
+              karcie pomijane (mają dedykowane pola wyżej) &mdash; nie dubluj. Max {MAX_FEATURES}.
+            </p>
+            <input
+              type="hidden"
+              name="features_json"
+              readOnly
+              value={JSON.stringify(
+                featureRows.filter((r) => r.key.trim() && r.value.trim())
+              )}
+            />
+            {featureRows.length === 0 && (
+              <span className="text-xs text-[var(--muted)] italic">
+                Brak parametrów &mdash; dodaj pierwszy.
+              </span>
+            )}
+            <div className="flex flex-col gap-2">
+              {featureRows.map((row, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    value={row.key}
+                    onChange={(e) => setFeatureKey(i, e.target.value)}
+                    placeholder="np. Wypełnienie"
+                    maxLength={100}
+                    className={`${inputClass} w-2/5`}
+                  />
+                  <input
+                    value={row.value}
+                    onChange={(e) => setFeatureValue(i, e.target.value)}
+                    placeholder="np. Pianka HR"
+                    maxLength={300}
+                    className={`${inputClass} flex-1`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeFeatureRow(i)}
+                    aria-label="Usuń parametr"
+                    className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={addFeatureRow}
+              disabled={featureRows.length >= MAX_FEATURES}
+              className="self-start px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors disabled:opacity-50"
+            >
+              + Dodaj parametr
+            </button>
+          </div>
 
           <div className="md:col-span-2 flex justify-end pt-2">
             <button

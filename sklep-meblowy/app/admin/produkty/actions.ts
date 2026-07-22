@@ -20,6 +20,7 @@ import { recordPriceHistory } from "@/app/_lib/price-history";
 import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-html";
 import { buildGroupKey, pickGroupKey } from "@/app/_lib/size-groups";
 import { normalizeDeliveryTime, normalizeWarranty } from "@/app/_lib/spec-format";
+import { parseFeatureRows } from "@/app/_lib/product-features";
 import type {
   ActionResult,
   ProductDescriptionSection,
@@ -187,6 +188,9 @@ export async function updateProductBasics(
     delivery_time: emptyToNull(normalizeDeliveryTime(sanitize(formData.get("delivery_time"), 100))),
     warranty: emptyToNull(normalizeWarranty(sanitize(formData.get("warranty"), 100))),
     sale_price: salePriceToSave,
+    // Parametry produktu (sekcja Specyfikacja) — pełny stan wierszy z
+    // formularza nadpisuje całą tablicę (spójnie z resztą pól sekcji).
+    features: parseFeatureRows(formData.get("features_json")),
   };
 
   const { error } = await supabase
