@@ -170,8 +170,15 @@ export default function ProductEditor({
           Sekcja: Podstawowe dane
           ============================================================ */}
       <CollapsibleSection title="Podstawowe dane" storageKey="podstawowe">
+        {/* onSubmit zamiast action: React 19 po zakończeniu akcji formularza robi
+            automatyczny form.reset(), który cofa niekontrolowany <select> kategorii
+            do wartości z mountu (a ponowny zapis odsyłałby starą kategorię do bazy). */}
         <form
-          action={(fd) => startBasicsTransition(async () => handleResult(await updateProductBasics(fd)))}
+          onSubmit={(e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            startBasicsTransition(async () => handleResult(await updateProductBasics(fd)));
+          }}
           className="grid grid-cols-1 md:grid-cols-2 gap-4"
         >
           <input type="hidden" name="id" value={product.id} />
