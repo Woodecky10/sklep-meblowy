@@ -271,27 +271,33 @@ export default function VariantsEditor({
       }
       const res = await updateProductVariants(productId, toSave);
       if (res.ok) {
-        // Zbierz info dla par (opcja,wartosc) tego produktu (z aktualnych opcji).
-        // Dedupe po variantInfoKey — dwie opcje o tej samej nazwie dawałyby
-        // duplikat pary w jednym batchu upsert (Postgres: "ON CONFLICT ...
-        // cannot affect row a second time"). Zachowaj ostatni wpis dla klucza.
-        const pairsByKey = new Map<
-          string,
-          { option_name: string; value: string; info: string; info_de: string }
-        >();
-        for (const o of toSave?.options ?? []) {
-          for (const v of o.values) {
-            const e = variantInfo[variantInfoKey(o.name, v)];
-            pairsByKey.set(variantInfoKey(o.name, v), {
-              option_name: o.name,
-              value: v,
-              info: e?.info ?? "",
-              info_de: e?.info_de ?? "",
-            });
+        if (!infoDirty) {
+          // Nic w info nie zmieniono (np. zapis samej ceny) — nie wywoluj
+          // upsertVariantInfo wcale, zeby nie kasowac par, ktorych admin
+          // nigdy nie dotknal w tej sesji (variantInfo jest zasiane z
+          // 300s-cache'owanej globalnej mapy, wiec moze byc nieaktualne).
+          onToast({ type: "success", message: res.message ?? "Zapisano warianty" });
+          setVariants(toSave);
+          return;
+        }
+        // Rekoncyliacja TYLKO par faktycznie dotknietych w tej sesji: diff
+        // variantInfo vs savedVariantInfo. Zmienione/dodane pary → upsert,
+        // pary usuniete z variantInfo wzgledem baseline → DELETE (info: "").
+        // Klucze sa unikalne (Map/object), wiec bez dodatkowego dedupe.
+        const entries: { option_name: string; value: string; info: string; info_de: string }[] = [];
+        for (const [key, entry] of Object.entries(variantInfo)) {
+          if (JSON.stringify(entry) !== JSON.stringify(savedVariantInfo[key])) {
+            const [option_name, value] = key.split(" ");
+            entries.push({ option_name, value, info: entry.info, info_de: entry.info_de ?? "" });
           }
         }
-        const pairs = [...pairsByKey.values()];
-        const infoRes = await upsertVariantInfo(productId, pairs);
+        for (const key of Object.keys(savedVariantInfo)) {
+          if (!(key in variantInfo)) {
+            const [option_name, value] = key.split(" ");
+            entries.push({ option_name, value, info: "", info_de: "" });
+          }
+        }
+        const infoRes = await upsertVariantInfo(productId, entries);
         onToast({
           type: infoRes.ok ? "success" : "error",
           message: infoRes.ok ? (res.message ?? "Zapisano warianty") : infoRes.error,
