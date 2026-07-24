@@ -99,6 +99,9 @@ export function localizeFeatureFacets(
 // selected: slug → wybrane wartości. Produkt pasuje, gdy dla KAŻDEJ grupy ma
 // parametr o tym slugu z ≥1 wybraną wartością (OR w grupie, AND między
 // grupami). Brak parametru = brak dopasowania (spójnie z opcjami/tkaniną).
+// Dopasowanie wartości bez rozróżniania wielkości liter — spójnie z dedupe
+// facetów (collectFeatureFacets), inaczej "Tak" vs "TAK" gubiłyby produkty;
+// klucz i tak jest case-insensitive przez slug.
 export function productMatchesFeatureFilters(
   features: unknown,
   selected: Record<string, string[]>
@@ -110,9 +113,9 @@ export function productMatchesFeatureFilters(
     const values = new Set<string>();
     for (const { key, value } of entries) {
       if (optionParamSlug(key) !== slug) continue;
-      values.add(value);
+      values.add(value.toLowerCase());
     }
-    if (!wanted.some((w) => values.has(w))) return false;
+    if (!wanted.some((w) => values.has(w.trim().toLowerCase()))) return false;
   }
   return true;
 }

@@ -73,6 +73,18 @@ describe("collectFeatureFacets", () => {
     ]);
   });
 
+  it("dedupe wartości case-insensitive (pierwsza pisownia wygrywa)", () => {
+    const out = collectFeatureFacets(
+      rows(
+        [{ key: "Pojemnik na pościel", value: "Tak" }],
+        [{ key: "Pojemnik na pościel", value: "TAK" }]
+      )
+    );
+    expect(out).toEqual([
+      { slug: "pojemnik-na-posciel", name: "Pojemnik na pościel", values: ["Tak"] },
+    ]);
+  });
+
   it("puste grupy wypadają (brak danych → [])", () => {
     expect(collectFeatureFacets([])).toEqual([]);
   });
@@ -126,6 +138,18 @@ describe("productMatchesFeatureFilters", () => {
         "wysokosc-nozek": ["15 cm"],
       })
     ).toBe(false);
+  });
+  it("dopasowanie wartości case-insensitive (Tak ↔ TAK)", () => {
+    expect(
+      productMatchesFeatureFilters([{ key: "Pojemnik na pościel", value: "TAK" }], {
+        "pojemnik-na-posciel": ["Tak"],
+      })
+    ).toBe(true);
+    expect(
+      productMatchesFeatureFilters([{ key: "Pojemnik na pościel", value: "Tak" }], {
+        "pojemnik-na-posciel": ["TAK"],
+      })
+    ).toBe(true);
   });
   it("brak parametru / śmieciowe features przy aktywnej grupie → false", () => {
     expect(
