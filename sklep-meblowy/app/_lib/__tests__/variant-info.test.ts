@@ -8,7 +8,7 @@ import {
 
 describe("variantInfoKey", () => {
   it("łączy opcję i wartość stabilnym separatorem (NUL)", () => {
-    expect(variantInfoKey("Tkanina", "Baloo 2071")).toBe("Tkanina Baloo 2071");
+    expect(variantInfoKey("Tkanina", "Baloo 2071")).toBe("Tkanina\u0000Baloo 2071");
   });
   it("różne pary → różne klucze; te same → ten sam", () => {
     expect(variantInfoKey("Kolor nóżek", "Złote")).not.toBe(variantInfoKey("Rama", "Złote"));

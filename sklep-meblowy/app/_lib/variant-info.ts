@@ -15,10 +15,10 @@ export type VariantInfoEntry = { info: string; info_de: string | null };
 // Limit długości krótkiej informacji (tooltip).
 export const VARIANT_INFO_MAX_LEN = 200;
 
-// Stabilny klucz pary opcja+wartość. Separator NUL ( ) nie występuje w
-// nazwach opcji ani wartościach — brak kolizji.
+// Stabilny klucz pary opcja+wartość. Separator NUL (\u0000) nigdy nie
+// występuje w nazwach opcji ani wartościach — brak kolizji.
 export function variantInfoKey(optionName: string, value: string): string {
-  return `${optionName} ${value}`;
+  return `${optionName}\u0000${value}`;
 }
 
 // Buduje mapę klucz → {info, info_de} z wierszy DB. Pomija wpisy bez treści PL
