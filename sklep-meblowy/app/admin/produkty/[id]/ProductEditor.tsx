@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -27,6 +27,7 @@ export default function ProductEditor({
   fabrics,
   fabricGroups,
   variantInfo,
+  featureKeySuggestions,
 }: {
   product: Product;
   categories: CategoryDef[];
@@ -35,6 +36,8 @@ export default function ProductEditor({
   fabrics: Fabric[];
   fabricGroups: FabricPriceGroup[];
   variantInfo: Record<string, VariantInfoEntry>;
+  // Podpowiedzi nazw parametrów — dropdown „+ Wybierz z listy".
+  featureKeySuggestions: string[];
 }) {
   const [images, setImages] = useState<string[]>(product.images ?? []);
   // Baseline ostatnio zapisanej galerii — resetowany na zapisany payload po
@@ -49,6 +52,7 @@ export default function ProductEditor({
     (product.features ?? []).map((f) => ({ key: f.key, value: f.value }))
   );
   function addFeatureRow() {
+    setPickerOpen(false);
     setFeatureRows((r) => [...r, { key: "", value: "" }]);
   }
   function removeFeatureRow(i: number) {
@@ -60,6 +64,41 @@ export default function ProductEditor({
   function setFeatureValue(i: number, value: string) {
     setFeatureRows((r) => r.map((row, idx) => (idx === i ? { ...row, value } : row)));
   }
+  // Dropdown „+ Wybierz z listy": nazwy z featureKeySuggestions minus już
+  // obecne w wierszach (trim + case-insensitive). Wybór dodaje wiersz z nazwą
+  // i fokusuje pole wartości (pendingFocusIdx odczytywany w ref callbacku).
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement | null>(null);
+  const pendingFocusIdx = useRef<number | null>(null);
+  const usedFeatureKeys = new Set(
+    featureRows.map((r) => r.key.trim().toLowerCase())
+  );
+  const availableSuggestions = featureKeySuggestions.filter(
+    (k) => !usedFeatureKeys.has(k.toLowerCase())
+  );
+  function addFeatureRowFromList(key: string) {
+    if (featureRows.length >= MAX_FEATURES) return;
+    pendingFocusIdx.current = featureRows.length;
+    setFeatureRows((r) => [...r, { key, value: "" }]);
+    setPickerOpen(false);
+  }
+  useEffect(() => {
+    if (!pickerOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setPickerOpen(false);
+    }
+    function onMouseDown(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("mousedown", onMouseDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onMouseDown);
+    };
+  }, [pickerOpen]);
   const [toast, setToast] = useState<Toast>(null);
   const [savingBasics, startBasicsTransition] = useTransition();
   const [savingImages, startImagesTransition] = useTransition();
@@ -389,6 +428,12 @@ export default function ProductEditor({
                   </div>
                   <div className="flex-1 min-w-0">
                     <input
+                      ref={(el) => {
+                        if (el && pendingFocusIdx.current === i) {
+                          pendingFocusIdx.current = null;
+                          el.focus();
+                        }
+                      }}
                       value={row.value}
                       onChange={(e) => setFeatureValue(i, e.target.value)}
                       placeholder="np. Pianka HR"
@@ -409,14 +454,52 @@ export default function ProductEditor({
                 </div>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={addFeatureRow}
-              disabled={featureRows.length >= MAX_FEATURES}
-              className="self-start px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors disabled:opacity-50"
-            >
-              + Dodaj parametr
-            </button>
+            <div className="flex items-center gap-2">
+              <div className="relative" ref={pickerRef}>
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen((o) => !o)}
+                  disabled={featureRows.length >= MAX_FEATURES || availableSuggestions.length === 0}
+                  aria-expanded={pickerOpen}
+                  aria-haspopup="listbox"
+                  title={
+                    availableSuggestions.length === 0
+                      ? "Wszystkie nazwy z listy są już dodane"
+                      : undefined
+                  }
+                  className="px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors disabled:opacity-50"
+                >
+                  + Wybierz z listy ▾
+                </button>
+                {pickerOpen && (
+                  <ul
+                    role="listbox"
+                    aria-label="Gotowe nazwy parametrów"
+                    className="absolute z-20 top-full mt-1 left-0 w-72 max-h-64 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--bg)] shadow-lg py-1"
+                  >
+                    {availableSuggestions.map((k) => (
+                      <li key={k} role="option" aria-selected={false}>
+                        <button
+                          type="button"
+                          onClick={() => addFeatureRowFromList(k)}
+                          className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-gold)]/10"
+                        >
+                          {k}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={addFeatureRow}
+                disabled={featureRows.length >= MAX_FEATURES}
+                className="px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors disabled:opacity-50"
+              >
+                + Dodaj własny parametr
+              </button>
+            </div>
           </div>
 
           <div className="md:col-span-2 flex justify-end pt-2">

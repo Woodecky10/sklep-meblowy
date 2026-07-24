@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/app/_lib/admin";
-import { getProduct, getSizeGroupMembersAdmin } from "@/app/_lib/products";
+import {
+  getProduct,
+  getSizeGroupMembersAdmin,
+  getFeatureKeySuggestionsAdmin,
+} from "@/app/_lib/products";
 import { getAllCategories } from "@/app/_lib/categories";
 import { getAllFabrics, getFabricPriceGroups } from "@/app/_lib/fabrics";
 import { getVariantInfoMap } from "@/app/_lib/variant-info-data";
@@ -18,14 +22,16 @@ export default async function AdminProductEditPage({
 }) {
   await requireAdmin();
   const { id } = await params;
-  const [product, categories, de, fabrics, fabricGroups, variantInfo] = await Promise.all([
-    getProduct(id),
-    getAllCategories(),
-    getProductDe(id),
-    getAllFabrics(),
-    getFabricPriceGroups(),
-    getVariantInfoMap(),
-  ]);
+  const [product, categories, de, fabrics, fabricGroups, variantInfo, featureKeySuggestions] =
+    await Promise.all([
+      getProduct(id),
+      getAllCategories(),
+      getProductDe(id),
+      getAllFabrics(),
+      getFabricPriceGroups(),
+      getVariantInfoMap(),
+      getFeatureKeySuggestionsAdmin(),
+    ]);
   if (!product) notFound();
 
   // Panel zawsze pokazuje bieżący produkt; gdy jest w grupie — całe rodzeństwo.
@@ -42,6 +48,7 @@ export default async function AdminProductEditPage({
       fabrics={fabrics}
       fabricGroups={fabricGroups}
       variantInfo={variantInfo}
+      featureKeySuggestions={featureKeySuggestions}
     />
   );
 }

@@ -9,6 +9,7 @@ import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Category, Product } from "./types";
 import { deriveFabricFamilies, productMatchesFabric } from "./fabric-filter";
 import { getAllFabrics } from "./fabrics";
+import { collectFeatureKeySuggestions } from "./product-features";
 import {
   productMatchesOptionFilters,
   productMatchesDimensions,
@@ -486,4 +487,16 @@ export async function getFilterFacets(locale: Locale = DEFAULT_LOCALE) {
     options: localizeOptionFacets(optionGroups, locale),
     dimensions: dimensionBounds,
   };
+}
+
+// Sugestie nazw parametrów dla edytora produktu — klucze `features` ze
+// WSZYSTKICH produktów (też ukrytych, stąd admin client) ∪ SEED_FEATURE_KEYS.
+// Błąd zapytania → [] (edytor działa, tylko bez podpowiedzi).
+export async function getFeatureKeySuggestionsAdmin(): Promise<string[]> {
+  const supabase = await createAdminClient();
+  const { data, error } = await supabase.from("products").select("features");
+  if (error) return [];
+  return collectFeatureKeySuggestions(
+    (data ?? []).map((r) => (r as { features: unknown }).features)
+  );
 }
