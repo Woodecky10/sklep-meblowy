@@ -49,6 +49,7 @@ export default function ProductEditor({
     (product.features ?? []).map((f) => ({ key: f.key, value: f.value }))
   );
   function addFeatureRow() {
+    setPickerOpen(false);
     setFeatureRows((r) => [...r, { key: "", value: "" }]);
   }
   function removeFeatureRow(i: number) {
@@ -73,6 +74,7 @@ export default function ProductEditor({
     (k) => !usedFeatureKeys.has(k.toLowerCase())
   );
   function addFeatureRowFromList(key: string) {
+    if (featureRows.length >= MAX_FEATURES) return;
     pendingFocusIdx.current = featureRows.length;
     setFeatureRows((r) => [...r, { key, value: "" }]);
     setPickerOpen(false);
