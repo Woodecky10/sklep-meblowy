@@ -20,6 +20,8 @@ import {
 // - submit formularza / klik [data-guard-save] → jednostka czysta;
 // - klik wewnętrznego <a> przy brudnym stanie → dialog Zostań / Zapisz i wyjdź /
 //   Wyjdź bez zapisywania;
+// - przycisk „wstecz" przeglądarki przy brudnym stanie → ten sam dialog
+//   (sentinel historii — patrz armBackGuard/onPopState niżej);
 // - beforeunload (zamknięcie karty/reload) → natywny prompt przeglądarki.
 // Spec: docs/superpowers/specs/2026-07-06-admin-unsaved-guard-design.md
 //
@@ -30,30 +32,49 @@ function pruneDetached(set: Set<Element>) {
   for (const el of set) if (!el.isConnected) set.delete(el);
 }
 
+// Cel nawigacji, którą przechwycił guard: klik wewnętrznego linku (href) albo
+// przycisk „wstecz" przeglądarki (back — brak konkretnego URL, wracamy w historii).
+type PendingNav = { kind: "href"; href: string } | { kind: "back" };
+
 export default function UnsavedChangesGuard() {
   const router = useRouter();
   const pathname = usePathname();
   // Brudne jednostki jako elementy DOM (form lub kontener sekcji). Ref, nie
   // state — zmiany nie mają renderować; render tylko dla dialogu.
   const dirtyRef = useRef<Set<Element>>(new Set());
-  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingNav | null>(null);
   // Źródło prawdy dla domknięć pętli zapisu (state służy tylko do renderu
   // dialogu — patrz openDialog/closeDialog i komentarz przy saveAndLeave).
-  const pendingHrefRef = useRef<string | null>(null);
+  const pendingRef = useRef<PendingNav | null>(null);
   const [saving, setSaving] = useState(false);
+  // Czy „sentinel" historii jest wypchnięty (uzbrojony przechwyt przycisku
+  // „wstecz"). Uzbrajamy przy pierwszej brudnej edycji; rozbrajamy po
+  // skonsumowaniu (popstate) lub zmianie strony.
+  const armedRef = useRef(false);
 
-  function openDialog(href: string) {
-    pendingHrefRef.current = href;
-    setPendingHref(href);
+  function openDialog(next: PendingNav) {
+    pendingRef.current = next;
+    setPending(next);
   }
   function closeDialog() {
-    pendingHrefRef.current = null;
-    setPendingHref(null);
+    pendingRef.current = null;
+    setPending(null);
   }
 
-  // Zmiana strony w panelu unieważnia jednostki poprzedniej strony.
+  // Wypchnij duplikat bieżącego wpisu historii, żeby przycisk „wstecz" najpierw
+  // zdjął sentinel (bez realnej nawigacji — ten sam URL), a my zdążyli pokazać
+  // dialog w popstate. Idempotentne (jeden sentinel na sesję brudnych zmian).
+  function armBackGuard() {
+    if (armedRef.current || typeof window === "undefined") return;
+    window.history.pushState(null, "", window.location.href);
+    armedRef.current = true;
+  }
+
+  // Zmiana strony w panelu unieważnia jednostki poprzedniej strony i rozbraja
+  // sentinel (nowa strona = świeży stan).
   useEffect(() => {
     dirtyRef.current.clear();
+    armedRef.current = false;
   }, [pathname]);
 
   useEffect(() => {
@@ -75,7 +96,11 @@ export default function UnsavedChangesGuard() {
         inIgnored: target.closest("[data-guard-ignore]") !== null,
         unitKind: found?.kind ?? null,
       };
-      if (shouldMarkDirty(info) && found) dirtyRef.current.add(found.unit);
+      if (shouldMarkDirty(info) && found) {
+        dirtyRef.current.add(found.unit);
+        // Pierwsza brudna edycja uzbraja przechwyt przycisku „wstecz".
+        armBackGuard();
+      }
     }
 
     // Submit czyści formularz (optymistycznie — błąd zapisu pokazuje toast edytora).
@@ -121,7 +146,27 @@ export default function UnsavedChangesGuard() {
       e.preventDefault();
       e.stopPropagation();
       const href = anchor.getAttribute("href");
-      if (href) openDialog(href);
+      if (href) openDialog({ kind: "href", href });
+    }
+
+    // Przycisk „wstecz"/„dalej" przeglądarki. Sentinel został właśnie zdjęty →
+    // jesteśmy z powrotem na URL edytora (bez realnej nawigacji). Przy brudnym
+    // stanie pokazujemy dialog i NIE wypychamy sentinela ponownie (zrobi to
+    // „Zostań"); „Wyjdź" wykona history.back() do faktycznej poprzedniej strony.
+    // Gdy nic brudnego (np. po zapisie), a sentinel był — dokończ cofanie.
+    function onPopState() {
+      pruneDetached(dirtyRef.current);
+      if (dirtyRef.current.size > 0) {
+        // Zablokuj wyjście: wypchnij ponownie bieżący wpis (ten sam URL), więc
+        // zostajemy na edytorze (App Router nie nawiguje) i pokaż dialog.
+        // armedRef zostaje true — na wierzchu wciąż jest sentinel.
+        window.history.pushState(null, "", window.location.href);
+        openDialog({ kind: "back" });
+      } else if (armedRef.current) {
+        // Po zapisie (brak brudnych) — sentinel skonsumowany; dokończ cofanie.
+        armedRef.current = false;
+        window.history.back();
+      }
     }
 
     function onBeforeUnload(e: BeforeUnloadEvent) {
@@ -135,39 +180,64 @@ export default function UnsavedChangesGuard() {
     document.addEventListener("change", onEdit, true);
     document.addEventListener("submit", onSubmit, true);
     document.addEventListener("click", onClick, true);
+    window.addEventListener("popstate", onPopState);
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => {
       document.removeEventListener("input", onEdit, true);
       document.removeEventListener("change", onEdit, true);
       document.removeEventListener("submit", onSubmit, true);
       document.removeEventListener("click", onClick, true);
+      window.removeEventListener("popstate", onPopState);
       window.removeEventListener("beforeunload", onBeforeUnload);
     };
   }, []);
 
+  // Wykonaj przechwyconą nawigację: link → router.push(href); „wstecz" →
+  // history.back() (po zdjęciu sentinela w popstate jesteśmy na URL edytora,
+  // więc jeden krok wstecz prowadzi na faktyczną poprzednią stronę).
   function leaveWithoutSaving() {
-    const href = pendingHrefRef.current;
-    if (!href) return;
+    const p = pendingRef.current;
+    if (!p) return;
     dirtyRef.current.clear();
+    armedRef.current = false;
     closeDialog();
-    router.push(href);
+    if (p.kind === "href") {
+      router.push(p.href);
+    } else {
+      // „wstecz": wyjdź z edytora do widoku nadrzędnego (np.
+      // /admin/produkty/[id] → /admin/produkty). Niezawodny router.push na
+      // stały URL — bez walki z indeksem historii App Routera (history.back
+      // desynchronizował się z sentinelem i nie nawigował).
+      const parts = pathname.split("/").filter(Boolean);
+      parts.pop();
+      router.push("/" + parts.join("/"));
+    }
+  }
+
+  // „Zostań": zamknij dialog i — jeśli wciąż są niezapisane zmiany — ponownie
+  // uzbrój przechwyt „wstecz" (przy dialogu wywołanym przyciskiem „wstecz"
+  // sentinel został skonsumowany, więc trzeba go odtworzyć).
+  function stay() {
+    closeDialog();
+    pruneDetached(dirtyRef.current);
+    if (dirtyRef.current.size > 0) armBackGuard();
   }
 
   // „Zapisz i wyjdź": wyzwól natywne zapisy edytorów, czekaj aż ustaną
   // (migawka disabled eliminuje przyciski zablokowane z innych powodów),
   // nawiguj tylko przy czystym sukcesie (bez toastu błędu / resztek dirty).
   // Domknięcie tej pętli jest zamrożone na renderze, w którym powstało —
-  // nie widzi PÓŹNIEJSZYCH setPendingHref. Dlatego intencja nawigacji jest
-  // pilnowana przez pendingHrefRef (żywy, czytany na bieżąco) + token
-  // hrefAtStart: nawigujemy po zakończeniu zapisu tylko jeśli ref wciąż
-  // wskazuje na TEN SAM href, na który użytkownik kliknął „Zapisz i wyjdź".
+  // nie widzi PÓŹNIEJSZYCH setPending. Dlatego intencja nawigacji jest
+  // pilnowana przez pendingRef (żywy, czytany na bieżąco) + token
+  // pendingAtStart: nawigujemy po zakończeniu zapisu tylko jeśli ref wciąż
+  // wskazuje na TEN SAM cel, na który użytkownik kliknął „Zapisz i wyjdź".
   // „Zostań" (lub Escape) w trakcie zapisu robi closeDialog() → ref = null →
-  // po ustaniu zapisu leaveWithoutSaving() jest no-opem (guard `if (!href)`).
-  // Jeśli w międzyczasie otwarto NOWY dialog (inny link), ref wskazuje na
-  // inny href niż hrefAtStart — stara pętla go nie nadpisuje ani nie nawiguje.
+  // po ustaniu zapisu leaveWithoutSaving() jest no-opem (guard `if (!p)`).
+  // Jeśli w międzyczasie otwarto NOWY dialog, ref wskazuje na inny obiekt niż
+  // pendingAtStart — stara pętla go nie nadpisuje ani nie nawiguje.
   async function saveAndLeave() {
-    const hrefAtStart = pendingHrefRef.current;
-    if (!hrefAtStart || saving) return;
+    const pendingAtStart = pendingRef.current;
+    if (!pendingAtStart || saving) return;
     setSaving(true);
     const units = Array.from(dirtyRef.current);
 
@@ -218,17 +288,17 @@ export default function UnsavedChangesGuard() {
     });
     setSaving(false);
     if (decision === "leave") {
-      if (pendingHrefRef.current === hrefAtStart) leaveWithoutSaving();
-    } else if (pendingHrefRef.current === hrefAtStart) {
-      closeDialog(); // zostań — użytkownik widzi toast/walidację
+      if (pendingRef.current === pendingAtStart) leaveWithoutSaving();
+    } else if (pendingRef.current === pendingAtStart) {
+      stay(); // zostań — użytkownik widzi toast/walidację
     }
   }
 
   return (
     <UnsavedDialog
-      open={pendingHref !== null}
+      open={pending !== null}
       saving={saving}
-      onStay={closeDialog}
+      onStay={stay}
       onSaveAndLeave={saveAndLeave}
       onLeave={leaveWithoutSaving}
     />
