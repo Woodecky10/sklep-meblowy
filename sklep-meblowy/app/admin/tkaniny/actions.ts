@@ -170,8 +170,8 @@ export async function createFabric(formData: FormData): Promise<ActionResult> {
   if (!groupId) return { ok: false, error: "Wybierz grupę cenową" };
   const description = parseRichHtml(formData.get("description"));
   const descriptionDe = parseRichHtml(formData.get("description_de"));
-  const shortInfo = emptyToNull(sanitize(formData.get("short_info"), 200));
-  const shortInfoDe = emptyToNull(sanitize(formData.get("short_info_de"), 200));
+  const shortInfo = emptyToNull(sanitize(formData.get("short_info"), 500));
+  const shortInfoDe = emptyToNull(sanitize(formData.get("short_info_de"), 500));
   const rawFeatured = parseFeaturedProductIds(formData.get("featured_product_ids_json"));
 
   const supabase = await createAdminClient();
@@ -222,8 +222,8 @@ export async function updateFabric(formData: FormData): Promise<ActionResult> {
   if (!groupId) return { ok: false, error: "Wybierz grupę cenową" };
   const description = parseRichHtml(formData.get("description"));
   const descriptionDe = parseRichHtml(formData.get("description_de"));
-  const shortInfo = emptyToNull(sanitize(formData.get("short_info"), 200));
-  const shortInfoDe = emptyToNull(sanitize(formData.get("short_info_de"), 200));
+  const shortInfo = emptyToNull(sanitize(formData.get("short_info"), 500));
+  const shortInfoDe = emptyToNull(sanitize(formData.get("short_info_de"), 500));
   const rawFeatured = parseFeaturedProductIds(formData.get("featured_product_ids_json"));
 
   const supabase = await createAdminClient();
