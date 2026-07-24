@@ -38,8 +38,12 @@ export type FilterBarDimensionBounds = {
 };
 
 type Props = {
-  colors: FilterBarFacet[];
-  materials: FilterBarFacet[];
+  // colors/materials są tymczasowo opcjonalne — page.tsx już ich nie przekazuje
+  // (filtr koloru/tkaniny usunięty z backendu w Task 2). UI czyści Task 3.
+  colors?: FilterBarFacet[];
+  materials?: FilterBarFacet[];
+  // Facety parametrów produktu (?cecha_<slug>=) — konsumowane przez Task 3.
+  featureFacets?: FilterBarOptionFacet[];
   optionFacets?: FilterBarOptionFacet[];
   dimensionBounds?: FilterBarDimensionBounds;
   sections?: FilterBarSection[];
@@ -61,8 +65,8 @@ type DropdownKey =
 const DIM_KEYS = ["szer_od", "szer_do", "gl_od", "gl_do", "wys_od", "wys_do"] as const;
 
 export default function FilterBar({
-  colors,
-  materials,
+  colors = [],
+  materials = [],
   optionFacets = [],
   dimensionBounds,
   sections = [],

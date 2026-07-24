@@ -4,11 +4,15 @@ import { createClient, createAdminClient } from "./supabase/server";
 import { getCategories } from "./categories";
 import { buildSearchOrFilter, rankByNameMatch } from "./search-filter";
 import { sizeLabelOf } from "./size-groups";
-import { localizeProduct, buildLocalizedFacets } from "./localize";
+import { localizeProduct } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Category, Product } from "./types";
-import { deriveFabricFamilies, productMatchesFabric } from "./fabric-filter";
-import { getAllFabrics } from "./fabrics";
+import {
+  productMatchesFeatureFilters,
+  collectFeatureFacets,
+  localizeFeatureFacets,
+  type FeatureFacetGroup,
+} from "./feature-filter";
 import { collectFeatureKeySuggestions } from "./product-features";
 import {
   productMatchesOptionFilters,
@@ -54,13 +58,12 @@ export type ProductFilters = {
   priceMin?: number;
   priceMax?: number;
   inStockOnly?: boolean;
-  colors?: string[];
-  // Filtr tkanin (?tkanina=). Wartości: rodziny tkanin z katalogu fabrics
-  // (dopasowywane do opcji wariantów) ∪ legacy wartości kolumny material.
-  materials?: string[];
   // Filtry opcji wariantów (?opcja_<slug>=w1,w2): slug → wybrane wartości.
   // Parsowane w sklep/page.tsx przez parseOptionFilterParams.
   optionFilters?: Record<string, string[]>;
+  // Filtry parametrów produktu (?cecha_<slug>=w1|w2): slug → wybrane wartości.
+  // Parsowane w sklep/page.tsx przez parseFeatureFilterParams.
+  featureFilters?: Record<string, string[]>;
   // Zakresy wymiarów w cm (?szer_od= / ?szer_do= / gl / wys).
   dimensionRanges?: DimensionRanges;
   // Slug kolekcji — filtruje produkty należące do konkretnej kolekcji
@@ -89,9 +92,8 @@ export async function getProducts(filters: ProductFilters = {}) {
     priceMin,
     priceMax,
     inStockOnly,
-    colors,
-    materials,
     optionFilters,
+    featureFilters,
     dimensionRanges,
     collectionSlug,
     sectionSlug,
@@ -152,38 +154,37 @@ export async function getProducts(filters: ProductFilters = {}) {
 
   if (inStockOnly) query = query.gt("stock", 0);
 
-  if (colors?.length) query = query.in("color", colors);
-
-  // Filtry liczone w JS (tkanina / opcje wariantów / wymiary) — nie da się ich
-  // wyrazić w .in() na kolumnie (prawda żyje w JSONB variants/dimensions), więc
-  // liczymy pasujące id w JS (skala: dziesiątki produktów; RLS i tak ogranicza
-  // odczyt do aktywnych) i zawężamy główne zapytanie przez .in("id", ids).
-  // Paginacja/sort/AND z pozostałymi filtrami zostają w DB.
+  // Filtry liczone w JS (opcje wariantów / parametry / wymiary) — nie da się ich
+  // wyrazić w .in() na kolumnie (prawda żyje w JSONB variants/features/
+  // dimensions), więc liczymy pasujące id w JS (skala: dziesiątki produktów;
+  // RLS i tak ogranicza odczyt do aktywnych) i zawężamy główne zapytanie przez
+  // .in("id", ids). Paginacja/sort/AND z pozostałymi filtrami zostają w DB.
   const optionFiltersActive = Object.values(optionFilters ?? {}).some(
     (v) => v.length > 0
   );
+  const featureFiltersActive = Object.values(featureFilters ?? {}).some(
+    (v) => v.length > 0
+  );
   const dimensionsActive = hasActiveDimensionRanges(dimensionRanges ?? {});
-  if (materials?.length || optionFiltersActive || dimensionsActive) {
-    const [{ data: jsFilterRows }, fabrics] = await Promise.all([
-      // Bez .limit() — świadomie (katalog ~dziesiątki produktów). Przy dużym wzroście katalogu PostgREST utnie wiersze i filtr/facety po cichu zgubią produkty — wtedy zdenormalizować rodziny do kolumny.
-      supabase.from("products").select("id, variants, material, dimensions"),
-      materials?.length ? getAllFabrics() : Promise.resolve([]),
-    ]);
-    const familyNames = fabrics.map((f) => f.name);
+  if (optionFiltersActive || featureFiltersActive || dimensionsActive) {
+    // Bez .limit() — świadomie (katalog ~dziesiątki produktów). Przy dużym wzroście katalogu PostgREST utnie wiersze i filtr/facety po cichu zgubią produkty — wtedy zdenormalizować rodziny do kolumny.
+    const { data: jsFilterRows } = await supabase
+      .from("products")
+      .select("id, variants, features, dimensions");
     const ids = (
       (jsFilterRows ?? []) as {
         id: string;
         variants: Product["variants"];
-        material: string | null;
+        features: unknown;
         dimensions: Product["dimensions"];
       }[]
     )
       .filter(
         (r) =>
-          (!materials?.length ||
-            productMatchesFabric(r.variants, r.material, materials, familyNames)) &&
           (!optionFiltersActive ||
             productMatchesOptionFilters(r.variants, optionFilters!)) &&
+          (!featureFiltersActive ||
+            productMatchesFeatureFilters(r.features, featureFilters!)) &&
           (!dimensionsActive ||
             productMatchesDimensions(r.dimensions, dimensionRanges!))
       )
@@ -404,88 +405,52 @@ export function invalidateFacetsCache(): void {
 // ⚠️ Wewnątrz unstable_cache nie wolno używać cookies() → products czytamy
 // CZYSTYM klientem anon (RLS widzi dokładnie to co gość: tylko is_active —
 // przy okazji facety przestają zawierać dane produktów ukrytych, gdy ogląda
-// je zalogowany admin). fabrics ma RLS admin-only → createAdminClient
-// (wzorzec fetchAllFabrics, działa w unstable_cache).
+// je zalogowany admin).
 const getFacetSource = unstable_cache(
   async (): Promise<{
-    colorRows: { value: string | null; value_de: string | null }[];
-    fabricFacetRows: { value: string | null; value_de: string | null }[];
     optionGroups: OptionFacetGroup[];
+    featureGroups: FeatureFacetGroup[];
     dimensionBounds: DimensionBounds;
   }> => {
     const anon = createBareAnonClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
-    const admin = await createAdminClient();
-    const [{ data: colorsData }, { data: fabricSourceData }, { data: fabricsData }] =
-      await Promise.all([
-        anon.from("products").select("color, color_de").not("color", "is", null),
-        // Bez .limit() — świadomie (katalog ~dziesiątki produktów). Przy dużym
-        // wzroście katalogu PostgREST utnie wiersze i facety po cichu zgubią
-        // produkty — wtedy zdenormalizować rodziny do kolumny.
-        anon.from("products").select("variants, material, material_de, dimensions"),
-        admin
-          .from("fabrics")
-          .select("name, name_de")
-          .order("sort_order", { ascending: true })
-          .order("name", { ascending: true }),
-      ]);
+    // Bez .limit() — świadomie (katalog ~dziesiątki produktów). Przy dużym
+    // wzroście katalogu PostgREST utnie wiersze i facety po cichu zgubią
+    // produkty — wtedy zdenormalizować rodziny do kolumny.
+    const { data: sourceData } = await anon
+      .from("products")
+      .select("variants, features, dimensions");
 
-    const colorRows = (
-      (colorsData ?? []) as { color: string | null; color_de: string | null }[]
-    ).map((r) => ({ value: r.color, value_de: r.color_de }));
-
-    // Facet „Tkanina" = rodziny tkanin UŻYTE w widocznych produktach (value =
-    // nazwa PL z katalogu, label DE = fabrics.name_de) ∪ legacy wartości kolumny
-    // material (label DE = material_de). Dedupe po PL value robi
-    // buildLocalizedFacets (rodzina z name_de wygrywa etykietę nad legacy).
-    const fabricRows = (fabricSourceData ?? []) as {
+    const rows = (sourceData ?? []) as {
       variants: Product["variants"];
-      material: string | null;
-      material_de: string | null;
+      features: unknown;
       dimensions: Product["dimensions"];
     }[];
-    const fabrics = (fabricsData ?? []) as { name: string; name_de: string | null }[];
-    const familyNames = fabrics.map((f) => f.name);
-    const usedFamilies = new Set<string>();
-    for (const row of fabricRows) {
-      for (const fam of deriveFabricFamilies(row.variants, familyNames)) {
-        usedFamilies.add(fam);
-      }
-    }
-    const fabricFacetRows = [
-      ...fabrics
-        .filter((f) => usedFamilies.has(f.name))
-        .map((f) => ({ value: f.name as string | null, value_de: f.name_de })),
-      ...fabricRows
-        .filter((r) => r.material)
-        .map((r) => ({ value: r.material, value_de: r.material_de })),
-    ];
 
-    // Facety opcji wariantów (filterable=true) + granice wymiarów — z tych
-    // samych wierszy co facet tkanin (jeden skan, ten sam cache).
-    const optionGroups = collectOptionFacets(fabricRows);
-    const dimensionBounds = collectDimensionBounds(fabricRows);
+    // Facety opcji wariantów (filterable=true), parametrów produktu (features)
+    // i granice wymiarów — z tych samych wierszy (jeden skan, ten sam cache).
+    const optionGroups = collectOptionFacets(rows);
+    const featureGroups = collectFeatureFacets(rows);
+    const dimensionBounds = collectDimensionBounds(rows);
 
-    return { colorRows, fabricFacetRows, optionGroups, dimensionBounds };
+    return { optionGroups, featureGroups, dimensionBounds };
   },
-  ["facet-source-v2"],
+  ["facet-source-v3"],
   { tags: [FACETS_CACHE_TAG], revalidate: 300 }
 );
 
 // Pobiera facety filtrów na /sklep. Wartości cachowane (getFacetSource);
-// lokalizacja/sortowanie per request (tania, czysta buildLocalizedFacets).
+// lokalizacja/sortowanie per request (tania, czysta localizeOptionFacets).
 // Decyzja historyczna: nie ograniczamy facets do bieżącego search/category
 // (pełna paleta zawsze; pusta lista po kliknięciu jest akceptowana).
 export async function getFilterFacets(locale: Locale = DEFAULT_LOCALE) {
-  const { colorRows, fabricFacetRows, optionGroups, dimensionBounds } =
-    await getFacetSource();
+  const { optionGroups, featureGroups, dimensionBounds } = await getFacetSource();
   return {
-    colors: buildLocalizedFacets(colorRows, locale),
-    materials: buildLocalizedFacets(fabricFacetRows, locale),
     options: localizeOptionFacets(optionGroups, locale),
     dimensions: dimensionBounds,
+    features: localizeFeatureFacets(featureGroups, locale),
   };
 }
 
