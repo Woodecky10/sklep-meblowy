@@ -333,11 +333,11 @@ function FabricForm({
         <input type="hidden" name="description_de" value={descriptionDe} />
         <RichTextEditor value={descriptionDe} onChange={setDescriptionDe} ariaLabel="Opis tkaniny (DE)" />
       </Field>
-      <Field label="Krótkie info" hint="Krótki tekst w dymku obok „szczegóły” w pickerze (maks. 200 znaków).">
+      <Field label="Krótkie info" hint="Krótki tekst w dymku obok „szczegóły” w pickerze (maks. 500 znaków).">
         <textarea
           name="short_info"
           defaultValue={initial?.short_info ?? ""}
-          maxLength={200}
+          maxLength={500}
           rows={2}
           className={inputCls}
           placeholder="np. Miękki welur, łatwy w czyszczeniu"
@@ -347,7 +347,7 @@ function FabricForm({
         <textarea
           name="short_info_de"
           defaultValue={initial?.short_info_de ?? ""}
-          maxLength={200}
+          maxLength={500}
           rows={2}
           className={inputCls}
         />
