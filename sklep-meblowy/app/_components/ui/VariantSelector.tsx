@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { Product, ProductVariants } from "@/app/_lib/types";
@@ -18,6 +18,9 @@ import {
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { useEurRate } from "@/app/_lib/rate-context";
 import { formatMoney } from "@/app/_lib/money";
+import { useVariantInfo } from "@/app/_lib/variant-info-context";
+import { variantInfoKey, variantInfoText } from "@/app/_lib/variant-info";
+import ValueInfoTip from "./ValueInfoTip";
 
 type Props = {
   variants: ProductVariants;
@@ -46,6 +49,51 @@ function getValueLabel(
   return mapDe(VARIANT_VALUE_DE, raw) ?? raw;
 }
 
+// Zewnętrzny „przycisk" wartości wariantu (chip/próbka/kafelek). Natywny
+// <button> nie może zawierać zagnieżdżonego <button> (ValueInfoTip) — podczas
+// parsowania HTML przeglądarka zamyka zewnętrzny button na widok wewnętrznego,
+// co psuje hydration (React: "cannot contain a nested <button>"). Gdy wartość
+// ma tooltip informacyjny, renderujemy div[role=button] z obsługą klawiatury
+// zamiast <button>; pozostałe wartości bez zmian (nadal natywny <button>).
+function SwatchButton({
+  hasTip,
+  onClick,
+  ariaPressed,
+  className,
+  children,
+}: {
+  hasTip: boolean;
+  onClick: () => void;
+  ariaPressed: boolean;
+  className: string;
+  children: ReactNode;
+}) {
+  if (hasTip) {
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        aria-pressed={ariaPressed}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        className={className}
+      >
+        {children}
+      </div>
+    );
+  }
+  return (
+    <button type="button" aria-pressed={ariaPressed} onClick={onClick} className={className}>
+      {children}
+    </button>
+  );
+}
+
 export default function VariantSelector({
   variants,
   selected,
@@ -57,6 +105,9 @@ export default function VariantSelector({
   const fabricImages = useFabricImages();
   const rate = useEurRate();
   const t = getDictionary(locale);
+  const variantInfo = useVariantInfo();
+  const infoTextFor = (optionName: string, value: string) =>
+    variantInfoText(variantInfo[variantInfoKey(optionName, value)], locale);
   function pick(name: string, value: string) {
     onChange({ ...selected, [name]: value });
   }
@@ -103,6 +154,7 @@ export default function VariantSelector({
                 valuePrices={option.value_prices}
                 images={fabricImages}
                 labelOf={(v) => getValueLabel(product, option.name, v, locale, fabricMap)}
+                infoFor={(v) => infoTextFor(option.name, v)}
                 locale={locale}
                 rate={rate}
                 onPick={(v) => pick(option.name, v)}
@@ -113,6 +165,7 @@ export default function VariantSelector({
                 current={current}
                 valuePrices={option.value_prices}
                 labelOf={(v) => getValueLabel(product, option.name, v, locale, fabricMap)}
+                infoFor={(v) => infoTextFor(option.name, v)}
                 hint={t.product.cornerSideHint}
                 locale={locale}
                 rate={rate}
@@ -125,6 +178,7 @@ export default function VariantSelector({
                 valuePrices={option.value_prices}
                 valueImages={option.value_images ?? {}}
                 labelOf={(v) => getValueLabel(product, option.name, v, locale, fabricMap)}
+                infoFor={(v) => infoTextFor(option.name, v)}
                 locale={locale}
                 rate={rate}
                 onPick={(v) => pick(option.name, v)}
@@ -135,17 +189,23 @@ export default function VariantSelector({
                   const isActive = current === v;
                   const label = getValueLabel(product, option.name, v, locale, fabricMap);
                   const surcharge = option.value_prices?.[v] ?? 0;
+                  const info = infoTextFor(option.name, v);
                   return (
-                    <button
+                    <SwatchButton
                       key={v}
+                      hasTip={!!info}
                       onClick={() => pick(option.name, v)}
+                      ariaPressed={isActive}
                       className={`px-4 py-2 text-sm font-sans rounded-full border transition-colors ${
                         isActive
                           ? "border-[var(--color-gold)] bg-[var(--color-gold)] text-[var(--color-navy)] font-semibold"
                           : "border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)]"
                       }`}
                     >
-                      {label}
+                      <span className="inline-flex items-center gap-1">
+                        {label}
+                        {info && <ValueInfoTip text={info} />}
+                      </span>
                       {surcharge !== 0 && (
                         <span className={isActive ? "opacity-80" : "text-[var(--muted)]"}>
                           {" "}
@@ -153,7 +213,7 @@ export default function VariantSelector({
                           {formatMoney(Math.abs(surcharge), locale, rate)})
                         </span>
                       )}
-                    </button>
+                    </SwatchButton>
                   );
                 })}
               </div>
@@ -178,6 +238,7 @@ function FabricSwatchGroup({
   valuePrices,
   images,
   labelOf,
+  infoFor,
   locale,
   rate,
   onPick,
@@ -187,6 +248,7 @@ function FabricSwatchGroup({
   valuePrices: Record<string, number> | undefined;
   images: Record<string, string>;
   labelOf: (v: string) => string;
+  infoFor: (value: string) => string | null;
   locale: Locale;
   rate: number;
   onPick: (v: string) => void;
@@ -201,12 +263,13 @@ function FabricSwatchGroup({
     const img = images[v];
     const surcharge = valuePrices?.[v] ?? 0;
     const label = labelOf(v);
+    const info = infoFor(v);
     return (
-      <button
+      <SwatchButton
         key={v}
-        type="button"
+        hasTip={!!info}
         onClick={() => onPick(v)}
-        aria-pressed={active}
+        ariaPressed={active}
         className="flex flex-col items-center gap-1.5 text-center group"
       >
         <span
@@ -226,16 +289,17 @@ function FabricSwatchGroup({
           )}
         </span>
         <span
-          className={`text-xs leading-tight ${
+          className={`text-xs leading-tight inline-flex items-center gap-1 ${
             active ? "text-[var(--color-gold)] font-semibold" : "text-[var(--fg)]"
           }`}
         >
           {label}
+          {info && <ValueInfoTip text={info} />}
         </span>
         <span className="text-[11px] text-[var(--muted)]">
           {surcharge > 0 ? `+${formatMoney(surcharge, locale, rate)}` : formatMoney(0, locale, rate)}
         </span>
-      </button>
+      </SwatchButton>
     );
   };
 
@@ -379,6 +443,7 @@ function ValueImageSwatchGroup({
   valuePrices,
   valueImages,
   labelOf,
+  infoFor,
   locale,
   rate,
   onPick,
@@ -388,6 +453,7 @@ function ValueImageSwatchGroup({
   valuePrices: Record<string, number> | undefined;
   valueImages: Record<string, string[]>;
   labelOf: (v: string) => string;
+  infoFor: (value: string) => string | null;
   locale: Locale;
   rate: number;
   onPick: (v: string) => void;
@@ -399,12 +465,13 @@ function ValueImageSwatchGroup({
         const img = valueImages[v]?.[0];
         const surcharge = valuePrices?.[v] ?? 0;
         const label = labelOf(v);
+        const info = infoFor(v);
         return (
-          <button
+          <SwatchButton
             key={v}
-            type="button"
+            hasTip={!!info}
             onClick={() => onPick(v)}
-            aria-pressed={active}
+            ariaPressed={active}
             className="flex flex-col items-center gap-1.5 text-center group"
           >
             <span
@@ -424,16 +491,17 @@ function ValueImageSwatchGroup({
               )}
             </span>
             <span
-              className={`text-xs leading-tight ${
+              className={`text-xs leading-tight inline-flex items-center gap-1 ${
                 active ? "text-[var(--color-gold)] font-semibold" : "text-[var(--fg)]"
               }`}
             >
               {label}
+              {info && <ValueInfoTip text={info} />}
             </span>
             <span className="text-[11px] text-[var(--muted)]">
               {surcharge > 0 ? `+${formatMoney(surcharge, locale, rate)}` : formatMoney(0, locale, rate)}
             </span>
-          </button>
+          </SwatchButton>
         );
       })}
     </div>
@@ -456,6 +524,7 @@ function CornerSideGroup({
   current,
   valuePrices,
   labelOf,
+  infoFor,
   hint,
   locale,
   rate,
@@ -465,6 +534,7 @@ function CornerSideGroup({
   current: string | undefined;
   valuePrices: Record<string, number> | undefined;
   labelOf: (v: string) => string;
+  infoFor: (value: string) => string | null;
   hint: string;
   locale: Locale;
   rate: number;
@@ -478,29 +548,33 @@ function CornerSideGroup({
           const active = current === v;
           const label = labelOf(v);
           const surcharge = valuePrices?.[v] ?? 0;
+          const info = infoFor(v);
           if (!side) {
             return (
-              <button
+              <SwatchButton
                 key={v}
-                type="button"
+                hasTip={!!info}
                 onClick={() => onPick(v)}
-                aria-pressed={active}
+                ariaPressed={active}
                 className={`px-4 py-2 text-sm font-sans rounded-full border transition-colors ${
                   active
                     ? "border-[var(--color-gold)] bg-[var(--color-gold)] text-[var(--color-navy)] font-semibold"
                     : "border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)]"
                 }`}
               >
-                {label}
-              </button>
+                <span className="inline-flex items-center gap-1">
+                  {label}
+                  {info && <ValueInfoTip text={info} />}
+                </span>
+              </SwatchButton>
             );
           }
           return (
-            <button
+            <SwatchButton
               key={v}
-              type="button"
+              hasTip={!!info}
               onClick={() => onPick(v)}
-              aria-pressed={active}
+              ariaPressed={active}
               className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-colors ${
                 active
                   ? "border-[var(--color-gold)]"
@@ -517,11 +591,12 @@ function CornerSideGroup({
                 />
               </span>
               <span
-                className={`text-xs leading-tight ${
+                className={`text-xs leading-tight inline-flex items-center gap-1 ${
                   active ? "text-[var(--color-gold)] font-semibold" : "text-[var(--fg)]"
                 }`}
               >
                 {label}
+                {info && <ValueInfoTip text={info} />}
                 {surcharge !== 0 && (
                   <span className={active ? "opacity-80" : "text-[var(--muted)]"}>
                     {" "}
@@ -530,7 +605,7 @@ function CornerSideGroup({
                   </span>
                 )}
               </span>
-            </button>
+            </SwatchButton>
           );
         })}
       </div>
