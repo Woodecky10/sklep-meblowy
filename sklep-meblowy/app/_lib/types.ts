@@ -21,8 +21,10 @@ export type ProductOption = {
   name: string;
   values: string[];
   value_prices?: Record<string, number>;
-  // Zdjęcia per wartość opcji (np. mebel w danej tkaninie) — po wyborze
-  // wartości idą na początek galerii na karcie produktu (getVariantImages).
+  // Zdjęcia per wartość opcji (np. mebel w danej tkaninie). Dla opcji strony
+  // narożnika (Strona) po wyborze idą na początek galerii karty produktu
+  // (getVariantImages); dla pozostałych opcji pokazują się jako swatche
+  // w selektorze (VariantSelector), nie w głównej galerii.
   // Brak wpisu = brak zdjęć wariantowych. Puste tablice nie są zapisywane.
   value_images?: Record<string, string[]>;
   // Admin zaznaczył „Filtr w sklepie" — opcja pojawia się jako filtr na /sklep
