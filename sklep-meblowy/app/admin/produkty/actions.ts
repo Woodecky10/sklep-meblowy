@@ -21,6 +21,8 @@ import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-ht
 import { buildGroupKey, pickGroupKey } from "@/app/_lib/size-groups";
 import { normalizeDeliveryTime, normalizeWarranty } from "@/app/_lib/spec-format";
 import { parseFeatureRows } from "@/app/_lib/product-features";
+import { normalizeVariantInfoInput } from "@/app/_lib/variant-info";
+import { invalidateVariantInfoCache } from "@/app/_lib/variant-info-data";
 import type {
   ActionResult,
   ProductDescriptionSection,
@@ -884,4 +886,41 @@ export async function updateSizeLabel(
   const ids = key ? await sizeGroupMemberIds(supabase, key) : [pid];
   revalidateProducts(ids.length ? ids : [pid]);
   return { ok: true, message: "Zapisano etykietę" };
+}
+
+// ============================================================
+// upsertVariantInfo — globalny slownik info o wariancie (opcja+wartosc)
+// ============================================================
+// entries = wszystkie pary (opcja,wartosc) biezacego produktu z ich trescia.
+// Niepuste → upsert po (option_name,value); puste → delete. Zapis GLOBALNY.
+export async function upsertVariantInfo(
+  productId: string,
+  entries: { option_name: string; value: string; info: string; info_de: string }[]
+): Promise<ActionResult> {
+  await requireAdmin();
+  if (!Array.isArray(entries)) return { ok: false, error: "Nieprawidłowe dane info" };
+
+  const { upserts, deletes } = normalizeVariantInfoInput(entries);
+  const supabase = await createAdminClient();
+
+  if (upserts.length > 0) {
+    const rows = upserts.map((u) => ({ ...u, updated_at: new Date().toISOString() }));
+    const { error } = await supabase
+      .from("variant_info")
+      .upsert(rows as never, { onConflict: "option_name,value" });
+    if (error) return { ok: false, error: error.message };
+  }
+
+  for (const d of deletes) {
+    const { error } = await supabase
+      .from("variant_info")
+      .delete()
+      .eq("option_name", d.option_name)
+      .eq("value", d.value);
+    if (error) return { ok: false, error: error.message };
+  }
+
+  invalidateVariantInfoCache();
+  if (productId) revalidatePath(`/produkt/${productId}`);
+  return { ok: true, message: "Zapisano informacje o wariantach" };
 }

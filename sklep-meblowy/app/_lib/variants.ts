@@ -2,6 +2,7 @@ import type { Product, ProductOption, ProductVariants } from "./types";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "./de-content-maps";
 import { effectivePrice, isOnSale } from "./pricing";
+import { isCornerSideOptionName } from "./corner-side";
 
 // Czy produkt ma warianty (i przynajmniej jedną opcję)?
 export function hasVariants(product: Product): boolean {
@@ -65,10 +66,11 @@ export function formatVariantLabel(
     .join(", ");
 }
 
-// Zdjęcia do pokazania klientowi: zdjęcia wybranych wartości opcji
-// (value_images, w kolejności opcji) na początku, po nich galeria produktu;
-// deduplikacja URL-i (pierwsze wystąpienie wygrywa). Brak wyboru / brak zdjęć
-// wariantowych → galeria produktu jak dotychczas.
+// Zdjęcia do pokazania klientowi w GŁÓWNEJ galerii. Zdjęcia per wartość
+// (value_images) trafiają na początek galerii TYLKO dla opcji strony narożnika
+// (isCornerSideOptionName) — pozostałe opcje pokazują swoje value_images jako
+// swatche w selektorze (VariantSelector), nie w galerii. Brak wyboru / brak
+// zdjęć narożnika → galeria produktu. Deduplikacja URL-i (pierwsze wygrywa).
 export function getVariantImages(
   product: Product,
   selectedValues: Record<string, string>
@@ -77,6 +79,9 @@ export function getVariantImages(
   for (const opt of product.variants?.options ?? []) {
     const v = selectedValues[opt.name];
     if (v == null) continue;
+    // Tylko narożnik (Strona) dokłada zdjęcia do głównej galerii; inne opcje
+    // mają swoje zdjęcia jako swatche w selektorze (jak tkaniny).
+    if (!isCornerSideOptionName(opt.name)) continue;
     const imgs = opt.value_images?.[v];
     if (!Array.isArray(imgs)) continue;
     for (const url of imgs) {
@@ -92,6 +97,16 @@ export function getVariantImages(
     out.push(url);
   }
   return out;
+}
+
+// Czy opcja ma jakiekolwiek zdjęcia per wartość (niepusta tablica URL-i).
+// Selektor używa tego, by pokazać wartości jako swatche zamiast chipów tekstowych.
+export function optionHasValueImages(option: ProductOption): boolean {
+  const vi = option.value_images;
+  if (!vi) return false;
+  return Object.values(vi).some(
+    (urls) => Array.isArray(urls) && urls.some((u) => typeof u === "string" && u.length > 0)
+  );
 }
 
 // Display name opcji — jeśli admin nadpisał ("Wariant" → "Kolor"), użyj override.
@@ -344,12 +359,21 @@ export type FabricValueMeta = {
   groupNameDe: string | null;
   groupSurcharge: number;
   groupSort: number;
+  shortInfo: string | null;
+  shortInfoDe: string | null;
 };
 
 // Buduje mapę wartość wariantu („Nazwa Numer"/„Nazwa") → FabricValueMeta.
 // Tkaniny z group_id spoza `groups` pomijane (teoretyczne — FK NOT NULL).
 export function buildFabricMetaMap(
-  fabrics: { name: string; colors: string[]; slug: string; group_id: string }[],
+  fabrics: {
+    name: string;
+    colors: string[];
+    slug: string;
+    group_id: string;
+    short_info?: string | null;
+    short_info_de?: string | null;
+  }[],
   groups: { id: string; code: string; name: string; name_de: string | null; surcharge: number; sort_order: number }[]
 ): Record<string, FabricValueMeta> {
   const byId = new Map(groups.map((g) => [g.id, g]));
@@ -368,6 +392,8 @@ export function buildFabricMetaMap(
       groupNameDe: g.name_de,
       groupSurcharge: g.surcharge,
       groupSort: g.sort_order,
+      shortInfo: (f.short_info ?? "").trim() || null,
+      shortInfoDe: (f.short_info_de ?? "").trim() || null,
     };
     for (const v of values) map[v] = meta;
   }

@@ -21,8 +21,10 @@ export type ProductOption = {
   name: string;
   values: string[];
   value_prices?: Record<string, number>;
-  // Zdjęcia per wartość opcji (np. mebel w danej tkaninie) — po wyborze
-  // wartości idą na początek galerii na karcie produktu (getVariantImages).
+  // Zdjęcia per wartość opcji (np. mebel w danej tkaninie). Dla opcji strony
+  // narożnika (Strona) po wyborze idą na początek galerii karty produktu
+  // (getVariantImages); dla pozostałych opcji pokazują się jako swatche
+  // w selektorze (VariantSelector), nie w głównej galerii.
   // Brak wpisu = brak zdjęć wariantowych. Puste tablice nie są zapisywane.
   value_images?: Record<string, string[]>;
   // Admin zaznaczył „Filtr w sklepie" — opcja pojawia się jako filtr na /sklep
@@ -199,6 +201,10 @@ export type Fabric = {
   // Opis na stronę tkaniny (sanityzowany HTML). description_de null → fallback PL.
   description: string | null;
   description_de: string | null;
+  // Krótkie info o tkaninie (dymek obok „szczegóły" w pickerze). Zwykły tekst,
+  // osobne od description. short_info_de null → fallback PL.
+  short_info: string | null;
+  short_info_de: string | null;
   // Wybrane produkty pokazywane w sekcji „Meble w tej tkaninie" na stronie
   // tkaniny (kolejność = kolejność w tablicy; max 20 w adminie). Nieznane/
   // nieaktywne id pomijane przy renderze.

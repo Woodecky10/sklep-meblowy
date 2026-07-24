@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { updateProductVariants } from "../actions";
+import { updateProductVariants, upsertVariantInfo } from "../actions";
+import { variantInfoKey, type VariantInfoEntry } from "@/app/_lib/variant-info";
 import type {
   ProductOption,
   ProductVariants,
@@ -35,6 +36,7 @@ export default function VariantsEditor({
   categorySlug,
   fabrics,
   fabricGroups,
+  initialVariantInfo,
   onToast,
 }: {
   productId: string;
@@ -42,12 +44,22 @@ export default function VariantsEditor({
   categorySlug: string;
   fabrics: Fabric[];
   fabricGroups: FabricPriceGroup[];
+  initialVariantInfo: Record<string, VariantInfoEntry>;
   onToast: (t: Toast) => void;
 }) {
   const [variants, setVariants] = useState<ProductVariants | null>(initial);
   const [saving, startSaveTransition] = useTransition();
   const [fabricPickerOpen, setFabricPickerOpen] = useState(false);
   const confirm = useConfirm();
+
+  // Info o wariancie jest GLOBALNE (slownik po parze opcja+wartosc), wiec trzymane
+  // osobno od products.variants. Edytujemy kopie; zapis przez upsertVariantInfo.
+  const [variantInfo, setVariantInfo] = useState<Record<string, VariantInfoEntry>>(initialVariantInfo);
+  const [savedVariantInfo, setSavedVariantInfo] = useState<Record<string, VariantInfoEntry>>(initialVariantInfo);
+  const infoDirty = useMemo(
+    () => JSON.stringify(variantInfo) !== JSON.stringify(savedVariantInfo),
+    [variantInfo, savedVariantInfo]
+  );
 
   // Wybór strony narożnika: stan = obecność opcji side-like (także ręcznej
   // "STRONA"/"STRONA MEBLA"). Toggle widoczny dla kategorii narożników albo
@@ -151,6 +163,17 @@ export default function VariantsEditor({
     setVariants({ ...variants, options: nextOptions });
   }
 
+  // Ustaw info dla pary (nazwa opcji, wartosc). Puste PL → usun wpis z mapy.
+  function setValueInfo(optionName: string, value: string, info: string, infoDe: string) {
+    const key = variantInfoKey(optionName, value);
+    setVariantInfo((prev) => {
+      const next = { ...prev };
+      if (info.trim()) next[key] = { info, info_de: infoDe.trim() ? infoDe : null };
+      else delete next[key];
+      return next;
+    });
+  }
+
   // Dodaj wgrane zdjęcia do wartości opcji (dopisywane na koniec, bez duplikatów).
   function addValueImages(optIdx: number, value: string, urls: string[]) {
     if (!variants) return;
@@ -248,7 +271,38 @@ export default function VariantsEditor({
       }
       const res = await updateProductVariants(productId, toSave);
       if (res.ok) {
-        onToast({ type: "success", message: res.message ?? "Zapisano warianty" });
+        if (!infoDirty) {
+          // Nic w info nie zmieniono (np. zapis samej ceny) — nie wywoluj
+          // upsertVariantInfo wcale, zeby nie kasowac par, ktorych admin
+          // nigdy nie dotknal w tej sesji (variantInfo jest zasiane z
+          // 300s-cache'owanej globalnej mapy, wiec moze byc nieaktualne).
+          onToast({ type: "success", message: res.message ?? "Zapisano warianty" });
+          setVariants(toSave);
+          return;
+        }
+        // Rekoncyliacja TYLKO par faktycznie dotknietych w tej sesji: diff
+        // variantInfo vs savedVariantInfo. Zmienione/dodane pary → upsert,
+        // pary usuniete z variantInfo wzgledem baseline → DELETE (info: "").
+        // Klucze sa unikalne (Map/object), wiec bez dodatkowego dedupe.
+        const entries: { option_name: string; value: string; info: string; info_de: string }[] = [];
+        for (const [key, entry] of Object.entries(variantInfo)) {
+          if (JSON.stringify(entry) !== JSON.stringify(savedVariantInfo[key])) {
+            const [option_name, value] = key.split("\u0000");
+            entries.push({ option_name, value, info: entry.info, info_de: entry.info_de ?? "" });
+          }
+        }
+        for (const key of Object.keys(savedVariantInfo)) {
+          if (!(key in variantInfo)) {
+            const [option_name, value] = key.split("\u0000");
+            entries.push({ option_name, value, info: "", info_de: "" });
+          }
+        }
+        const infoRes = await upsertVariantInfo(productId, entries);
+        onToast({
+          type: infoRes.ok ? "success" : "error",
+          message: infoRes.ok ? (res.message ?? "Zapisano warianty") : infoRes.error,
+        });
+        if (infoRes.ok) setSavedVariantInfo(variantInfo);
         setVariants(toSave);
       } else {
         onToast({ type: "error", message: res.error });
@@ -374,6 +428,8 @@ export default function VariantsEditor({
             onToggleFilterable={(v) => setOptionFilterable(i, v)}
             onAddValueImages={(v, urls) => addValueImages(i, v, urls)}
             onRemoveValueImage={(v, url) => removeValueImage(i, v, url)}
+            onSetValueInfo={(v, info, infoDe) => setValueInfo(opt.name, v, info, infoDe)}
+            infoFor={(v) => variantInfo[variantInfoKey(opt.name, v)]}
             onToast={onToast}
           />
         ))}
@@ -409,12 +465,12 @@ export default function VariantsEditor({
           ============================================================ */}
       <div className="flex items-center justify-between gap-4 pt-4 border-t border-[var(--border)]">
         <p className="text-xs text-[var(--muted)]">
-          {dirty ? "Masz niezapisane zmiany w wariantach." : "Warianty zapisane."}
+          {dirty || infoDirty ? "Masz niezapisane zmiany w wariantach." : "Warianty zapisane."}
         </p>
         <button
           type="button"
           onClick={save}
-          disabled={saving || !dirty}
+          disabled={saving || (!dirty && !infoDirty)}
           aria-busy={saving}
           data-guard-save
           className="px-6 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
@@ -453,6 +509,8 @@ function OptionRow({
   onToggleFilterable,
   onAddValueImages,
   onRemoveValueImage,
+  onSetValueInfo,
+  infoFor,
   onToast,
 }: {
   option: ProductOption;
@@ -464,10 +522,13 @@ function OptionRow({
   onToggleFilterable: (v: boolean) => void;
   onAddValueImages: (value: string, urls: string[]) => void;
   onRemoveValueImage: (value: string, url: string) => void;
+  onSetValueInfo: (value: string, info: string, infoDe: string) => void;
+  infoFor: (value: string) => VariantInfoEntry | undefined;
   onToast: (t: Toast) => void;
 }) {
   const [newValue, setNewValue] = useState("");
   const [imagesFor, setImagesFor] = useState<string | null>(null);
+  const [infoForVal, setInfoForVal] = useState<string | null>(null);
   return (
     <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl p-4 flex flex-col gap-3">
       <div className="flex items-center gap-3">
@@ -534,6 +595,20 @@ function OptionRow({
                   >
                     📷{imgCount > 0 ? ` ${imgCount}` : ""}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setInfoForVal(infoForVal === v ? null : v)}
+                    aria-expanded={infoForVal === v}
+                    aria-label={`Informacja o wariancie ${v}`}
+                    title="Krótka informacja (tooltip u klienta)"
+                    className={`shrink-0 px-2 py-1 text-[11px] font-sans rounded-full border transition-colors ${
+                      infoForVal === v || infoFor(v)
+                        ? "border-[var(--color-gold)] text-[var(--color-gold-text)]"
+                        : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold-text)]"
+                    }`}
+                  >
+                    ℹ{infoFor(v) ? " •" : ""}
+                  </button>
                   <div className="flex items-center gap-1 shrink-0">
                     <span className="text-xs text-[var(--muted)]">+</span>
                     <input
@@ -572,6 +647,33 @@ function OptionRow({
                     onRemove={(url) => onRemoveValueImage(v, url)}
                     onToast={onToast}
                   />
+                )}
+                {infoForVal === v && (
+                  <div className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--card-bg)] p-3">
+                    <label className="text-[11px] uppercase tracking-widest text-[var(--muted)]">
+                      Info PL (tooltip, maks. 200 zn.) — zapis globalny dla „{option.name}: {v}&rdquo;
+                    </label>
+                    <textarea
+                      maxLength={200}
+                      value={infoFor(v)?.info ?? ""}
+                      onChange={(e) => onSetValueInfo(v, e.target.value, infoFor(v)?.info_de ?? "")}
+                      placeholder="np. Miękki welur, łatwy w czyszczeniu"
+                      className={`${inputClass} min-h-[3rem]`}
+                    />
+                    <label className="text-[11px] uppercase tracking-widest text-[var(--muted)]">
+                      Info DE (opcjonalnie)
+                    </label>
+                    <textarea
+                      maxLength={200}
+                      value={infoFor(v)?.info_de ?? ""}
+                      onChange={(e) => onSetValueInfo(v, infoFor(v)?.info ?? "", e.target.value)}
+                      placeholder="z. B. Weicher Cord, pflegeleicht"
+                      className={`${inputClass} min-h-[3rem]`}
+                    />
+                    <p className="text-[11px] text-[var(--muted)]">
+                      Uwaga: edycja zmienia info wszędzie, gdzie występuje ta para (opcja + wartość).
+                    </p>
+                  </div>
                 )}
               </div>
             );

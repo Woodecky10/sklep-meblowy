@@ -170,6 +170,8 @@ export async function createFabric(formData: FormData): Promise<ActionResult> {
   if (!groupId) return { ok: false, error: "Wybierz grupę cenową" };
   const description = parseRichHtml(formData.get("description"));
   const descriptionDe = parseRichHtml(formData.get("description_de"));
+  const shortInfo = emptyToNull(sanitize(formData.get("short_info"), 500));
+  const shortInfoDe = emptyToNull(sanitize(formData.get("short_info_de"), 500));
   const rawFeatured = parseFeaturedProductIds(formData.get("featured_product_ids_json"));
 
   const supabase = await createAdminClient();
@@ -185,6 +187,8 @@ export async function createFabric(formData: FormData): Promise<ActionResult> {
     .insert({
       name, name_de: nameDe, sort_order: sortOrder, colors, color_images, price, category,
       group_id: groupId, slug, description, description_de: descriptionDe,
+      short_info: shortInfo,
+      short_info_de: shortInfoDe,
       featured_product_ids: featuredProductIds,
     } as never)
     .select()
@@ -218,6 +222,8 @@ export async function updateFabric(formData: FormData): Promise<ActionResult> {
   if (!groupId) return { ok: false, error: "Wybierz grupę cenową" };
   const description = parseRichHtml(formData.get("description"));
   const descriptionDe = parseRichHtml(formData.get("description_de"));
+  const shortInfo = emptyToNull(sanitize(formData.get("short_info"), 500));
+  const shortInfoDe = emptyToNull(sanitize(formData.get("short_info_de"), 500));
   const rawFeatured = parseFeaturedProductIds(formData.get("featured_product_ids_json"));
 
   const supabase = await createAdminClient();
@@ -227,6 +233,8 @@ export async function updateFabric(formData: FormData): Promise<ActionResult> {
     .update({
       name, name_de: nameDe, sort_order: sortOrder, colors, color_images, price, category,
       group_id: groupId, description, description_de: descriptionDe,
+      short_info: shortInfo,
+      short_info_de: shortInfoDe,
       featured_product_ids: featuredProductIds,
     } as never)
     .eq("id", id);

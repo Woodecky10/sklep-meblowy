@@ -37,6 +37,8 @@ import { buildSizeOptions } from "@/app/_lib/size-groups";
 import { effectivePrice } from "@/app/_lib/pricing";
 import { getFabricImageMap, getFabricMetaMap } from "@/app/_lib/fabrics";
 import { FabricImageProvider, FabricMetaProvider } from "@/app/_lib/fabric-context";
+import { getVariantInfoMap } from "@/app/_lib/variant-info-data";
+import { VariantInfoProvider } from "@/app/_lib/variant-info-context";
 import { getBundlesForProduct } from "@/app/_lib/bundles-server";
 import type { Product } from "@/app/_lib/types";
 
@@ -120,6 +122,9 @@ export default async function ProduktPage({ params }: Props) {
   // Mapa wartość wariantu → metadane tkaniny (slug, grupa cenowa) — selektor
   // grupuje próbki w rozwijane karty grup + link „szczegóły" do /tkaniny/[slug].
   const fabricMetaMap = await getFabricMetaMap();
+  // Mapa (opcja+wartość) → {info, info_de} — krótkie informacje o wariancie
+  // (tooltip „i" przy wartości w selektorze).
+  const variantInfoMap = await getVariantInfoMap();
 
   // Etykieta cross-sell pochodzi z LABELA pierwszej cross_sell_categories tej
   // kategorii — np. dla łóżek pokaże "Polecane materace".
@@ -277,14 +282,16 @@ export default async function ProduktPage({ params }: Props) {
           żeby wypełniała pustą przestrzeń pod galerią. */}
       <FabricImageProvider map={fabricImageMap}>
         <FabricMetaProvider map={fabricMetaMap}>
-          <ProductMainSection
-            product={product}
-            categoryLabel={categoryLabel ?? null}
-            rating={rating}
-            specifications={details}
-            sizeOptions={sizeOptions}
-            bundles={bundles}
-          />
+          <VariantInfoProvider map={variantInfoMap}>
+            <ProductMainSection
+              product={product}
+              categoryLabel={categoryLabel ?? null}
+              rating={rating}
+              specifications={details}
+              sizeOptions={sizeOptions}
+              bundles={bundles}
+            />
+          </VariantInfoProvider>
         </FabricMetaProvider>
       </FabricImageProvider>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { Product, ProductVariants } from "@/app/_lib/types";
@@ -8,7 +8,7 @@ import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "@/app/_lib/de-content-maps";
 import { localizeHref, pickLocalized, type Locale } from "@/app/_lib/i18n";
 import { useFabricLabels, useFabricImages, useFabricMeta } from "@/app/_lib/fabric-context";
-import { FABRIC_OPTION_NAME, sortVariantValues, sortVariantOptions } from "@/app/_lib/variants";
+import { FABRIC_OPTION_NAME, sortVariantValues, sortVariantOptions, optionHasValueImages } from "@/app/_lib/variants";
 import {
   cornerSideOf,
   isCornerSideOptionName,
@@ -18,6 +18,9 @@ import {
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { useEurRate } from "@/app/_lib/rate-context";
 import { formatMoney } from "@/app/_lib/money";
+import { useVariantInfo } from "@/app/_lib/variant-info-context";
+import { variantInfoKey, variantInfoText } from "@/app/_lib/variant-info";
+import ValueInfoTip from "./ValueInfoTip";
 
 type Props = {
   variants: ProductVariants;
@@ -46,6 +49,52 @@ function getValueLabel(
   return mapDe(VARIANT_VALUE_DE, raw) ?? raw;
 }
 
+// Zewnętrzny „przycisk" wartości wariantu (chip/próbka/kafelek). Natywny
+// <button> nie może zawierać zagnieżdżonego <button> (ValueInfoTip) — podczas
+// parsowania HTML przeglądarka zamyka zewnętrzny button na widok wewnętrznego,
+// co psuje hydration (React: "cannot contain a nested <button>"). Gdy wartość
+// ma tooltip informacyjny, renderujemy div[role=button] z obsługą klawiatury
+// zamiast <button>; pozostałe wartości bez zmian (nadal natywny <button>).
+function SwatchButton({
+  hasTip,
+  onClick,
+  ariaPressed,
+  className,
+  children,
+}: {
+  hasTip: boolean;
+  onClick: () => void;
+  ariaPressed: boolean;
+  className: string;
+  children: ReactNode;
+}) {
+  if (hasTip) {
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        aria-pressed={ariaPressed}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        className={className}
+      >
+        {children}
+      </div>
+    );
+  }
+  return (
+    <button type="button" aria-pressed={ariaPressed} onClick={onClick} className={className}>
+      {children}
+    </button>
+  );
+}
+
 export default function VariantSelector({
   variants,
   selected,
@@ -57,6 +106,9 @@ export default function VariantSelector({
   const fabricImages = useFabricImages();
   const rate = useEurRate();
   const t = getDictionary(locale);
+  const variantInfo = useVariantInfo();
+  const infoTextFor = (optionName: string, value: string) =>
+    variantInfoText(variantInfo[variantInfoKey(optionName, value)], locale);
   function pick(name: string, value: string) {
     onChange({ ...selected, [name]: value });
   }
@@ -103,6 +155,7 @@ export default function VariantSelector({
                 valuePrices={option.value_prices}
                 images={fabricImages}
                 labelOf={(v) => getValueLabel(product, option.name, v, locale, fabricMap)}
+                infoFor={(v) => infoTextFor(option.name, v)}
                 locale={locale}
                 rate={rate}
                 onPick={(v) => pick(option.name, v)}
@@ -113,7 +166,20 @@ export default function VariantSelector({
                 current={current}
                 valuePrices={option.value_prices}
                 labelOf={(v) => getValueLabel(product, option.name, v, locale, fabricMap)}
+                infoFor={(v) => infoTextFor(option.name, v)}
                 hint={t.product.cornerSideHint}
+                locale={locale}
+                rate={rate}
+                onPick={(v) => pick(option.name, v)}
+              />
+            ) : optionHasValueImages(option) ? (
+              <ValueImageSwatchGroup
+                values={orderedValues}
+                current={current}
+                valuePrices={option.value_prices}
+                valueImages={option.value_images ?? {}}
+                labelOf={(v) => getValueLabel(product, option.name, v, locale, fabricMap)}
+                infoFor={(v) => infoTextFor(option.name, v)}
                 locale={locale}
                 rate={rate}
                 onPick={(v) => pick(option.name, v)}
@@ -124,17 +190,23 @@ export default function VariantSelector({
                   const isActive = current === v;
                   const label = getValueLabel(product, option.name, v, locale, fabricMap);
                   const surcharge = option.value_prices?.[v] ?? 0;
+                  const info = infoTextFor(option.name, v);
                   return (
-                    <button
+                    <SwatchButton
                       key={v}
+                      hasTip={!!info}
                       onClick={() => pick(option.name, v)}
+                      ariaPressed={isActive}
                       className={`px-4 py-2 text-sm font-sans rounded-full border transition-colors ${
                         isActive
                           ? "border-[var(--color-gold)] bg-[var(--color-gold)] text-[var(--color-navy)] font-semibold"
                           : "border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)]"
                       }`}
                     >
-                      {label}
+                      <span className="inline-flex items-center gap-1">
+                        {label}
+                        {info && <ValueInfoTip text={info} />}
+                      </span>
                       {surcharge !== 0 && (
                         <span className={isActive ? "opacity-80" : "text-[var(--muted)]"}>
                           {" "}
@@ -142,7 +214,7 @@ export default function VariantSelector({
                           {formatMoney(Math.abs(surcharge), locale, rate)})
                         </span>
                       )}
-                    </button>
+                    </SwatchButton>
                   );
                 })}
               </div>
@@ -167,6 +239,7 @@ function FabricSwatchGroup({
   valuePrices,
   images,
   labelOf,
+  infoFor,
   locale,
   rate,
   onPick,
@@ -176,6 +249,7 @@ function FabricSwatchGroup({
   valuePrices: Record<string, number> | undefined;
   images: Record<string, string>;
   labelOf: (v: string) => string;
+  infoFor: (value: string) => string | null;
   locale: Locale;
   rate: number;
   onPick: (v: string) => void;
@@ -190,12 +264,13 @@ function FabricSwatchGroup({
     const img = images[v];
     const surcharge = valuePrices?.[v] ?? 0;
     const label = labelOf(v);
+    const info = infoFor(v);
     return (
-      <button
+      <SwatchButton
         key={v}
-        type="button"
+        hasTip={!!info}
         onClick={() => onPick(v)}
-        aria-pressed={active}
+        ariaPressed={active}
         className="flex flex-col items-center gap-1.5 text-center group"
       >
         <span
@@ -215,16 +290,17 @@ function FabricSwatchGroup({
           )}
         </span>
         <span
-          className={`text-xs leading-tight ${
+          className={`text-xs leading-tight inline-flex items-center gap-1 ${
             active ? "text-[var(--color-gold)] font-semibold" : "text-[var(--fg)]"
           }`}
         >
           {label}
+          {info && <ValueInfoTip text={info} />}
         </span>
         <span className="text-[11px] text-[var(--muted)]">
           {surcharge > 0 ? `+${formatMoney(surcharge, locale, rate)}` : formatMoney(0, locale, rate)}
         </span>
-      </button>
+      </SwatchButton>
     );
   };
 
@@ -258,7 +334,7 @@ function FabricSwatchGroup({
     label: string;
     surcharge: number;
     sort: number;
-    fabrics: Map<string, { slug: string | null; values: string[] }>;
+    fabrics: Map<string, { slug: string | null; shortInfo: string | null; values: string[] }>;
   };
   const buckets = new Map<string, GroupBucket>();
   for (const v of values) {
@@ -286,7 +362,12 @@ function FabricSwatchGroup({
     const fabricName = m?.fabricName ?? v;
     const entry = bucket.fabrics.get(fabricName);
     if (entry) entry.values.push(v);
-    else bucket.fabrics.set(fabricName, { slug: m?.slug ?? null, values: [v] });
+    else
+      bucket.fabrics.set(fabricName, {
+        slug: m?.slug ?? null,
+        shortInfo: m ? pickLocalized(m.shortInfo ?? "", m.shortInfoDe, locale) || null : null,
+        values: [v],
+      });
   }
   const ordered = [...buckets.values()].sort((a, b) => a.sort - b.sort);
   const currentGroup = current ? meta[current]?.groupCode ?? "__other" : null;
@@ -336,6 +417,7 @@ function FabricSwatchGroup({
                           {t.fabrics.detailsLink}
                         </Link>
                       )}
+                      {entry.shortInfo && <ValueInfoTip text={entry.shortInfo} />}
                     </p>
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                       {entry.values.map(swatch)}
@@ -358,6 +440,81 @@ function FabricSwatchGroup({
   );
 }
 
+// Swatche zdjęć wariantu (value_images) dla opcji innych niż tkanina/narożnik.
+// Zachowują się jak próbki tkanin: miniatura przy wartości, klik = wybór; zdjęcia
+// NIE wchodzą do głównej galerii (patrz getVariantImages — scala tylko narożnik).
+// Miniatura = pierwsze zdjęcie wartości; brak zdjęcia → tekst wartości w kółku.
+function ValueImageSwatchGroup({
+  values,
+  current,
+  valuePrices,
+  valueImages,
+  labelOf,
+  infoFor,
+  locale,
+  rate,
+  onPick,
+}: {
+  values: string[];
+  current: string | undefined;
+  valuePrices: Record<string, number> | undefined;
+  valueImages: Record<string, string[]>;
+  labelOf: (v: string) => string;
+  infoFor: (value: string) => string | null;
+  locale: Locale;
+  rate: number;
+  onPick: (v: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+      {values.map((v) => {
+        const active = current === v;
+        const img = valueImages[v]?.[0];
+        const surcharge = valuePrices?.[v] ?? 0;
+        const label = labelOf(v);
+        const info = infoFor(v);
+        return (
+          <SwatchButton
+            key={v}
+            hasTip={!!info}
+            onClick={() => onPick(v)}
+            ariaPressed={active}
+            className="flex flex-col items-center gap-1.5 text-center group"
+          >
+            <span
+              className={`relative w-16 h-16 rounded-full overflow-hidden border-2 transition-colors ${
+                active
+                  ? "border-[var(--color-gold)]"
+                  : "border-[var(--border)] group-hover:border-[var(--color-gold)]"
+              }`}
+            >
+              {img ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={img} alt={label} loading="lazy" className="w-full h-full object-cover" />
+              ) : (
+                <span className="w-full h-full flex items-center justify-center bg-[var(--bg)] text-[10px] text-[var(--muted)]">
+                  {v.split(" ").pop()}
+                </span>
+              )}
+            </span>
+            <span
+              className={`text-xs leading-tight inline-flex items-center gap-1 ${
+                active ? "text-[var(--color-gold)] font-semibold" : "text-[var(--fg)]"
+              }`}
+            >
+              {label}
+              {info && <ValueInfoTip text={info} />}
+            </span>
+            <span className="text-[11px] text-[var(--muted)]">
+              {surcharge > 0 ? `+${formatMoney(surcharge, locale, rate)}` : formatMoney(0, locale, rate)}
+            </span>
+          </SwatchButton>
+        );
+      })}
+    </div>
+  );
+}
+
 // Grafiki stron narożnika (statyczne SVG z public/, językowo neutralne —
 // etykieta pod kafelkiem idzie z wartości opcji przez overrides → mapy DE).
 const CORNER_SIDE_IMAGES: Record<CornerSide, string> = {
@@ -374,6 +531,7 @@ function CornerSideGroup({
   current,
   valuePrices,
   labelOf,
+  infoFor,
   hint,
   locale,
   rate,
@@ -383,6 +541,7 @@ function CornerSideGroup({
   current: string | undefined;
   valuePrices: Record<string, number> | undefined;
   labelOf: (v: string) => string;
+  infoFor: (value: string) => string | null;
   hint: string;
   locale: Locale;
   rate: number;
@@ -396,29 +555,33 @@ function CornerSideGroup({
           const active = current === v;
           const label = labelOf(v);
           const surcharge = valuePrices?.[v] ?? 0;
+          const info = infoFor(v);
           if (!side) {
             return (
-              <button
+              <SwatchButton
                 key={v}
-                type="button"
+                hasTip={!!info}
                 onClick={() => onPick(v)}
-                aria-pressed={active}
+                ariaPressed={active}
                 className={`px-4 py-2 text-sm font-sans rounded-full border transition-colors ${
                   active
                     ? "border-[var(--color-gold)] bg-[var(--color-gold)] text-[var(--color-navy)] font-semibold"
                     : "border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)]"
                 }`}
               >
-                {label}
-              </button>
+                <span className="inline-flex items-center gap-1">
+                  {label}
+                  {info && <ValueInfoTip text={info} />}
+                </span>
+              </SwatchButton>
             );
           }
           return (
-            <button
+            <SwatchButton
               key={v}
-              type="button"
+              hasTip={!!info}
               onClick={() => onPick(v)}
-              aria-pressed={active}
+              ariaPressed={active}
               className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-colors ${
                 active
                   ? "border-[var(--color-gold)]"
@@ -435,11 +598,12 @@ function CornerSideGroup({
                 />
               </span>
               <span
-                className={`text-xs leading-tight ${
+                className={`text-xs leading-tight inline-flex items-center gap-1 ${
                   active ? "text-[var(--color-gold)] font-semibold" : "text-[var(--fg)]"
                 }`}
               >
                 {label}
+                {info && <ValueInfoTip text={info} />}
                 {surcharge !== 0 && (
                   <span className={active ? "opacity-80" : "text-[var(--muted)]"}>
                     {" "}
@@ -448,7 +612,7 @@ function CornerSideGroup({
                   </span>
                 )}
               </span>
-            </button>
+            </SwatchButton>
           );
         })}
       </div>

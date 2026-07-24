@@ -18,6 +18,7 @@ import {
   buildGroupSurchargeMap,
   buildFabricMetaMap,
   rebuildFabricValuePrices,
+  optionHasValueImages,
 } from "@/app/_lib/variants";
 import type { Product } from "@/app/_lib/types";
 
@@ -152,6 +153,8 @@ describe("buildFabricMetaMap", () => {
       groupNameDe: "Premium DE",
       groupSurcharge: 250,
       groupSort: 1,
+      shortInfo: null,
+      shortInfoDe: null,
     });
     expect(map["Sawana"].groupCode).toBe("standard");
   });
@@ -161,6 +164,24 @@ describe("buildFabricMetaMap", () => {
       groups
     );
     expect(map).toEqual({});
+  });
+  describe("buildFabricMetaMap — krótkie info", () => {
+    it("shortInfo/shortInfoDe trafiają do meta każdej wartości tkaniny; puste → null", () => {
+      const map = buildFabricMetaMap(
+        [
+          { name: "Baloo", colors: ["01", "02"], slug: "baloo", group_id: "g1", short_info: "  Miękki welur ", short_info_de: " Velours " },
+          { name: "Sawana", colors: ["21"], slug: "sawana", group_id: "g1", short_info: "  ", short_info_de: null },
+          { name: "Riviera", colors: [], slug: "riviera", group_id: "g1" },
+        ],
+        groups
+      );
+      expect(map["Baloo 01"].shortInfo).toBe("Miękki welur");
+      expect(map["Baloo 01"].shortInfoDe).toBe("Velours");
+      expect(map["Baloo 02"].shortInfo).toBe("Miękki welur"); // wszystkie kolory dostają to samo
+      expect(map["Sawana 21"].shortInfo).toBeNull(); // whitespace → null
+      expect(map["Riviera"].shortInfo).toBeNull(); // brak pól → null
+      expect(map["Riviera"].shortInfoDe).toBeNull();
+    });
   });
 });
 
@@ -233,29 +254,48 @@ const productWithValueImages = {
   },
 } as unknown as Product;
 
-describe("getVariantImages — zdjęcia per wartość opcji (value_images)", () => {
+describe("getVariantImages — value_images tylko dla narożnika", () => {
   it("brak wyboru → galeria produktu", () => {
     expect(getVariantImages(productWithValueImages, {})).toEqual([
       "prod1.jpg", "prod2.jpg",
     ]);
   });
-  it("wybrana wartość ze zdjęciami → zdjęcia wariantu na początku + galeria produktu", () => {
+  it("opcja nie-narożnikowa (Tkanina) ze zdjęciami → tylko galeria produktu", () => {
     expect(
       getVariantImages(productWithValueImages, { Tkanina: "Riviera 16" })
-    ).toEqual(["riv1.jpg", "riv2.jpg", "prod1.jpg", "prod2.jpg"]);
+    ).toEqual(["prod1.jpg", "prod2.jpg"]);
   });
-  it("wybrana wartość bez zdjęć → galeria produktu jak dotychczas", () => {
+  it("opcja narożnika (Strona) ze zdjęciami → zdjęcia narożnika + galeria, dedup", () => {
+    expect(
+      getVariantImages(productWithValueImages, { Strona: "Lewa" })
+    ).toEqual(["lewa.jpg", "prod1.jpg", "prod2.jpg"]);
+  });
+  it("narożnik + nie-narożnik → scala tylko narożnik", () => {
+    expect(
+      getVariantImages(productWithValueImages, { Tkanina: "Riviera 16", Strona: "Lewa" })
+    ).toEqual(["lewa.jpg", "prod1.jpg", "prod2.jpg"]);
+  });
+  it("wybrana wartość bez zdjęć → galeria produktu", () => {
     expect(
       getVariantImages(productWithValueImages, { Tkanina: "Sawana 21" })
     ).toEqual(["prod1.jpg", "prod2.jpg"]);
   });
-  it("dwie opcje ze zdjęciami → kolejność wg kolejności opcji + dedup z galerią", () => {
-    expect(
-      getVariantImages(productWithValueImages, { Tkanina: "Riviera 16", Strona: "Lewa" })
-    ).toEqual(["riv1.jpg", "riv2.jpg", "lewa.jpg", "prod1.jpg", "prod2.jpg"]);
-  });
   it("produkt bez variants → galeria produktu", () => {
     const p = { ...productWithValueImages, variants: null } as unknown as Product;
     expect(getVariantImages(p, {})).toEqual(["prod1.jpg", "prod2.jpg"]);
+  });
+});
+
+describe("optionHasValueImages", () => {
+  it("opcja z niepustymi value_images → true", () => {
+    expect(
+      optionHasValueImages({ name: "Kolor nóżek", values: ["Złote"], value_images: { "Złote": ["a.jpg"] } })
+    ).toBe(true);
+  });
+  it("opcja bez value_images → false", () => {
+    expect(optionHasValueImages({ name: "Rozmiar", values: ["M"] })).toBe(false);
+  });
+  it("opcja z samymi pustymi tablicami → false", () => {
+    expect(optionHasValueImages({ name: "X", values: ["a"], value_images: { a: [] } })).toBe(false);
   });
 });

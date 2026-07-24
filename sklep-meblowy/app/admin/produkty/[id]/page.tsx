@@ -7,6 +7,7 @@ import {
 } from "@/app/_lib/products";
 import { getAllCategories } from "@/app/_lib/categories";
 import { getAllFabrics, getFabricPriceGroups } from "@/app/_lib/fabrics";
+import { getVariantInfoMap } from "@/app/_lib/variant-info-data";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import ProductEditor from "./ProductEditor";
 import type { ProductDeFields } from "./TranslationEditor";
@@ -21,13 +22,14 @@ export default async function AdminProductEditPage({
 }) {
   await requireAdmin();
   const { id } = await params;
-  const [product, categories, de, fabrics, fabricGroups, featureKeySuggestions] =
+  const [product, categories, de, fabrics, fabricGroups, variantInfo, featureKeySuggestions] =
     await Promise.all([
       getProduct(id),
       getAllCategories(),
       getProductDe(id),
       getAllFabrics(),
       getFabricPriceGroups(),
+      getVariantInfoMap(),
       getFeatureKeySuggestionsAdmin(),
     ]);
   if (!product) notFound();
@@ -45,6 +47,7 @@ export default async function AdminProductEditPage({
       sizeGroupMembers={sizeGroupMembers}
       fabrics={fabrics}
       fabricGroups={fabricGroups}
+      variantInfo={variantInfo}
       featureKeySuggestions={featureKeySuggestions}
     />
   );
