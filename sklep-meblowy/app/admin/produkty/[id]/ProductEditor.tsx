@@ -32,6 +32,8 @@ export default function ProductEditor({
   sizeGroupMembers: SizeGroupMember[];
   fabrics: Fabric[];
   fabricGroups: FabricPriceGroup[];
+  // Podpowiedzi nazw parametrów — konsumowane w Task 3 (UI „+ Wybierz z listy").
+  featureKeySuggestions: string[];
 }) {
   const [images, setImages] = useState<string[]>(product.images ?? []);
   // Baseline ostatnio zapisanej galerii — resetowany na zapisany payload po

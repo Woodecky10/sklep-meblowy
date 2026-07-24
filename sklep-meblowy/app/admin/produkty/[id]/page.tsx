@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/app/_lib/admin";
-import { getProduct, getSizeGroupMembersAdmin } from "@/app/_lib/products";
+import {
+  getProduct,
+  getSizeGroupMembersAdmin,
+  getFeatureKeySuggestionsAdmin,
+} from "@/app/_lib/products";
 import { getAllCategories } from "@/app/_lib/categories";
 import { getAllFabrics, getFabricPriceGroups } from "@/app/_lib/fabrics";
 import { createAdminClient } from "@/app/_lib/supabase/server";
@@ -17,13 +21,15 @@ export default async function AdminProductEditPage({
 }) {
   await requireAdmin();
   const { id } = await params;
-  const [product, categories, de, fabrics, fabricGroups] = await Promise.all([
-    getProduct(id),
-    getAllCategories(),
-    getProductDe(id),
-    getAllFabrics(),
-    getFabricPriceGroups(),
-  ]);
+  const [product, categories, de, fabrics, fabricGroups, featureKeySuggestions] =
+    await Promise.all([
+      getProduct(id),
+      getAllCategories(),
+      getProductDe(id),
+      getAllFabrics(),
+      getFabricPriceGroups(),
+      getFeatureKeySuggestionsAdmin(),
+    ]);
   if (!product) notFound();
 
   // Panel zawsze pokazuje bieżący produkt; gdy jest w grupie — całe rodzeństwo.
@@ -39,6 +45,7 @@ export default async function AdminProductEditPage({
       sizeGroupMembers={sizeGroupMembers}
       fabrics={fabrics}
       fabricGroups={fabricGroups}
+      featureKeySuggestions={featureKeySuggestions}
     />
   );
 }

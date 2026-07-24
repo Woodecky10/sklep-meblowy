@@ -23,6 +23,7 @@ import StarRating from "@/app/_components/ui/StarRating";
 import ReviewList from "@/app/_components/ui/ReviewList";
 import ReviewForm from "@/app/_components/ui/ReviewForm";
 import { sanitizeProductHtml } from "@/app/_lib/product-html";
+import { DEDICATED_FEATURE_KEYS } from "@/app/_lib/product-features";
 import ProductDescriptionSections from "@/app/_components/ui/ProductDescriptionSections";
 import TrustBar from "@/app/_components/ui/TrustBar";
 import { COMPANY } from "@/app/_lib/company";
@@ -169,16 +170,7 @@ export default async function ProduktPage({ params }: Props) {
   // te które już są dedykowane (Kolor, Materiał, Wymiary, Konstrukcja, Czas
   // realizacji, Gwarancja) — żeby nie dublować linii w specyfikacji.
   const DEDICATED_KEYS = new Set(
-    [
-      "kolor",
-      "materiał",
-      "material",
-      "wymiary",
-      "konstrukcja",
-      "czas realizacji",
-      "gwarancja",
-      "waga",
-    ].map((s) => s.toLowerCase())
+    DEDICATED_FEATURE_KEYS.map((s) => s.toLowerCase())
   );
   for (const f of product.features ?? []) {
     if (DEDICATED_KEYS.has(f.key.toLowerCase().trim())) continue;
