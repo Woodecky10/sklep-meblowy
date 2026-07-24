@@ -334,7 +334,7 @@ function FabricSwatchGroup({
     label: string;
     surcharge: number;
     sort: number;
-    fabrics: Map<string, { slug: string | null; values: string[] }>;
+    fabrics: Map<string, { slug: string | null; shortInfo: string | null; values: string[] }>;
   };
   const buckets = new Map<string, GroupBucket>();
   for (const v of values) {
@@ -362,7 +362,12 @@ function FabricSwatchGroup({
     const fabricName = m?.fabricName ?? v;
     const entry = bucket.fabrics.get(fabricName);
     if (entry) entry.values.push(v);
-    else bucket.fabrics.set(fabricName, { slug: m?.slug ?? null, values: [v] });
+    else
+      bucket.fabrics.set(fabricName, {
+        slug: m?.slug ?? null,
+        shortInfo: m ? pickLocalized(m.shortInfo ?? "", m.shortInfoDe, locale) || null : null,
+        values: [v],
+      });
   }
   const ordered = [...buckets.values()].sort((a, b) => a.sort - b.sort);
   const currentGroup = current ? meta[current]?.groupCode ?? "__other" : null;
@@ -412,6 +417,7 @@ function FabricSwatchGroup({
                           {t.fabrics.detailsLink}
                         </Link>
                       )}
+                      {entry.shortInfo && <ValueInfoTip text={entry.shortInfo} />}
                     </p>
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                       {entry.values.map(swatch)}
