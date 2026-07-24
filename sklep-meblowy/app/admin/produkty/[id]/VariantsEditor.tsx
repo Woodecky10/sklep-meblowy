@@ -287,13 +287,13 @@ export default function VariantsEditor({
         const entries: { option_name: string; value: string; info: string; info_de: string }[] = [];
         for (const [key, entry] of Object.entries(variantInfo)) {
           if (JSON.stringify(entry) !== JSON.stringify(savedVariantInfo[key])) {
-            const [option_name, value] = key.split(" ");
+            const [option_name, value] = key.split("\u0000");
             entries.push({ option_name, value, info: entry.info, info_de: entry.info_de ?? "" });
           }
         }
         for (const key of Object.keys(savedVariantInfo)) {
           if (!(key in variantInfo)) {
-            const [option_name, value] = key.split(" ");
+            const [option_name, value] = key.split("\u0000");
             entries.push({ option_name, value, info: "", info_de: "" });
           }
         }
