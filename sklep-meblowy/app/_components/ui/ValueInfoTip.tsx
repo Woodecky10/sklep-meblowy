@@ -18,6 +18,7 @@ export default function ValueInfoTip({ text }: { text: string }) {
           e.stopPropagation();
           setOpen((v) => !v);
         }}
+        onKeyDown={(e) => e.stopPropagation()}
         className="w-4 h-4 inline-flex items-center justify-center rounded-full border border-[var(--border)] text-[10px] leading-none text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold)] cursor-help"
       >
         i
