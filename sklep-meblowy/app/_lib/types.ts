@@ -201,6 +201,10 @@ export type Fabric = {
   // Opis na stronę tkaniny (sanityzowany HTML). description_de null → fallback PL.
   description: string | null;
   description_de: string | null;
+  // Krótkie info o tkaninie (dymek obok „szczegóły" w pickerze). Zwykły tekst,
+  // osobne od description. short_info_de null → fallback PL.
+  short_info: string | null;
+  short_info_de: string | null;
   // Wybrane produkty pokazywane w sekcji „Meble w tej tkaninie" na stronie
   // tkaniny (kolejność = kolejność w tablicy; max 20 w adminie). Nieznane/
   // nieaktywne id pomijane przy renderze.
