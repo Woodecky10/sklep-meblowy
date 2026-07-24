@@ -359,12 +359,21 @@ export type FabricValueMeta = {
   groupNameDe: string | null;
   groupSurcharge: number;
   groupSort: number;
+  shortInfo: string | null;
+  shortInfoDe: string | null;
 };
 
 // Buduje mapę wartość wariantu („Nazwa Numer"/„Nazwa") → FabricValueMeta.
 // Tkaniny z group_id spoza `groups` pomijane (teoretyczne — FK NOT NULL).
 export function buildFabricMetaMap(
-  fabrics: { name: string; colors: string[]; slug: string; group_id: string }[],
+  fabrics: {
+    name: string;
+    colors: string[];
+    slug: string;
+    group_id: string;
+    short_info?: string | null;
+    short_info_de?: string | null;
+  }[],
   groups: { id: string; code: string; name: string; name_de: string | null; surcharge: number; sort_order: number }[]
 ): Record<string, FabricValueMeta> {
   const byId = new Map(groups.map((g) => [g.id, g]));
@@ -383,6 +392,8 @@ export function buildFabricMetaMap(
       groupNameDe: g.name_de,
       groupSurcharge: g.surcharge,
       groupSort: g.sort_order,
+      shortInfo: (f.short_info ?? "").trim() || null,
+      shortInfoDe: (f.short_info_de ?? "").trim() || null,
     };
     for (const v of values) map[v] = meta;
   }

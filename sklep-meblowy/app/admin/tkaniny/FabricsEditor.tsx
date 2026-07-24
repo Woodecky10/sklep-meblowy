@@ -333,6 +333,25 @@ function FabricForm({
         <input type="hidden" name="description_de" value={descriptionDe} />
         <RichTextEditor value={descriptionDe} onChange={setDescriptionDe} ariaLabel="Opis tkaniny (DE)" />
       </Field>
+      <Field label="Krótkie info" hint="Krótki tekst w dymku obok „szczegóły” w pickerze (maks. 200 znaków).">
+        <textarea
+          name="short_info"
+          defaultValue={initial?.short_info ?? ""}
+          maxLength={200}
+          rows={2}
+          className={inputCls}
+          placeholder="np. Miękki welur, łatwy w czyszczeniu"
+        />
+      </Field>
+      <Field label="Krótkie info (DE)" hint="Puste → na /de pokaże się PL.">
+        <textarea
+          name="short_info_de"
+          defaultValue={initial?.short_info_de ?? ""}
+          maxLength={200}
+          rows={2}
+          className={inputCls}
+        />
+      </Field>
 
       {/* Kolory (numery) + zdjęcia próbek widoczne dla klienta */}
       <div className="flex flex-col gap-2">

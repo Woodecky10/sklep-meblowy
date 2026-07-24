@@ -153,6 +153,8 @@ describe("buildFabricMetaMap", () => {
       groupNameDe: "Premium DE",
       groupSurcharge: 250,
       groupSort: 1,
+      shortInfo: null,
+      shortInfoDe: null,
     });
     expect(map["Sawana"].groupCode).toBe("standard");
   });
@@ -162,6 +164,24 @@ describe("buildFabricMetaMap", () => {
       groups
     );
     expect(map).toEqual({});
+  });
+  describe("buildFabricMetaMap — krótkie info", () => {
+    it("shortInfo/shortInfoDe trafiają do meta każdej wartości tkaniny; puste → null", () => {
+      const map = buildFabricMetaMap(
+        [
+          { name: "Baloo", colors: ["01", "02"], slug: "baloo", group_id: "g1", short_info: "  Miękki welur ", short_info_de: " Velours " },
+          { name: "Sawana", colors: ["21"], slug: "sawana", group_id: "g1", short_info: "  ", short_info_de: null },
+          { name: "Riviera", colors: [], slug: "riviera", group_id: "g1" },
+        ],
+        groups
+      );
+      expect(map["Baloo 01"].shortInfo).toBe("Miękki welur");
+      expect(map["Baloo 01"].shortInfoDe).toBe("Velours");
+      expect(map["Baloo 02"].shortInfo).toBe("Miękki welur"); // wszystkie kolory dostają to samo
+      expect(map["Sawana 21"].shortInfo).toBeNull(); // whitespace → null
+      expect(map["Riviera"].shortInfo).toBeNull(); // brak pól → null
+      expect(map["Riviera"].shortInfoDe).toBeNull();
+    });
   });
 });
 
