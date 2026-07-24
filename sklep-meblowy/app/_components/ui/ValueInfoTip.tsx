@@ -1,14 +1,36 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 // Mały dostępny tooltip przy wartości wariantu. Pokazuje krótką informację na
-// hover i focus (CSS: group-hover/group-focus-within) oraz na klik (mobile).
+// hover i focus (CSS: group-hover/group-focus-within) oraz na klik/tap (mobile).
 export default function ValueInfoTip({ text }: { text: string }) {
   const id = useId();
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  // Tooltip otwarty tapnięciem (mobile) zamykamy Escape'em oraz kliknięciem poza
+  // — hover/focus na desktopie i tak działa niezależnie przez CSS. Listenery
+  // dokładamy tylko gdy otwarty (capture: łapiemy przed innymi handlerami).
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    function onPointerDown(e: Event) {
+      const t = e.target;
+      if (!(t instanceof Node) || !ref.current?.contains(t)) setOpen(false);
+    }
+    document.addEventListener("keydown", onKey, true);
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => {
+      document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("pointerdown", onPointerDown, true);
+    };
+  }, [open]);
+
   return (
-    <span className="relative inline-flex group align-middle">
+    <span ref={ref} className="relative inline-flex group align-middle">
       <button
         type="button"
         aria-label="Informacja o wariancie"
