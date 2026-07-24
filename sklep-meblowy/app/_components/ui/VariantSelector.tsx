@@ -8,7 +8,7 @@ import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "@/app/_lib/de-content-maps";
 import { localizeHref, pickLocalized, type Locale } from "@/app/_lib/i18n";
 import { useFabricLabels, useFabricImages, useFabricMeta } from "@/app/_lib/fabric-context";
-import { FABRIC_OPTION_NAME, sortVariantValues, sortVariantOptions } from "@/app/_lib/variants";
+import { FABRIC_OPTION_NAME, sortVariantValues, sortVariantOptions, optionHasValueImages } from "@/app/_lib/variants";
 import {
   cornerSideOf,
   isCornerSideOptionName,
@@ -114,6 +114,17 @@ export default function VariantSelector({
                 valuePrices={option.value_prices}
                 labelOf={(v) => getValueLabel(product, option.name, v, locale, fabricMap)}
                 hint={t.product.cornerSideHint}
+                locale={locale}
+                rate={rate}
+                onPick={(v) => pick(option.name, v)}
+              />
+            ) : optionHasValueImages(option) ? (
+              <ValueImageSwatchGroup
+                values={orderedValues}
+                current={current}
+                valuePrices={option.value_prices}
+                valueImages={option.value_images ?? {}}
+                labelOf={(v) => getValueLabel(product, option.name, v, locale, fabricMap)}
                 locale={locale}
                 rate={rate}
                 onPick={(v) => pick(option.name, v)}
@@ -354,6 +365,77 @@ function FabricSwatchGroup({
       >
         {locale === "de" ? "Weniger anzeigen" : "Zobacz mniej"}
       </button>
+    </div>
+  );
+}
+
+// Swatche zdjęć wariantu (value_images) dla opcji innych niż tkanina/narożnik.
+// Zachowują się jak próbki tkanin: miniatura przy wartości, klik = wybór; zdjęcia
+// NIE wchodzą do głównej galerii (patrz getVariantImages — scala tylko narożnik).
+// Miniatura = pierwsze zdjęcie wartości; brak zdjęcia → tekst wartości w kółku.
+function ValueImageSwatchGroup({
+  values,
+  current,
+  valuePrices,
+  valueImages,
+  labelOf,
+  locale,
+  rate,
+  onPick,
+}: {
+  values: string[];
+  current: string | undefined;
+  valuePrices: Record<string, number> | undefined;
+  valueImages: Record<string, string[]>;
+  labelOf: (v: string) => string;
+  locale: Locale;
+  rate: number;
+  onPick: (v: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+      {values.map((v) => {
+        const active = current === v;
+        const img = valueImages[v]?.[0];
+        const surcharge = valuePrices?.[v] ?? 0;
+        const label = labelOf(v);
+        return (
+          <button
+            key={v}
+            type="button"
+            onClick={() => onPick(v)}
+            aria-pressed={active}
+            className="flex flex-col items-center gap-1.5 text-center group"
+          >
+            <span
+              className={`relative w-16 h-16 rounded-full overflow-hidden border-2 transition-colors ${
+                active
+                  ? "border-[var(--color-gold)]"
+                  : "border-[var(--border)] group-hover:border-[var(--color-gold)]"
+              }`}
+            >
+              {img ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={img} alt={label} loading="lazy" className="w-full h-full object-cover" />
+              ) : (
+                <span className="w-full h-full flex items-center justify-center bg-[var(--bg)] text-[10px] text-[var(--muted)]">
+                  {v.split(" ").pop()}
+                </span>
+              )}
+            </span>
+            <span
+              className={`text-xs leading-tight ${
+                active ? "text-[var(--color-gold)] font-semibold" : "text-[var(--fg)]"
+              }`}
+            >
+              {label}
+            </span>
+            <span className="text-[11px] text-[var(--muted)]">
+              {surcharge > 0 ? `+${formatMoney(surcharge, locale, rate)}` : formatMoney(0, locale, rate)}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
