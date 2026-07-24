@@ -7,6 +7,7 @@ import Link from "next/link";
 import { updateProductBasics, updateProductImages, duplicateProduct } from "../actions";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { Product, ActionResult, Fabric, FabricPriceGroup } from "@/app/_lib/types";
+import type { VariantInfoEntry } from "@/app/_lib/variant-info";
 import type { CategoryDef } from "@/app/_lib/categories";
 import { Field, IconBtn, inputClass, CollapsibleSection, type Toast } from "./_shared";
 import { useImageUpload } from "./useImageUpload";
@@ -25,6 +26,7 @@ export default function ProductEditor({
   sizeGroupMembers,
   fabrics,
   fabricGroups,
+  variantInfo,
 }: {
   product: Product;
   categories: CategoryDef[];
@@ -32,6 +34,7 @@ export default function ProductEditor({
   sizeGroupMembers: SizeGroupMember[];
   fabrics: Fabric[];
   fabricGroups: FabricPriceGroup[];
+  variantInfo: Record<string, VariantInfoEntry>;
 }) {
   const [images, setImages] = useState<string[]>(product.images ?? []);
   // Baseline ostatnio zapisanej galerii — resetowany na zapisany payload po
@@ -531,7 +534,7 @@ export default function ProductEditor({
       {/* ============================================================
           Sekcja: Warianty (pełny editor)
           ============================================================ */}
-      <VariantsEditor productId={product.id} initial={product.variants} categorySlug={product.category} fabrics={fabrics} fabricGroups={fabricGroups} onToast={showToast} />
+      <VariantsEditor productId={product.id} initial={product.variants} categorySlug={product.category} fabrics={fabrics} fabricGroups={fabricGroups} initialVariantInfo={variantInfo} onToast={showToast} />
 
       {/* ============================================================
           Sekcja: Pojedynczy opis (fallback gdy brak sekcji)
