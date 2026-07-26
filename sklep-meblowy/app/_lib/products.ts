@@ -14,6 +14,10 @@ import {
   collectFeatureValueSuggestions,
 } from "./product-features";
 import {
+  collectVariantImageSuggestions,
+  type VariantImageGroup,
+} from "./variant-image-suggestions";
+import {
   productMatchesOptionFilters,
   productMatchesDimensions,
   hasActiveDimensionRanges,
@@ -510,4 +514,19 @@ export async function getFeatureSuggestionsAdmin(): Promise<{
     keys: collectFeatureKeySuggestions(lists),
     valuesByKey: collectFeatureValueSuggestions(lists),
   };
+}
+
+// Podpowiedzi zdjęć dla wybieraka „+ Wybierz z wgranych" w edytorze produktu —
+// zdjęcia przypisane do wartości opcji wariantów WSZYSTKICH produktów (też
+// ukrytych, stąd admin client), bez opcji „Tkanina" (filtr w czystej funkcji).
+// Błąd zapytania → pusta lista: edytor działa dalej, tylko bez wybieraka.
+export async function getVariantImageSuggestionsAdmin(): Promise<
+  VariantImageGroup[]
+> {
+  const supabase = await createAdminClient();
+  const { data, error } = await supabase.from("products").select("name, variants");
+  if (error) return [];
+  return collectVariantImageSuggestions(
+    (data ?? []) as { name: unknown; variants: unknown }[]
+  );
 }

@@ -18,6 +18,7 @@ import TranslationEditor, { type ProductDeFields } from "./TranslationEditor";
 import SizeGroupEditor from "./SizeGroupEditor";
 import type { SizeGroupMember } from "@/app/_lib/products";
 import { MAX_FEATURES } from "@/app/_lib/product-features";
+import type { VariantImageGroup } from "@/app/_lib/variant-image-suggestions";
 
 export default function ProductEditor({
   product,
@@ -29,6 +30,7 @@ export default function ProductEditor({
   variantInfo,
   featureKeySuggestions,
   featureValueSuggestions,
+  variantImageGroups,
 }: {
   product: Product;
   categories: CategoryDef[];
@@ -42,6 +44,9 @@ export default function ProductEditor({
   // Podpowiedzi wartości parametrów — mapa nazwa (trim+lowercase) → wartości
   // już użyte w produktach; zasila strzałkę ▾ przy polu wartości.
   featureValueSuggestions: Record<string, string[]>;
+  // Zdjęcia wartości opcji z innych produktów — zasilają wybierak
+  // „+ Wybierz z wgranych" (bez opcji „Tkanina", bez galerii).
+  variantImageGroups: VariantImageGroup[];
 }) {
   const [images, setImages] = useState<string[]>(product.images ?? []);
   // Baseline ostatnio zapisanej galerii — resetowany na zapisany payload po
@@ -701,7 +706,7 @@ export default function ProductEditor({
       {/* ============================================================
           Sekcja: Warianty (pełny editor)
           ============================================================ */}
-      <VariantsEditor productId={product.id} initial={product.variants} categorySlug={product.category} fabrics={fabrics} fabricGroups={fabricGroups} initialVariantInfo={variantInfo} onToast={showToast} />
+      <VariantsEditor productId={product.id} initial={product.variants} categorySlug={product.category} fabrics={fabrics} fabricGroups={fabricGroups} initialVariantInfo={variantInfo} variantImageGroups={variantImageGroups} onToast={showToast} />
 
       {/* ============================================================
           Sekcja: Pojedynczy opis (fallback gdy brak sekcji)
