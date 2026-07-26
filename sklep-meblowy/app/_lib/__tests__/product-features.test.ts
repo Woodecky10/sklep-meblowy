@@ -3,6 +3,7 @@ import {
   parseFeatureRows,
   MAX_FEATURES,
   collectFeatureKeySuggestions,
+  collectFeatureValueSuggestions,
   SEED_FEATURE_KEYS,
   DEDICATED_FEATURE_KEYS,
 } from "../product-features";
@@ -114,5 +115,63 @@ describe("collectFeatureKeySuggestions", () => {
     ]);
     expect(out).toContain("Poprawny");
     expect(out).toHaveLength(SEED_FEATURE_KEYS.length + 1);
+  });
+});
+
+describe("collectFeatureValueSuggestions", () => {
+  it("grupuje wartości po kluczu trim + case-insensitive; klucze mapy lowercase", () => {
+    const out = collectFeatureValueSuggestions([
+      [{ key: "Wysokość nóżek", value: "12 cm" }],
+      [{ key: "  wysokość nóżek ", value: "10 cm" }],
+      [{ key: "WYSOKOŚĆ NÓŻEK", value: "15 cm" }],
+    ]);
+    expect(Object.keys(out)).toEqual(["wysokość nóżek"]);
+    expect(out["wysokość nóżek"]).toEqual(["10 cm", "12 cm", "15 cm"]);
+  });
+
+  it("dedupe wartości trim + case-insensitive — pierwsza spotkana pisownia wygrywa", () => {
+    const out = collectFeatureValueSuggestions([
+      [{ key: "Pojemnik na pościel", value: "Tak" }],
+      [{ key: "pojemnik na pościel", value: " tak " }],
+      [{ key: "Pojemnik na pościel", value: "TAK" }],
+    ]);
+    expect(out["pojemnik na pościel"]).toEqual(["Tak"]);
+  });
+
+  it("sortuje numerycznie po polsku — 9 cm przed 10 cm, ł między l i m", () => {
+    const out = collectFeatureValueSuggestions([
+      [{ key: "Wysokość nóżek", value: "10 cm" }],
+      [{ key: "Wysokość nóżek", value: "9 cm" }],
+      [{ key: "Nóżki", value: "metal" }],
+      [{ key: "Nóżki", value: "łuk drewniany" }],
+      [{ key: "Nóżki", value: "lite drewno" }],
+    ]);
+    expect(out["wysokość nóżek"]).toEqual(["9 cm", "10 cm"]);
+    expect(out["nóżki"]).toEqual(["lite drewno", "łuk drewniany", "metal"]);
+  });
+
+  it("nie filtruje DEDICATED_FEATURE_KEYS — wartości dla „Kolor” dostępne", () => {
+    const out = collectFeatureValueSuggestions([
+      [{ key: "Kolor", value: "szary" }],
+    ]);
+    expect(out["kolor"]).toEqual(["szary"]);
+  });
+
+  it("pomija śmieci: nie-tablice, elementy bez pól, nie-stringi, puste po trim, limity długości", () => {
+    const out = collectFeatureValueSuggestions([
+      null,
+      "tekst",
+      42,
+      [{ value: "bez klucza" }, { key: "K" }, { key: 7, value: "x" }, { key: "K", value: 9 }],
+      [{ key: "K", value: "   " }, { key: "   ", value: "x" }],
+      [{ key: "a".repeat(101), value: "x" }],
+      [{ key: "K", value: "b".repeat(301) }],
+      [{ key: "K", value: "ok" }],
+    ]);
+    expect(out).toEqual({ k: ["ok"] });
+  });
+
+  it("puste wejście → {}", () => {
+    expect(collectFeatureValueSuggestions([])).toEqual({});
   });
 });

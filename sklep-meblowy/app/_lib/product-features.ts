@@ -93,3 +93,44 @@ export function collectFeatureKeySuggestions(featuresLists: unknown[]): string[]
   }
   return out.sort((a, b) => a.localeCompare(b, "pl"));
 }
+
+// Mapa: nazwa parametru (trim + lowercase) → wartości już użyte w produktach
+// (podpowiedzi w polu wartości edytora). Wejście defensywne jak wyżej
+// (unknown[] — surowe kolumny `features`). Klucz/wartość nie-string, puste po
+// trim, klucz >100 zn., wartość >300 zn. → pomijane. Dedupe wartości per klucz
+// trim + case-insensitive — pierwsza spotkana pisownia wygrywa. Sort wartości
+// numeryczny polski („9 cm" przed „10 cm"). DEDICATED_FEATURE_KEYS świadomie
+// nie są filtrowane (ręcznie wpisana taka nazwa też dostaje podpowiedzi).
+export function collectFeatureValueSuggestions(
+  featuresLists: unknown[]
+): Record<string, string[]> {
+  const byKey = new Map<string, { seen: Set<string>; values: string[] }>();
+  for (const list of featuresLists) {
+    if (!Array.isArray(list)) continue;
+    for (const item of list) {
+      if (!item || typeof item !== "object") continue;
+      const rec = item as { key?: unknown; value?: unknown };
+      if (typeof rec.key !== "string" || typeof rec.value !== "string") continue;
+      const key = rec.key.trim();
+      const value = rec.value.trim();
+      if (!key || key.length > 100 || !value || value.length > 300) continue;
+      const keyLower = key.toLowerCase();
+      let entry = byKey.get(keyLower);
+      if (!entry) {
+        entry = { seen: new Set(), values: [] };
+        byKey.set(keyLower, entry);
+      }
+      const valueLower = value.toLowerCase();
+      if (entry.seen.has(valueLower)) continue;
+      entry.seen.add(valueLower);
+      entry.values.push(value);
+    }
+  }
+  const out: Record<string, string[]> = {};
+  for (const [keyLower, entry] of byKey) {
+    out[keyLower] = entry.values.sort((a, b) =>
+      a.localeCompare(b, "pl", { numeric: true })
+    );
+  }
+  return out;
+}
