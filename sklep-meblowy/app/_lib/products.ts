@@ -524,7 +524,14 @@ export async function getVariantImageSuggestionsAdmin(): Promise<
   VariantImageGroup[]
 > {
   const supabase = await createAdminClient();
-  const { data, error } = await supabase.from("products").select("name, variants");
+  // .order("name") NIE jest kosmetyką zapytania: podpis miniatury („wartość ·
+  // produkt") i casing nagłówka grupy biorą się z PIERWSZEGO wystąpienia URL-a
+  // przy dedupe. Bez ORDER BY PostgREST nie gwarantuje kolejności wierszy, więc
+  // dowolny UPDATE mógłby bez powodu przestawić podpisy w wybieraku.
+  const { data, error } = await supabase
+    .from("products")
+    .select("name, variants")
+    .order("name");
   if (error) return [];
   return collectVariantImageSuggestions(
     (data ?? []) as { name: unknown; variants: unknown }[]

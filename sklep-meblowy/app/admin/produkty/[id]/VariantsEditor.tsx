@@ -810,9 +810,12 @@ function FabricPicker({
           <h3 className="font-display text-lg font-semibold text-[var(--fg)]">
             Wybierz tkaniny (wybrano: {selectedNames.length} → {totalValues} wart.)
           </h3>
+          {/* data-guard-ignore — jak w ImagePickerModal: filtrowanie listy to nie
+              edycja danych, a modal siedzi w [data-guard-section]. */}
           <input
             type="text"
             autoFocus
+            data-guard-ignore
             placeholder="Szukaj…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}

@@ -55,9 +55,14 @@ export default function ImagePickerModal({
           <h3 className="font-display text-lg font-semibold text-[var(--fg)]">
             Wybierz z wgranych (zaznaczono: {selected.length})
           </h3>
+          {/* data-guard-ignore: modal renderuje się WEWNĄTRZ [data-guard-section]
+              edytora wariantów, a guard traktuje każde input/change w sekcji jako
+              edycję. Bez tego atrybutu samo wpisanie frazy w szukajkę (nawet po
+              „Anuluj") wywoływało dialog „masz niezapisane zmiany". Nie usuwać. */}
           <input
             type="text"
             autoFocus
+            data-guard-ignore
             placeholder="Szukaj…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
