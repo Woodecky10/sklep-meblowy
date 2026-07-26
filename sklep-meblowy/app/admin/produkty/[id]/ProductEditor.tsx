@@ -16,6 +16,7 @@ import DescriptionSectionsEditor from "./DescriptionSectionsEditor";
 import DescriptionFieldEditor from "./DescriptionFieldEditor";
 import TranslationEditor, { type ProductDeFields } from "./TranslationEditor";
 import SizeGroupEditor from "./SizeGroupEditor";
+import ImagePickerModal from "./ImagePickerModal";
 import type { SizeGroupMember } from "@/app/_lib/products";
 import { MAX_FEATURES } from "@/app/_lib/product-features";
 import type { VariantImageGroup } from "@/app/_lib/variant-image-suggestions";
@@ -53,6 +54,10 @@ export default function ProductEditor({
   // sukcesie. Bez tego imagesDirty liczone względem propa product.images
   // (niezmiennego bez reloadu) wisiało jako true po zapisie (audyt LOW).
   const [savedImages, setSavedImages] = useState<string[]>(product.images ?? []);
+  // Wybierak „+ Wybierz z wgranych" dla globalnej galerii. Źródło to zdjęcia
+  // wartości opcji wariantów (bez „Tkaniny") — patrz spec: galerie innych
+  // produktów świadomie nie zasilają listy.
+  const [galleryPickerOpen, setGalleryPickerOpen] = useState(false);
   // Parametry produktu (specyfikacja) — wiersze klucz→wartość, seed z
   // product.features (importowane nie giną); serializacja do hidden
   // features_json w formularzu „Podstawowe dane" (wspólny przycisk zapisu).
@@ -610,14 +615,25 @@ export default function ProductEditor({
         title="Zdjęcia produktu"
         storageKey="zdjecia"
         headerAside={
-          <label
-            className={`shrink-0 px-5 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors cursor-pointer ${
-              upload.uploading ? "opacity-50 cursor-not-allowed" : ""
-            }`}
-          >
-            {upload.progressText ?? "+ Dodaj zdjęcia"}
-            <input {...upload.inputProps} className="hidden" />
-          </label>
+          <div className="shrink-0 flex flex-wrap items-center gap-2">
+            <label
+              className={`px-5 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors cursor-pointer ${
+                upload.uploading ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            >
+              {upload.progressText ?? "+ Dodaj zdjęcia"}
+              <input {...upload.inputProps} className="hidden" />
+            </label>
+            {variantImageGroups.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setGalleryPickerOpen(true)}
+                className="px-5 py-3 border border-[var(--color-gold)] text-[var(--color-gold)] font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
+              >
+                + Wybierz z wgranych
+              </button>
+            )}
+          </div>
         }
       >
         <p className="text-sm text-[var(--muted)] max-w-2xl">
@@ -702,6 +718,22 @@ export default function ProductEditor({
           </button>
         </div>
       </CollapsibleSection>
+
+      {/* Modal poza CollapsibleSection — zwinięcie sekcji ukryłoby go razem
+          z jej zawartością. */}
+      {galleryPickerOpen && (
+        <ImagePickerModal
+          groups={variantImageGroups}
+          alreadyUsed={images}
+          onPick={(picked) => {
+            // Dedupe: ten sam URL nie ma wejść do galerii dwa razy (upload
+            // zawsze dawał nowe URL-e, więc dotąd nie było takiego ryzyka).
+            setImages((prev) => [...prev, ...picked.filter((u) => !prev.includes(u))]);
+            setGalleryPickerOpen(false);
+          }}
+          onCancel={() => setGalleryPickerOpen(false)}
+        />
+      )}
 
       {/* ============================================================
           Sekcja: Warianty (pełny editor)
