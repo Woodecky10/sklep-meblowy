@@ -9,7 +9,10 @@ import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Category, Product } from "./types";
 import { deriveFabricFamilies, productMatchesFabric } from "./fabric-filter";
 import { getAllFabrics } from "./fabrics";
-import { collectFeatureKeySuggestions } from "./product-features";
+import {
+  collectFeatureKeySuggestions,
+  collectFeatureValueSuggestions,
+} from "./product-features";
 import {
   productMatchesOptionFilters,
   productMatchesDimensions,
@@ -489,14 +492,22 @@ export async function getFilterFacets(locale: Locale = DEFAULT_LOCALE) {
   };
 }
 
-// Sugestie nazw parametrów dla edytora produktu — klucze `features` ze
-// WSZYSTKICH produktów (też ukrytych, stąd admin client) ∪ SEED_FEATURE_KEYS.
-// Błąd zapytania → [] (edytor działa, tylko bez podpowiedzi).
-export async function getFeatureKeySuggestionsAdmin(): Promise<string[]> {
+// Sugestie parametrów dla edytora produktu — z kolumn `features` WSZYSTKICH
+// produktów (też ukrytych, stąd admin client): keys = nazwy (∪ SEED_FEATURE_KEYS),
+// valuesByKey = nazwa (trim+lowercase) → użyte wartości. Błąd zapytania →
+// puste (edytor działa, tylko bez podpowiedzi). Typ zwrotki inline — bez
+// export type (gotcha Turbopack w plikach akcji; tu nie ma "use server",
+// ale konsument i tak potrzebuje tylko destrukturyzacji).
+export async function getFeatureSuggestionsAdmin(): Promise<{
+  keys: string[];
+  valuesByKey: Record<string, string[]>;
+}> {
   const supabase = await createAdminClient();
   const { data, error } = await supabase.from("products").select("features");
-  if (error) return [];
-  return collectFeatureKeySuggestions(
-    (data ?? []).map((r) => (r as { features: unknown }).features)
-  );
+  if (error) return { keys: [], valuesByKey: {} };
+  const lists = (data ?? []).map((r) => (r as { features: unknown }).features);
+  return {
+    keys: collectFeatureKeySuggestions(lists),
+    valuesByKey: collectFeatureValueSuggestions(lists),
+  };
 }
