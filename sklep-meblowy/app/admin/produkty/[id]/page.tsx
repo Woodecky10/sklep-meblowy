@@ -3,7 +3,7 @@ import { requireAdmin } from "@/app/_lib/admin";
 import {
   getProduct,
   getSizeGroupMembersAdmin,
-  getFeatureKeySuggestionsAdmin,
+  getFeatureSuggestionsAdmin,
 } from "@/app/_lib/products";
 import { getAllCategories } from "@/app/_lib/categories";
 import { getAllFabrics, getFabricPriceGroups } from "@/app/_lib/fabrics";
@@ -22,7 +22,7 @@ export default async function AdminProductEditPage({
 }) {
   await requireAdmin();
   const { id } = await params;
-  const [product, categories, de, fabrics, fabricGroups, variantInfo, featureKeySuggestions] =
+  const [product, categories, de, fabrics, fabricGroups, variantInfo, featureSuggestions] =
     await Promise.all([
       getProduct(id),
       getAllCategories(),
@@ -30,7 +30,7 @@ export default async function AdminProductEditPage({
       getAllFabrics(),
       getFabricPriceGroups(),
       getVariantInfoMap(),
-      getFeatureKeySuggestionsAdmin(),
+      getFeatureSuggestionsAdmin(),
     ]);
   if (!product) notFound();
 
@@ -48,7 +48,8 @@ export default async function AdminProductEditPage({
       fabrics={fabrics}
       fabricGroups={fabricGroups}
       variantInfo={variantInfo}
-      featureKeySuggestions={featureKeySuggestions}
+      featureKeySuggestions={featureSuggestions.keys}
+      featureValueSuggestions={featureSuggestions.valuesByKey}
     />
   );
 }

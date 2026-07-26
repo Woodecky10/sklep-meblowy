@@ -28,6 +28,7 @@ export default function ProductEditor({
   fabricGroups,
   variantInfo,
   featureKeySuggestions,
+  featureValueSuggestions,
 }: {
   product: Product;
   categories: CategoryDef[];
@@ -38,6 +39,9 @@ export default function ProductEditor({
   variantInfo: Record<string, VariantInfoEntry>;
   // Podpowiedzi nazw parametrów — dropdown „+ Wybierz z listy".
   featureKeySuggestions: string[];
+  // Podpowiedzi wartości parametrów — mapa nazwa (trim+lowercase) → wartości
+  // już użyte w produktach; zasila strzałkę ▾ przy polu wartości.
+  featureValueSuggestions: Record<string, string[]>;
 }) {
   const [images, setImages] = useState<string[]>(product.images ?? []);
   // Baseline ostatnio zapisanej galerii — resetowany na zapisany payload po
@@ -51,14 +55,26 @@ export default function ProductEditor({
   const [featureRows, setFeatureRows] = useState<FeatureRow[]>(() =>
     (product.features ?? []).map((f) => ({ key: f.key, value: f.value }))
   );
+  // Dropdown wartości parametru: indeks wiersza z otwartą listą (najwyżej
+  // jeden naraz; otwarcie zamyka picker nazw i odwrotnie). Strzałka ▾ tylko
+  // gdy nazwa wiersza ma zapisane wartości (lookup trim + lowercase). Każda
+  // edycja nazwy/wierszy zamyka listę (indeksy się przesuwają, strzałka może
+  // zniknąć).
+  const [valuePickerIdx, setValuePickerIdx] = useState<number | null>(null);
+  const valuePickerRef = useRef<HTMLDivElement | null>(null);
+  const valueSuggestionsFor = (key: string) =>
+    featureValueSuggestions[key.trim().toLowerCase()] ?? [];
   function addFeatureRow() {
     setPickerOpen(false);
+    setValuePickerIdx(null);
     setFeatureRows((r) => [...r, { key: "", value: "" }]);
   }
   function removeFeatureRow(i: number) {
+    setValuePickerIdx(null);
     setFeatureRows((r) => r.filter((_, idx) => idx !== i));
   }
   function setFeatureKey(i: number, key: string) {
+    setValuePickerIdx(null);
     setFeatureRows((r) => r.map((row, idx) => (idx === i ? { ...row, key } : row)));
   }
   function setFeatureValue(i: number, value: string) {
@@ -80,6 +96,7 @@ export default function ProductEditor({
     if (featureRows.length >= MAX_FEATURES) return;
     pendingFocusIdx.current = featureRows.length;
     setFeatureRows((r) => [...r, { key, value: "" }]);
+    setValuePickerIdx(null);
     setPickerOpen(false);
   }
   useEffect(() => {
@@ -99,6 +116,24 @@ export default function ProductEditor({
       document.removeEventListener("mousedown", onMouseDown);
     };
   }, [pickerOpen]);
+  // Zamykanie dropdownu wartości: Esc / klik poza wierszem z otwartą listą.
+  useEffect(() => {
+    if (valuePickerIdx === null) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setValuePickerIdx(null);
+    }
+    function onMouseDown(e: MouseEvent) {
+      if (valuePickerRef.current && !valuePickerRef.current.contains(e.target as Node)) {
+        setValuePickerIdx(null);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("mousedown", onMouseDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onMouseDown);
+    };
+  }, [valuePickerIdx]);
   const [toast, setToast] = useState<Toast>(null);
   const [savingBasics, startBasicsTransition] = useTransition();
   const [savingImages, startImagesTransition] = useTransition();
@@ -426,7 +461,10 @@ export default function ProductEditor({
                       className={inputClass}
                     />
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div
+                    className="flex-1 min-w-0 relative"
+                    ref={valuePickerIdx === i ? valuePickerRef : undefined}
+                  >
                     <input
                       ref={(el) => {
                         if (el && pendingFocusIdx.current === i) {
@@ -438,8 +476,51 @@ export default function ProductEditor({
                       onChange={(e) => setFeatureValue(i, e.target.value)}
                       placeholder="np. Pianka HR"
                       maxLength={300}
-                      className={inputClass}
+                      className={
+                        valueSuggestionsFor(row.key).length > 0
+                          ? `${inputClass} pr-9`
+                          : inputClass
+                      }
                     />
+                    {valueSuggestionsFor(row.key).length > 0 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPickerOpen(false);
+                            setValuePickerIdx((v) => (v === i ? null : i));
+                          }}
+                          aria-label="Wybierz wartość z listy"
+                          aria-expanded={valuePickerIdx === i}
+                          aria-haspopup="listbox"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-full text-[var(--color-gold-text)] hover:bg-[var(--color-gold)]/10"
+                        >
+                          ▾
+                        </button>
+                        {valuePickerIdx === i && (
+                          <ul
+                            role="listbox"
+                            aria-label="Użyte wartości parametru"
+                            className="absolute z-20 top-full mt-1 left-0 w-full max-h-64 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--bg)] shadow-lg py-1"
+                          >
+                            {valueSuggestionsFor(row.key).map((v) => (
+                              <li key={v} role="option" aria-selected={false}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFeatureValue(i, v);
+                                    setValuePickerIdx(null);
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-gold)]/10"
+                                >
+                                  {v}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -458,7 +539,10 @@ export default function ProductEditor({
               <div className="relative" ref={pickerRef}>
                 <button
                   type="button"
-                  onClick={() => setPickerOpen((o) => !o)}
+                  onClick={() => {
+                    setValuePickerIdx(null);
+                    setPickerOpen((o) => !o);
+                  }}
                   disabled={featureRows.length >= MAX_FEATURES || availableSuggestions.length === 0}
                   aria-expanded={pickerOpen}
                   aria-haspopup="listbox"
