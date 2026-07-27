@@ -14,6 +14,7 @@ import {
 } from "@/app/_lib/variants";
 import type { ProductVariants } from "@/app/_lib/types";
 import { parseFeaturedProductIds } from "@/app/_lib/fabric-featured-products";
+import { parseFabricProperties } from "@/app/_lib/fabric-properties";
 
 export type ActionResult =
   | { ok: true; message?: string; data?: unknown }
@@ -172,6 +173,9 @@ export async function createFabric(formData: FormData): Promise<ActionResult> {
   const descriptionDe = parseRichHtml(formData.get("description_de"));
   const shortInfo = emptyToNull(sanitize(formData.get("short_info"), 500));
   const shortInfoDe = emptyToNull(sanitize(formData.get("short_info_de"), 500));
+  // Niezaznaczony checkbox nie trafia do FormData — getAll zwraca same
+  // zaznaczone kody, parse odsiewa ewentualne śmieci z podrobionego requestu.
+  const properties = parseFabricProperties(formData.getAll("properties"));
   const rawFeatured = parseFeaturedProductIds(formData.get("featured_product_ids_json"));
 
   const supabase = await createAdminClient();
@@ -189,6 +193,7 @@ export async function createFabric(formData: FormData): Promise<ActionResult> {
       group_id: groupId, slug, description, description_de: descriptionDe,
       short_info: shortInfo,
       short_info_de: shortInfoDe,
+      properties,
       featured_product_ids: featuredProductIds,
     } as never)
     .select()
@@ -224,6 +229,9 @@ export async function updateFabric(formData: FormData): Promise<ActionResult> {
   const descriptionDe = parseRichHtml(formData.get("description_de"));
   const shortInfo = emptyToNull(sanitize(formData.get("short_info"), 500));
   const shortInfoDe = emptyToNull(sanitize(formData.get("short_info_de"), 500));
+  // Niezaznaczony checkbox nie trafia do FormData — getAll zwraca same
+  // zaznaczone kody, parse odsiewa ewentualne śmieci z podrobionego requestu.
+  const properties = parseFabricProperties(formData.getAll("properties"));
   const rawFeatured = parseFeaturedProductIds(formData.get("featured_product_ids_json"));
 
   const supabase = await createAdminClient();
@@ -235,6 +243,7 @@ export async function updateFabric(formData: FormData): Promise<ActionResult> {
       group_id: groupId, description, description_de: descriptionDe,
       short_info: shortInfo,
       short_info_de: shortInfoDe,
+      properties,
       featured_product_ids: featuredProductIds,
     } as never)
     .eq("id", id);
