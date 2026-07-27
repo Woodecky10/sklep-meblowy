@@ -5,7 +5,7 @@ import { defineConfig, devices } from "@playwright/test";
 //   E2E_BASE_URL=http://localhost:3210 npx playwright test --config=playwright.local.config.ts
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: /(corner-side|filter-pending)\.spec\.ts/,
+  testMatch: /(corner-side|filter-pending|variant-tooltip)\.spec\.ts/,
   timeout: 60_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
