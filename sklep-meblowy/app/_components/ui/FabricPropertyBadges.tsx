@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { FabricPropertyCode } from "@/app/_lib/fabric-properties";
+import { FABRIC_PROPERTY_CODES, type FabricPropertyCode } from "@/app/_lib/fabric-properties";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import type { Locale } from "@/app/_lib/i18n";
 
@@ -38,8 +38,12 @@ export default function FabricPropertyBadges({
   codes: FabricPropertyCode[];
   locale: Locale;
 }) {
+  // Kolejność wyświetlania jest stała (FABRIC_PROPERTY_CODES) niezależnie od
+  // kolejności wejścia — parser z bazy już sortuje, ale render nie ma zależeć
+  // od tego, kto poda kody; przy okazji odsiewa duplikaty.
+  const ordered = FABRIC_PROPERTY_CODES.filter((code) => codes.includes(code));
   // Brak cech → zero markupu (żadnego pustego wiersza pod nazwą tkaniny).
-  if (codes.length === 0) return null;
+  if (ordered.length === 0) return null;
   const t = getDictionary(locale);
   const labels: Record<FabricPropertyCode, string> = {
     waterproof: t.fabrics.propertyWaterproof,
@@ -50,7 +54,7 @@ export default function FabricPropertyBadges({
   // z `uppercase tracking-widest` — pigułki mają zostać pisane zdaniowo.
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5 normal-case tracking-normal">
-      {codes.map((code) => (
+      {ordered.map((code) => (
         <span
           key={code}
           className="inline-flex items-center gap-1 rounded-full border border-[var(--color-gold)]/40 bg-[var(--color-gold)]/10 px-2 py-0.5 text-[11px] font-sans font-semibold text-[var(--color-gold-text)]"

@@ -424,7 +424,10 @@ function FabricSwatchGroup({
               <div className="p-4 flex flex-col gap-5 border-t border-[var(--border)]">
                 {[...g.fabrics.entries()].map(([fabricName, entry]) => (
                   <div key={fabricName}>
-                    <p className="text-xs font-sans text-[var(--muted)] mb-2 flex items-center gap-2">
+                    {/* flex-wrap: nazwa rodziny + „szczegóły" + dymek + do trzech
+                        pigułek nie mieszczą się w jednym wierszu na telefonie,
+                        a karta grupy ma overflow-hidden (przycięłaby treść). */}
+                    <p className="text-xs font-sans text-[var(--muted)] mb-2 flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-[var(--fg)]">{fabricName}</span>
                       {entry.slug && (
                         <Link
