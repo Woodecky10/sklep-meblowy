@@ -3,7 +3,7 @@ import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "./de-content-maps";
 import { effectivePrice, isOnSale } from "./pricing";
 import { isCornerSideOptionName } from "./corner-side";
-import { parseFabricProperties, type FabricPropertyCode } from "./fabric-properties";
+import { resolveFabricProperties, type FabricPropertyDef } from "./fabric-properties";
 
 // Czy produkt ma warianty (i przynajmniej jedną opcję)?
 export function hasVariants(product: Product): boolean {
@@ -362,7 +362,9 @@ export type FabricValueMeta = {
   groupSort: number;
   shortInfo: string | null;
   shortInfoDe: string | null;
-  properties: FabricPropertyCode[];
+  // Rozwiązane definicje (podpis + ikonka), nie same kody — komponenty renderują
+  // pigułki bez sięgania do słownika.
+  properties: FabricPropertyDef[];
 };
 
 // Buduje mapę wartość wariantu („Nazwa Numer"/„Nazwa") → FabricValueMeta.
@@ -378,7 +380,9 @@ export function buildFabricMetaMap(
     // unknown, bo kolumna bywa nieobecna (stary cache) — parser to znosi.
     properties?: unknown;
   }[],
-  groups: { id: string; code: string; name: string; name_de: string | null; surcharge: number; sort_order: number }[]
+  groups: { id: string; code: string; name: string; name_de: string | null; surcharge: number; sort_order: number }[],
+  // Słownik cech z fabric_property_defs; pusty (np. błąd zapytania) → zero pigułek.
+  propertyDefs: FabricPropertyDef[]
 ): Record<string, FabricValueMeta> {
   const byId = new Map(groups.map((g) => [g.id, g]));
   const map: Record<string, FabricValueMeta> = {};
@@ -398,7 +402,7 @@ export function buildFabricMetaMap(
       groupSort: g.sort_order,
       shortInfo: (f.short_info ?? "").trim() || null,
       shortInfoDe: (f.short_info_de ?? "").trim() || null,
-      properties: parseFabricProperties(f.properties),
+      properties: resolveFabricProperties(f.properties, propertyDefs),
     };
     for (const v of values) map[v] = meta;
   }

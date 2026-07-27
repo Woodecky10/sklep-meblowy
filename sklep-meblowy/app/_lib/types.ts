@@ -179,6 +179,18 @@ export type FabricPriceGroup = {
   created_at: string;
 };
 
+// Definicja cechy tkaniny (migracja 64) — edytowalna w /admin/tkaniny.
+// `icon` to klucz z biblioteki w app/_lib/fabric-properties.ts, nie plik.
+export type FabricPropertyDefRow = {
+  id: string;
+  code: string;
+  label: string;
+  label_de: string | null;
+  icon: string;
+  sort_order: number;
+  created_at: string;
+};
+
 // Katalog tkanin (migracja 37) — reużywalny zbiór nazw używanych jako wartości
 // opcji wariantu „Tkanina". name_de null → na /de fallback do name.
 export type Fabric = {

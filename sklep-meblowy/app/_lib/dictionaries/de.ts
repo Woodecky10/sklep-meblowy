@@ -109,9 +109,6 @@ export const de: DeepPartial<PlShape> = {
     detailsLink: "Details",
     otherGroupLabel: "Sonstige",
     notFoundTitle: "Stoff nicht gefunden",
-    propertyWaterproof: "Wasserabweisend",
-    propertyPetFriendly: "Tierfreundlich",
-    propertyEasyClean: "Pflegeleicht",
   },
   cart: {
     empty: "Ihr Warenkorb ist leer",

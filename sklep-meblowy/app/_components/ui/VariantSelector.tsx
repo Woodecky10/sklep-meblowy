@@ -8,7 +8,7 @@ import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "@/app/_lib/de-content-maps";
 import { localizeHref, pickLocalized, type Locale } from "@/app/_lib/i18n";
 import { useFabricLabels, useFabricImages, useFabricMeta } from "@/app/_lib/fabric-context";
-import type { FabricPropertyCode } from "@/app/_lib/fabric-properties";
+import type { FabricPropertyDef } from "@/app/_lib/fabric-properties";
 import { FABRIC_OPTION_NAME, sortVariantValues, sortVariantOptions, optionHasValueImages } from "@/app/_lib/variants";
 import {
   cornerSideOf,
@@ -154,7 +154,7 @@ export default function VariantSelector({
               </span>{" "}
               {option.name === FABRIC_OPTION_NAME && current && (
                 <FabricPropertyBadges
-                  codes={fabricMeta[current]?.properties ?? []}
+                  defs={fabricMeta[current]?.properties ?? []}
                   locale={locale}
                 />
               )}
@@ -347,7 +347,7 @@ function FabricSwatchGroup({
     sort: number;
     fabrics: Map<
       string,
-      { slug: string | null; shortInfo: string | null; properties: FabricPropertyCode[]; values: string[] }
+      { slug: string | null; shortInfo: string | null; properties: FabricPropertyDef[]; values: string[] }
     >;
   };
   const buckets = new Map<string, GroupBucket>();
@@ -441,7 +441,7 @@ function FabricSwatchGroup({
                         </Link>
                       )}
                       {entry.shortInfo && <ValueInfoTip text={entry.shortInfo} />}
-                      <FabricPropertyBadges codes={entry.properties} locale={locale} />
+                      <FabricPropertyBadges defs={entry.properties} locale={locale} />
                     </p>
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                       {entry.values.map(swatch)}
