@@ -155,6 +155,7 @@ describe("buildFabricMetaMap", () => {
       groupSort: 1,
       shortInfo: null,
       shortInfoDe: null,
+      properties: [],
     });
     expect(map["Sawana"].groupCode).toBe("standard");
   });
@@ -181,6 +182,48 @@ describe("buildFabricMetaMap", () => {
       expect(map["Sawana 21"].shortInfo).toBeNull(); // whitespace → null
       expect(map["Riviera"].shortInfo).toBeNull(); // brak pól → null
       expect(map["Riviera"].shortInfoDe).toBeNull();
+    });
+  });
+  describe("buildFabricMetaMap — cechy tkaniny", () => {
+    it("przenosi cechy z kolumny properties na każdą wartość rodziny", () => {
+      const map = buildFabricMetaMap(
+        [
+          {
+            name: "Inari",
+            colors: ["22", "23"],
+            slug: "inari",
+            group_id: "g1",
+            properties: ["easy_clean", "waterproof"],
+          },
+        ],
+        [{ id: "g1", code: "std", name: "Standard", name_de: null, surcharge: 0, sort_order: 1 }]
+      );
+      expect(map["Inari 22"].properties).toEqual(["waterproof", "easy_clean"]);
+      expect(map["Inari 23"].properties).toEqual(["waterproof", "easy_clean"]);
+    });
+
+    it("brak kolumny properties (stary cache) → pusta lista, bez wyjątku", () => {
+      const map = buildFabricMetaMap(
+        [{ name: "Kronos", colors: ["01"], slug: "kronos", group_id: "g1" }],
+        [{ id: "g1", code: "std", name: "Standard", name_de: null, surcharge: 0, sort_order: 1 }]
+      );
+      expect(map["Kronos 01"].properties).toEqual([]);
+    });
+
+    it("nieznany kod w bazie jest odsiewany", () => {
+      const map = buildFabricMetaMap(
+        [
+          {
+            name: "Poso",
+            colors: ["105"],
+            slug: "poso",
+            group_id: "g1",
+            properties: ["waterproof", "nieznana_cecha"],
+          },
+        ],
+        [{ id: "g1", code: "std", name: "Standard", name_de: null, surcharge: 0, sort_order: 1 }]
+      );
+      expect(map["Poso 105"].properties).toEqual(["waterproof"]);
     });
   });
 });

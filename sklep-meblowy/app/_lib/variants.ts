@@ -3,6 +3,7 @@ import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "./de-content-maps";
 import { effectivePrice, isOnSale } from "./pricing";
 import { isCornerSideOptionName } from "./corner-side";
+import { parseFabricProperties, type FabricPropertyCode } from "./fabric-properties";
 
 // Czy produkt ma warianty (i przynajmniej jedną opcję)?
 export function hasVariants(product: Product): boolean {
@@ -361,6 +362,7 @@ export type FabricValueMeta = {
   groupSort: number;
   shortInfo: string | null;
   shortInfoDe: string | null;
+  properties: FabricPropertyCode[];
 };
 
 // Buduje mapę wartość wariantu („Nazwa Numer"/„Nazwa") → FabricValueMeta.
@@ -373,6 +375,8 @@ export function buildFabricMetaMap(
     group_id: string;
     short_info?: string | null;
     short_info_de?: string | null;
+    // unknown, bo kolumna bywa nieobecna (stary cache) — parser to znosi.
+    properties?: unknown;
   }[],
   groups: { id: string; code: string; name: string; name_de: string | null; surcharge: number; sort_order: number }[]
 ): Record<string, FabricValueMeta> {
@@ -394,6 +398,7 @@ export function buildFabricMetaMap(
       groupSort: g.sort_order,
       shortInfo: (f.short_info ?? "").trim() || null,
       shortInfoDe: (f.short_info_de ?? "").trim() || null,
+      properties: parseFabricProperties(f.properties),
     };
     for (const v of values) map[v] = meta;
   }
