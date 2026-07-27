@@ -143,7 +143,8 @@ describe("buildFabricMetaMap", () => {
         { name: "Monolith", colors: ["84"], slug: "monolith", group_id: "g2" },
         { name: "Sawana", colors: [], slug: "sawana", group_id: "g1" },
       ],
-      groups
+      groups,
+      []
     );
     expect(map["Monolith 84"]).toEqual({
       fabricName: "Monolith",
@@ -162,7 +163,8 @@ describe("buildFabricMetaMap", () => {
   it("pomija tkaniny z nieznanym group_id", () => {
     const map = buildFabricMetaMap(
       [{ name: "X", colors: [], slug: "x", group_id: "nieistnieje" }],
-      groups
+      groups,
+      []
     );
     expect(map).toEqual({});
   });
@@ -174,7 +176,8 @@ describe("buildFabricMetaMap", () => {
           { name: "Sawana", colors: ["21"], slug: "sawana", group_id: "g1", short_info: "  ", short_info_de: null },
           { name: "Riviera", colors: [], slug: "riviera", group_id: "g1" },
         ],
-        groups
+        groups,
+        []
       );
       expect(map["Baloo 01"].shortInfo).toBe("Miękki welur");
       expect(map["Baloo 01"].shortInfoDe).toBe("Velours");
@@ -184,46 +187,49 @@ describe("buildFabricMetaMap", () => {
       expect(map["Riviera"].shortInfoDe).toBeNull();
     });
   });
+  // Definicje cech przychodzą dziś z tabeli fabric_property_defs (migracja 64),
+  // więc mapa dostaje je z zewnątrz — kody tkaniny są tylko odnośnikiem.
+  const PROPERTY_DEFS = [
+    { code: "waterproof", label: "Wodoodporna", labelDe: "Wasserabweisend", icon: "drop" as const, sortOrder: 0 },
+    { code: "easy_clean", label: "Łatwa w czyszczeniu", labelDe: null, icon: "sparkle" as const, sortOrder: 2 },
+  ];
+
   describe("buildFabricMetaMap — cechy tkaniny", () => {
-    it("przenosi cechy z kolumny properties na każdą wartość rodziny", () => {
+    it("rozwiązuje kody na definicje i przenosi je na każdą wartość rodziny", () => {
       const map = buildFabricMetaMap(
-        [
-          {
-            name: "Inari",
-            colors: ["22", "23"],
-            slug: "inari",
-            group_id: "g1",
-            properties: ["easy_clean", "waterproof"],
-          },
-        ],
-        [{ id: "g1", code: "std", name: "Standard", name_de: null, surcharge: 0, sort_order: 1 }]
+        [{ name: "Inari", colors: ["22", "23"], slug: "inari", group_id: "g1", properties: ["easy_clean", "waterproof"] }],
+        [{ id: "g1", code: "std", name: "Standard", name_de: null, surcharge: 0, sort_order: 1 }],
+        PROPERTY_DEFS
       );
-      expect(map["Inari 22"].properties).toEqual(["waterproof", "easy_clean"]);
-      expect(map["Inari 23"].properties).toEqual(["waterproof", "easy_clean"]);
+      expect(map["Inari 22"].properties.map((p) => p.code)).toEqual(["waterproof", "easy_clean"]);
+      expect(map["Inari 23"].properties[0].label).toBe("Wodoodporna");
     });
 
-    it("brak kolumny properties (stary cache) → pusta lista, bez wyjątku", () => {
+    it("brak kolumny properties → pusta lista, bez wyjątku", () => {
       const map = buildFabricMetaMap(
         [{ name: "Kronos", colors: ["01"], slug: "kronos", group_id: "g1" }],
-        [{ id: "g1", code: "std", name: "Standard", name_de: null, surcharge: 0, sort_order: 1 }]
+        [{ id: "g1", code: "std", name: "Standard", name_de: null, surcharge: 0, sort_order: 1 }],
+        PROPERTY_DEFS
       );
       expect(map["Kronos 01"].properties).toEqual([]);
     });
 
-    it("nieznany kod w bazie jest odsiewany", () => {
+    it("kod bez definicji (usunięta cecha) jest odsiewany", () => {
       const map = buildFabricMetaMap(
-        [
-          {
-            name: "Poso",
-            colors: ["105"],
-            slug: "poso",
-            group_id: "g1",
-            properties: ["waterproof", "nieznana_cecha"],
-          },
-        ],
-        [{ id: "g1", code: "std", name: "Standard", name_de: null, surcharge: 0, sort_order: 1 }]
+        [{ name: "Poso", colors: ["105"], slug: "poso", group_id: "g1", properties: ["waterproof", "skasowana"] }],
+        [{ id: "g1", code: "std", name: "Standard", name_de: null, surcharge: 0, sort_order: 1 }],
+        PROPERTY_DEFS
       );
-      expect(map["Poso 105"].properties).toEqual(["waterproof"]);
+      expect(map["Poso 105"].properties.map((p) => p.code)).toEqual(["waterproof"]);
+    });
+
+    it("brak definicji w ogóle → pusta lista", () => {
+      const map = buildFabricMetaMap(
+        [{ name: "Poso", colors: ["105"], slug: "poso", group_id: "g1", properties: ["waterproof"] }],
+        [{ id: "g1", code: "std", name: "Standard", name_de: null, surcharge: 0, sort_order: 1 }],
+        []
+      );
+      expect(map["Poso 105"].properties).toEqual([]);
     });
   });
 });
