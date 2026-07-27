@@ -20,6 +20,12 @@ const LABELS = ["Wodoodporna", "Przyjazna zwierzętom", "Łatwa w czyszczeniu"];
 const LABEL_RE = new RegExp(LABELS.join("|"));
 
 test("pigułki cech tkaniny są widoczne w rozwiniętej liście tkanin", async ({ page }) => {
+  // Wąski viewport LOKALNIE dla tego testu (globalny projekt to Desktop Chrome
+  // 1280×720). Regresja, której pilnuje asercja na końcu, występuje wyłącznie
+  // przy ciasnym wierszu rodziny tkaniny — na 1280 px nazwa + „szczegóły" +
+  // dymek + trzy pigułki mieszczą się w jednym wierszu i nic się nie przycina.
+  await page.setViewportSize({ width: 390, height: 844 });
+
   // Zgoda cookie z góry — baner (fixed, z-50) nie zasłania nic w teście.
   await page.addInitScript(() => {
     localStorage.setItem(
@@ -72,13 +78,55 @@ test("pigułki cech tkaniny są widoczne w rozwiniętej liście tkanin", async (
   // Pigułka to samodzielny znacznik z pełnym podpisem, nie fragment zdania.
   await expect(first).toHaveText(new RegExp(`^(${LABELS.join("|")})$`));
 
-  // Nie wystaje poza kartę grupy (karta ma overflow-hidden — przy braku
-  // zawijania wiersza rodziny pigułka byłaby przycięta na telefonie).
-  const box = await first.boundingBox();
-  expect(box, "pigułka ma mierzalny prostokąt").not.toBeNull();
-  const viewport = page.viewportSize();
-  expect(viewport, "viewport znany").not.toBeNull();
-  if (!box || !viewport) return;
-  expect(box.x, "lewa krawędź w ekranie").toBeGreaterThanOrEqual(0);
-  expect(box.x + box.width, "prawa krawędź w ekranie").toBeLessThanOrEqual(viewport.width + 1);
+  // Co dokładnie sprawdza asercja niżej: ŻADNA pigułka nie wychodzi w poziomie
+  // poza kartę grupy cenowej, czyli poza swój najbliższy przodek z
+  // `overflow-hidden` (VariantSelector.tsx:406). To granica, na której treść
+  // jest realnie ucinana — dlatego mierzymy względem KARTY, nie viewportu:
+  // przycięcie przez overflow-hidden nie zmienia getBoundingClientRect()
+  // dziecka, więc porównanie z ekranem przepuszcza ucięcie kartą. Granicą jest
+  // padding-box karty (prostokąt bez ramki). O pionie asercja nie mówi nic.
+  //
+  // To niezmiennik, którego pilnują zawijania wprowadzone w 2b048276 (wiersz
+  // rodziny) i w samym FabricPropertyBadges (kontener pigułek). UWAGA na skalę
+  // ochrony: przy krótkiej nazwie rodziny nawet bez tych zawijań pigułki wciąż
+  // się mieszczą (wewnętrzne kontenery flex potrafią się skurczyć), więc test
+  // NIE gwarantuje wykrycia każdego cofnięcia `flex-wrap` — łapie dopiero stan,
+  // w którym pigułka faktycznie wyjeżdża poza kartę (dłuższe nazwy rodzin,
+  // węższe karty, dłuższe podpisy cech). Mierzone są WSZYSTKIE pigułki, bo
+  // wypada zwykle ostatnia w wierszu, nie pierwsza.
+  const clips = await badges.evaluateAll((els) =>
+    els.map((el) => {
+      // Najbliższy przodek, który faktycznie przycina w poziomie (overflowX
+      // inne niż `visible`). Dla pigułki w rozwiniętej liście to karta grupy.
+      let node = el.parentElement;
+      while (node && getComputedStyle(node).overflowX === "visible") {
+        node = node.parentElement;
+      }
+      if (!node) return null;
+      const style = getComputedStyle(node);
+      const badge = el.getBoundingClientRect();
+      const clipper = node.getBoundingClientRect();
+      return {
+        text: (el.textContent ?? "").trim(),
+        overflowRight:
+          // Padding-box: krawędź border-boxa minus ramka — tam tnie overflow.
+          badge.right - (clipper.right - parseFloat(style.borderRightWidth || "0")),
+        overflowLeft: clipper.left + parseFloat(style.borderLeftWidth || "0") - badge.left,
+      };
+    })
+  );
+  const measured = clips.filter((c) => c !== null);
+  expect(measured.length, "każda pigułka ma przodka przycinającego treść (karta grupy)").toBe(
+    clips.length
+  );
+  const worstRight = measured.reduce((acc, c) => (c.overflowRight > acc.overflowRight ? c : acc));
+  const worstLeft = measured.reduce((acc, c) => (c.overflowLeft > acc.overflowLeft ? c : acc));
+  expect(
+    worstRight.overflowRight,
+    `pigułka „${worstRight.text}" wychodzi poza prawą krawędź karty grupy (wiersz się nie zawija)`
+  ).toBeLessThanOrEqual(1);
+  expect(
+    worstLeft.overflowLeft,
+    `pigułka „${worstLeft.text}" wychodzi poza lewą krawędź karty grupy`
+  ).toBeLessThanOrEqual(1);
 });
