@@ -153,8 +153,11 @@ export default async function RootLayout({
                       <PromoBanner data={promo} locale={locale} closeLabel={t.common.close} />
                       {/* Wspólny sticky na oba paski — jeden element zamiast
                           dwóch osobnych sticky eliminuje 1px szczeliny przy
-                          ułamkowym zoomie. */}
-                      <div className="sticky top-0 z-50">
+                          ułamkowym zoomie.
+                          data-sticky-header: po tym atrybucie dymki „i"
+                          (ValueInfoTip) mierzą realną wysokość nagłówka
+                          (inna na mobile/desktop) i nie chowają się pod nim. */}
+                      <div className="sticky top-0 z-50" data-sticky-header>
                         <TopBar />
                         <Navbar />
                       </div>
