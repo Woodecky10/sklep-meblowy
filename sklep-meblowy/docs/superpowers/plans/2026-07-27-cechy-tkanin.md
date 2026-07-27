@@ -609,6 +609,6 @@ git commit -m "test(e2e): pigulki cech tkaniny na karcie produktu"
 
 ## Po planie (robi Mikołaj, nie subagent)
 
-1. Zapuszczenie migracji **63** na Supabase (expand-first, przed merge'em).
+1. Zapuszczenie migracji **63** na Supabase (expand-first, przed merge'em). **Kolejność nie jest kosmetyczna:** jeśli kod trafi na produkcję PRZED migracją, `createFabric`/`updateFabric` wyślą do PostgREST kolumnę `properties`, której w bazie jeszcze nie ma — a wtedy odrzucony zostaje CAŁY zapis (`PGRST204`), nie samo nowe pole. Panel tkanin przestaje zapisywać cokolwiek: nazwę, kolory, zdjęcia, krótkie info. To samo dotyczy preview deploymentu tego PR-a, bo preview korzysta z tej samej bazy co produkcja.
 2. Zaznaczenie cech przy tkaninach w `/admin/tkaniny` — dopóki tego nie ma, klient nie zobaczy żadnej pigułki i to jest zachowanie oczekiwane.
 3. Klik-testy: karta produktu PL i `/de`, telefon (pigułki zawijają się do dwóch wierszy), tkanina bez cech (brak pustego wiersza).
