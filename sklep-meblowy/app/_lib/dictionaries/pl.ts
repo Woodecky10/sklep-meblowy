@@ -100,6 +100,9 @@ export type PlShape = {
     detailsLink: string;
     otherGroupLabel: string;
     notFoundTitle: string;
+    propertyWaterproof: string;
+    propertyPetFriendly: string;
+    propertyEasyClean: string;
   };
   cart: {
     empty: string;
@@ -445,6 +448,9 @@ export const pl = {
     detailsLink: "szczegóły",
     otherGroupLabel: "Pozostałe",
     notFoundTitle: "Tkanina nie znaleziona",
+    propertyWaterproof: "Wodoodporna",
+    propertyPetFriendly: "Przyjazna zwierzętom",
+    propertyEasyClean: "Łatwa w czyszczeniu",
   },
   cart: {
     empty: "Koszyk jest pusty",

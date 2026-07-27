@@ -8,6 +8,7 @@ import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "@/app/_lib/de-content-maps";
 import { localizeHref, pickLocalized, type Locale } from "@/app/_lib/i18n";
 import { useFabricLabels, useFabricImages, useFabricMeta } from "@/app/_lib/fabric-context";
+import type { FabricPropertyCode } from "@/app/_lib/fabric-properties";
 import { FABRIC_OPTION_NAME, sortVariantValues, sortVariantOptions, optionHasValueImages } from "@/app/_lib/variants";
 import {
   cornerSideOf,
@@ -21,6 +22,7 @@ import { formatMoney } from "@/app/_lib/money";
 import { useVariantInfo } from "@/app/_lib/variant-info-context";
 import { variantInfoKey, variantInfoText } from "@/app/_lib/variant-info";
 import ValueInfoTip from "./ValueInfoTip";
+import FabricPropertyBadges from "./FabricPropertyBadges";
 
 type Props = {
   variants: ProductVariants;
@@ -104,6 +106,9 @@ export default function VariantSelector({
   const locale = useClientLocale();
   const fabricMap = useFabricLabels();
   const fabricImages = useFabricImages();
+  // Metadane tkanin także tutaj (nie tylko w FabricSwatchGroup) — pigułki cech
+  // idą również przy podpisie wybranej wartości, nad listą próbek.
+  const fabricMeta = useFabricMeta();
   const rate = useEurRate();
   const t = getDictionary(locale);
   const variantInfo = useVariantInfo();
@@ -146,7 +151,13 @@ export default function VariantSelector({
                 ) : (
                   <span className="text-[var(--muted)]">{locale === "de" ? "wählen" : "wybierz"}</span>
                 )}
-              </span>
+              </span>{" "}
+              {option.name === FABRIC_OPTION_NAME && current && (
+                <FabricPropertyBadges
+                  codes={fabricMeta[current]?.properties ?? []}
+                  locale={locale}
+                />
+              )}
             </p>
             {option.name === FABRIC_OPTION_NAME ? (
               <FabricSwatchGroup
@@ -334,7 +345,10 @@ function FabricSwatchGroup({
     label: string;
     surcharge: number;
     sort: number;
-    fabrics: Map<string, { slug: string | null; shortInfo: string | null; values: string[] }>;
+    fabrics: Map<
+      string,
+      { slug: string | null; shortInfo: string | null; properties: FabricPropertyCode[]; values: string[] }
+    >;
   };
   const buckets = new Map<string, GroupBucket>();
   for (const v of values) {
@@ -366,6 +380,9 @@ function FabricSwatchGroup({
       bucket.fabrics.set(fabricName, {
         slug: m?.slug ?? null,
         shortInfo: m ? pickLocalized(m.shortInfo ?? "", m.shortInfoDe, locale) || null : null,
+        // Cechy są per rodzina tkaniny, nie per kolor — wystarczy z pierwszej
+        // wartości, którą rodzina wnosi do kubełka.
+        properties: m?.properties ?? [],
         values: [v],
       });
   }
@@ -418,6 +435,7 @@ function FabricSwatchGroup({
                         </Link>
                       )}
                       {entry.shortInfo && <ValueInfoTip text={entry.shortInfo} />}
+                      <FabricPropertyBadges codes={entry.properties} locale={locale} />
                     </p>
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                       {entry.values.map(swatch)}
