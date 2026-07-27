@@ -398,7 +398,10 @@ function FabricSwatchGroup({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    // data-testid = kotwica dla e2e: podpisy pigułek cech („Łatwa w czyszczeniu"
+    // itp.) trafiają się też w treści produktu, więc test musi szukać ich
+    // wyłącznie tutaj — w rozwiniętej liście tkanin.
+    <div data-testid="fabric-groups" className="flex flex-col gap-3">
       {ordered.map((g) => {
         const isOpen = open.has(g.code);
         const count = g.fabrics.size;

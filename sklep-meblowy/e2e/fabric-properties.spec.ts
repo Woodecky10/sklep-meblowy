@@ -69,7 +69,12 @@ test("pigułki cech tkaniny są widoczne w rozwiniętej liście tkanin", async (
     await collapsed.first().click();
   }
 
-  const badges = page.getByText(LABEL_RE);
+  // Szukamy WYŁĄCZNIE w rozwiniętej liście tkanin (kontener z data-testid
+  // w VariantSelector). `getByText` dopasowuje podłańcuchowo, a te same frazy
+  // naturalnie występują w treści produktu — wystarczy wiersz specyfikacji
+  // „Łatwa w czyszczeniu" nad selektorem, żeby `first()` trafił w niego
+  // i asercja na pełny podpis poleciała z mylącym komunikatem.
+  const badges = page.getByTestId("fabric-groups").getByText(LABEL_RE);
   const found = await badges.count();
   test.skip(found === 0, "żadna tkanina nie ma jeszcze zaznaczonej cechy w katalogu");
 
@@ -80,7 +85,7 @@ test("pigułki cech tkaniny są widoczne w rozwiniętej liście tkanin", async (
 
   // Co dokładnie sprawdza asercja niżej: ŻADNA pigułka nie wychodzi w poziomie
   // poza kartę grupy cenowej, czyli poza swój najbliższy przodek z
-  // `overflow-hidden` (VariantSelector.tsx:406). To granica, na której treść
+  // `overflow-hidden` (VariantSelector.tsx:409). To granica, na której treść
   // jest realnie ucinana — dlatego mierzymy względem KARTY, nie viewportu:
   // przycięcie przez overflow-hidden nie zmienia getBoundingClientRect()
   // dziecka, więc porównanie z ekranem przepuszcza ucięcie kartą. Granicą jest
