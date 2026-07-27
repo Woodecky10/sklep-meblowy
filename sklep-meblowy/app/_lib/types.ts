@@ -205,6 +205,9 @@ export type Fabric = {
   // osobne od description. short_info_de null → fallback PL.
   short_info: string | null;
   short_info_de: string | null;
+  // Cechy tkaniny (kody z app/_lib/fabric-properties.ts) — pigułki przy
+  // wyborze tkaniny na karcie produktu. Pusto = nic się nie pokazuje.
+  properties: string[];
   // Wybrane produkty pokazywane w sekcji „Meble w tej tkaninie" na stronie
   // tkaniny (kolejność = kolejność w tablicy; max 20 w adminie). Nieznane/
   // nieaktywne id pomijane przy renderze.

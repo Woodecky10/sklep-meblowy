@@ -9,12 +9,21 @@ import { uploadProductImage } from "@/app/admin/produkty/actions";
 import { compressIfNeeded } from "@/app/_lib/image-compress";
 import { normalizeSearchText } from "@/app/_lib/search-normalize";
 import { MAX_FEATURED_PRODUCTS } from "@/app/_lib/fabric-featured-products";
+import { FABRIC_PROPERTY_CODES, type FabricPropertyCode } from "@/app/_lib/fabric-properties";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import FabricGroupsPanel from "./FabricGroupsPanel";
 import type { Fabric, FabricPriceGroup } from "@/app/_lib/types";
 
 // Produkt w pickerze „Meble w tej tkaninie" (lista z page.tsx — tylko aktywne).
 export type FabricPickerProduct = { id: string; name: string; image: string | null };
+
+// Podpisy checkboxów w panelu (admin jest wyłącznie po polsku). Podpisy dla
+// klienta sklepu żyją w słowniku PL/DE — to dwa różne teksty i tak ma być.
+const PROPERTY_LABELS_PL: Record<FabricPropertyCode, string> = {
+  waterproof: "Wodoodporna",
+  pet_friendly: "Przyjazna zwierzętom",
+  easy_clean: "Łatwa w czyszczeniu",
+};
 
 export default function FabricsEditor({
   initialFabrics,
@@ -352,6 +361,34 @@ function FabricForm({
           className={inputCls}
         />
       </Field>
+
+      {/* Cechy tkaniny — zamknięty zestaw kodów z fabric-properties.ts. Blok
+          świadomie NIE używa <Field>: Field renderuje <label>, a <label> w
+          <label> to nieprawidłowy HTML (klik w podpis/podpowiedź zaznaczałby
+          pierwszy checkbox). Ten sam układ co „Kolory / numery" niżej. */}
+      <div className="flex flex-col gap-2">
+        <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
+          Cechy tkaniny
+        </span>
+        <p className="text-[11px] text-[var(--muted)] -mt-1">
+          Pokazują się klientowi jako plakietki przy wyborze tkaniny. Zaznacz
+          tylko to, co potwierdza producent.
+        </p>
+        <div className="flex flex-wrap gap-x-5 gap-y-2">
+          {FABRIC_PROPERTY_CODES.map((code) => (
+            <label key={code} className="inline-flex items-center gap-2 text-sm text-[var(--fg)] cursor-pointer">
+              <input
+                type="checkbox"
+                name="properties"
+                value={code}
+                defaultChecked={(initial?.properties ?? []).includes(code)}
+                className="w-4 h-4 accent-[var(--color-gold)]"
+              />
+              {PROPERTY_LABELS_PL[code]}
+            </label>
+          ))}
+        </div>
+      </div>
 
       {/* Kolory (numery) + zdjęcia próbek widoczne dla klienta */}
       <div className="flex flex-col gap-2">
