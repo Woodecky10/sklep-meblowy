@@ -88,10 +88,13 @@ function IconPicker({
 // Zamiast tego kontrolowane inputy + przycisk z onClick i ręczna FormData.
 export default function FabricPropertiesPanel({
   defs,
+  unavailable,
   fabrics,
   onResult,
 }: {
   defs: FabricPropertyDefRow[];
+  // true = listy nie udało się pobrać (≠ „słownik jest pusty").
+  unavailable: boolean;
   fabrics: Fabric[];
   onResult: (res: ActionResult) => void;
 }) {
@@ -118,7 +121,12 @@ export default function FabricPropertiesPanel({
       </p>
 
       <div className="flex flex-col gap-3">
-        {defs.length === 0 ? (
+        {unavailable ? (
+          <p className="text-xs text-red-600 border border-red-300 dark:border-red-900 rounded-lg p-2 leading-snug">
+            Nie udało się wczytać listy cech. Odśwież stronę — jeśli problem
+            wraca, cechy nie są jeszcze przygotowane w bazie.
+          </p>
+        ) : defs.length === 0 ? (
           <p className="text-xs text-[var(--muted)] italic">
             Brak cech — dodaj pierwszą poniżej.
           </p>

@@ -4,6 +4,9 @@ import {
   buildFabricPropertyDefs,
   resolveFabricProperties,
   propertyCodeSlug,
+  normalizePropertyCodes,
+  filterKnownCodes,
+  fabricPropertiesPatch,
 } from "@/app/_lib/fabric-properties";
 
 const DEFS = buildFabricPropertyDefs([
@@ -94,6 +97,65 @@ describe("resolveFabricProperties", () => {
     const snapshot = JSON.stringify(codes);
     resolveFabricProperties(codes, DEFS);
     expect(JSON.stringify(codes)).toBe(snapshot);
+  });
+});
+
+describe("normalizePropertyCodes", () => {
+  it("przycina białe znaki i zachowuje kolejność", () => {
+    expect(normalizePropertyCodes([" waterproof ", "paw"])).toEqual(["waterproof", "paw"]);
+  });
+
+  it("odsiewa nie-stringi i puste wartości", () => {
+    expect(normalizePropertyCodes(["a", 1, null, undefined, {}, "   ", "b"])).toEqual(["a", "b"]);
+  });
+
+  it("usuwa duplikaty (pierwsze wystąpienie wygrywa)", () => {
+    expect(normalizePropertyCodes(["a", "b", " a ", "b"])).toEqual(["a", "b"]);
+  });
+
+  it("wejście nie-tablicowe → pusta lista", () => {
+    expect(normalizePropertyCodes(null)).toEqual([]);
+    expect(normalizePropertyCodes("waterproof")).toEqual([]);
+  });
+});
+
+describe("filterKnownCodes", () => {
+  it("zostawia tylko kody ze słownika, w kolejności wejścia", () => {
+    expect(filterKnownCodes(["b", "x", "a"], new Set(["a", "b"]))).toEqual(["b", "a"]);
+  });
+
+  it("pusty słownik → pusta lista (żaden kod nie jest znany)", () => {
+    expect(filterKnownCodes(["a", "b"], new Set())).toEqual([]);
+  });
+
+  it("nie mutuje wejścia", () => {
+    const codes = ["a", "x"];
+    filterKnownCodes(codes, new Set(["a"]));
+    expect(codes).toEqual(["a", "x"]);
+  });
+});
+
+// Regresja: pusty/niedostępny słownik NIE może po cichu wyczyścić
+// fabrics.properties przy edycji tkaniny (review zadania 4, finding 1).
+describe("fabricPropertiesPatch", () => {
+  it("(a) sekcja wyrenderowana, admin odznaczył wszystko → zapis ustawia []", () => {
+    expect(fabricPropertiesPatch(true, [])).toEqual({ properties: [] });
+  });
+
+  it("(b) sekcji nie wyrenderowano (brak definicji) → payload BEZ klucza properties", () => {
+    const patch = fabricPropertiesPatch(false, []);
+    expect(patch).toEqual({});
+    expect("properties" in patch).toBe(false);
+  });
+
+  it("(c) sekcja wyrenderowana, zaznaczone dwie cechy → zapisane dwa kody", () => {
+    expect(fabricPropertiesPatch(true, ["waterproof", "easy_clean"])).toEqual({
+      properties: ["waterproof", "easy_clean"],
+    });
+  });
+
+  it("brak sekcji ignoruje ewentualne kody z podrobionego requestu", () => {
+    expect(fabricPropertiesPatch(false, ["waterproof"])).toEqual({});
   });
 });
 

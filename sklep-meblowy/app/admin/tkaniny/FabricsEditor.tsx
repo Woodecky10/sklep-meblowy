@@ -25,7 +25,9 @@ export default function FabricsEditor({
 }: {
   initialFabrics: Fabric[];
   groups: FabricPriceGroup[];
-  propertyDefs: FabricPropertyDefRow[];
+  // null = słownika cech nie udało się pobrać (inna sytuacja niż pusta lista):
+  // formularz tkaniny ostrzega i nie rusza zapisanych cech.
+  propertyDefs: FabricPropertyDefRow[] | null;
   pickerProducts: FabricPickerProduct[];
 }) {
   const confirm = useConfirm();
@@ -91,7 +93,8 @@ export default function FabricsEditor({
       <FabricGroupsPanel groups={groups} onResult={(res) => handleResult(res)} />
 
       <FabricPropertiesPanel
-        defs={propertyDefs}
+        defs={propertyDefs ?? []}
+        unavailable={propertyDefs === null}
         fabrics={fabrics}
         onResult={(res) => handleResult(res)}
       />
@@ -204,7 +207,7 @@ function FabricForm({
   initial?: Fabric;
   categories: string[];
   groups: FabricPriceGroup[];
-  propertyDefs: FabricPropertyDefRow[];
+  propertyDefs: FabricPropertyDefRow[] | null;
   pickerProducts: FabricPickerProduct[];
   onSubmit: (fd: FormData) => Promise<void>;
   onCancel: () => void;
@@ -379,26 +382,42 @@ function FabricForm({
           Pokazują się klientowi jako plakietki przy wyborze tkaniny. Zaznacz
           tylko to, co potwierdza producent.
         </p>
-        {propertyDefs.length === 0 ? (
-          <span className="text-xs text-[var(--muted)] italic">
-            Brak cech — dodaj je w karcie &bdquo;Cechy tkanin&rdquo; na górze
-            strony.
-          </span>
+        {propertyDefs === null ? (
+          // Słownika nie udało się wczytać. Nie renderujemy checkboxów ANI
+          // markera `properties_present` — dzięki temu zapis pominie kolumnę
+          // `properties` i nie skasuje cech, których nie było jak pokazać.
+          <p className="text-xs text-red-600 border border-red-300 dark:border-red-900 rounded-lg p-2 leading-snug">
+            Nie udało się wczytać listy cech tkanin. Zapis tej tkaniny{" "}
+            <strong>nie zmieni</strong> jej dotychczasowych cech. Odśwież stronę
+            i spróbuj ponownie.
+          </p>
         ) : (
-          <div className="flex flex-wrap gap-x-5 gap-y-2">
-            {propertyDefs.map((def) => (
-              <label key={def.id} className="inline-flex items-center gap-2 text-sm text-[var(--fg)] cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="properties"
-                  value={def.code}
-                  defaultChecked={(initial?.properties ?? []).includes(def.code)}
-                  className="w-4 h-4 accent-[var(--color-gold)]"
-                />
-                {def.label}
-              </label>
-            ))}
-          </div>
+          <>
+            {/* Marker „sekcja cech była wyrenderowana" — odróżnia „admin
+                odznaczył wszystko" od „nie było czego pokazać". */}
+            <input type="hidden" name="properties_present" value="1" />
+            {propertyDefs.length === 0 ? (
+              <span className="text-xs text-[var(--muted)] italic">
+                Brak cech — dodaj je w karcie &bdquo;Cechy tkanin&rdquo; na
+                górze strony.
+              </span>
+            ) : (
+              <div className="flex flex-wrap gap-x-5 gap-y-2">
+                {propertyDefs.map((def) => (
+                  <label key={def.id} className="inline-flex items-center gap-2 text-sm text-[var(--fg)] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="properties"
+                      value={def.code}
+                      defaultChecked={(initial?.properties ?? []).includes(def.code)}
+                      className="w-4 h-4 accent-[var(--color-gold)]"
+                    />
+                    {def.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 

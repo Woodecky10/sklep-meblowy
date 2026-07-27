@@ -77,6 +77,42 @@ export function resolveFabricProperties(
   return defs.filter((d) => wanted.has(d.code));
 }
 
+// Kody nadesłane checkboxami panelu → uporządkowana lista: trim, odsiew
+// nie-stringów i pustych, dedupe, kolejność wejścia zachowana.
+export function normalizePropertyCodes(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const v of raw) {
+    if (typeof v !== "string") continue;
+    const code = v.trim();
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    out.push(code);
+  }
+  return out;
+}
+
+// Zostawia tylko kody istniejące w słowniku (`fabric_property_defs`). Zestaw
+// cech nie jest już zamknięty w kodzie, więc to jedyna zapora przed
+// wstrzyknięciem dowolnego kodu spreparowanym requestem.
+export function filterKnownCodes(codes: string[], known: Set<string>): string[] {
+  return codes.filter((c) => known.has(c));
+}
+
+// Fragment payloadu zapisu tkaniny dotyczący cech. `sectionRendered` mówi, czy
+// formularz w ogóle pokazał checkboxy (marker `properties_present`):
+// - true  → zapisz dokładnie to, co zaznaczono (pusto = admin odznaczył wszystko),
+// - false → BRAK klucza `properties`, czyli nie ruszaj tego, co tkanina już ma.
+// Bez tego rozróżnienia niedostępny słownik (np. przed migracją 64) kasowałby
+// przy każdej edycji tkaniny jej dotychczasowe cechy — po cichu i bezpowrotnie.
+export function fabricPropertiesPatch(
+  sectionRendered: boolean,
+  codes: string[]
+): { properties?: string[] } {
+  return sectionRendered ? { properties: codes } : {};
+}
+
 // Kod cechy generowany raz, przy tworzeniu — stabilny przy zmianie nazwy, bo
 // tkaniny trzymają kod, nie napis (wzorzec fabricSlug dla tkanin).
 export function propertyCodeSlug(name: string, taken: Set<string>): string {
