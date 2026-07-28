@@ -156,3 +156,50 @@ Wykonaj po ustawieniu zmiennych z sekcji 2 i skonfigurowaniu SMTP z sekcji 3.
    po tym teście końcowym, a potem sprawdzaj tam **od czasu do czasu** —
    to jedyny sposób, żeby zauważyć, że np. Resend wyłączył konto albo domena
    przestała być zweryfikowana.
+
+---
+
+## 5. Zaległości — świadomie odłożone (nie blokują uruchomienia)
+
+Lista z końcowej recenzji gałęzi. Nic tu nie jest awarią; wszystko jest znane
+i celowo zostawione na później. Kolejność wg tego, co najpewniej zaboli pierwsze.
+
+1. **Suma w euro może się nie zgadzać o kilka euro.** Mail sumuje ceny
+   jednostkowe pozycji (każda zaokrąglona w górę przy zapisie zamówienia), a
+   `orders.total` powstał z jednego zaokrąglenia całości — suma sufitów nie równa
+   się sufitowi sumy. Przy 3 × 1001 zł i kursie 0,23 wychodzi 693 € w mailu przy
+   691 € zapisanych. Strona ukrywa tę resztę w wierszu „Dostawa"; mail takiego
+   wiersza nie ma, więc niemiecki klient zobaczy `Produkte − Rabatt ≠ Bezahlt`.
+   **Dotyczy tylko `/de`**, a ceny w EUR nie są jeszcze uruchomione — stąd odłożone.
+   Uwaga przy naprawie: fikstura w `scripts/preview-mail.mjs` liczy `total` formułą
+   **maila**, nie checkoutu, więc podgląd tego błędu nie pokaże.
+2. **`getStripe()` jest wołane bezwarunkowo w `/api/checkout`**, więc zamówienie za
+   pobraniem też wymaga `STRIPE_SECRET_KEY` — mimo że Stripe'a nie dotyka. Błąd
+   istniał przed mailami. PR #48 (migracja na Przelewy24) i tak wycina Stripe z tej
+   trasy; jeśli #48 poczeka, warto przenieść to wywołanie pod warunek `isCod`.
+3. **Luka w rozpoznawaniu zapłaty przy anulowaniu.** Jeśli admin przestawi
+   **nieopłacone** zamówienie online z `pending` na `processing` i anuluje je
+   dopiero potem, mail powie „było opłacone". Reguła (`wasOrderPaid` w
+   `app/_lib/mail/status-notify.ts`) nie ma czym tego odróżnić bez oparcia się o
+   kolumnę płatności, którą PR #48 usuwa. Obejście: anuluj nieopłacone zamówienia
+   wprost z `pending`.
+4. **Gałąź „gość bez konta" w mailach nie ma przypadku w podglądzie.** Została
+   sprawdzona jednorazowym skryptem, ale `npm run preview:mail` jej nie renderuje,
+   więc regresja w tym wariancie nie zostanie zauważona wzrokowo.
+5. **`getMailBranding` nie ma testu.** Czysta połowa (`brandingFromRaw`) jest pokryta
+   sześcioma przypadkami; nieprzetestowane zostaje 12 linii, których jedyną gałęzią
+   jest `catch → paleta domyślna`.
+6. **Brak `maxDuration` dla akcji panelu.** Trasy `/api/checkout` i `/api/webhook`
+   mają `maxDuration = 30`; dla Server Action ustawia się to na poziomie strony,
+   więc `app/admin/zamowienia/actions.ts` nie ma tego limitu.
+
+### Dwie decyzje produktowe (nie techniczne)
+
+- **Na jaki adres pisać do zalogowanego klienta.** Dziś mail idzie na adres z konta
+  (`profiles.email`), nie na ten wpisany w formularzu zamówienia — a te mogą się
+  różnić, jeśli ktoś zamawia na cudzy adres. Adres z konta jest potwierdzony i
+  pewnie działa; adres z formularza nie jest ani jednym, ani drugim, i nie ma go
+  gdzie zapisać bez migracji. Rekomendacja: zostawić, a w checkoucie pokazać
+  klientowi, na jaki adres poleci potwierdzenie.
+- **Suma linii przy pozycji kupionej w kilku sztukach.** Mail pokazuje `2 × 1090 zł`,
+  ale nie `2180 zł` — klient musi mnożyć w głowie, żeby zweryfikować kwotę końcową.
