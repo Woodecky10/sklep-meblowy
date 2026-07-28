@@ -8,7 +8,7 @@ Sklep meblowy **Mollien** (meble na zamówienie). **Next.js 16** (App Router, Se
 > ⚠️ To NIE jest Next.js z treningu — wersja 16 ma breaking changes. Przed kodem Server Component/Action sprawdź `node_modules/next/dist/docs/`. `params`/`searchParams` to Promise. (Patrz `sklep-meblowy/AGENTS.md`.)
 
 ## Stan repo (2026-07-28)
-`origin/main` = `a58e8d3` (2026-07-27), **na produkcji** (Vercel auto-deployuje z `main`). Bramki na `main`, przemierzone 2026-07-28: `npx tsc --noEmit` 0 błędów · `npm run lint` 0 błędów (4 ostrzeżenia o nieużywanych zmiennych) · **748 testów w 61 plikach** (vitest) · `npm run build` przechodzi (Turbopack). Dodatkowo 7 plików e2e (Playwright, odpalane ręcznie).
+`origin/main` = `a58e8d3` (2026-07-27), **na produkcji** (Vercel auto-deployuje z `main`). Bramki na `main`, sprawdzone 2026-07-28: `npx tsc --noEmit` 0 błędów · `npm run lint` 0 błędów (4 ostrzeżenia o nieużywanych zmiennych) · **748 testów w 61 plikach** (vitest) · `npm run build` przechodzi (Turbopack). Dodatkowo 7 plików e2e (Playwright, odpalane ręcznie).
 
 Ostatnio scalone (pełna lista: `gh pr list --state merged`):
 - **#96 / #97** — **cechy tkanin**: wodoodporna / przyjazna zwierzętom / łatwa w czyszczeniu jako pigułki na karcie produktu + **edytowalny słownik cech** w panelu (migracje 63/64).
