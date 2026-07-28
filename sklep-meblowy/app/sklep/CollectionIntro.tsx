@@ -51,9 +51,14 @@ export default function CollectionIntro({
       <p className={paraCls}>{first}</p>
 
       {rest.length > 0 && (
-        <details className="group mt-4">
+        // flex + order: <summary> MUSI byc pierwszym dzieckiem w DOM (tak dziala
+        // <details>), ale kolejnosc wizualna odwracamy flexboksem, zeby po
+        // rozwinieciu "Zwin opis" stalo POD akapitami, a nie w srodku tekstu.
+        // W stanie zwinietym summary jest jedynym widocznym dzieckiem, wiec
+        // order nie ma tam znaczenia — przycisk zostaje tuz pod pierwszym akapitem.
+        <details className="group mt-4 flex flex-col">
           <summary
-            className="mx-auto inline-flex cursor-pointer list-none items-center gap-1.5 font-sans text-xs uppercase tracking-widest text-[var(--color-gold)] transition-colors hover:text-[var(--color-gold-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-gold)] [&::-webkit-details-marker]:hidden"
+            className="order-2 mx-auto inline-flex cursor-pointer list-none items-center gap-1.5 font-sans text-xs uppercase tracking-widest text-[var(--color-gold)] transition-colors hover:text-[var(--color-gold-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-gold)] [&::-webkit-details-marker]:hidden"
           >
             {/* Dwie etykiety, przełączane CSS-em wg stanu <details> — bez tego
                 trzeba by komponentu klienckiego tylko po zmianę jednego napisu. */}
@@ -73,7 +78,9 @@ export default function CollectionIntro({
             </svg>
           </summary>
 
-          <div className="mt-4 flex flex-col gap-4">
+          {/* order-1 = nad przyciskiem. mb-4 zamiast mt-4, bo odstep jest teraz
+              MIEDZY akapitami i przyciskiem pod nimi, nie nad tekstem. */}
+          <div className="order-1 mb-4 flex flex-col gap-4">
             {rest.map((p, i) => (
               <p key={i} className={paraCls}>
                 {p}
