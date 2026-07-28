@@ -9,6 +9,7 @@ import { brandingFromRaw } from "../app/_lib/mail/branding.ts";
 import { OrderConfirmation } from "../app/_lib/mail/templates/OrderConfirmation.tsx";
 import { OrderShipped } from "../app/_lib/mail/templates/OrderShipped.tsx";
 import { OrderCancelled } from "../app/_lib/mail/templates/OrderCancelled.tsx";
+import { AuthConfirm } from "../app/_lib/mail/templates/AuthConfirm.tsx";
 import { wasOrderPaid } from "../app/_lib/mail/status-notify.ts";
 
 const OUT = "mail-preview";
@@ -140,10 +141,27 @@ const cases = [
       wasPaid: wasOrderPaid("cod", "processing"),
     }),
   },
+  {
+    name: "auth-confirm-pl",
+    el: AuthConfirm({
+      branding,
+      locale: "pl",
+      // Placeholder Supabase — po wyrenderowaniu zostaje w HTML dosłownie
+      // i to Supabase podstawia pod niego prawdziwy link.
+      confirmationUrl: "{{ .ConfirmationURL }}",
+    }),
+  },
 ];
 
 for (const c of cases) {
-  const html = await render(c.el);
+  let html = await render(c.el);
+  // Supabase wymaga, żeby {{ .ConfirmationURL }} przeżyło render dosłownie w
+  // atrybucie href — React/serializer HTML ma tendencję do percent-encodowania
+  // nawiasów klamrowych i spacji w atrybutach URL. Naprawiamy to na wypadek,
+  // gdyby render() zakodował placeholder.
+  if (html.includes(encodeURI("{{ .ConfirmationURL }}"))) {
+    html = html.replaceAll(encodeURI("{{ .ConfirmationURL }}"), "{{ .ConfirmationURL }}");
+  }
   writeFileSync(`${OUT}/${c.name}.html`, html, "utf8");
   console.log(`OK ${OUT}/${c.name}.html`);
 }
