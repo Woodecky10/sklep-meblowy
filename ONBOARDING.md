@@ -32,7 +32,8 @@ Decyzja właścicielki (2026-06-17): sklep przejął funkcje BaseLinkera natywni
 4 podprojekty programu „zastąpienie BL":
 1. ✅ **Panel zarządzania zamówieniami** — na `main`.
 2. ✅ **Natywne tworzenie produktów** — na `main`.
-3. ⬜ **Faktury / VAT — przez KSeF** — TODO, czeka na odpowiedzi właścicielki. USTALENIE 2026-06-18: faktury **MUSZĄ być w KSeF** (obowiązkowy od 1.04.2026 dla „pozostałych przedsiębiorców"). **Rekomendacja: NIE budować bezpośredniej integracji KSeF** — sklep zbiera dane → API programu fakturowego (Fakturownia/wFirma/inFakt/Comarch), który robi KSeF+FA(3)+numerację+PDF+UPO. W kodzie ZERO podstaw (brak NIP/danych firmy/VAT/podziału netto-brutto). Najważniejsze pytanie: z jakiego programu fakturowego korzysta księgowa.
+3. ❌ **Faktury / VAT — przez KSeF — NIE ROBIMY.** Decyzja 2026-07-28: sklep nie będzie w żaden sposób obsługiwał faktur. Nie zaczynaj tego tematu bez wyraźnej nowej decyzji — nawet jeśli poniższy kontekst wygląda na zaproszenie.
+   <br>Kontekst, gdyby temat kiedyś wrócił: KSeF jest obowiązkowy od 1.04.2026 dla „pozostałych przedsiębiorców", a sklep meblowy nie łapie się na wyjątek dla najmniejszych firm (jeden mebel > 450 zł). Faktury są więc wystawiane **poza sklepem** — po stronie księgowości. Gdyby wracać: rekomendacja z rozpoznania to NIE budować bezpośredniej integracji KSeF, tylko oddać dane do API programu fakturowego (Fakturownia/wFirma/inFakt/Comarch), który robi KSeF + FA(3) + numerację + PDF + UPO. W kodzie jest ZERO podstaw (brak NIP, danych firmy, VAT, podziału netto/brutto) — to byłby projekt od zera, nie rozszerzenie.
 4. 🟡 **Wysyłka — transport firmą transportową (NIE kurier)** — slice 1 ZROBIONY (PR #38: klient widzi przewoźnika + tracking w `/konto/zamowienia/[id]`). ⬜ Reszta: planowany termin dostawy, dane dla firmy transportowej (piętro/winda/wniesienie/telefon), model kosztu. Gabarytów nie wozi kurier → bez integracji API kuriera, moduł ręczny.
 
 Pytania do właścicielki (faktury KSeF + wysyłka): `sklep-meblowy/docs/2026-06-18-rozpoznanie-faktury-wysylka.md`.
@@ -87,11 +88,11 @@ Origin wymaga konta **Woodecky10** — `mwlo1403` NIE ma write (push → 403). K
 brainstorming → spec (`docs/superpowers/specs/`) → plan TDD (`docs/superpowers/plans/`) → implementacja subagent-driven (świeży subagent na task + recenzja po każdym + final whole-branch review) → merge. Panel admina jest **PL-only** (bez i18n). Server actions: `"use server"` + `requireAdmin()` + `createAdminClient()` + `revalidatePath`, zwracają `ActionResult` (typ w `app/_lib/types.ts`), updaty castowane `as never`. Komponenty klienckie używają `app/admin/_shared` + `useTransition`.
 
 ## Następny krok
-0. **Domknięcie otwartych PR-ów** (kolejność: 62 → 98 → 78 → 92 → 48) — patrz „Otwarte PR-y" wyżej. Przy #92 i #48 dochodzi robota na bazie prod.
-1. **EUR go-live:** ustaw realny kurs w `/admin/ustawienia`; testowa sesja EUR (card+p24) na `/de`.
-2. **Zamknięcie konta BaseLinker** — można (obrazy przehostowane, kod/dane czyste).
-3. **Podprojekt 3 (faktury KSeF)** — czeka na odpowiedź: z jakiego programu fakturowego korzysta księgowa (przesądza drogę); potem spec → plan → wdrożenie.
-4. **Reszta podprojektu 4 (wysyłka)** — termin dostawy, dane transportu, model kosztu.
+0. **Domknięcie otwartych PR-ów** (kolejność: 62 → 98 → 99 → 100 → 78 → 92 → 48) — patrz „Otwarte PR-y" wyżej. Przy #92 i #48 dochodzi robota na bazie prod.
+1. **Maile transakcyjne** — sklep nie wysyła DZIŚ żadnego maila (zero paczek mailowych w `package.json`). Do zrobienia: potwierdzenie zakupu, powiadomienie „przesyłka w trasie", oraz przebranding maila weryfikacyjnego Supabase Auth na design sklepu. Decyzja 2026-07-28.
+2. **EUR go-live:** ustaw realny kurs w `/admin/ustawienia`; testowa sesja EUR (card+p24) na `/de`.
+3. **Zamknięcie konta BaseLinker** — można (obrazy przehostowane, kod/dane czyste).
+4. **Reszta podprojektu 4 (wysyłka)** — planowany termin dostawy widoczny dla klienta. Uwaga: strona `/dostawa` już przesądza politykę (dostawa darmowa w całej PL, termin i wniesienie ustalane telefonicznie), więc zbieranie piętra/windy/kosztu w checkoucie jest prawdopodobnie zbędne — zakres z rozpoznania 2026-06-18 jest w tej części nieaktualny.
 
 ## Drobne follow-upy (nieblokujące)
 - `schema.sql` jest niekompletnym baseline'em (pre-existing) — fresh-DB bootstrap z samego pliku byłby niepełny; źródłem prawdy są **migracje**.
