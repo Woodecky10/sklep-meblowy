@@ -32,22 +32,28 @@ export default function CollectionIntro({
   if (paragraphs.length === 0) return null;
 
   const [first, ...rest] = paragraphs;
-  // max-w-3xl, bo przy pełnej szerokości kontenera (7xl) wiersz miałby ~180
-  // znaków i tekst stałby się nieczytelny. Miara ~75 znaków to komfort czytania.
-  const paraCls = "text-[15px] leading-relaxed text-[var(--muted)]";
+  // 16px przy max-w-4xl daje ~95 znaków w wierszu. Szersza miara wymaga większego
+  // stopnia pisma, inaczej wiersz robi się za długi i oko gubi początek następnego
+  // — przy tekście wyśrodkowanym (ragged z obu stron) tym bardziej.
+  const paraCls =
+    "text-base leading-relaxed text-[var(--muted)] text-balance";
 
   return (
-    <section
-      // Złota kreska po lewej — ten sam akcent, którym sklep oznacza treść
-      // wyróżnioną; oddziela opis od nagłówka bez dokładania ramki czy karty.
-      className="mb-10 max-w-3xl border-l-2 border-[var(--color-gold)] pl-5"
-    >
+    <section className="mb-10 max-w-4xl mx-auto text-center">
+      {/* Krótka złota kreska NAD tekstem, wyśrodkowana. Wersja z kreską po lewej
+          nie da się pogodzić z centrowaniem — wisiałaby na środku strony,
+          oderwana od lewej krawędzi nagłówka. Ten sam akcent, inne osadzenie. */}
+      <span
+        aria-hidden="true"
+        className="mx-auto mb-5 block h-px w-12 bg-[var(--color-gold)]"
+      />
+
       <p className={paraCls}>{first}</p>
 
       {rest.length > 0 && (
-        <details className="group mt-3">
+        <details className="group mt-4">
           <summary
-            className="inline-flex cursor-pointer list-none items-center gap-1.5 font-sans text-xs uppercase tracking-widest text-[var(--color-gold)] transition-colors hover:text-[var(--color-gold-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-gold)] [&::-webkit-details-marker]:hidden"
+            className="mx-auto inline-flex cursor-pointer list-none items-center gap-1.5 font-sans text-xs uppercase tracking-widest text-[var(--color-gold)] transition-colors hover:text-[var(--color-gold-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-gold)] [&::-webkit-details-marker]:hidden"
           >
             {/* Dwie etykiety, przełączane CSS-em wg stanu <details> — bez tego
                 trzeba by komponentu klienckiego tylko po zmianę jednego napisu. */}
@@ -67,7 +73,7 @@ export default function CollectionIntro({
             </svg>
           </summary>
 
-          <div className="mt-3 flex flex-col gap-3">
+          <div className="mt-4 flex flex-col gap-4">
             {rest.map((p, i) => (
               <p key={i} className={paraCls}>
                 {p}
