@@ -4,6 +4,7 @@ import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
 import { buildFabricDeMap, buildFabricImageMap, buildFabricMetaMap, type FabricValueMeta } from "./variants";
+import { buildFabricPropertyDefs, type FabricPropertyDef } from "./fabric-properties";
 import type { Fabric, FabricPriceGroup } from "./types";
 
 export const FABRICS_CACHE_TAG = "fabrics";
@@ -61,6 +62,31 @@ export function invalidateFabricGroupsCache(): void {
   revalidateTag(FABRIC_GROUPS_CACHE_TAG, "max");
 }
 
+export const FABRIC_PROPERTY_DEFS_CACHE_TAG = "fabric-property-defs";
+
+const fetchFabricPropertyDefs = unstable_cache(
+  async (): Promise<FabricPropertyDef[]> => {
+    const supabase = await createAdminClient();
+    // Błąd (np. brak tabeli przed migracją) → pusta lista: karta produktu ma
+    // wyrenderować się bez pigułek, a nie wysypać.
+    const { data, error } = await supabase
+      .from("fabric_property_defs")
+      .select("code, label, label_de, icon, sort_order")
+      .order("sort_order", { ascending: true });
+    if (error) return [];
+    return buildFabricPropertyDefs(data);
+  },
+  ["fabric-property-defs-all"],
+  { tags: [FABRIC_PROPERTY_DEFS_CACHE_TAG], revalidate: 300 }
+);
+
+// Słownik cech tkanin (migracja 64), rosnąco po sort_order.
+export const getFabricPropertyDefs = cache(fetchFabricPropertyDefs);
+
+export function invalidateFabricPropertyDefsCache(): void {
+  revalidateTag(FABRIC_PROPERTY_DEFS_CACHE_TAG, "max");
+}
+
 // Tkanina po slugu (strona /tkaniny/[slug]). Lookup w cache'owanej liście —
 // przy ~200 tkaninach szybsze i prostsze niż osobne zapytanie.
 export async function getFabricBySlug(slug: string): Promise<Fabric | null> {
@@ -71,6 +97,10 @@ export async function getFabricBySlug(slug: string): Promise<Fabric | null> {
 // Mapa wartość wariantu → metadane tkaniny (slug + grupa) — seed kontekstu
 // klienckiego na karcie produktu (FabricMetaProvider).
 export async function getFabricMetaMap(): Promise<Record<string, FabricValueMeta>> {
-  const [fabrics, groups] = await Promise.all([getAllFabrics(), getFabricPriceGroups()]);
-  return buildFabricMetaMap(fabrics, groups);
+  const [fabrics, groups, defs] = await Promise.all([
+    getAllFabrics(),
+    getFabricPriceGroups(),
+    getFabricPropertyDefs(),
+  ]);
+  return buildFabricMetaMap(fabrics, groups, defs);
 }

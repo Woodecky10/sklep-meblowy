@@ -11,7 +11,8 @@ import { searchMatches } from "@/app/_lib/search-normalize";
 import { MAX_FEATURED_PRODUCTS } from "@/app/_lib/fabric-featured-products";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import FabricGroupsPanel from "./FabricGroupsPanel";
-import type { Fabric, FabricPriceGroup } from "@/app/_lib/types";
+import FabricPropertiesPanel from "./FabricPropertiesPanel";
+import type { Fabric, FabricPriceGroup, FabricPropertyDefRow } from "@/app/_lib/types";
 
 // Produkt w pickerze „Meble w tej tkaninie" (lista z page.tsx — tylko aktywne).
 export type FabricPickerProduct = { id: string; name: string; image: string | null };
@@ -19,10 +20,14 @@ export type FabricPickerProduct = { id: string; name: string; image: string | nu
 export default function FabricsEditor({
   initialFabrics,
   groups,
+  propertyDefs,
   pickerProducts,
 }: {
   initialFabrics: Fabric[];
   groups: FabricPriceGroup[];
+  // null = słownika cech nie udało się pobrać (inna sytuacja niż pusta lista):
+  // formularz tkaniny ostrzega i nie rusza zapisanych cech.
+  propertyDefs: FabricPropertyDefRow[] | null;
   pickerProducts: FabricPickerProduct[];
 }) {
   const confirm = useConfirm();
@@ -87,6 +92,13 @@ export default function FabricsEditor({
 
       <FabricGroupsPanel groups={groups} onResult={(res) => handleResult(res)} />
 
+      <FabricPropertiesPanel
+        defs={propertyDefs ?? []}
+        unavailable={propertyDefs === null}
+        fabrics={fabrics}
+        onResult={(res) => handleResult(res)}
+      />
+
       {toast && <ToastView toast={toast} onClose={() => setToast(null)} />}
 
       {creating && (
@@ -95,6 +107,7 @@ export default function FabricsEditor({
             mode="create"
             categories={categories}
             groups={groups}
+            propertyDefs={propertyDefs}
             pickerProducts={pickerProducts}
             onCancel={() => setCreating(false)}
             onSubmit={async (fd) => {
@@ -159,6 +172,7 @@ export default function FabricsEditor({
                     initial={f}
                     categories={categories}
                     groups={groups}
+                    propertyDefs={propertyDefs}
                     pickerProducts={pickerProducts}
                     onCancel={() => setEditingId(null)}
                     onSubmit={async (fd) => {
@@ -184,6 +198,7 @@ function FabricForm({
   initial,
   categories,
   groups,
+  propertyDefs,
   pickerProducts,
   onSubmit,
   onCancel,
@@ -192,6 +207,7 @@ function FabricForm({
   initial?: Fabric;
   categories: string[];
   groups: FabricPriceGroup[];
+  propertyDefs: FabricPropertyDefRow[] | null;
   pickerProducts: FabricPickerProduct[];
   onSubmit: (fd: FormData) => Promise<void>;
   onCancel: () => void;
@@ -332,6 +348,77 @@ function FabricForm({
         <input type="hidden" name="description_de" value={descriptionDe} />
         <RichTextEditor value={descriptionDe} onChange={setDescriptionDe} ariaLabel="Opis tkaniny (DE)" />
       </Field>
+      <Field label="Krótkie info" hint="Krótki tekst w dymku obok „szczegóły” w pickerze (maks. 500 znaków).">
+        <textarea
+          name="short_info"
+          defaultValue={initial?.short_info ?? ""}
+          maxLength={500}
+          rows={2}
+          className={inputCls}
+          placeholder="np. Miękki welur, łatwy w czyszczeniu"
+        />
+      </Field>
+      <Field label="Krótkie info (DE)" hint="Puste → na /de pokaże się PL.">
+        <textarea
+          name="short_info_de"
+          defaultValue={initial?.short_info_de ?? ""}
+          maxLength={500}
+          rows={2}
+          className={inputCls}
+        />
+      </Field>
+
+      {/* Cechy tkaniny — lista z panelu „Cechy tkanin" (fabric_property_defs),
+          nie ze stałej w kodzie: dodana tam cecha pojawia się tu od razu. Blok
+          świadomie NIE używa <Field>: Field renderuje <label>, a <label> w
+          <label> to nieprawidłowy HTML (klik w podpis/podpowiedź zaznaczałby
+          pierwszy checkbox). Ten sam układ co „Kolory / numery" niżej. */}
+      <div className="flex flex-col gap-2">
+        <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
+          Cechy tkaniny
+        </span>
+        <p className="text-[11px] text-[var(--muted)] -mt-1">
+          Pokazują się klientowi jako plakietki przy wyborze tkaniny. Zaznacz
+          tylko to, co potwierdza producent.
+        </p>
+        {propertyDefs === null ? (
+          // Słownika nie udało się wczytać. Nie renderujemy checkboxów ANI
+          // markera `properties_present` — dzięki temu zapis pominie kolumnę
+          // `properties` i nie skasuje cech, których nie było jak pokazać.
+          <p className="text-xs text-red-600 border border-red-300 dark:border-red-900 rounded-lg p-2 leading-snug">
+            Nie udało się wczytać listy cech tkanin. Zapis tej tkaniny{" "}
+            <strong>nie zmieni</strong> jej dotychczasowych cech. Odśwież stronę
+            i spróbuj ponownie.
+          </p>
+        ) : (
+          <>
+            {/* Marker „sekcja cech była wyrenderowana" — odróżnia „admin
+                odznaczył wszystko" od „nie było czego pokazać". */}
+            <input type="hidden" name="properties_present" value="1" />
+            {propertyDefs.length === 0 ? (
+              <span className="text-xs text-[var(--muted)] italic">
+                Brak cech — dodaj je w karcie &bdquo;Cechy tkanin&rdquo; na
+                górze strony.
+              </span>
+            ) : (
+              <div className="flex flex-wrap gap-x-5 gap-y-2">
+                {propertyDefs.map((def) => (
+                  <label key={def.id} className="inline-flex items-center gap-2 text-sm text-[var(--fg)] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="properties"
+                      value={def.code}
+                      defaultChecked={(initial?.properties ?? []).includes(def.code)}
+                      className="w-4 h-4 accent-[var(--color-gold)]"
+                    />
+                    {def.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Kolory (numery) + zdjęcia próbek widoczne dla klienta */}
       <div className="flex flex-col gap-2">

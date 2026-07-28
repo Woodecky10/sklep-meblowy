@@ -18,6 +18,7 @@ import {
   buildGroupSurchargeMap,
   buildFabricMetaMap,
   rebuildFabricValuePrices,
+  optionHasValueImages,
 } from "@/app/_lib/variants";
 import type { Product } from "@/app/_lib/types";
 
@@ -142,7 +143,8 @@ describe("buildFabricMetaMap", () => {
         { name: "Monolith", colors: ["84"], slug: "monolith", group_id: "g2" },
         { name: "Sawana", colors: [], slug: "sawana", group_id: "g1" },
       ],
-      groups
+      groups,
+      []
     );
     expect(map["Monolith 84"]).toEqual({
       fabricName: "Monolith",
@@ -152,15 +154,83 @@ describe("buildFabricMetaMap", () => {
       groupNameDe: "Premium DE",
       groupSurcharge: 250,
       groupSort: 1,
+      shortInfo: null,
+      shortInfoDe: null,
+      properties: [],
     });
     expect(map["Sawana"].groupCode).toBe("standard");
   });
   it("pomija tkaniny z nieznanym group_id", () => {
     const map = buildFabricMetaMap(
       [{ name: "X", colors: [], slug: "x", group_id: "nieistnieje" }],
-      groups
+      groups,
+      []
     );
     expect(map).toEqual({});
+  });
+  describe("buildFabricMetaMap — krótkie info", () => {
+    it("shortInfo/shortInfoDe trafiają do meta każdej wartości tkaniny; puste → null", () => {
+      const map = buildFabricMetaMap(
+        [
+          { name: "Baloo", colors: ["01", "02"], slug: "baloo", group_id: "g1", short_info: "  Miękki welur ", short_info_de: " Velours " },
+          { name: "Sawana", colors: ["21"], slug: "sawana", group_id: "g1", short_info: "  ", short_info_de: null },
+          { name: "Riviera", colors: [], slug: "riviera", group_id: "g1" },
+        ],
+        groups,
+        []
+      );
+      expect(map["Baloo 01"].shortInfo).toBe("Miękki welur");
+      expect(map["Baloo 01"].shortInfoDe).toBe("Velours");
+      expect(map["Baloo 02"].shortInfo).toBe("Miękki welur"); // wszystkie kolory dostają to samo
+      expect(map["Sawana 21"].shortInfo).toBeNull(); // whitespace → null
+      expect(map["Riviera"].shortInfo).toBeNull(); // brak pól → null
+      expect(map["Riviera"].shortInfoDe).toBeNull();
+    });
+  });
+  // Definicje cech przychodzą dziś z tabeli fabric_property_defs (migracja 64),
+  // więc mapa dostaje je z zewnątrz — kody tkaniny są tylko odnośnikiem.
+  const PROPERTY_DEFS = [
+    { code: "waterproof", label: "Wodoodporna", labelDe: "Wasserabweisend", icon: "drop" as const, sortOrder: 0 },
+    { code: "easy_clean", label: "Łatwa w czyszczeniu", labelDe: null, icon: "sparkle" as const, sortOrder: 2 },
+  ];
+
+  describe("buildFabricMetaMap — cechy tkaniny", () => {
+    it("rozwiązuje kody na definicje i przenosi je na każdą wartość rodziny", () => {
+      const map = buildFabricMetaMap(
+        [{ name: "Inari", colors: ["22", "23"], slug: "inari", group_id: "g1", properties: ["easy_clean", "waterproof"] }],
+        [{ id: "g1", code: "std", name: "Standard", name_de: null, surcharge: 0, sort_order: 1 }],
+        PROPERTY_DEFS
+      );
+      expect(map["Inari 22"].properties.map((p) => p.code)).toEqual(["waterproof", "easy_clean"]);
+      expect(map["Inari 23"].properties[0].label).toBe("Wodoodporna");
+    });
+
+    it("brak kolumny properties → pusta lista, bez wyjątku", () => {
+      const map = buildFabricMetaMap(
+        [{ name: "Kronos", colors: ["01"], slug: "kronos", group_id: "g1" }],
+        [{ id: "g1", code: "std", name: "Standard", name_de: null, surcharge: 0, sort_order: 1 }],
+        PROPERTY_DEFS
+      );
+      expect(map["Kronos 01"].properties).toEqual([]);
+    });
+
+    it("kod bez definicji (usunięta cecha) jest odsiewany", () => {
+      const map = buildFabricMetaMap(
+        [{ name: "Poso", colors: ["105"], slug: "poso", group_id: "g1", properties: ["waterproof", "skasowana"] }],
+        [{ id: "g1", code: "std", name: "Standard", name_de: null, surcharge: 0, sort_order: 1 }],
+        PROPERTY_DEFS
+      );
+      expect(map["Poso 105"].properties.map((p) => p.code)).toEqual(["waterproof"]);
+    });
+
+    it("brak definicji w ogóle → pusta lista", () => {
+      const map = buildFabricMetaMap(
+        [{ name: "Poso", colors: ["105"], slug: "poso", group_id: "g1", properties: ["waterproof"] }],
+        [{ id: "g1", code: "std", name: "Standard", name_de: null, surcharge: 0, sort_order: 1 }],
+        []
+      );
+      expect(map["Poso 105"].properties).toEqual([]);
+    });
   });
 });
 
@@ -233,29 +303,48 @@ const productWithValueImages = {
   },
 } as unknown as Product;
 
-describe("getVariantImages — zdjęcia per wartość opcji (value_images)", () => {
+describe("getVariantImages — value_images tylko dla narożnika", () => {
   it("brak wyboru → galeria produktu", () => {
     expect(getVariantImages(productWithValueImages, {})).toEqual([
       "prod1.jpg", "prod2.jpg",
     ]);
   });
-  it("wybrana wartość ze zdjęciami → zdjęcia wariantu na początku + galeria produktu", () => {
+  it("opcja nie-narożnikowa (Tkanina) ze zdjęciami → tylko galeria produktu", () => {
     expect(
       getVariantImages(productWithValueImages, { Tkanina: "Riviera 16" })
-    ).toEqual(["riv1.jpg", "riv2.jpg", "prod1.jpg", "prod2.jpg"]);
+    ).toEqual(["prod1.jpg", "prod2.jpg"]);
   });
-  it("wybrana wartość bez zdjęć → galeria produktu jak dotychczas", () => {
+  it("opcja narożnika (Strona) ze zdjęciami → zdjęcia narożnika + galeria, dedup", () => {
+    expect(
+      getVariantImages(productWithValueImages, { Strona: "Lewa" })
+    ).toEqual(["lewa.jpg", "prod1.jpg", "prod2.jpg"]);
+  });
+  it("narożnik + nie-narożnik → scala tylko narożnik", () => {
+    expect(
+      getVariantImages(productWithValueImages, { Tkanina: "Riviera 16", Strona: "Lewa" })
+    ).toEqual(["lewa.jpg", "prod1.jpg", "prod2.jpg"]);
+  });
+  it("wybrana wartość bez zdjęć → galeria produktu", () => {
     expect(
       getVariantImages(productWithValueImages, { Tkanina: "Sawana 21" })
     ).toEqual(["prod1.jpg", "prod2.jpg"]);
   });
-  it("dwie opcje ze zdjęciami → kolejność wg kolejności opcji + dedup z galerią", () => {
-    expect(
-      getVariantImages(productWithValueImages, { Tkanina: "Riviera 16", Strona: "Lewa" })
-    ).toEqual(["riv1.jpg", "riv2.jpg", "lewa.jpg", "prod1.jpg", "prod2.jpg"]);
-  });
   it("produkt bez variants → galeria produktu", () => {
     const p = { ...productWithValueImages, variants: null } as unknown as Product;
     expect(getVariantImages(p, {})).toEqual(["prod1.jpg", "prod2.jpg"]);
+  });
+});
+
+describe("optionHasValueImages", () => {
+  it("opcja z niepustymi value_images → true", () => {
+    expect(
+      optionHasValueImages({ name: "Kolor nóżek", values: ["Złote"], value_images: { "Złote": ["a.jpg"] } })
+    ).toBe(true);
+  });
+  it("opcja bez value_images → false", () => {
+    expect(optionHasValueImages({ name: "Rozmiar", values: ["M"] })).toBe(false);
+  });
+  it("opcja z samymi pustymi tablicami → false", () => {
+    expect(optionHasValueImages({ name: "X", values: ["a"], value_images: { a: [] } })).toBe(false);
   });
 });

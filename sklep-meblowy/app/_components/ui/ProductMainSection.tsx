@@ -31,6 +31,10 @@ import LocalizedLink from "./LocalizedLink";
 // — wypełnia pustą przestrzeń gdy prawa kolumna (akcje + warianty + info)
 // jest dłuższa od galerii. Przekazana jako prop z page.tsx żeby zachować
 // jeden punkt prawdy o cechach.
+//
+// Lewa kolumna jest sticky (lg:top-40, jak konfigurator na /zestaw/[slug]) —
+// przy dłuższej prawej kolumnie galeria podąża za scrollem i pod nią nie
+// widać pustej przestrzeni.
 export default function ProductMainSection({
   product,
   categoryLabel,
@@ -71,7 +75,7 @@ export default function ProductMainSection({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-16">
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8 lg:sticky lg:top-40 lg:self-start">
         <ImageGallery images={images} name={product.name} />
 
         {specifications.length > 0 && (

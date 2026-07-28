@@ -53,8 +53,9 @@ export default function AddToCartButton({
       id: product.id,
       name: product.name,
       price,
-      // Zdjęcie pozycji = pierwsze zdjęcie aktualnej galerii (wariantowe, gdy
-      // wybrana wartość ma value_images; inaczej pierwsze zdjęcie produktu).
+      // Zdjęcie pozycji = pierwsze zdjęcie aktualnej galerii. Zdjęcia wariantu
+      // trafiają do galerii tylko dla opcji strony narożnika (Strona); dla
+      // pozostałych opcji jest to pierwsze zdjęcie produktu (product.images[0]).
       image: getVariantImages(product, selectedValues ?? {})[0] ?? "",
       quantity: 1,
       variantValues: hasSelection ? selectedValues : undefined,

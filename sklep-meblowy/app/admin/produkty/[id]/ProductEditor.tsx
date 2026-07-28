@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { updateProductBasics, updateProductImages, duplicateProduct } from "../actions";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { Product, ActionResult, Fabric, FabricPriceGroup } from "@/app/_lib/types";
+import type { VariantInfoEntry } from "@/app/_lib/variant-info";
 import type { CategoryDef } from "@/app/_lib/categories";
 import { Field, IconBtn, inputClass, CollapsibleSection, type Toast } from "./_shared";
 import { useImageUpload } from "./useImageUpload";
@@ -15,7 +16,10 @@ import DescriptionSectionsEditor from "./DescriptionSectionsEditor";
 import DescriptionFieldEditor from "./DescriptionFieldEditor";
 import TranslationEditor, { type ProductDeFields } from "./TranslationEditor";
 import SizeGroupEditor from "./SizeGroupEditor";
+import ImagePickerModal from "./ImagePickerModal";
 import type { SizeGroupMember } from "@/app/_lib/products";
+import { MAX_FEATURES } from "@/app/_lib/product-features";
+import type { VariantImageGroup } from "@/app/_lib/variant-image-suggestions";
 
 export default function ProductEditor({
   product,
@@ -24,6 +28,10 @@ export default function ProductEditor({
   sizeGroupMembers,
   fabrics,
   fabricGroups,
+  variantInfo,
+  featureKeySuggestions,
+  featureValueSuggestions,
+  variantImageGroups,
 }: {
   product: Product;
   categories: CategoryDef[];
@@ -31,12 +39,111 @@ export default function ProductEditor({
   sizeGroupMembers: SizeGroupMember[];
   fabrics: Fabric[];
   fabricGroups: FabricPriceGroup[];
+  variantInfo: Record<string, VariantInfoEntry>;
+  // Podpowiedzi nazw parametrów — dropdown „+ Wybierz z listy".
+  featureKeySuggestions: string[];
+  // Podpowiedzi wartości parametrów — mapa nazwa (trim+lowercase) → wartości
+  // już użyte w produktach; zasila strzałkę ▾ przy polu wartości.
+  featureValueSuggestions: Record<string, string[]>;
+  // Zdjęcia wartości opcji z innych produktów — zasilają wybierak
+  // „+ Wybierz z wgranych" (bez opcji „Tkanina", bez galerii).
+  variantImageGroups: VariantImageGroup[];
 }) {
   const [images, setImages] = useState<string[]>(product.images ?? []);
   // Baseline ostatnio zapisanej galerii — resetowany na zapisany payload po
   // sukcesie. Bez tego imagesDirty liczone względem propa product.images
   // (niezmiennego bez reloadu) wisiało jako true po zapisie (audyt LOW).
   const [savedImages, setSavedImages] = useState<string[]>(product.images ?? []);
+  // Wybierak „+ Wybierz z wgranych" dla globalnej galerii. Źródło to zdjęcia
+  // wartości opcji wariantów (bez „Tkaniny") — patrz spec: galerie innych
+  // produktów świadomie nie zasilają listy.
+  const [galleryPickerOpen, setGalleryPickerOpen] = useState(false);
+  // Parametry produktu (specyfikacja) — wiersze klucz→wartość, seed z
+  // product.features (importowane nie giną); serializacja do hidden
+  // features_json w formularzu „Podstawowe dane" (wspólny przycisk zapisu).
+  type FeatureRow = { key: string; value: string };
+  const [featureRows, setFeatureRows] = useState<FeatureRow[]>(() =>
+    (product.features ?? []).map((f) => ({ key: f.key, value: f.value }))
+  );
+  // Dropdown wartości parametru: indeks wiersza z otwartą listą (najwyżej
+  // jeden naraz; otwarcie zamyka picker nazw i odwrotnie). Strzałka ▾ tylko
+  // gdy nazwa wiersza ma zapisane wartości (lookup trim + lowercase). Każda
+  // edycja nazwy/wierszy zamyka listę (indeksy się przesuwają, strzałka może
+  // zniknąć).
+  const [valuePickerIdx, setValuePickerIdx] = useState<number | null>(null);
+  const valuePickerRef = useRef<HTMLDivElement | null>(null);
+  const valueSuggestionsFor = (key: string) =>
+    featureValueSuggestions[key.trim().toLowerCase()] ?? [];
+  function addFeatureRow() {
+    setPickerOpen(false);
+    setValuePickerIdx(null);
+    setFeatureRows((r) => [...r, { key: "", value: "" }]);
+  }
+  function removeFeatureRow(i: number) {
+    setValuePickerIdx(null);
+    setFeatureRows((r) => r.filter((_, idx) => idx !== i));
+  }
+  function setFeatureKey(i: number, key: string) {
+    setValuePickerIdx(null);
+    setFeatureRows((r) => r.map((row, idx) => (idx === i ? { ...row, key } : row)));
+  }
+  function setFeatureValue(i: number, value: string) {
+    setFeatureRows((r) => r.map((row, idx) => (idx === i ? { ...row, value } : row)));
+  }
+  // Dropdown „+ Wybierz z listy": nazwy z featureKeySuggestions minus już
+  // obecne w wierszach (trim + case-insensitive). Wybór dodaje wiersz z nazwą
+  // i fokusuje pole wartości (pendingFocusIdx odczytywany w ref callbacku).
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement | null>(null);
+  const pendingFocusIdx = useRef<number | null>(null);
+  const usedFeatureKeys = new Set(
+    featureRows.map((r) => r.key.trim().toLowerCase())
+  );
+  const availableSuggestions = featureKeySuggestions.filter(
+    (k) => !usedFeatureKeys.has(k.toLowerCase())
+  );
+  function addFeatureRowFromList(key: string) {
+    if (featureRows.length >= MAX_FEATURES) return;
+    pendingFocusIdx.current = featureRows.length;
+    setFeatureRows((r) => [...r, { key, value: "" }]);
+    setValuePickerIdx(null);
+    setPickerOpen(false);
+  }
+  useEffect(() => {
+    if (!pickerOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setPickerOpen(false);
+    }
+    function onMouseDown(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("mousedown", onMouseDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onMouseDown);
+    };
+  }, [pickerOpen]);
+  // Zamykanie dropdownu wartości: Esc / klik poza wierszem z otwartą listą.
+  useEffect(() => {
+    if (valuePickerIdx === null) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setValuePickerIdx(null);
+    }
+    function onMouseDown(e: MouseEvent) {
+      if (valuePickerRef.current && !valuePickerRef.current.contains(e.target as Node)) {
+        setValuePickerIdx(null);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("mousedown", onMouseDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onMouseDown);
+    };
+  }, [valuePickerIdx]);
   const [toast, setToast] = useState<Toast>(null);
   const [savingBasics, startBasicsTransition] = useTransition();
   const [savingImages, startImagesTransition] = useTransition();
@@ -170,8 +277,15 @@ export default function ProductEditor({
           Sekcja: Podstawowe dane
           ============================================================ */}
       <CollapsibleSection title="Podstawowe dane" storageKey="podstawowe">
+        {/* onSubmit zamiast action: React 19 po zakończeniu akcji formularza robi
+            automatyczny form.reset(), który cofa niekontrolowany <select> kategorii
+            do wartości z mountu (a ponowny zapis odsyłałby starą kategorię do bazy). */}
         <form
-          action={(fd) => startBasicsTransition(async () => handleResult(await updateProductBasics(fd)))}
+          onSubmit={(e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            startBasicsTransition(async () => handleResult(await updateProductBasics(fd)));
+          }}
           className="grid grid-cols-1 md:grid-cols-2 gap-4"
         >
           <input type="hidden" name="id" value={product.id} />
@@ -317,6 +431,171 @@ export default function ProductEditor({
             />
           </Field>
 
+          {/* Parametry produktu — dowolne pary klucz→wartość doklejane do
+              sekcji „Specyfikacja" pod zdjęciem (kolumna products.features). */}
+          <div className="md:col-span-2 flex flex-col gap-2 pt-2 border-t border-[var(--border)]">
+            <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
+              Parametry produktu
+            </span>
+            <p className="text-[11px] text-[var(--muted)] -mt-1">
+              Wyświetlane w sekcji &bdquo;Specyfikacja&rdquo; pod zdjęciem. Nazwy: Kolor,
+              Materiał, Wymiary, Waga, Konstrukcja, Czas realizacji, Gwarancja są na
+              karcie pomijane (mają dedykowane pola wyżej) &mdash; nie dubluj. Max {MAX_FEATURES}.
+            </p>
+            <input
+              type="hidden"
+              name="features_json"
+              readOnly
+              value={JSON.stringify(
+                featureRows.filter((r) => r.key.trim() && r.value.trim())
+              )}
+            />
+            {featureRows.length === 0 && (
+              <span className="text-xs text-[var(--muted)] italic">
+                Brak parametrów &mdash; dodaj pierwszy.
+              </span>
+            )}
+            <div className="flex flex-col gap-2">
+              {featureRows.map((row, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  {/* Wrappery nadają szerokość; input zostaje z inputClass (w-full)
+                      i wypełnia wrapper. Bez tego w-full z inputClass kłóciło się
+                      z w-2/5/flex-1 na inpucie → pole wartości zapadało się do ~25px
+                      i wpisany tekst był niewidoczny. min-w-0 pozwala flex-1 zwężać. */}
+                  <div className="w-2/5">
+                    <input
+                      value={row.key}
+                      onChange={(e) => setFeatureKey(i, e.target.value)}
+                      placeholder="np. Wypełnienie"
+                      maxLength={100}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div
+                    className="flex-1 min-w-0 relative"
+                    ref={valuePickerIdx === i ? valuePickerRef : undefined}
+                  >
+                    <input
+                      ref={(el) => {
+                        if (el && pendingFocusIdx.current === i) {
+                          pendingFocusIdx.current = null;
+                          el.focus();
+                        }
+                      }}
+                      value={row.value}
+                      onChange={(e) => setFeatureValue(i, e.target.value)}
+                      placeholder="np. Pianka HR"
+                      maxLength={300}
+                      className={
+                        valueSuggestionsFor(row.key).length > 0
+                          ? `${inputClass} pr-9`
+                          : inputClass
+                      }
+                    />
+                    {valueSuggestionsFor(row.key).length > 0 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPickerOpen(false);
+                            setValuePickerIdx((v) => (v === i ? null : i));
+                          }}
+                          aria-label="Wybierz wartość z listy"
+                          aria-expanded={valuePickerIdx === i}
+                          aria-haspopup="listbox"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-full text-[var(--color-gold-text)] hover:bg-[var(--color-gold)]/10"
+                        >
+                          ▾
+                        </button>
+                        {valuePickerIdx === i && (
+                          <ul
+                            role="listbox"
+                            aria-label="Użyte wartości parametru"
+                            className="absolute z-20 top-full mt-1 left-0 w-full max-h-64 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--bg)] shadow-lg py-1"
+                          >
+                            {valueSuggestionsFor(row.key).map((v) => (
+                              <li key={v} role="option" aria-selected={false}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFeatureValue(i, v);
+                                    setValuePickerIdx(null);
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-gold)]/10"
+                                >
+                                  {v}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeFeatureRow(i)}
+                    aria-label="Usuń parametr"
+                    className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative" ref={pickerRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setValuePickerIdx(null);
+                    setPickerOpen((o) => !o);
+                  }}
+                  disabled={featureRows.length >= MAX_FEATURES || availableSuggestions.length === 0}
+                  aria-expanded={pickerOpen}
+                  aria-haspopup="listbox"
+                  title={
+                    availableSuggestions.length === 0
+                      ? "Wszystkie nazwy z listy są już dodane"
+                      : undefined
+                  }
+                  className="px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors disabled:opacity-50"
+                >
+                  + Wybierz z listy ▾
+                </button>
+                {pickerOpen && (
+                  <ul
+                    role="listbox"
+                    aria-label="Gotowe nazwy parametrów"
+                    className="absolute z-20 top-full mt-1 left-0 w-72 max-h-64 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--bg)] shadow-lg py-1"
+                  >
+                    {availableSuggestions.map((k) => (
+                      <li key={k} role="option" aria-selected={false}>
+                        <button
+                          type="button"
+                          onClick={() => addFeatureRowFromList(k)}
+                          className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-gold)]/10"
+                        >
+                          {k}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={addFeatureRow}
+                disabled={featureRows.length >= MAX_FEATURES}
+                className="px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors disabled:opacity-50"
+              >
+                + Dodaj własny parametr
+              </button>
+            </div>
+          </div>
+
           <div className="md:col-span-2 flex justify-end pt-2">
             <button
               type="submit"
@@ -336,14 +615,25 @@ export default function ProductEditor({
         title="Zdjęcia produktu"
         storageKey="zdjecia"
         headerAside={
-          <label
-            className={`shrink-0 px-5 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors cursor-pointer ${
-              upload.uploading ? "opacity-50 cursor-not-allowed" : ""
-            }`}
-          >
-            {upload.progressText ?? "+ Dodaj zdjęcia"}
-            <input {...upload.inputProps} className="hidden" />
-          </label>
+          <div className="shrink-0 flex flex-wrap items-center gap-2">
+            <label
+              className={`px-5 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors cursor-pointer ${
+                upload.uploading ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            >
+              {upload.progressText ?? "+ Dodaj zdjęcia"}
+              <input {...upload.inputProps} className="hidden" />
+            </label>
+            {variantImageGroups.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setGalleryPickerOpen(true)}
+                className="px-5 py-3 border border-[var(--color-gold)] text-[var(--color-gold)] font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
+              >
+                + Wybierz z wgranych
+              </button>
+            )}
+          </div>
         }
       >
         <p className="text-sm text-[var(--muted)] max-w-2xl">
@@ -429,10 +719,26 @@ export default function ProductEditor({
         </div>
       </CollapsibleSection>
 
+      {/* Modal poza CollapsibleSection — zwinięcie sekcji ukryłoby go razem
+          z jej zawartością. */}
+      {galleryPickerOpen && (
+        <ImagePickerModal
+          groups={variantImageGroups}
+          alreadyUsed={images}
+          onPick={(picked) => {
+            // Dedupe: ten sam URL nie ma wejść do galerii dwa razy (upload
+            // zawsze dawał nowe URL-e, więc dotąd nie było takiego ryzyka).
+            setImages((prev) => [...prev, ...picked.filter((u) => !prev.includes(u))]);
+            setGalleryPickerOpen(false);
+          }}
+          onCancel={() => setGalleryPickerOpen(false)}
+        />
+      )}
+
       {/* ============================================================
           Sekcja: Warianty (pełny editor)
           ============================================================ */}
-      <VariantsEditor productId={product.id} initial={product.variants} categorySlug={product.category} fabrics={fabrics} fabricGroups={fabricGroups} onToast={showToast} />
+      <VariantsEditor productId={product.id} initial={product.variants} categorySlug={product.category} fabrics={fabrics} fabricGroups={fabricGroups} initialVariantInfo={variantInfo} variantImageGroups={variantImageGroups} onToast={showToast} />
 
       {/* ============================================================
           Sekcja: Pojedynczy opis (fallback gdy brak sekcji)
