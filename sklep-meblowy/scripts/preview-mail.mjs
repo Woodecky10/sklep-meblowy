@@ -18,11 +18,13 @@ const branding = brandingFromRaw({
   font_pair: "inter-playfair",
 });
 
+// UWAGA: total MUSI sie zgadzac z pozycjami, inaczej podglad uczy patrzenia
+// obok liczb. Pozycje: 5900*1 + 1090*2 = 8080. 8080 - 320 (zestaw) - 200 (kod) = 7560.
 const order = {
   id: "11111111-1111-1111-1111-111111111111",
   order_number: 1042,
   currency: "pln",
-  total: 7480,
+  total: 7560,
   promo_discount: 200,
   bundle_discount: 320,
   payment_method: "online",
@@ -60,6 +62,24 @@ const items = [
   },
 ];
 
+// Kurs jak seed w store_settings. W produkcji /api/checkout zapisuje pozycje
+// JUZ przeliczone (toCharge), wiec zamowienie EUR ma ceny pozycji w EUR —
+// fikstura musi to odwzorowac, inaczej podglad klamie.
+const EUR_RATE = 0.23;
+const toEur = (pln) => Math.ceil(pln * EUR_RATE);
+
+const itemsDe = items.map((i) => ({ ...i, price: toEur(i.price) }));
+const orderDe = {
+  ...order,
+  currency: "eur",
+  bundle_discount: toEur(order.bundle_discount),
+  promo_discount: toEur(order.promo_discount),
+  total:
+    itemsDe.reduce((s, i) => s + i.price * i.quantity, 0) -
+    toEur(order.bundle_discount) -
+    toEur(order.promo_discount),
+};
+
 const cases = [
   {
     name: "order-confirmation-pl",
@@ -71,8 +91,8 @@ const cases = [
   {
     name: "order-confirmation-de",
     el: OrderConfirmation({
-      order: { ...order, currency: "eur", total: 1720 },
-      items, branding, locale: "de",
+      order: orderDe,
+      items: itemsDe, branding, locale: "de",
       orderUrl: "https://www.mollien.pl/de/konto/zamowienia/" + order.id,
     }),
   },
