@@ -20,6 +20,11 @@ async function customerEmailOf(order: {
 // Maile po złożeniu zamówienia: potwierdzenie do klienta + powiadomienie do
 // właścicielki. NIGDY nie rzuca — wołane z webhooka Stripe (500 = ponowienie
 // eventu) i z /api/checkout (wyjątek = zepsuty zakup).
+// Gwarancja to NAJWYŻEJ-RAZ, nie dokładnie-raz: skoro funkcja połyka każdy
+// błąd, a webhook mimo to zwraca 200 (CAS już "spalony" przez markOrderPaid),
+// przejściowa awaria w środku (odczyt DB, render, Resend) po prostu gubi
+// mail — bez retry. Świadomy kompromis: „nie zepsuj zakupu" jest ważniejsze
+// niż dostarczenie powiadomienia.
 // Idempotencja NIE jest tu pilnowana: wołaj tylko z miejsc chronionych CAS-em
 // (markOrderPaid dla online, jednorazowe utworzenie zamówienia dla COD).
 export async function notifyOrderPlaced(orderId: string): Promise<void> {
@@ -28,7 +33,7 @@ export async function notifyOrderPlaced(orderId: string): Promise<void> {
     const items = order.items ?? [];
     const branding = await getMailBranding();
     const locale = mailLocale(order.currency);
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? `https://www.mollien.pl`;
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://mollien.pl";
     const prefix = locale === "de" ? "/de" : "";
 
     const to = await customerEmailOf(order);

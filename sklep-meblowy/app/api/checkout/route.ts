@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/app/_lib/stripe";
 import { createClient, createAdminClient } from "@/app/_lib/supabase/server";
@@ -425,11 +425,6 @@ export async function POST(request: NextRequest) {
     // który by to zrobił po płatności) — best-effort jak w webhooku,
     // used_count to miękka statystyka.
     if (isCod) {
-      // COD nie przechodzi przez webhook płatności, więc potwierdzenie idzie
-      // tu — zamówienie właśnie powstało, więc to wywołanie jest jednorazowe.
-      // Zamówienia online czekają na webhook: mail dopiero po zapłacie.
-      await notifyOrderPlaced(order.id);
-
       if (promoCodeId) {
         try {
           await incrementPromoUsage(promoCodeId);
@@ -437,6 +432,10 @@ export async function POST(request: NextRequest) {
           console.error("[promo] increment used_count (COD) nieudany:", err);
         }
       }
+      // Mail NA KONIEC i przez after(): wysylka nie moze opoznic odpowiedzi ani
+      // wywalic zakupu. Zamowienie jest juz utworzone, wiec blad tutaj kosztowalby
+      // klienta drugie zamowienie po ponownym kliknieciu.
+      after(() => notifyOrderPlaced(order.id));
       return NextResponse.json({
         url: `${origin}${localePrefix}/checkout/success?order_id=${order.id}`,
       });
