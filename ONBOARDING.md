@@ -7,15 +7,24 @@ Sklep meblowy **Mollien** (meble na zamówienie). **Next.js 16** (App Router, Se
 
 > ⚠️ To NIE jest Next.js z treningu — wersja 16 ma breaking changes. Przed kodem Server Component/Action sprawdź `node_modules/next/dist/docs/`. `params`/`searchParams` to Promise. (Patrz `sklep-meblowy/AGENTS.md`.)
 
-## Stan repo (2026-06-24)
-`origin/main` = `73382b2`, **na produkcji** (Vercel auto-deployuje z `main`). Bramki na `main`: `tsc` 0 · `lint` 0 · **208 testów** (vitest) · `build` przechodzi (Turbopack).
+## Stan repo (2026-07-28)
+`origin/main` = `a58e8d3` (2026-07-27), **na produkcji** (Vercel auto-deployuje z `main`). Bramki na `main`, przemierzone 2026-07-28: `npx tsc --noEmit` 0 błędów · `npm run lint` 0 błędów (4 ostrzeżenia o nieużywanych zmiennych) · **748 testów w 61 plikach** (vitest) · `npm run build` przechodzi (Turbopack). Dodatkowo 7 plików e2e (Playwright, odpalane ręcznie).
 
-Ostatnio scalone:
-- **PR #41** — domknięcie wycieków PL na `/de` (redirecty/linki gubiły prefiks `/de`, komunikaty błędów po DE).
-- **PR #42** — **ceny w EUR na `/de`** (patrz sekcja niżej).
-- **PR #43** — **pełne wycięcie BaseLinkera** (kod, API, cron, panel admina, env, migr. 34 drop kolumn/tabeli).
-- **PR #44** — przehostowanie obrazów 15 produktów z CDN BaseLinkera → Supabase storage (skrypt `scripts/rehost-bl-images.mjs`).
-- **PR #45** — fix przełącznika języka DE/PL: `<Link>`→natywny `<a>` (pełny reload). Locale niesie nagłówek `x-locale` (proxy), a chrome (TopBar/Navbar/Footer) jest serwerowy w root layoucie — App Router NIE re-renderuje root layoutu przy soft-nav, więc soft-switch tłumaczył tylko stronę. **Nie zamieniać `<a>` z powrotem na `<Link>` w `LanguageSwitcher`.**
+Ostatnio scalone (pełna lista: `gh pr list --state merged`):
+- **#96 / #97** — **cechy tkanin**: wodoodporna / przyjazna zwierzętom / łatwa w czyszczeniu jako pigułki na karcie produktu + **edytowalny słownik cech** w panelu (migracje 63/64).
+- **#89 / #90** — krótkie info o tkaninie w pickerze (ikona obok „szczegóły"), limit 500 znaków.
+- **#91 / #93** — parametry produktu w adminie: nazwy i wartości wybierane z listy zamiast wpisywania z palca.
+- **#94** — wybór już wgranego zdjęcia zamiast ponownego uploadu.
+- **#85 / #86 / #88** — warianty: zdjęcia jako swatche (poza główną galerią), tooltip „info o wariancie" + globalny słownik, a11y tooltipa.
+- **#83 / #84 / #87 / #95** — fixy: zapis kategorii produktu (auto-reset formularza React 19), lightbox galerii przez portal, strażnik niezapisanych zmian łapie „wstecz", dymki wariantów nie chowają się pod nagłówkiem.
+- **#45** (starsze, ale wciąż istotne) — przełącznik języka DE/PL używa natywnego `<a>`, nie `<Link>`. Locale niesie nagłówek `x-locale` (proxy), a chrome (TopBar/Navbar/Footer) jest serwerowy w root layoucie — App Router NIE re-renderuje root layoutu przy soft-nav, więc soft-switch tłumaczył tylko stronę. **Nie zamieniać `<a>` z powrotem na `<Link>` w `LanguageSwitcher`.**
+
+### Otwarte PR-y (2026-07-28 — wszystkie zielone i scalalne, `main` domergowany do każdego)
+- **#62** — usunięcie jednorazowego skryptu `rehost-bl-images.mjs`; domyka wycięcie BaseLinkera. Bez wpływu na runtime.
+- **#98** — `.gitignore` na zrzuty ekranu i `.playwright-mcp/` w korzeniu repo.
+- **#78** — przycisk „na górę" w adminie + wyszukiwanie odporne na spacje i kolejność słów. Migracja `65_products_search_key` **jest już na produkcji** (odpalona 2026-07-21 jeszcze pod numerem 61; przenumerowana przy merge'u main-a, bo 61 zajęło `61_variant_info`). Cała jest idempotentna, więc ponowne odpalenie to no-op.
+- **#92** — filtry na `/sklep` z parametrów produktu zamiast koloru/tkaniny (moduł `fabric-filter` usunięty; katalog tkanin i `/tkaniny` nietknięte). Do merge'a dochodzi **osobna operacja SQL na prodzie**: odznaczenie flagi „filtrowalna" dla opcji „Kolor nóżek".
+- **#48** — migracja płatności **Stripe → bezpośrednie Przelewy24/PayPro**. ⚠️ Migracje `47_p24_payment_ref` i `48_drop_stripe_payment_intent` **NIE są jeszcze na produkcji** — odpalić przy merge'u. Konflikt z zestawami (bundles) rozstrzygnięty w merge-commicie `9466ce6` — uzasadnienia decyzji o kwotach są w jego komunikacie, przeczytaj przed merge'em.
 
 ## Duży kierunek: rezygnacja z BaseLinkera — ZAKOŃCZONA
 Decyzja właścicielki (2026-06-17): sklep przejął funkcje BaseLinkera natywnie. **BaseLinker został KOMPLETNIE wycięty** z kodu, configu, env, kolumn DB i danych (obrazy przehostowane). `grep -ri baselinker app/` = pusty. **Konto BaseLinker można zamknąć** bez utraty obrazów ani funkcji. Dawne audyty BL (`docs/audyt-baselinker-*`, `docs/bl-*`) są nieaktualne (legacy).
@@ -51,11 +60,17 @@ Niezbędne env do dev (nazwy — wartości z Vercel/starego `.env.local`):
 > **Baza i storage są ZDALNE/współdzielone (Supabase).** Migracje (29–34) już wgrane, obrazy w storage. Nowy komp **nie robi setupu bazy** — wystarczy `.env.local` wskazujący na ten sam projekt Supabase. `.env.local` i `node_modules` są gitignored, więc nie przychodzą z klonem.
 
 ## Baza — migracje
-**WSZYSTKIE migracje (przez 34) są ODPALONE** na produkcyjnym Supabase (29–32: 2026-06-23; 33 EUR + 34 drop BL: 2026-06-24). Wspólna baza → świeży klon nic nie re-uruchamia. Przyszłe migracje: kolejny numer w `sklep-meblowy/supabase/migrations/`; odpala **człowiek** w Supabase SQL Editorze (agent NIE ma dostępu DDL).
+**Wszystkie migracje z `main` (60 plików, numeracja do 64) są ODPALONE** na produkcyjnym Supabase — sprawdzone `list_migrations` 2026-07-28. Wspólna baza → świeży klon nic nie re-uruchamia. Przyszłe migracje: kolejny numer w `sklep-meblowy/supabase/migrations/`.
+
+**Odpalanie:** agent MA dostęp DDL przez **Supabase MCP** (`apply_migration`) — connected project to **produkcja**, więc każde wywołanie idzie na żywą bazę. Wariant awaryjny: człowiek w Supabase SQL Editorze.
+
+> ⚠️ **Auto-apply po merge'u nie działa** — migracja scalona do `main` NIE wjeżdża sama na bazę (potwierdzone 2× na migracjach 57 i 58). Po każdym merge'u PR-a z migracją: `list_migrations` / `list_tables` i zaaplikuj ręcznie.
+> ⚠️ **Numeracja kolizjuje na długo żyjących branchach.** Dwa równolegle otwarte PR-y potrafią zająć ten sam numer (61 = `variant_info` na `main` i `products_search_key` w #78). Przed merge'em sprawdź, czy numer jest wolny na `main`, i przenumeruj plik brancha — migracje pisz idempotentnie (`if not exists`), żeby przenumerowanie nie groziło podwójnym odpaleniem.
 
 ## Bramki jakości (uruchamiać z `sklep-meblowy/`)
-`npx tsc --noEmit` (0 błędów) · `npm run lint` (0) · `npm test` (vitest — ~208 zielonych) · `npm run build` (Turbopack przechodzi).
-> Po przełączeniu gałęzi build/tsc potrafi pokazać „phantom" błędy ze stale cache `.next` (referencje do nieistniejących już tras). Jeśli tak — `rm -rf .next` i ponów.
+`npx tsc --noEmit` (0 błędów) · `npm run lint` (0 błędów; 4 ostrzeżenia o nieużywanych zmiennych są znane) · `npm test` (vitest — **748 zielonych** w 61 plikach) · `npm run build` (Turbopack przechodzi) · `npm run test:e2e` (Playwright, 7 plików — wymaga sesji admina, patrz `e2e/.auth`).
+> Po przełączeniu gałęzi build/tsc potrafi pokazać „phantom" błędy ze stale cache `.next` (referencje do nieistniejących już tras — np. `Cannot find module '../../../app/api/webhook/route.js'` po skoku na branch #48, który wycina Stripe'a). Jeśli tak — `rm -rf .next` i ponów.
+> Nie odpalaj `npm run build`, gdy w tle chodzi `next dev` — build psuje `.next` dev-serwera i localhost zaczyna serwować stary render. Wtedy: ubij proces na `:3000`, `rm -rf .next`, restart.
 
 ## Push do origin
 Origin wymaga konta **Woodecky10** — `mwlo1403` NIE ma write (push → 403). Każdy push do `main` — za wyraźną zgodą właściciela.
@@ -72,6 +87,7 @@ Origin wymaga konta **Woodecky10** — `mwlo1403` NIE ma write (push → 403). K
 brainstorming → spec (`docs/superpowers/specs/`) → plan TDD (`docs/superpowers/plans/`) → implementacja subagent-driven (świeży subagent na task + recenzja po każdym + final whole-branch review) → merge. Panel admina jest **PL-only** (bez i18n). Server actions: `"use server"` + `requireAdmin()` + `createAdminClient()` + `revalidatePath`, zwracają `ActionResult` (typ w `app/_lib/types.ts`), updaty castowane `as never`. Komponenty klienckie używają `app/admin/_shared` + `useTransition`.
 
 ## Następny krok
+0. **Domknięcie otwartych PR-ów** (kolejność: 62 → 98 → 78 → 92 → 48) — patrz „Otwarte PR-y" wyżej. Przy #92 i #48 dochodzi robota na bazie prod.
 1. **EUR go-live:** ustaw realny kurs w `/admin/ustawienia`; testowa sesja EUR (card+p24) na `/de`.
 2. **Zamknięcie konta BaseLinker** — można (obrazy przehostowane, kod/dane czyste).
 3. **Podprojekt 3 (faktury KSeF)** — czeka na odpowiedź: z jakiego programu fakturowego korzysta księgowa (przesądza drogę); potem spec → plan → wdrożenie.
