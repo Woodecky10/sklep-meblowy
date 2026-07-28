@@ -20,7 +20,8 @@
 - **Maile używają tokenów `light`** z `resolveThemeTokens`. Dark mode w mailu jest nieprzewidywalny — nie próbujemy.
 - **Kolory tylko jako literalne hexy, inline.** Zmienne CSS i klasy Tailwinda nie działają w kliencie pocztowym.
 - **Panel admina i mail #4 są PL-only.** Maile do klienta PL/DE wg `orders.currency`.
-- Bramki po każdym zadaniu: `npx tsc --noEmit` (0 błędów), `npm run lint` (0 błędów; 4 istniejące ostrzeżenia w `variants.ts` są znane i dozwolone), `npm test`, `npm run build`. Wszystko z katalogu `sklep-meblowy/`.
+- Bramki po każdym zadaniu: `npx tsc --noEmit` (0 błędów), `npm run lint` (**0 błędów**), `npm test`, `npm run build`. Wszystko z katalogu `sklep-meblowy/`.
+- **4 istniejące ostrzeżenia lint** (nie błędy) są znane i dozwolone, w trzech plikach: `app/_lib/__tests__/fabrics.test.ts` (2 — `FABRIC_OPTION_NAME`, `ProductOption`), `app/_lib/bundles-server.ts` (1 — `_drop`), `app/_lib/variants.ts` (1 — `_selectedValues`). Wszystkie to `no-unused-vars`. Nie „naprawiaj" ich — to pliki poza zakresem tego planu.
 - Po przełączeniu gałęzi `rm -rf .next` przed buildem — stale cache daje phantom błędy.
 
 ## File Structure
