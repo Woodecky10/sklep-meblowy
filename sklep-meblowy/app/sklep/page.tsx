@@ -191,7 +191,13 @@ export default async function SklepPage({
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
-      <div className="mb-10">
+      {/* Nagłówek wyśrodkowany TYLKO dla widoku kolekcji — tam tworzy jedną
+          kompozycję z wyśrodkowanym opisem pod nim. Ten sam blok obsługuje
+          kategorie, wyszukiwanie i „wszystkie produkty"; tam centrowanie dałoby
+          wyśrodkowany nagłówek nad lewo-wyrównanymi filtrami, bez niczego, co by
+          to uzasadniało. Warunek na `collection`, nie na `collection.description`,
+          żeby wszystkie kolekcje wyglądały tak samo — dziś 3 z 4 mają pusty opis. */}
+      <div className={`mb-10 ${collection ? "text-center" : ""}`}>
         <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
           {t.shop.eyebrow}
         </p>
