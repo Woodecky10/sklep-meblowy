@@ -4,7 +4,7 @@ import type { OrderStatus } from "../types";
 import { getMailBranding } from "./branding-server";
 import { mailLocale } from "./locale";
 import { sendMail } from "./send";
-import { shouldNotifyCustomer } from "./status-notify";
+import { shouldNotifyCustomer, wasOrderPaid } from "./status-notify";
 import { OrderConfirmation } from "./templates/OrderConfirmation";
 import { AdminNewOrder } from "./templates/AdminNewOrder";
 import { OrderShipped } from "./templates/OrderShipped";
@@ -98,7 +98,7 @@ export async function notifyStatusChange(
     const order = await getOrderById(orderId);
     const branding = await getMailBranding();
     const locale = mailLocale(order.currency);
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? `https://www.mollien.pl`;
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://mollien.pl";
     const prefix = locale === "de" ? "/de" : "";
     const to = order.guest_email ?? (await customerEmailOf(order));
     if (!to) {
@@ -123,7 +123,7 @@ export async function notifyStatusChange(
     }
 
     // cancelled — jedyny pozostały status z shouldNotifyCustomer
-    const wasPaid = previousStatus !== "pending";
+    const wasPaid = wasOrderPaid(order.payment_method, previousStatus);
     const html = await render(
       OrderCancelled({ order, branding, locale, wasPaid })
     );

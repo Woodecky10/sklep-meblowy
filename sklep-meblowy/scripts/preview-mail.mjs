@@ -9,6 +9,7 @@ import { brandingFromRaw } from "../app/_lib/mail/branding.ts";
 import { OrderConfirmation } from "../app/_lib/mail/templates/OrderConfirmation.tsx";
 import { OrderShipped } from "../app/_lib/mail/templates/OrderShipped.tsx";
 import { OrderCancelled } from "../app/_lib/mail/templates/OrderCancelled.tsx";
+import { wasOrderPaid } from "../app/_lib/mail/status-notify.ts";
 
 const OUT = "mail-preview";
 mkdirSync(OUT, { recursive: true });
@@ -127,6 +128,17 @@ const cases = [
   {
     name: "order-cancelled-unpaid-pl",
     el: OrderCancelled({ order, branding, locale: "pl", wasPaid: false }),
+  },
+  {
+    name: "order-cancelled-cod-pl",
+    el: OrderCancelled({
+      order: { ...order, payment_method: "cod" },
+      branding,
+      locale: "pl",
+      // Po poprawce wasOrderPaid("cod", ...) daje false, wiec ten wariant NIE
+      // moze zawierac akapitu o zwrocie srodkow.
+      wasPaid: wasOrderPaid("cod", "processing"),
+    }),
   },
 ];
 
