@@ -1,4 +1,7 @@
--- Migracja 61: kolumny wyszukiwania odporne na spacje na products.
+-- Migracja 65: kolumny wyszukiwania odporne na spacje na products.
+-- (Numer 61 zajęty przez 61_variant_info na main; ta migracja jest już
+--  zaaplikowana na produkcji 2026-07-21 jako "61_products_search_key" —
+--  ponowne uruchomienie jest no-opem, cała jest idempotentna.)
 -- search_key = lower(name+description) z usuniętymi tagami HTML i WSZYSTKIMI
 -- spacjami → ILIKE %token% dopasowuje niezależnie od spacji/kolejności (tokeny
 -- ANDowane w zapytaniu). Diakrytyki zachowane (jak dotychczasowe wyszukiwanie
