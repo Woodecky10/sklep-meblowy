@@ -111,9 +111,31 @@ export function OrderConfirmation({
               {t.notes}: {item.notes}
             </Text>
           )}
-          <Text style={rowStyle}>
-            {item.quantity} × {formatOrderAmount(Number(item.price), cur)}
-          </Text>
+          {/* Ilosc x cena jednostkowa po lewej, suma pozycji po prawej — tak samo
+              jak w szczegolach zamowienia w panelu admina. Bez sumy pozycji klient
+              przy ilosci > 1 musi mnozyc w glowie, zeby zweryfikowac wiersz
+              "Produkty". Pokazywana zawsze, takze przy jednej sztuce: spojna
+              kolumna kwot czyta sie jak rachunek, warunek robilby dziury. */}
+          <Row>
+            <Column>
+              <Text style={{ ...rowStyle, margin: 0 }}>
+                {item.quantity} × {formatOrderAmount(Number(item.price), cur)}
+              </Text>
+            </Column>
+            <Column align="right">
+              <Text
+                style={{
+                  color: c.fg,
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  margin: 0,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {formatOrderAmount(Number(item.price) * item.quantity, cur)}
+              </Text>
+            </Column>
+          </Row>
         </Section>
       ))}
 
