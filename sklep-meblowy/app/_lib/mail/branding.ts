@@ -1,0 +1,70 @@
+import { createAdminClient } from "../supabase/server";
+import {
+  normalizeThemeSettings,
+  resolveThemeTokens,
+  DEFAULT_FONT_PAIR,
+  type FontPairKey,
+  type ThemeTokens,
+} from "../theme";
+
+// Fontów w mailu NIE DA SIĘ wymusić: Gmail wycina @font-face, Outlook go
+// ignoruje. FONT_PAIRS z theme.ts trzyma referencje `var(--font-*)`, bezużyteczne
+// w mailu — dlatego osobne mapowanie na stacki z realnym fallbackiem.
+// Georgia jako szeryf jest dostępna na Windows/macOS/Androidzie.
+const MAIL_FONT_STACKS: Record<FontPairKey, { sans: string; display: string }> = {
+  "inter-playfair": {
+    sans: "Inter, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif",
+    display: "'Playfair Display', Georgia, 'Times New Roman', serif",
+  },
+  "lato-cormorant": {
+    sans: "Lato, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif",
+    display: "'Cormorant Garamond', Georgia, 'Times New Roman', serif",
+  },
+  montserrat: {
+    sans: "Montserrat, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif",
+    display: "Montserrat, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif",
+  },
+  "nunito-lora": {
+    sans: "'Nunito Sans', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif",
+    display: "Lora, Georgia, 'Times New Roman', serif",
+  },
+};
+
+export type MailBranding = {
+  colors: ThemeTokens;
+  fonts: { sans: string; display: string };
+};
+
+type ThemeRow = {
+  theme_preset?: unknown;
+  theme_overrides?: unknown;
+  font_pair?: unknown;
+};
+
+// Czysta: surowy wiersz → gotowe tokeny. Maile używają palety `light` —
+// dark mode w kliencie pocztowym jest nieprzewidywalny, nie próbujemy.
+export function brandingFromRaw(raw: ThemeRow | null): MailBranding {
+  const settings = normalizeThemeSettings(raw);
+  const { light } = resolveThemeTokens(settings);
+  return {
+    colors: light,
+    fonts: MAIL_FONT_STACKS[settings.fontPair] ?? MAIL_FONT_STACKS[DEFAULT_FONT_PAIR],
+  };
+}
+
+// Odczyt motywu z bazy — tego samego źródła, z którego kolory bierze strona,
+// żeby mail nie rozjechał się po zmianie motywu w /admin/wyglad.
+// Błąd odczytu nie może zablokować maila: lepiej wysłać w domyślnej palecie.
+export async function getMailBranding(): Promise<MailBranding> {
+  try {
+    const supabase = await createAdminClient();
+    const { data } = await supabase
+      .from("store_settings")
+      .select("theme_preset, theme_overrides, font_pair")
+      .maybeSingle();
+    return brandingFromRaw((data as ThemeRow | null) ?? null);
+  } catch (err) {
+    console.error("[mail] odczyt motywu nieudany, używam domyślnego:", err);
+    return brandingFromRaw(null);
+  }
+}
