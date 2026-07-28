@@ -7,6 +7,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { render } from "@react-email/components";
 import { brandingFromRaw } from "../app/_lib/mail/branding.ts";
 import { OrderConfirmation } from "../app/_lib/mail/templates/OrderConfirmation.tsx";
+import { OrderShipped } from "../app/_lib/mail/templates/OrderShipped.tsx";
+import { OrderCancelled } from "../app/_lib/mail/templates/OrderCancelled.tsx";
 
 const OUT = "mail-preview";
 mkdirSync(OUT, { recursive: true });
@@ -103,6 +105,28 @@ const cases = [
       items, branding, locale: "pl",
       orderUrl: "https://www.mollien.pl/konto/zamowienia/" + order.id,
     }),
+  },
+  {
+    name: "order-shipped-pl",
+    el: OrderShipped({
+      order, branding, locale: "pl",
+      orderUrl: "https://www.mollien.pl/konto/zamowienia/" + order.id,
+    }),
+  },
+  {
+    name: "order-shipped-de",
+    el: OrderShipped({
+      order: { ...order, currency: "eur" }, branding, locale: "de",
+      orderUrl: "https://www.mollien.pl/de/konto/zamowienia/" + order.id,
+    }),
+  },
+  {
+    name: "order-cancelled-paid-pl",
+    el: OrderCancelled({ order, branding, locale: "pl", wasPaid: true }),
+  },
+  {
+    name: "order-cancelled-unpaid-pl",
+    el: OrderCancelled({ order, branding, locale: "pl", wasPaid: false }),
   },
 ];
 

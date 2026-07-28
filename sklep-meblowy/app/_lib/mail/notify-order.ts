@@ -1,10 +1,14 @@
 import { render } from "@react-email/components";
 import { getOrderById, getProfilesByIds } from "../orders";
+import type { OrderStatus } from "../types";
 import { getMailBranding } from "./branding-server";
 import { mailLocale } from "./locale";
 import { sendMail } from "./send";
+import { shouldNotifyCustomer } from "./status-notify";
 import { OrderConfirmation } from "./templates/OrderConfirmation";
 import { AdminNewOrder } from "./templates/AdminNewOrder";
+import { OrderShipped } from "./templates/OrderShipped";
+import { OrderCancelled } from "./templates/OrderCancelled";
 
 // Adres klienta: gość ma guest_email, zalogowany — email z profiles.
 async function customerEmailOf(order: {
@@ -78,5 +82,60 @@ export async function notifyOrderPlaced(orderId: string): Promise<void> {
     }
   } catch (err) {
     console.error("[mail] notifyOrderPlaced nieudane:", err);
+  }
+}
+
+// Mail po zmianie statusu. `previousStatus` służy tylko do rozpoznania, czy
+// anulowane zamówienie było wcześniej opłacone — po CAS-ie status w bazie to
+// już "cancelled". Nigdy nie rzuca.
+export async function notifyStatusChange(
+  orderId: string,
+  status: OrderStatus,
+  previousStatus: OrderStatus
+): Promise<void> {
+  if (!shouldNotifyCustomer(status)) return;
+  try {
+    const order = await getOrderById(orderId);
+    const branding = await getMailBranding();
+    const locale = mailLocale(order.currency);
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? `https://www.mollien.pl`;
+    const prefix = locale === "de" ? "/de" : "";
+    const to = order.guest_email ?? (await customerEmailOf(order));
+    if (!to) {
+      console.error(`[mail] zamówienie ${orderId} bez adresu e-mail — pomijam`);
+      return;
+    }
+    const orderUrl = `${base}${prefix}/konto/zamowienia/${order.id}`;
+
+    if (status === "shipped") {
+      const html = await render(
+        OrderShipped({ order, branding, locale, orderUrl })
+      );
+      await sendMail({
+        to,
+        subject:
+          locale === "de"
+            ? `Bestellung #${order.order_number} ist unterwegs`
+            : `Zamówienie #${order.order_number} jest w drodze`,
+        html,
+      });
+      return;
+    }
+
+    // cancelled — jedyny pozostały status z shouldNotifyCustomer
+    const wasPaid = previousStatus !== "pending";
+    const html = await render(
+      OrderCancelled({ order, branding, locale, wasPaid })
+    );
+    await sendMail({
+      to,
+      subject:
+        locale === "de"
+          ? `Bestellung #${order.order_number} wurde storniert`
+          : `Zamówienie #${order.order_number} zostało anulowane`,
+      html,
+    });
+  } catch (err) {
+    console.error("[mail] notifyStatusChange nieudane:", err);
   }
 }
