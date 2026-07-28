@@ -194,7 +194,10 @@ export const de: DeepPartial<PlShape> = {
     wishlistTitle: "Favoriten",
   },
   shop: {
-    eyebrow: "Kollektion",
+    eyebrowShop: "Shop",
+    eyebrowCollection: "Kollektion",
+    eyebrowCategory: "Kategorie",
+    eyebrowSearch: "Suche",
     title: "Shop",
     allProducts: "Alle Produkte",
     searchPrefix: "Ergebnisse",

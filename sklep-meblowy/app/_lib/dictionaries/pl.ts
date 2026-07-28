@@ -183,7 +183,12 @@ export type PlShape = {
     wishlistTitle: string;
   };
   shop: {
-    eyebrow: string;
+    // Nadkreślenie nad tytułem /sklep — zależne od widoku. Wcześniej była tu
+    // jedna wartość „Kolekcja", pokazywana także nad „Wszystkie produkty".
+    eyebrowShop: string;
+    eyebrowCollection: string;
+    eyebrowCategory: string;
+    eyebrowSearch: string;
     title: string;
     allProducts: string;
     searchPrefix: string;
@@ -533,7 +538,10 @@ export const pl = {
     wishlistTitle: "Ulubione",
   },
   shop: {
-    eyebrow: "Kolekcja",
+    eyebrowShop: "Sklep",
+    eyebrowCollection: "Kolekcja",
+    eyebrowCategory: "Kategoria",
+    eyebrowSearch: "Wyszukiwanie",
     title: "Sklep",
     allProducts: "Wszystkie produkty",
     searchPrefix: "Wyniki",

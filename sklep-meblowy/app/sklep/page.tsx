@@ -180,6 +180,20 @@ export default async function SklepPage({
   }
   const heading = resolveHeading();
 
+  // Nadkreślenie musi opisywać TEN widok, nie zawsze „Kolekcja" — wcześniej nad
+  // „Wszystkie produkty" i nad kategorią stało nieprawdziwe „KOLEKCJA".
+  // Ta sama kolejność pierwszeństwa co w resolveHeading, żeby nadkreślenie i
+  // tytuł nie mogły się rozjechać (np. „Kategoria" nad nazwą kolekcji).
+  function resolveEyebrow(): string {
+    if (collection) return t.shop.eyebrowCollection;
+    if (search) return t.shop.eyebrowSearch;
+    if (category) return t.shop.eyebrowCategory;
+    // Sekcja to grupa kategorii (np. „Narożniki”), więc też „Kategoria”.
+    if (sectionLabel) return t.shop.eyebrowCategory;
+    return t.shop.eyebrowShop;
+  }
+  const eyebrow = resolveEyebrow();
+
   // Projekcja dla FilterBar (client) — slug + label per sekcja.
   const filterSections = sections.map((s) => ({
     slug: s.slug,
@@ -199,7 +213,7 @@ export default async function SklepPage({
           żeby wszystkie kolekcje wyglądały tak samo — dziś 3 z 4 mają pusty opis. */}
       <div className={`mb-10 ${collection ? "text-center" : ""}`}>
         <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-          {t.shop.eyebrow}
+          {eyebrow}
         </p>
         <h1 className="font-display text-4xl font-bold text-[var(--fg)]">
           {heading}
