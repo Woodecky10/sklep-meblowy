@@ -1061,7 +1061,7 @@ Create `app/_lib/mail/notify-order.ts`:
 
 ```ts
 import { render } from "@react-email/components";
-import { getOrderById } from "../orders";
+import { getOrderById, getProfilesByIds } from "../orders";
 import { getMailBranding } from "./branding-server";
 import { mailLocale } from "./locale";
 import { sendMail } from "./send";
@@ -1075,7 +1075,6 @@ async function customerEmailOf(order: {
 }): Promise<string | null> {
   if (order.guest_email) return order.guest_email;
   if (!order.user_id) return null;
-  const { getProfilesByIds } = await import("../orders");
   const profiles = await getProfilesByIds([order.user_id]);
   return profiles[order.user_id]?.email ?? null;
 }
