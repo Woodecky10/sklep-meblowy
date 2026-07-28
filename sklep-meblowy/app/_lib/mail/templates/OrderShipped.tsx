@@ -12,6 +12,8 @@ const COPY = {
     tracking: "Numer śledzenia",
     phone: "Firma transportowa skontaktuje się telefonicznie, aby ustalić termin dostawy.",
     cta: "Zobacz zamówienie",
+    noAccount:
+      "Zamówienie nie jest powiązane z kontem. Jeśli utworzysz konto na ten sam adres e-mail, zobaczysz w nim historię i status zamówienia.",
   },
   de: {
     preview: (nr: number) => `Bestellung #${nr} ist unterwegs`,
@@ -21,6 +23,8 @@ const COPY = {
     tracking: "Sendungsnummer",
     phone: "Die Spedition ruft Sie an, um den Liefertermin zu vereinbaren.",
     cta: "Bestellung ansehen",
+    noAccount:
+      "Diese Bestellung ist nicht mit einem Konto verknüpft. Wenn Sie ein Konto mit derselben E-Mail-Adresse erstellen, sehen Sie darin den Bestellverlauf und -status.",
   },
 } as const;
 
@@ -29,11 +33,15 @@ export function OrderShipped({
   branding,
   locale,
   orderUrl,
+  hasAccount,
 }: {
   order: Order;
   branding: MailBranding;
   locale: "pl" | "de";
   orderUrl: string;
+  // Patrz komentarz w OrderConfirmation.tsx — gość (user_id = null) nie ma
+  // dokąd wejść pod /konto/zamowienia/<id>, więc przycisk tylko dla kont.
+  hasAccount: boolean;
 }) {
   const t = COPY[locale];
   const c = branding.colors;
@@ -77,9 +85,15 @@ export function OrderShipped({
         {t.phone}
       </Text>
 
-      <MailButton branding={branding} href={orderUrl}>
-        {t.cta}
-      </MailButton>
+      {hasAccount ? (
+        <MailButton branding={branding} href={orderUrl}>
+          {t.cta}
+        </MailButton>
+      ) : (
+        <Text style={{ color: c.muted, fontSize: "13px", lineHeight: "1.6", margin: 0 }}>
+          {t.noAccount}
+        </Text>
+      )}
     </MailLayout>
   );
 }

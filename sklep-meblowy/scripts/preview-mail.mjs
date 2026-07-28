@@ -1,7 +1,7 @@
 // Renderuje szablony maili do plików HTML, żeby obejrzeć je w przeglądarce
 // bez zakładania konta Resend i bez wysyłania czegokolwiek.
 // Uruchom z katalogu sklep-meblowy/:
-//   npx tsx scripts/preview-mail.mjs
+//   npm run preview:mail
 // Wynik: mail-preview/*.html (katalog gitignorowany).
 import { mkdirSync, writeFileSync } from "node:fs";
 import { render } from "@react-email/components";
@@ -9,6 +9,7 @@ import { brandingFromRaw } from "../app/_lib/mail/branding.ts";
 import { OrderConfirmation } from "../app/_lib/mail/templates/OrderConfirmation.tsx";
 import { OrderShipped } from "../app/_lib/mail/templates/OrderShipped.tsx";
 import { OrderCancelled } from "../app/_lib/mail/templates/OrderCancelled.tsx";
+import { AdminNewOrder } from "../app/_lib/mail/templates/AdminNewOrder.tsx";
 import { AuthConfirm } from "../app/_lib/mail/templates/AuthConfirm.tsx";
 import { wasOrderPaid } from "../app/_lib/mail/status-notify.ts";
 
@@ -84,12 +85,19 @@ const orderDe = {
     toEur(order.promo_discount),
 };
 
+// customerEmail/adminUrl dla AdminNewOrder (mail #4 — patrz FIX 7): adres
+// oczywiscie-fikcyjny + URL panelu w stylu localhost, zeby nikt nie pomylil
+// tego z prawdziwym namierzeniem klienta.
+const FAKE_CUSTOMER_EMAIL = "jan.kowalski@example.com";
+const ADMIN_URL = "http://localhost:3000/admin/zamowienia/" + order.id;
+
 const cases = [
   {
     name: "order-confirmation-pl",
     el: OrderConfirmation({
       order, items, branding, locale: "pl",
       orderUrl: "https://www.mollien.pl/konto/zamowienia/" + order.id,
+      hasAccount: true,
     }),
   },
   {
@@ -98,6 +106,7 @@ const cases = [
       order: orderDe,
       items: itemsDe, branding, locale: "de",
       orderUrl: "https://www.mollien.pl/de/konto/zamowienia/" + order.id,
+      hasAccount: true,
     }),
   },
   {
@@ -106,6 +115,7 @@ const cases = [
       order: { ...order, payment_method: "cod" },
       items, branding, locale: "pl",
       orderUrl: "https://www.mollien.pl/konto/zamowienia/" + order.id,
+      hasAccount: true,
     }),
   },
   {
@@ -113,6 +123,7 @@ const cases = [
     el: OrderShipped({
       order, branding, locale: "pl",
       orderUrl: "https://www.mollien.pl/konto/zamowienia/" + order.id,
+      hasAccount: true,
     }),
   },
   {
@@ -120,6 +131,7 @@ const cases = [
     el: OrderShipped({
       order: { ...order, currency: "eur" }, branding, locale: "de",
       orderUrl: "https://www.mollien.pl/de/konto/zamowienia/" + order.id,
+      hasAccount: true,
     }),
   },
   {
@@ -139,6 +151,23 @@ const cases = [
       // Po poprawce wasOrderPaid("cod", ...) daje false, wiec ten wariant NIE
       // moze zawierac akapitu o zwrocie srodkow.
       wasPaid: wasOrderPaid("cod", "processing"),
+    }),
+  },
+  {
+    // FIX 7: niemiecki akapit o zwrocie srodkow nigdy nie byl wyrenderowany —
+    // ten sam fixture EUR (orderDe) co order-confirmation-de, wasPaid: true
+    // wymusza renderowanie zdania o zwrocie.
+    name: "order-cancelled-de",
+    el: OrderCancelled({ order: orderDe, branding, locale: "de", wasPaid: true }),
+  },
+  {
+    // FIX 7: mail do wlascicielki (AdminNewOrder) byl calkowicie nieobecny w
+    // podgladzie. Te same pozycje/zamowienie co order-confirmation-pl.
+    name: "admin-new-order",
+    el: AdminNewOrder({
+      order, items, branding,
+      customerEmail: FAKE_CUSTOMER_EMAIL,
+      adminUrl: ADMIN_URL,
     }),
   },
   {

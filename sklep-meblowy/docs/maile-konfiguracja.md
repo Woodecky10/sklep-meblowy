@@ -39,11 +39,13 @@ Wszystkie kroki są wykonywalne bez dodatkowych pytań.
 > nie ustawi się `MAIL_REPLY_TO`) po prostu odbije się do klienta.
 >
 > To ma realne znaczenie: mail o anulowaniu zamówienia kończy się zdaniem
-> „Jeśli to pomyłka albo masz pytania — odpowiedz na tę wiadomość" i trafia
-> do klienta, któremu właśnie anulowano zamówienie na kilka tysięcy złotych.
-> Odbita odpowiedź w tym momencie to najgorszy możliwy scenariusz — klient,
-> który próbuje wyjaśnić sprawę, dostaje w odpowiedzi komunikat o błędzie
-> dostarczenia i wrażenie, że sklep zniknął.
+> „Jeśli to pomyłka albo masz pytania — odpowiedz na tę wiadomość albo napisz
+> na [adres z `COMPANY.email`]" i trafia do klienta, któremu właśnie
+> anulowano zamówienie na kilka tysięcy złotych. Drugi adres w tym zdaniu
+> jest zabezpieczeniem na wypadek odbitej odpowiedzi, nie zwalnia z ustawienia
+> `MAIL_REPLY_TO` — odbita odpowiedź w tym momencie to wciąż najgorszy możliwy
+> scenariusz — klient, który próbuje wyjaśnić sprawę, dostaje w odpowiedzi
+> komunikat o błędzie dostarczenia i wrażenie, że sklep zniknął.
 >
 > Dlatego `MAIL_REPLY_TO` traktujemy jako **wymaganą** zmienną, nie
 > opcjonalną, choć kod się bez niej nie wywali (`sendMail` po prostu nie
@@ -68,7 +70,7 @@ Supabase po każdej zmianie.
    wypuszcza wiadomość z waszym DKIM (czyli mail wygląda jak wysłany przez
    `mollien.pl`, nie przez Supabase).
 2. Wygeneruj HTML: z katalogu `sklep-meblowy/` uruchom
-   `npx tsx scripts/preview-mail.mjs`. Wynik trafia do gitignorowanego
+   `npm run preview:mail`. Wynik trafia do gitignorowanego
    katalogu `mail-preview/` — weź `mail-preview/auth-confirm-pl.html`.
 3. Panel Supabase → **Authentication → Email Templates → Confirm signup**:
    wklej całą zawartość pliku (surowe HTML, nie tylko fragment) w pole
@@ -88,15 +90,46 @@ Supabase po każdej zmianie.
 tego pliku trzeba powtórzyć kroki 2–3 — panel Supabase nie aktualizuje się
 sam, treść w panelu jest statyczną kopią wygenerowanego HTML.
 
-## 4. Test końcowy po uzbrojeniu
+> **Znane ograniczenie: mail weryfikacyjny jest tylko po polsku.** Supabase
+> trzyma jeden szablon na typ maila (np. jeden „Confirm signup" dla całego
+> projektu) — nie jeden na język. Generujemy i wklejamy wyłącznie
+> `mail-preview/auth-confirm-pl.html`, więc klient rejestrujący się na `/de`
+> i tak dostaje polski mail weryfikacyjny. Nie ma tu prostego obejścia bez
+> Supabase Edge Function podstawiającej szablon po locale — to osobne,
+> większe zadanie. Zapisane tutaj, żeby nikt nie zgłaszał tego jako bug.
+
+## 4. Pułapki w panelu admina (przeczytaj przed pierwszą realizacją)
+
+1. **Wpisz przewoźnika i numer śledzenia PRZED przestawieniem statusu na
+   „Wysłane".** Te pola zapisuje osobny formularz („Dane dostawy") niż
+   dropdown statusu — to nie jest jeden krok. Mail „w drodze" wysyła się
+   dokładnie raz, w momencie zmiany statusu, i jeśli `carrier`/
+   `tracking_number` są w tym momencie puste, szablon po prostu je pomija
+   (nie czeka, nie przypomina). Nie ma re-send: żeby klient dostał
+   przewoźnika i numer śledzenia mailem, trzeba by anulować i odtworzyć całą
+   sekwencję statusów, co nie jest realną opcją. W skrócie: najpierw
+   „Dane dostawy", potem dropdown na „Wysłane" — w tej kolejności.
+2. **Ręczne przestawienie opłaconego online zamówienia z `pending` w panelu
+   trwale gasi jego mail „Zamówienie przyjęte".** Webhook Stripe wysyła to
+   potwierdzenie tylko zwycięzcy przejścia `pending → paid` (CAS w
+   `markOrderPaid`). Jeśli admin ręcznie przestawi zamówienie z `pending` na
+   inny status, zanim webhook zdąży je rozliczyć, to gdy płatność faktycznie
+   dojdzie, webhook już nie zastaje statusu `pending` — nie ma czego
+   zaklaimować, mail się nie wysyła, i nic tego nie sygnalizuje. Klient nigdy
+   nie dostaje potwierdzenia zakupu. Zamówienia online w statusie `pending`
+   anuluj albo przesuwaj dalej tylko wtedy, gdy godzisz się z tym skutkiem.
+
+## 5. Test końcowy po uzbrojeniu
 
 Wykonaj po ustawieniu zmiennych z sekcji 2 i skonfigurowaniu SMTP z sekcji 3.
 
 1. Złóż testowe zamówienie za pobraniem → klient dostaje „Zamówienie
    przyjęte", właścicielka „Nowe zamówienie" (jeśli ustawiono
    `MAIL_ADMIN_TO`).
-2. W panelu zmień status na **Wysłane** → klient dostaje „w drodze" z
-   przewoźnikiem i numerem śledzenia.
+2. W formularzu „Dane dostawy" wpisz przewoźnika i numer śledzenia, **potem**
+   w panelu zmień status na **Wysłane** (patrz sekcja 4, punkt 1 — w tej
+   kolejności) → klient dostaje „w drodze" z przewoźnikiem i numerem
+   śledzenia.
 3. Na innym zamówieniu ustaw **Anulowane** → klient dostaje „anulowane".
    Jeśli zamówienie było opłacone online, mail wspomina zwrot środków; nie
    obiecuje automatycznego przelewu — tylko że sklep się odezwie.
@@ -112,3 +145,14 @@ Wykonaj po ustawieniu zmiennych z sekcji 2 i skonfigurowaniu SMTP z sekcji 3.
 5. Zarejestruj konto testowe (patrz sekcja 3, krok 4) i sprawdź mail
    weryfikacyjny end-to-end — to jedyny z pięciu maili, którego nie da się
    przetestować przez samo złożenie zamówienia.
+6. Sprawdź zakładkę **Logs** w panelu Resend i potwierdź, że każdy z
+   powyższych testów widnieje jako `Delivered` (nie `Bounced`/`Failed`).
+   To jest **jedyne** miejsce, w którym nieudana wysyłka jest w ogóle
+   widoczna — kod nic nie zapisuje do bazy, nie ma kolumny „mail wysłany",
+   nie ma retry, a panel admina po zmianie statusu i tak pokaże „Status
+   zaktualizowany" niezależnie od tego, czy klient faktycznie coś dostał
+   (`notifyStatusChange`/`notifyOrderPlaced` nigdy nie rzucają, żeby nieudany
+   mail nie zepsuł działającej zmiany statusu ani zakupu). Zerknij na Logs
+   po tym teście końcowym, a potem sprawdzaj tam **od czasu do czasu** —
+   to jedyny sposób, żeby zauważyć, że np. Resend wyłączył konto albo domena
+   przestała być zweryfikowana.

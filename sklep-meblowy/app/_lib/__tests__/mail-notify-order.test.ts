@@ -14,6 +14,20 @@ vi.mock("../mail/send", () => ({
   sendMail: (...args: unknown[]) => sendMailMock(...args),
 }));
 
+// Bez tego mocka getMailBranding() prawdziwie odpytuje store_settings przez
+// createAdminClient — na maszynie z wypełnionym .env.local to jest żywy
+// odczyt z podłączonego projektu Supabase (produkcja), bo Vitest wczytuje
+// .env* do process.env i ten plik nie mockował dotąd branding-server.
+// Fabryka async, żeby móc bezpiecznie zaimportować prawdziwy `brandingFromRaw`
+// (obok hoistingu vi.mock) i zbudować deterministyczną fiksturę, której
+// kształt nie może rozjechać się z typem MailBranding.
+vi.mock("../mail/branding-server", async () => {
+  const { brandingFromRaw } = await import("../mail/branding");
+  return {
+    getMailBranding: vi.fn(async () => brandingFromRaw(null)),
+  };
+});
+
 import { notifyOrderPlaced } from "../mail/notify-order";
 
 // Zamówienie minimalne, ale kompletne pod kątem pól, których faktycznie

@@ -24,6 +24,11 @@ import {
   eligiblePromoBase,
 } from "@/app/_lib/bundles";
 
+// Ogranicza czas pracy handlera PO odpowiedzi (patrz after() nizej) —
+// wysylka maila nie moze wisiec bez limitu. 30s jest w limicie Node
+// kazdego planu Vercela.
+export const maxDuration = 30;
+
 // stripe v22 re-eksportuje SessionCreateParams jako alias typu (bez
 // wewnętrznego namespace), więc .LineItem nie istnieje — indeksujemy typ.
 type LineItem = NonNullable<
@@ -435,6 +440,9 @@ export async function POST(request: NextRequest) {
       // Mail NA KONIEC i przez after(): wysylka nie moze opoznic odpowiedzi ani
       // wywalic zakupu. Zamowienie jest juz utworzone, wiec blad tutaj kosztowalby
       // klienta drugie zamowienie po ponownym kliknieciu.
+      // POST-response: to wywolanie nigdy nie moze opoznic ani zepsuc odpowiedzi
+      // do klienta — sendMail i tak nigdy nie rzuca, ale after() dodatkowo
+      // gwarantuje, ze nawet powolny Resend nie wydluzy czasu checkoutu.
       after(() => notifyOrderPlaced(order.id));
       return NextResponse.json({
         url: `${origin}${localePrefix}/checkout/success?order_id=${order.id}`,

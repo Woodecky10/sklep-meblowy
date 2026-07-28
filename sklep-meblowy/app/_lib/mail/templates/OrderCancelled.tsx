@@ -1,5 +1,6 @@
 import { Text } from "@react-email/components";
 import { formatOrderAmount } from "../../money";
+import { COMPANY } from "../../company";
 import type { Order } from "../../types";
 import type { MailBranding } from "../branding";
 import { MailLayout } from "./_Layout";
@@ -13,7 +14,11 @@ const COPY = {
     // po stronie operatora płatności (patrz spec).
     refund: (amount: string) =>
       `Zamówienie było opłacone (${amount}). Skontaktujemy się z Tobą w sprawie zwrotu środków.`,
-    questions: "Jeśli to pomyłka albo masz pytania — odpowiedz na tę wiadomość.",
+    // Odpowiedź na maila nie może być JEDYNĄ drogą kontaktu: mollien.pl nie ma
+    // rekordów MX, więc bez działającego MAIL_REPLY_TO odpowiedź się odbija —
+    // a trafia to do klienta, któremu właśnie anulowano zamówienie.
+    questions: (email: string) =>
+      `Jeśli to pomyłka albo masz pytania — odpowiedz na tę wiadomość albo napisz na ${email}.`,
   },
   de: {
     preview: (nr: number) => `Bestellung #${nr} wurde storniert`,
@@ -21,7 +26,8 @@ const COPY = {
     intro: (nr: number) => `Bestellung #${nr} wurde storniert.`,
     refund: (amount: string) =>
       `Die Bestellung war bezahlt (${amount}). Wir melden uns bei Ihnen wegen der Rückerstattung.`,
-    questions: "Falls das ein Versehen ist oder Sie Fragen haben — antworten Sie auf diese E-Mail.",
+    questions: (email: string) =>
+      `Falls das ein Versehen ist oder Sie Fragen haben — antworten Sie auf diese E-Mail oder schreiben Sie an ${email}.`,
   },
 } as const;
 
@@ -57,7 +63,7 @@ export function OrderCancelled({
         </Text>
       )}
       <Text style={{ color: c.muted, fontSize: "13px", lineHeight: "1.6", margin: 0 }}>
-        {t.questions}
+        {t.questions(COMPANY.email)}
       </Text>
     </MailLayout>
   );

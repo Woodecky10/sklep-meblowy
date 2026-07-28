@@ -49,6 +49,7 @@ export async function notifyOrderPlaced(orderId: string): Promise<void> {
           branding,
           locale,
           orderUrl: `${base}${prefix}/konto/zamowienia/${order.id}`,
+          hasAccount: order.user_id !== null,
         })
       );
       await sendMail({
@@ -109,7 +110,7 @@ export async function notifyStatusChange(
 
     if (status === "shipped") {
       const html = await render(
-        OrderShipped({ order, branding, locale, orderUrl })
+        OrderShipped({ order, branding, locale, orderUrl, hasAccount: order.user_id !== null })
       );
       await sendMail({
         to,

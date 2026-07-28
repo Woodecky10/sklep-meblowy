@@ -22,6 +22,8 @@ const COPY = {
     next: "Skontaktujemy się telefonicznie, aby ustalić termin dostawy.",
     variantsFor: "Wybrane opcje",
     notes: "Uwagi",
+    noAccount:
+      "Zamówienie nie jest powiązane z kontem. Jeśli utworzysz konto na ten sam adres e-mail, zobaczysz w nim historię i status zamówienia.",
   },
   de: {
     preview: (nr: number) => `Bestellung #${nr} angenommen`,
@@ -39,6 +41,8 @@ const COPY = {
     next: "Wir rufen Sie an, um den Liefertermin zu vereinbaren.",
     variantsFor: "Gewählte Optionen",
     notes: "Anmerkungen",
+    noAccount:
+      "Diese Bestellung ist nicht mit einem Konto verknüpft. Wenn Sie ein Konto mit derselben E-Mail-Adresse erstellen, sehen Sie darin den Bestellverlauf und -status.",
   },
 } as const;
 
@@ -48,12 +52,17 @@ export function OrderConfirmation({
   branding,
   locale,
   orderUrl,
+  hasAccount,
 }: {
   order: Order;
   items: OrderItem[];
   branding: MailBranding;
   locale: "pl" | "de";
   orderUrl: string;
+  // Gościnne zamówienia (user_id = null) nie mają dokąd zaprowadzić:
+  // /konto/zamowienia/<id> wymaga sesji i filtruje po user_id, więc
+  // niezalogowany klik ląduje na gołym /logowanie. Przycisk tylko dla kont.
+  hasAccount: boolean;
 }) {
   const t = COPY[locale];
   const c = branding.colors;
@@ -163,9 +172,15 @@ export function OrderConfirmation({
         {t.next}
       </Text>
 
-      <MailButton branding={branding} href={orderUrl}>
-        {t.cta}
-      </MailButton>
+      {hasAccount ? (
+        <MailButton branding={branding} href={orderUrl}>
+          {t.cta}
+        </MailButton>
+      ) : (
+        <Text style={{ color: c.muted, fontSize: "13px", lineHeight: "1.6", margin: 0 }}>
+          {t.noAccount}
+        </Text>
+      )}
     </MailLayout>
   );
 }

@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/app/_lib/stripe";
 import { shouldSettleOrder } from "@/app/_lib/stripe-events";
@@ -7,6 +7,11 @@ import { incrementPromoUsage } from "@/app/_lib/promo";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { notifyOrderPlaced } from "@/app/_lib/mail/notify-order";
 import type { OrderStatus } from "@/app/_lib/types";
+
+// Ogranicza czas pracy handlera PO odpowiedzi (patrz after() nizej) —
+// wysylka maila nie moze wisiec bez limitu. 30s jest w limicie Node
+// kazdego planu Vercela.
+export const maxDuration = 30;
 
 // Rozliczenie FAKTYCZNIE opłaconego zamówienia: dedup eventów Stripe,
 // markOrderPaid (CAS) oraz increment promo (zwycięzca claimu).
@@ -128,8 +133,12 @@ async function settlePaidOrder(
   // Mail tylko dla zwycięzcy CAS-a pending→paid — duplikat webhooka Stripe
   // nie wyśle drugiego potwierdzenia. notifyOrderPlaced nie rzuca, więc
   // nieudany mail nie zamieni się w 500 i ponowienie eventu.
+  // after(): wysylka jest POST-response i nie moze opoznic odpowiedzi do
+  // Stripe. Zawieszone `await` tutaj trzymaloby polaczenie webhooka otwarte
+  // (Stripe rejestruje nieudane dostarczenie i ponawia event), mimo ze
+  // rozliczenie zamowienia juz sie powiodlo.
   if (claimedFirst) {
-    await notifyOrderPlaced(orderId);
+    after(() => notifyOrderPlaced(orderId));
   }
 
   return NextResponse.json({ received: true });
