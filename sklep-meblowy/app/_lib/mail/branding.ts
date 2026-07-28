@@ -1,4 +1,3 @@
-import { createAdminClient } from "../supabase/server";
 import {
   normalizeThemeSettings,
   resolveThemeTokens,
@@ -34,7 +33,7 @@ export type MailBranding = {
   fonts: { sans: string; display: string };
 };
 
-type ThemeRow = {
+export type ThemeRow = {
   theme_preset?: unknown;
   theme_overrides?: unknown;
   font_pair?: unknown;
@@ -52,22 +51,4 @@ export function brandingFromRaw(raw: ThemeRow | null): MailBranding {
     // TypeScript nie pozwoli dodać pary fontów w theme.ts bez dodania jej tutaj.
     fonts: MAIL_FONT_STACKS[settings.fontPair],
   };
-}
-
-// Odczyt motywu z bazy — tego samego źródła, z którego kolory bierze strona,
-// żeby mail nie rozjechał się po zmianie motywu w /admin/wyglad.
-// Błąd odczytu nie może zablokować maila: lepiej wysłać w domyślnej palecie.
-export async function getMailBranding(): Promise<MailBranding> {
-  try {
-    const supabase = await createAdminClient();
-    const { data } = await supabase
-      .from("store_settings")
-      .select("theme_preset, theme_overrides, font_pair")
-      .eq("id", true)
-      .maybeSingle();
-    return brandingFromRaw((data as ThemeRow | null) ?? null);
-  } catch (err) {
-    console.error("[mail] odczyt motywu nieudany, używam domyślnego:", err);
-    return brandingFromRaw(null);
-  }
 }
