@@ -30,7 +30,9 @@ describe("brandingFromRaw", () => {
     expect(b.fonts.display).toContain("Montserrat");
   });
 
-  it("nieznana para fontów spada na domyślny stack", () => {
+  it("śmieciowy font_pair z bazy nadal daje poprawny stack", () => {
+    // Clamping robi normalizeThemeSettings (theme.ts) — ten test pilnuje
+    // KONTRAKTU brandingFromRaw wobec śmieci w kolumnie, nie fallbacku tutaj.
     const b = brandingFromRaw({
       theme_preset: "klasyczny",
       theme_overrides: {},

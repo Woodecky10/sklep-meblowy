@@ -2,7 +2,6 @@ import { createAdminClient } from "../supabase/server";
 import {
   normalizeThemeSettings,
   resolveThemeTokens,
-  DEFAULT_FONT_PAIR,
   type FontPairKey,
   type ThemeTokens,
 } from "../theme";
@@ -48,7 +47,10 @@ export function brandingFromRaw(raw: ThemeRow | null): MailBranding {
   const { light } = resolveThemeTokens(settings);
   return {
     colors: light,
-    fonts: MAIL_FONT_STACKS[settings.fontPair] ?? MAIL_FONT_STACKS[DEFAULT_FONT_PAIR],
+    // Bez fallbacku: normalizeThemeSettings zwraca już zwalidowany FontPairKey,
+    // a Record<FontPairKey, ...> wymusza obecność wszystkich kluczy — więc
+    // TypeScript nie pozwoli dodać pary fontów w theme.ts bez dodania jej tutaj.
+    fonts: MAIL_FONT_STACKS[settings.fontPair],
   };
 }
 
@@ -61,6 +63,7 @@ export async function getMailBranding(): Promise<MailBranding> {
     const { data } = await supabase
       .from("store_settings")
       .select("theme_preset, theme_overrides, font_pair")
+      .eq("id", true)
       .maybeSingle();
     return brandingFromRaw((data as ThemeRow | null) ?? null);
   } catch (err) {
