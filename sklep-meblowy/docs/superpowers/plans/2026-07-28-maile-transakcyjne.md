@@ -472,6 +472,7 @@ git commit -m "feat(mail): paleta i fonty maila z motywu sklepu + jezyk z waluty
 - Consumes: `MailBranding` z Task 2; `COMPANY`, `formatCompanyHeader` z `app/_lib/company.ts`; `formatOrderAmount` z `app/_lib/money.ts`; `formatVariantLabel` z `app/_lib/variants.ts`; typy `Order`, `OrderItem` z `app/_lib/types.ts`.
 - Produces:
   - `MailLayout({ branding, locale, preview, heading, children })` — rama,
+  - `MailButton({ branding, href, children })` — przycisk CTA, **jedyne** miejsce ze stylem przycisku (używają go wszystkie szablony z Task 4, 5 i 6),
   - `OrderConfirmation({ order, items, branding, locale, orderUrl })` — komponent maila #1.
 
 Renderowanie do HTML robi konsument (Task 4) przez `render()` z `@react-email/components`.
@@ -489,6 +490,7 @@ Create `app/_lib/mail/templates/_Layout.tsx`:
 ```tsx
 import {
   Body,
+  Button,
   Container,
   Head,
   Hr,
@@ -499,6 +501,38 @@ import {
 } from "@react-email/components";
 import { COMPANY, formatCompanyHeader } from "../../company";
 import type { MailBranding } from "../branding";
+
+// Przycisk CTA — JEDYNE miejsce ze stylem przycisku. Wszystkie szablony
+// używają tego komponentu; nie powtarzaj bloku stylu w szablonie.
+export function MailButton({
+  branding,
+  href,
+  children,
+}: {
+  branding: MailBranding;
+  href: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Button
+      href={href}
+      style={{
+        backgroundColor: branding.colors.gold,
+        borderRadius: "8px",
+        color: branding.colors.navy,
+        fontFamily: branding.fonts.sans,
+        fontSize: "12px",
+        fontWeight: 700,
+        letterSpacing: "2px",
+        padding: "12px 24px",
+        textDecoration: "none",
+        textTransform: "uppercase",
+      }}
+    >
+      {children}
+    </Button>
+  );
+}
 
 // Wspólna rama wszystkich maili. Kolory i fonty WYŁĄCZNIE inline —
 // klient pocztowy nie zna zmiennych CSS ani klas Tailwinda.
@@ -590,12 +624,12 @@ export function MailLayout({
 Create `app/_lib/mail/templates/OrderConfirmation.tsx`:
 
 ```tsx
-import { Button, Hr, Row, Column, Section, Text } from "@react-email/components";
+import { Hr, Row, Column, Section, Text } from "@react-email/components";
 import { formatOrderAmount } from "../../money";
 import { formatVariantLabel } from "../../variants";
 import type { Order, OrderItem } from "../../types";
 import type { MailBranding } from "../branding";
-import { MailLayout } from "./_Layout";
+import { MailButton, MailLayout } from "./_Layout";
 
 const COPY = {
   pl: {
@@ -755,23 +789,9 @@ export function OrderConfirmation({
         {t.next}
       </Text>
 
-      <Button
-        href={orderUrl}
-        style={{
-          backgroundColor: c.gold,
-          borderRadius: "8px",
-          color: c.navy,
-          fontFamily: branding.fonts.sans,
-          fontSize: "12px",
-          fontWeight: 700,
-          letterSpacing: "2px",
-          padding: "12px 24px",
-          textDecoration: "none",
-          textTransform: "uppercase",
-        }}
-      >
+      <MailButton branding={branding} href={orderUrl}>
         {t.cta}
-      </Button>
+      </MailButton>
     </MailLayout>
   );
 }
@@ -930,12 +950,12 @@ git commit -m "feat(mail): rama maila + potwierdzenie zakupu + skrypt podgladu H
 Create `app/_lib/mail/templates/AdminNewOrder.tsx`:
 
 ```tsx
-import { Button, Hr, Text } from "@react-email/components";
+import { Hr, Text } from "@react-email/components";
 import { formatOrderAmount } from "../../money";
 import { formatVariantLabel } from "../../variants";
 import type { Order, OrderItem } from "../../types";
 import type { MailBranding } from "../branding";
-import { MailLayout } from "./_Layout";
+import { MailButton, MailLayout } from "./_Layout";
 
 // Zawsze PL — panel admina jest PL-only.
 export function AdminNewOrder({
@@ -986,23 +1006,9 @@ export function AdminNewOrder({
 
       <Hr style={{ borderColor: c.border, margin: "16px 0 24px" }} />
 
-      <Button
-        href={adminUrl}
-        style={{
-          backgroundColor: c.gold,
-          borderRadius: "8px",
-          color: c.navy,
-          fontFamily: branding.fonts.sans,
-          fontSize: "12px",
-          fontWeight: 700,
-          letterSpacing: "2px",
-          padding: "12px 24px",
-          textDecoration: "none",
-          textTransform: "uppercase",
-        }}
-      >
+      <MailButton branding={branding} href={adminUrl}>
         Otwórz w panelu
-      </Button>
+      </MailButton>
     </MailLayout>
   );
 }
@@ -1246,10 +1252,10 @@ Expected: 6 testów PASS.
 Create `app/_lib/mail/templates/OrderShipped.tsx`:
 
 ```tsx
-import { Button, Text } from "@react-email/components";
+import { Text } from "@react-email/components";
 import type { Order } from "../../types";
 import type { MailBranding } from "../branding";
-import { MailLayout } from "./_Layout";
+import { MailButton, MailLayout } from "./_Layout";
 
 const COPY = {
   pl: {
@@ -1325,23 +1331,9 @@ export function OrderShipped({
         {t.phone}
       </Text>
 
-      <Button
-        href={orderUrl}
-        style={{
-          backgroundColor: c.gold,
-          borderRadius: "8px",
-          color: c.navy,
-          fontFamily: branding.fonts.sans,
-          fontSize: "12px",
-          fontWeight: 700,
-          letterSpacing: "2px",
-          padding: "12px 24px",
-          textDecoration: "none",
-          textTransform: "uppercase",
-        }}
-      >
+      <MailButton branding={branding} href={orderUrl}>
         {t.cta}
-      </Button>
+      </MailButton>
     </MailLayout>
   );
 }
@@ -1587,9 +1579,9 @@ git commit -m "feat(mail): maile o wyslaniu i anulowaniu + utwardzenie CAS w upd
 Create `app/_lib/mail/templates/AuthConfirm.tsx`:
 
 ```tsx
-import { Button, Text } from "@react-email/components";
+import { Text } from "@react-email/components";
 import type { MailBranding } from "../branding";
-import { MailLayout } from "./_Layout";
+import { MailButton, MailLayout } from "./_Layout";
 
 const COPY = {
   pl: {
@@ -1638,23 +1630,9 @@ export function AuthConfirm({
       <Text style={{ color: c.fg, fontSize: "14px", lineHeight: "1.6", margin: "0 0 24px" }}>
         {t.intro}
       </Text>
-      <Button
-        href={confirmationUrl}
-        style={{
-          backgroundColor: c.gold,
-          borderRadius: "8px",
-          color: c.navy,
-          fontFamily: branding.fonts.sans,
-          fontSize: "12px",
-          fontWeight: 700,
-          letterSpacing: "2px",
-          padding: "12px 24px",
-          textDecoration: "none",
-          textTransform: "uppercase",
-        }}
-      >
+      <MailButton branding={branding} href={confirmationUrl}>
         {t.cta}
-      </Button>
+      </MailButton>
       <Text style={{ color: c.muted, fontSize: "12px", lineHeight: "1.6", margin: "24px 0 0" }}>
         {t.ignore}
       </Text>
