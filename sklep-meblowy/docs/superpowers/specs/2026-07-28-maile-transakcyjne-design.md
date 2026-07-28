@@ -58,10 +58,16 @@ Każdy mail wysyłamy w miejscu, które już jest chronione compare-and-swapem:
 
 - **#1 online** — w webhooku, po `markOrderPaid`. Ta funkcja zwraca `true` tylko dla zwycięzcy CAS-a `pending→paid` (`.eq("status","pending")`), więc powtórka webhooka Stripe nie wyśle drugiego maila.
 - **#1 COD** — w `/api/checkout` po utworzeniu zamówienia, pod warunkiem `isCod`. Online nie może dostać maila przed zapłatą.
-- **#2, #3** — w `updateOrderStatus`, po udanym CAS-ie na statusie (`.eq("status", from)`).
+- **#2, #3** — w `updateOrderStatus`, po udanym CAS-ie na statusie (`.eq("status", from)`). **Uwaga wykryta przy wdrożeniu:** dzisiejszy CAS nie sprawdzał, ile wierszy trafił, a Supabase zwraca `error: null` również przy zerze — więc przegrany wyścigu wysłałby klientowi powiadomienie o zmianie, której nie dokonał. Wymaga `.select("id")` i traktowania pustej odpowiedzi jako błędu.
 - **#4** — w tych samych dwóch miejscach co #1.
 
 Nie potrzebujemy tabeli `order_emails` ani kolumny „wysłano". Gdyby w przyszłości doszły maile bez takiej ochrony, wtedy — nie teraz.
+
+### Pobranie NIE jest „opłacone" (poprawka po wdrożeniu Task 5)
+
+Mail o anulowaniu wspomina zwrot środków tylko wtedy, gdy pieniądze faktycznie wpłynęły. **Nie da się tego wywnioskować z samego poprzedniego statusu.** Pierwotna wersja tego spec zakładała `wasPaid = previousStatus !== "pending"` i było to fałszywe dla pobrania: `createOrder` nadaje zamówieniom COD status `processing` od razu, a `paid` zapisuje wyłącznie `markOrderPaid`, którego COD nie dotyka. Skutek — każde anulowane zamówienie za pobraniem informowałoby klienta, że zapłacił, i obiecywało zwrot gotówki, której sklep nigdy nie wziął.
+
+Reguła musi uwzględniać `payment_method` i mieszkać w czystej funkcji z testami (`wasOrderPaid` w `mail/status-notify.ts`). Znane, świadomie zaakceptowane ograniczenie: admin może przestawić **nieopłacone** zamówienie online z `pending` na `processing` (`canTransition` to dopuszcza) i anulować je dopiero potem — wtedy wyjdzie `wasPaid = true`. Dokładne rozstrzygnięcie wymagałoby oparcia się o kolumnę płatności, którą otwarty PR #48 (migracja na Przelewy24) usuwa, więc świadomie się z nią nie wiążemy.
 
 ### Awaria maila nie może zepsuć zakupu
 

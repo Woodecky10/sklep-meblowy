@@ -1493,7 +1493,12 @@ export async function notifyStatusChange(
     }
 
     // cancelled — jedyny pozostały status z shouldNotifyCustomer
-    const wasPaid = previousStatus !== "pending";
+    // NIE `previousStatus !== "pending"` — to bylo falszywe dla pobrania.
+    // createOrder nadaje COD status "processing" od razu, a "paid" pisze wylacznie
+    // markOrderPaid (COD tam nie trafia), wiec kazde anulowane COD dostawaloby
+    // "bylo oplacone + zwrot srodkow" za gotowke, ktorej sklep nie wzial.
+    // Regula siedzi w czystej wasOrderPaid() w status-notify.ts, z testami.
+    const wasPaid = wasOrderPaid(order.payment_method, previousStatus);
     const html = await render(
       OrderCancelled({ order, branding, locale, wasPaid })
     );
