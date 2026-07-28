@@ -200,6 +200,8 @@ export const de: DeepPartial<PlShape> = {
     searchPrefix: "Ergebnisse",
     emptyTitle: "Keine Produkte",
     emptyHint: "Versuchen Sie, die Filter oder den Suchbegriff zu ändern.",
+    descriptionMore: "Mehr lesen",
+    descriptionLess: "Beschreibung einklappen",
   },
   filter: {
     sortAlpha: "Alphabetisch A-Z",

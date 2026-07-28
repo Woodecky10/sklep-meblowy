@@ -19,6 +19,7 @@ import { getDictionary } from "@/app/_lib/dictionaries";
 import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import ProductCard from "@/app/_components/ui/ProductCard";
 import FilterBar from "@/app/_components/ui/FilterBar";
+import CollectionIntro from "./CollectionIntro";
 import Pagination from "@/app/_components/ui/Pagination";
 
 // /sklep jest w pełni przetłumaczone przez słownik UI → DE zawsze (hasDe: true).
@@ -206,6 +207,16 @@ export default async function SklepPage({
           })}
         </p>
       </div>
+
+      {/* Opis kolekcji NAD filtrami — tylko gdy wybrana jest kolekcja i ma opis.
+          Puste opisy (dziś 3 z 4 kolekcji) nie zostawiają po sobie odstępu. */}
+      {collection?.description && (
+        <CollectionIntro
+          description={collection.description}
+          moreLabel={t.shop.descriptionMore}
+          lessLabel={t.shop.descriptionLess}
+        />
+      )}
 
       <Suspense>
         <FilterBar

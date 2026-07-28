@@ -189,6 +189,9 @@ export type PlShape = {
     searchPrefix: string;
     emptyTitle: string;
     emptyHint: string;
+    // Rozwijanie dłuższego opisu kolekcji nad filtrami (>1 akapit).
+    descriptionMore: string;
+    descriptionLess: string;
   };
   filter: {
     sortAlpha: string;
@@ -536,6 +539,8 @@ export const pl = {
     searchPrefix: "Wyniki",
     emptyTitle: "Brak produktów",
     emptyHint: "Spróbuj zmienić filtry lub frazę wyszukiwania.",
+    descriptionMore: "Czytaj więcej",
+    descriptionLess: "Zwiń opis",
   },
   filter: {
     sortAlpha: "Alfabetycznie A-Z",
