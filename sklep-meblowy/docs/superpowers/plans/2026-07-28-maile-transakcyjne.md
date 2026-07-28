@@ -31,7 +31,8 @@
 | `app/_lib/mail/client.ts` | Konstrukcja klienta Resend z env. Brak klucza → `null`. |
 | `app/_lib/mail/send.ts` | `sendMail()` — jedyne wyjście na świat. Try/catch, log, nigdy nie rzuca. |
 | `app/_lib/mail/locale.ts` | `mailLocale(currency)` — język maila z waluty zamówienia. |
-| `app/_lib/mail/branding.ts` | Paleta + stacki fontów. Czysta `brandingFromRaw` + IO `getMailBranding`. |
+| `app/_lib/mail/branding.ts` | **Czysty** moduł: `MAIL_FONT_STACKS`, `MailBranding`, `brandingFromRaw`. Bez importu Supabase. |
+| `app/_lib/mail/branding-server.ts` | `getMailBranding()` — odczyt `store_settings`. Zgodnie z konwencją repo (`blocks-server.ts`, `bundles-server.ts`, `menu-server.ts` i 4 inne). |
 | `app/_lib/mail/status-notify.ts` | `shouldNotifyCustomer(status)` — które przejścia statusu wysyłają mail. |
 | `app/_lib/mail/templates/_Layout.tsx` | Wspólna rama: nagłówek, stopka z danymi firmy, kolory, fonty. |
 | `app/_lib/mail/templates/OrderConfirmation.tsx` | Mail #1 — potwierdzenie zakupu (klient). |
@@ -267,7 +268,7 @@ git commit -m "feat(mail): fundament wysylki — klient Resend + sendMail ktore 
 - Produces:
   - `type MailBranding = { colors: ThemeTokens; fonts: { sans: string; display: string } }`
   - `brandingFromRaw(raw: ThemeRow | null): MailBranding` — czysta,
-  - `getMailBranding(): Promise<MailBranding>` — czyta `store_settings`, przy błędzie zwraca domyślne,
+  - `getMailBranding(): Promise<MailBranding>` — czyta `store_settings`, przy błędzie zwraca domyślne. **Uwaga:** Task 3 Step 1b przenosi tę funkcję do `branding-server.ts`, bo import Supabase w czystym module psuł skrypt podglądu. Kod poniżej opisuje stan po Task 2, przed rozdziałem.
   - `mailLocale(currency: string | null | undefined): "pl" | "de"`.
 
 - [ ] **Step 1: Napisz failujące testy**
@@ -470,7 +471,7 @@ git commit -m "feat(mail): paleta i fonty maila z motywu sklepu + jezyk z waluty
 - Modify: `package.json` (dependency `@react-email/components`), `.gitignore`
 
 **Interfaces:**
-- Consumes: `MailBranding` z Task 2; `COMPANY`, `formatCompanyHeader` z `app/_lib/company.ts`; `formatOrderAmount` z `app/_lib/money.ts`; `formatVariantLabel` z `app/_lib/variants.ts`; typy `Order`, `OrderItem` z `app/_lib/types.ts`.
+- Consumes: `MailBranding` i `brandingFromRaw` z `app/_lib/mail/branding.ts` (Task 2, po rozdziale w Step 1b); `COMPANY`, `formatCompanyHeader` z `app/_lib/company.ts`; `formatOrderAmount` z `app/_lib/money.ts`; `formatVariantLabel` z `app/_lib/variants.ts`; typy `Order`, `OrderItem` z `app/_lib/types.ts`.
 - Produces:
   - `MailLayout({ branding, locale, preview, heading, children })` — rama,
   - `MailButton({ branding, href, children })` — przycisk CTA, **jedyne** miejsce ze stylem przycisku (używają go wszystkie szablony z Task 4, 5 i 6),
@@ -483,6 +484,45 @@ Renderowanie do HTML robi konsument (Task 4) przez `render()` z `@react-email/co
 ```bash
 npm install @react-email/components
 ```
+
+- [ ] **Step 1b: Rozdziel `branding.ts` na czysty i serwerowy (WYMAGANE przed skryptem podglądu)**
+
+Task 2 wsadził `getMailBranding` do `branding.ts`, a ten importuje `createAdminClient` z `./supabase/server`, który na poziomie modułu importuje `next/headers`. Skrypt podglądu (Step 4) to zwykły Node — wciągnąłby `next/headers` poza kontekstem requestu. Repo ma na to gotową konwencję: czysta logika w `x.ts`, dostęp do bazy w `x-server.ts` (`blocks-server.ts`, `bundles-server.ts`, `menu-server.ts`, `contact-server.ts`, `pages-server.ts`, `i18n-server.ts`, `promo-banner-server.ts`).
+
+Przenieś `getMailBranding` wraz z jego importami (`createAdminClient`, typ `ThemeRow`) do nowego `app/_lib/mail/branding-server.ts`:
+
+```ts
+import { createAdminClient } from "../supabase/server";
+import { brandingFromRaw, type MailBranding } from "./branding";
+
+type ThemeRow = {
+  theme_preset?: unknown;
+  theme_overrides?: unknown;
+  font_pair?: unknown;
+};
+
+// Odczyt motywu z bazy — tego samego źródła, z którego kolory bierze strona,
+// żeby mail nie rozjechał się po zmianie motywu w /admin/wyglad.
+// Błąd odczytu nie może zablokować maila: lepiej wysłać w domyślnej palecie.
+export async function getMailBranding(): Promise<MailBranding> {
+  try {
+    const supabase = await createAdminClient();
+    const { data } = await supabase
+      .from("store_settings")
+      .select("theme_preset, theme_overrides, font_pair")
+      .eq("id", true)
+      .maybeSingle();
+    return brandingFromRaw((data as ThemeRow | null) ?? null);
+  } catch (err) {
+    console.error("[mail] odczyt motywu nieudany, używam domyślnego:", err);
+    return brandingFromRaw(null);
+  }
+}
+```
+
+W `branding.ts` zostaw **tylko** `MAIL_FONT_STACKS`, typ `MailBranding` i `brandingFromRaw`; usuń import `createAdminClient` i całe `getMailBranding`. Typ `ThemeRow` musi zostać wyeksportowany z `branding.ts` albo zduplikowany w `branding-server.ts` — wybierz eksport, jeśli `brandingFromRaw` przyjmuje go w sygnaturze.
+
+Testy w `app/_lib/__tests__/mail-branding.test.ts` dotyczą wyłącznie `brandingFromRaw` i `mailLocale`, więc nie zmieniaj ich — muszą przejść bez modyfikacji (10/10). To jest dowód, że rozdział niczego nie zepsuł.
 
 - [ ] **Step 2: Napisz ramę**
 
@@ -943,7 +983,7 @@ git commit -m "feat(mail): rama maila + potwierdzenie zakupu + skrypt podgladu H
 - Modify: `app/api/webhook/route.ts:119-125` (obszar po `claimedFirst`), `app/api/checkout/route.ts` (po `createOrder`)
 
 **Interfaces:**
-- Consumes: `sendMail` (Task 1), `getMailBranding`/`mailLocale` (Task 2), `MailLayout`/`OrderConfirmation` (Task 3), `getOrderById` z `app/_lib/orders.ts`.
+- Consumes: `sendMail` z `app/_lib/mail/send.ts` (Task 1), `getMailBranding` z `app/_lib/mail/branding-server.ts` i `mailLocale` z `app/_lib/mail/locale.ts` (Task 2 + rozdział w Task 3 Step 1b), `MailLayout`/`MailButton`/`OrderConfirmation` z `app/_lib/mail/templates/` (Task 3), `getOrderById` i `getProfilesByIds` z `app/_lib/orders.ts`.
 - Produces: `notifyOrderPlaced(orderId: string): Promise<void>` — nigdy nie rzuca; wysyła mail #1 do klienta i mail #4 do właścicielki.
 
 - [ ] **Step 1: Napisz mail dla właścicielki**
@@ -1022,7 +1062,7 @@ Create `app/_lib/mail/notify-order.ts`:
 ```ts
 import { render } from "@react-email/components";
 import { getOrderById } from "../orders";
-import { getMailBranding } from "./branding";
+import { getMailBranding } from "./branding-server";
 import { mailLocale } from "./locale";
 import { sendMail } from "./send";
 import { OrderConfirmation } from "./templates/OrderConfirmation";
