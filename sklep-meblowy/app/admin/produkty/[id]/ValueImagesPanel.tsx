@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import { useImageUpload } from "./useImageUpload";
 import type { Toast } from "./_shared";
+import ImagePickerModal from "./ImagePickerModal";
+import type { VariantImageGroup } from "@/app/_lib/variant-image-suggestions";
 
 // Panel zdjęć jednej wartości opcji wariantu — rozwijany pod wierszem wartości
 // w VariantsEditor: miniatury z usuwaniem + upload (multi-select i drag&drop,
@@ -11,16 +14,25 @@ import type { Toast } from "./_shared";
 export default function ValueImagesPanel({
   value,
   urls,
+  groups,
+  optionName,
   onAdd,
   onRemove,
   onToast,
 }: {
   value: string;
   urls: string[];
+  // Zdjęcia wartości opcji z innych produktów — źródło wybieraka „+ Wybierz
+  // z wgranych". Pusta lista = nie ma z czego wybierać, przycisk nie wchodzi.
+  groups: VariantImageGroup[];
+  // Nazwa opcji, w której siedzi ta wartość — służy TYLKO do wysunięcia jej
+  // grupy na górę wybieraka (kontekst), nie zawęża listy.
+  optionName: string;
   onAdd: (urls: string[]) => void;
   onRemove: (url: string) => void;
   onToast: (t: Toast) => void;
 }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
   const upload = useImageUpload({
     onUploaded: onAdd,
     onToast,
@@ -62,18 +74,41 @@ export default function ValueImagesPanel({
           ))}
         </ul>
       )}
-      <label
-        className={`self-start px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors cursor-pointer ${
-          upload.uploading ? "opacity-50 cursor-not-allowed" : ""
-        }`}
-      >
-        {upload.progressText ?? "+ Dodaj zdjęcia"}
-        <input {...upload.inputProps} className="hidden" />
-      </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <label
+          className={`px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors cursor-pointer ${
+            upload.uploading ? "opacity-50 cursor-not-allowed" : ""
+          }`}
+        >
+          {upload.progressText ?? "+ Dodaj zdjęcia"}
+          <input {...upload.inputProps} className="hidden" />
+        </label>
+        {groups.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--border)] text-[var(--fg)] rounded-full hover:border-[var(--color-gold)] hover:text-[var(--color-gold-text)] transition-colors"
+          >
+            + Wybierz z wgranych
+          </button>
+        )}
+      </div>
       <p className="text-[11px] text-[var(--muted)]">
         Zdjęcia tej wartości pokażą się na początku galerii, gdy klient ją
         wybierze na karcie produktu. Możesz też przeciągnąć pliki tutaj.
       </p>
+      {pickerOpen && (
+        <ImagePickerModal
+          groups={groups}
+          contextOptionName={optionName}
+          alreadyUsed={urls}
+          onPick={(picked) => {
+            onAdd(picked);
+            setPickerOpen(false);
+          }}
+          onCancel={() => setPickerOpen(false)}
+        />
+      )}
     </div>
   );
 }

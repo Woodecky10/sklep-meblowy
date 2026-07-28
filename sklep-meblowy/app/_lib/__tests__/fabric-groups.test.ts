@@ -29,6 +29,7 @@ function fab(name: string, category: string | null): Fabric {
     description_de: null,
     short_info: null,
     short_info_de: null,
+    properties: [],
     featured_product_ids: [],
     created_at: "",
   };

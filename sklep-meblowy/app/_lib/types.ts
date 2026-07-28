@@ -179,6 +179,18 @@ export type FabricPriceGroup = {
   created_at: string;
 };
 
+// Definicja cechy tkaniny (migracja 64) — edytowalna w /admin/tkaniny.
+// `icon` to klucz z biblioteki w app/_lib/fabric-properties.ts, nie plik.
+export type FabricPropertyDefRow = {
+  id: string;
+  code: string;
+  label: string;
+  label_de: string | null;
+  icon: string;
+  sort_order: number;
+  created_at: string;
+};
+
 // Katalog tkanin (migracja 37) — reużywalny zbiór nazw używanych jako wartości
 // opcji wariantu „Tkanina". name_de null → na /de fallback do name.
 export type Fabric = {
@@ -205,6 +217,9 @@ export type Fabric = {
   // osobne od description. short_info_de null → fallback PL.
   short_info: string | null;
   short_info_de: string | null;
+  // Cechy tkaniny (kody z app/_lib/fabric-properties.ts) — pigułki przy
+  // wyborze tkaniny na karcie produktu. Pusto = nic się nie pokazuje.
+  properties: string[];
   // Wybrane produkty pokazywane w sekcji „Meble w tej tkaninie" na stronie
   // tkaniny (kolejność = kolejność w tablicy; max 20 w adminie). Nieznane/
   // nieaktywne id pomijane przy renderze.

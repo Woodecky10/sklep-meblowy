@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
-import { invalidateFabricsCache, invalidateFabricGroupsCache } from "@/app/_lib/fabrics";
+import {
+  invalidateFabricsCache,
+  invalidateFabricGroupsCache,
+  invalidateFabricPropertyDefsCache,
+} from "@/app/_lib/fabrics";
 import { invalidateFacetsCache } from "@/app/_lib/products";
 import { sanitizeRichHtml } from "@/app/_lib/product-html";
 import { fabricSlug } from "@/app/_lib/fabric-slug";
@@ -14,6 +18,14 @@ import {
 } from "@/app/_lib/variants";
 import type { ProductVariants } from "@/app/_lib/types";
 import { parseFeaturedProductIds } from "@/app/_lib/fabric-featured-products";
+import {
+  FABRIC_PROPERTY_LABEL_MAX,
+  fabricPropertiesPatch,
+  filterKnownCodes,
+  isFabricPropertyIcon,
+  normalizePropertyCodes,
+  propertyCodeSlug,
+} from "@/app/_lib/fabric-properties";
 
 export type ActionResult =
   | { ok: true; message?: string; data?: unknown }
@@ -89,6 +101,32 @@ async function validateFeaturedProducts(
   if (error) return ids;
   const known = new Set(((data ?? []) as { id: string }[]).map((r) => r.id));
   return ids.filter((id) => known.has(id));
+}
+
+// Cienka skorupa nad czystymi helperami z fabric-properties.ts: jedyne, co robi
+// sama, to round-trip do bazy po zbiór istniejących kodów.
+// `null` = zapytania nie dało się wykonać; wołający przerywa zapis z błędem,
+// zamiast po cichu wyczyścić zaznaczenia admina.
+async function validateFabricPropertyCodes(
+  supabase: Awaited<ReturnType<typeof createAdminClient>>,
+  raw: FormDataEntryValue[]
+): Promise<string[] | null> {
+  const wanted = normalizePropertyCodes(raw);
+  if (wanted.length === 0) return [];
+  const { data, error } = await supabase.from("fabric_property_defs").select("code");
+  if (error) return null;
+  const known = new Set(((data ?? []) as { code: string }[]).map((r) => r.code));
+  return filterKnownCodes(wanted, known);
+}
+
+const PROPERTIES_READ_ERROR =
+  "Nie udało się odczytać listy cech tkanin — spróbuj zapisać ponownie";
+
+// Czy formularz w ogóle wyrenderował sekcję cech (ukryty marker). Brak markera
+// = lista definicji była niedostępna, więc pusty `getAll("properties")` znaczy
+// „nie wiem", a nie „admin odznaczył wszystko".
+function propertiesSectionRendered(formData: FormData): boolean {
+  return formData.get("properties_present") === "1";
 }
 
 // Ile zapisów produktów leci równolegle w jednej porcji. Zamienia setki
@@ -176,6 +214,15 @@ export async function createFabric(formData: FormData): Promise<ActionResult> {
 
   const supabase = await createAdminClient();
   const featuredProductIds = await validateFeaturedProducts(supabase, rawFeatured);
+  // Niezaznaczony checkbox nie trafia do FormData — getAll zwraca same
+  // zaznaczone kody, walidacja odsiewa kody spoza słownika cech.
+  const properties = await validateFabricPropertyCodes(
+    supabase,
+    formData.getAll("properties")
+  );
+  if (properties === null) return { ok: false, error: PROPERTIES_READ_ERROR };
+  // Nowa tkanina nie ma czego stracić — zawsze zapisujemy tablicę (pustą, gdy
+  // sekcja cech się nie wyrenderowała).
   const { data: slugRows } = await supabase.from("fabrics").select("slug");
   const taken = new Set(
     ((slugRows ?? []) as { slug: string | null }[]).map((r) => r.slug ?? "")
@@ -189,6 +236,7 @@ export async function createFabric(formData: FormData): Promise<ActionResult> {
       group_id: groupId, slug, description, description_de: descriptionDe,
       short_info: shortInfo,
       short_info_de: shortInfoDe,
+      properties,
       featured_product_ids: featuredProductIds,
     } as never)
     .select()
@@ -228,6 +276,20 @@ export async function updateFabric(formData: FormData): Promise<ActionResult> {
 
   const supabase = await createAdminClient();
   const featuredProductIds = await validateFeaturedProducts(supabase, rawFeatured);
+  // Niezaznaczony checkbox nie trafia do FormData — getAll zwraca same
+  // zaznaczone kody, walidacja odsiewa kody spoza słownika cech.
+  const properties = await validateFabricPropertyCodes(
+    supabase,
+    formData.getAll("properties")
+  );
+  if (properties === null) return { ok: false, error: PROPERTIES_READ_ERROR };
+  // Klucz `properties` trafia do payloadu TYLKO wtedy, gdy formularz pokazał
+  // sekcję cech. Bez markera (niedostępny słownik) edycja tkaniny zostawia jej
+  // dotychczasowe zaznaczenia w spokoju, zamiast nadpisać je pustą tablicą.
+  const propertiesPatch = fabricPropertiesPatch(
+    propertiesSectionRendered(formData),
+    properties
+  );
   const { error } = await supabase
     .from("fabrics")
     .update({
@@ -235,6 +297,7 @@ export async function updateFabric(formData: FormData): Promise<ActionResult> {
       group_id: groupId, description, description_de: descriptionDe,
       short_info: shortInfo,
       short_info_de: shortInfoDe,
+      ...propertiesPatch,
       featured_product_ids: featuredProductIds,
     } as never)
     .eq("id", id);
@@ -296,4 +359,112 @@ export async function updateFabricGroup(formData: FormData): Promise<ActionResul
   revalidatePath("/admin/tkaniny");
   revalidatePath("/tkaniny");
   return { ok: true, message: `Grupa zapisana — przeliczono ${updated} produkt(ów)` };
+}
+
+// ——— Cechy tkanin (słownik fabric_property_defs, migracja 64) ———————————————
+// Zestaw cech jest edytowalny w panelu; w kodzie zostaje tylko biblioteka
+// ikonek. `code` powstaje raz, ze slugu nazwy, i jest NIEZMIENNY — tkaniny
+// trzymają kod, więc zmiana kodu odpięłaby cechę od wszystkich tkanin.
+
+export async function createFabricProperty(formData: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  const label = sanitize(formData.get("label"), FABRIC_PROPERTY_LABEL_MAX);
+  if (!label) return { ok: false, error: "Nazwa cechy jest wymagana" };
+  const labelDe = emptyToNull(sanitize(formData.get("label_de"), FABRIC_PROPERTY_LABEL_MAX));
+  const icon = formData.get("icon");
+  // Ikonka to klucz z biblioteki w kodzie — cokolwiek innego odrzucamy tutaj,
+  // żeby do bazy nie trafił klucz, którego karta produktu nie umie narysować.
+  if (!isFabricPropertyIcon(icon)) return { ok: false, error: "Wybierz ikonkę" };
+  const sortOrder = parseSort(formData.get("sort_order"));
+
+  const supabase = await createAdminClient();
+  const { data: codeRows } = await supabase.from("fabric_property_defs").select("code");
+  const taken = new Set(((codeRows ?? []) as { code: string }[]).map((r) => r.code));
+  const code = propertyCodeSlug(label, taken);
+
+  const { error } = await supabase
+    .from("fabric_property_defs")
+    .insert({ code, label, label_de: labelDe, icon, sort_order: sortOrder } as never);
+  if (error) {
+    if (error.code === "23505") return { ok: false, error: "Taka cecha już istnieje" };
+    return { ok: false, error: error.message };
+  }
+
+  invalidateFabricPropertyDefsCache();
+  revalidatePath("/admin/tkaniny");
+  return { ok: true, message: `Cecha "${label}" dodana` };
+}
+
+// Edycja podpisów, ikonki i kolejności. `code` świadomie poza zakresem update'u.
+export async function updateFabricProperty(formData: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  const id = sanitize(formData.get("id"));
+  if (!id) return { ok: false, error: "Brak id cechy" };
+  const label = sanitize(formData.get("label"), FABRIC_PROPERTY_LABEL_MAX);
+  if (!label) return { ok: false, error: "Nazwa cechy jest wymagana" };
+  const labelDe = emptyToNull(sanitize(formData.get("label_de"), FABRIC_PROPERTY_LABEL_MAX));
+  const icon = formData.get("icon");
+  if (!isFabricPropertyIcon(icon)) return { ok: false, error: "Wybierz ikonkę" };
+  const sortOrder = parseSort(formData.get("sort_order"));
+
+  const supabase = await createAdminClient();
+  const { error } = await supabase
+    .from("fabric_property_defs")
+    .update({ label, label_de: labelDe, icon, sort_order: sortOrder } as never)
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  invalidateFabricPropertyDefsCache();
+  revalidatePath("/admin/tkaniny");
+  // Zmiana nazwy/ikonki jest widoczna dla klienta tak samo jak usunięcie cechy.
+  revalidatePath("/tkaniny");
+  return { ok: true, message: `Cecha "${label}" zapisana` };
+}
+
+// Usunięcie cechy kasuje też jej zaznaczenia w tkaninach (panel pyta o zgodę
+// i pokazuje licznik). Kolejność jest istotna: NAJPIERW odpięcie od tkanin,
+// POTEM kasowanie definicji. Odwrotna kolejność przy częściowej awarii
+// zostawiłaby w tkaninach kody bez definicji (renderują się nieszkodliwie,
+// ale mylą admina i nie da się ich odznaczyć z panelu).
+export async function deleteFabricProperty(formData: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  const id = sanitize(formData.get("id"));
+  if (!id) return { ok: false, error: "Brak id cechy" };
+  const code = sanitize(formData.get("code"), 100);
+  if (!code) return { ok: false, error: "Brak kodu cechy" };
+
+  const supabase = await createAdminClient();
+  // PostgREST nie umie `set properties = array_remove(properties, $1)` bez
+  // funkcji RPC, więc odczytujemy tylko tkaniny zawierające kod (operator cs)
+  // i zapisujemy każdej odfiltrowaną tablicę. Tkanin są dziesiątki, nie tysiące.
+  const { data: fabricRows, error: readErr } = await supabase
+    .from("fabrics")
+    .select("id, properties")
+    .contains("properties", [code]);
+  if (readErr) return { ok: false, error: readErr.message };
+
+  let cleaned = 0;
+  for (const row of (fabricRows ?? []) as { id: string; properties: string[] | null }[]) {
+    const next = (row.properties ?? []).filter((c) => c !== code);
+    const { error } = await supabase
+      .from("fabrics")
+      .update({ properties: next } as never)
+      .eq("id", row.id);
+    // Błąd przerywa akcję PRZED skasowaniem definicji — cecha zostaje spójna,
+    // admin widzi komunikat i może spróbować ponownie.
+    if (error) return { ok: false, error: error.message };
+    cleaned++;
+  }
+
+  const { error } = await supabase.from("fabric_property_defs").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  invalidateFabricPropertyDefsCache();
+  invalidateFabricsCache();
+  revalidatePath("/admin/tkaniny");
+  revalidatePath("/tkaniny");
+  return {
+    ok: true,
+    message: `Cecha usunięta — odpięta od ${cleaned} tkanin(y)`,
+  };
 }

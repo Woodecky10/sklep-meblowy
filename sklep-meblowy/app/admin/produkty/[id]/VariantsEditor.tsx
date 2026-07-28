@@ -25,6 +25,7 @@ import {
   isCornerCategorySlug,
 } from "@/app/_lib/corner-side";
 import ValueImagesPanel from "./ValueImagesPanel";
+import type { VariantImageGroup } from "@/app/_lib/variant-image-suggestions";
 
 // ============================================================
 // Komponent
@@ -37,6 +38,7 @@ export default function VariantsEditor({
   fabrics,
   fabricGroups,
   initialVariantInfo,
+  variantImageGroups,
   onToast,
 }: {
   productId: string;
@@ -45,6 +47,8 @@ export default function VariantsEditor({
   fabrics: Fabric[];
   fabricGroups: FabricPriceGroup[];
   initialVariantInfo: Record<string, VariantInfoEntry>;
+  // Zdjęcia wartości opcji z innych produktów — do wybieraka w panelu 📷.
+  variantImageGroups: VariantImageGroup[];
   onToast: (t: Toast) => void;
 }) {
   const [variants, setVariants] = useState<ProductVariants | null>(initial);
@@ -430,6 +434,7 @@ export default function VariantsEditor({
             onRemoveValueImage={(v, url) => removeValueImage(i, v, url)}
             onSetValueInfo={(v, info, infoDe) => setValueInfo(opt.name, v, info, infoDe)}
             infoFor={(v) => variantInfo[variantInfoKey(opt.name, v)]}
+            imageGroups={variantImageGroups}
             onToast={onToast}
           />
         ))}
@@ -511,6 +516,7 @@ function OptionRow({
   onRemoveValueImage,
   onSetValueInfo,
   infoFor,
+  imageGroups,
   onToast,
 }: {
   option: ProductOption;
@@ -524,6 +530,7 @@ function OptionRow({
   onRemoveValueImage: (value: string, url: string) => void;
   onSetValueInfo: (value: string, info: string, infoDe: string) => void;
   infoFor: (value: string) => VariantInfoEntry | undefined;
+  imageGroups: VariantImageGroup[];
   onToast: (t: Toast) => void;
 }) {
   const [newValue, setNewValue] = useState("");
@@ -643,6 +650,8 @@ function OptionRow({
                   <ValueImagesPanel
                     value={v}
                     urls={option.value_images?.[v] ?? []}
+                    groups={imageGroups}
+                    optionName={option.name}
                     onAdd={(urls) => onAddValueImages(v, urls)}
                     onRemove={(url) => onRemoveValueImage(v, url)}
                     onToast={onToast}
@@ -801,9 +810,12 @@ function FabricPicker({
           <h3 className="font-display text-lg font-semibold text-[var(--fg)]">
             Wybierz tkaniny (wybrano: {selectedNames.length} → {totalValues} wart.)
           </h3>
+          {/* data-guard-ignore — jak w ImagePickerModal: filtrowanie listy to nie
+              edycja danych, a modal siedzi w [data-guard-section]. */}
           <input
             type="text"
             autoFocus
+            data-guard-ignore
             placeholder="Szukaj…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}

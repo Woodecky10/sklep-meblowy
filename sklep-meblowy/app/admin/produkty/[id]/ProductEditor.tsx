@@ -16,8 +16,10 @@ import DescriptionSectionsEditor from "./DescriptionSectionsEditor";
 import DescriptionFieldEditor from "./DescriptionFieldEditor";
 import TranslationEditor, { type ProductDeFields } from "./TranslationEditor";
 import SizeGroupEditor from "./SizeGroupEditor";
+import ImagePickerModal from "./ImagePickerModal";
 import type { SizeGroupMember } from "@/app/_lib/products";
 import { MAX_FEATURES } from "@/app/_lib/product-features";
+import type { VariantImageGroup } from "@/app/_lib/variant-image-suggestions";
 
 export default function ProductEditor({
   product,
@@ -28,6 +30,8 @@ export default function ProductEditor({
   fabricGroups,
   variantInfo,
   featureKeySuggestions,
+  featureValueSuggestions,
+  variantImageGroups,
 }: {
   product: Product;
   categories: CategoryDef[];
@@ -38,12 +42,22 @@ export default function ProductEditor({
   variantInfo: Record<string, VariantInfoEntry>;
   // Podpowiedzi nazw parametrów — dropdown „+ Wybierz z listy".
   featureKeySuggestions: string[];
+  // Podpowiedzi wartości parametrów — mapa nazwa (trim+lowercase) → wartości
+  // już użyte w produktach; zasila strzałkę ▾ przy polu wartości.
+  featureValueSuggestions: Record<string, string[]>;
+  // Zdjęcia wartości opcji z innych produktów — zasilają wybierak
+  // „+ Wybierz z wgranych" (bez opcji „Tkanina", bez galerii).
+  variantImageGroups: VariantImageGroup[];
 }) {
   const [images, setImages] = useState<string[]>(product.images ?? []);
   // Baseline ostatnio zapisanej galerii — resetowany na zapisany payload po
   // sukcesie. Bez tego imagesDirty liczone względem propa product.images
   // (niezmiennego bez reloadu) wisiało jako true po zapisie (audyt LOW).
   const [savedImages, setSavedImages] = useState<string[]>(product.images ?? []);
+  // Wybierak „+ Wybierz z wgranych" dla globalnej galerii. Źródło to zdjęcia
+  // wartości opcji wariantów (bez „Tkaniny") — patrz spec: galerie innych
+  // produktów świadomie nie zasilają listy.
+  const [galleryPickerOpen, setGalleryPickerOpen] = useState(false);
   // Parametry produktu (specyfikacja) — wiersze klucz→wartość, seed z
   // product.features (importowane nie giną); serializacja do hidden
   // features_json w formularzu „Podstawowe dane" (wspólny przycisk zapisu).
@@ -51,14 +65,26 @@ export default function ProductEditor({
   const [featureRows, setFeatureRows] = useState<FeatureRow[]>(() =>
     (product.features ?? []).map((f) => ({ key: f.key, value: f.value }))
   );
+  // Dropdown wartości parametru: indeks wiersza z otwartą listą (najwyżej
+  // jeden naraz; otwarcie zamyka picker nazw i odwrotnie). Strzałka ▾ tylko
+  // gdy nazwa wiersza ma zapisane wartości (lookup trim + lowercase). Każda
+  // edycja nazwy/wierszy zamyka listę (indeksy się przesuwają, strzałka może
+  // zniknąć).
+  const [valuePickerIdx, setValuePickerIdx] = useState<number | null>(null);
+  const valuePickerRef = useRef<HTMLDivElement | null>(null);
+  const valueSuggestionsFor = (key: string) =>
+    featureValueSuggestions[key.trim().toLowerCase()] ?? [];
   function addFeatureRow() {
     setPickerOpen(false);
+    setValuePickerIdx(null);
     setFeatureRows((r) => [...r, { key: "", value: "" }]);
   }
   function removeFeatureRow(i: number) {
+    setValuePickerIdx(null);
     setFeatureRows((r) => r.filter((_, idx) => idx !== i));
   }
   function setFeatureKey(i: number, key: string) {
+    setValuePickerIdx(null);
     setFeatureRows((r) => r.map((row, idx) => (idx === i ? { ...row, key } : row)));
   }
   function setFeatureValue(i: number, value: string) {
@@ -80,6 +106,7 @@ export default function ProductEditor({
     if (featureRows.length >= MAX_FEATURES) return;
     pendingFocusIdx.current = featureRows.length;
     setFeatureRows((r) => [...r, { key, value: "" }]);
+    setValuePickerIdx(null);
     setPickerOpen(false);
   }
   useEffect(() => {
@@ -99,6 +126,24 @@ export default function ProductEditor({
       document.removeEventListener("mousedown", onMouseDown);
     };
   }, [pickerOpen]);
+  // Zamykanie dropdownu wartości: Esc / klik poza wierszem z otwartą listą.
+  useEffect(() => {
+    if (valuePickerIdx === null) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setValuePickerIdx(null);
+    }
+    function onMouseDown(e: MouseEvent) {
+      if (valuePickerRef.current && !valuePickerRef.current.contains(e.target as Node)) {
+        setValuePickerIdx(null);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("mousedown", onMouseDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onMouseDown);
+    };
+  }, [valuePickerIdx]);
   const [toast, setToast] = useState<Toast>(null);
   const [savingBasics, startBasicsTransition] = useTransition();
   const [savingImages, startImagesTransition] = useTransition();
@@ -426,7 +471,10 @@ export default function ProductEditor({
                       className={inputClass}
                     />
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div
+                    className="flex-1 min-w-0 relative"
+                    ref={valuePickerIdx === i ? valuePickerRef : undefined}
+                  >
                     <input
                       ref={(el) => {
                         if (el && pendingFocusIdx.current === i) {
@@ -438,8 +486,51 @@ export default function ProductEditor({
                       onChange={(e) => setFeatureValue(i, e.target.value)}
                       placeholder="np. Pianka HR"
                       maxLength={300}
-                      className={inputClass}
+                      className={
+                        valueSuggestionsFor(row.key).length > 0
+                          ? `${inputClass} pr-9`
+                          : inputClass
+                      }
                     />
+                    {valueSuggestionsFor(row.key).length > 0 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPickerOpen(false);
+                            setValuePickerIdx((v) => (v === i ? null : i));
+                          }}
+                          aria-label="Wybierz wartość z listy"
+                          aria-expanded={valuePickerIdx === i}
+                          aria-haspopup="listbox"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-full text-[var(--color-gold-text)] hover:bg-[var(--color-gold)]/10"
+                        >
+                          ▾
+                        </button>
+                        {valuePickerIdx === i && (
+                          <ul
+                            role="listbox"
+                            aria-label="Użyte wartości parametru"
+                            className="absolute z-20 top-full mt-1 left-0 w-full max-h-64 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--bg)] shadow-lg py-1"
+                          >
+                            {valueSuggestionsFor(row.key).map((v) => (
+                              <li key={v} role="option" aria-selected={false}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFeatureValue(i, v);
+                                    setValuePickerIdx(null);
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-gold)]/10"
+                                >
+                                  {v}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -458,7 +549,10 @@ export default function ProductEditor({
               <div className="relative" ref={pickerRef}>
                 <button
                   type="button"
-                  onClick={() => setPickerOpen((o) => !o)}
+                  onClick={() => {
+                    setValuePickerIdx(null);
+                    setPickerOpen((o) => !o);
+                  }}
                   disabled={featureRows.length >= MAX_FEATURES || availableSuggestions.length === 0}
                   aria-expanded={pickerOpen}
                   aria-haspopup="listbox"
@@ -521,14 +615,25 @@ export default function ProductEditor({
         title="Zdjęcia produktu"
         storageKey="zdjecia"
         headerAside={
-          <label
-            className={`shrink-0 px-5 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors cursor-pointer ${
-              upload.uploading ? "opacity-50 cursor-not-allowed" : ""
-            }`}
-          >
-            {upload.progressText ?? "+ Dodaj zdjęcia"}
-            <input {...upload.inputProps} className="hidden" />
-          </label>
+          <div className="shrink-0 flex flex-wrap items-center gap-2">
+            <label
+              className={`px-5 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors cursor-pointer ${
+                upload.uploading ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            >
+              {upload.progressText ?? "+ Dodaj zdjęcia"}
+              <input {...upload.inputProps} className="hidden" />
+            </label>
+            {variantImageGroups.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setGalleryPickerOpen(true)}
+                className="px-5 py-3 border border-[var(--color-gold)] text-[var(--color-gold)] font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
+              >
+                + Wybierz z wgranych
+              </button>
+            )}
+          </div>
         }
       >
         <p className="text-sm text-[var(--muted)] max-w-2xl">
@@ -614,10 +719,26 @@ export default function ProductEditor({
         </div>
       </CollapsibleSection>
 
+      {/* Modal poza CollapsibleSection — zwinięcie sekcji ukryłoby go razem
+          z jej zawartością. */}
+      {galleryPickerOpen && (
+        <ImagePickerModal
+          groups={variantImageGroups}
+          alreadyUsed={images}
+          onPick={(picked) => {
+            // Dedupe: ten sam URL nie ma wejść do galerii dwa razy (upload
+            // zawsze dawał nowe URL-e, więc dotąd nie było takiego ryzyka).
+            setImages((prev) => [...prev, ...picked.filter((u) => !prev.includes(u))]);
+            setGalleryPickerOpen(false);
+          }}
+          onCancel={() => setGalleryPickerOpen(false)}
+        />
+      )}
+
       {/* ============================================================
           Sekcja: Warianty (pełny editor)
           ============================================================ */}
-      <VariantsEditor productId={product.id} initial={product.variants} categorySlug={product.category} fabrics={fabrics} fabricGroups={fabricGroups} initialVariantInfo={variantInfo} onToast={showToast} />
+      <VariantsEditor productId={product.id} initial={product.variants} categorySlug={product.category} fabrics={fabrics} fabricGroups={fabricGroups} initialVariantInfo={variantInfo} variantImageGroups={variantImageGroups} onToast={showToast} />
 
       {/* ============================================================
           Sekcja: Pojedynczy opis (fallback gdy brak sekcji)
