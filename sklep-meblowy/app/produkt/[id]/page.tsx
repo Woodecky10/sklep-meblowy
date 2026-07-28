@@ -23,6 +23,7 @@ import StarRating from "@/app/_components/ui/StarRating";
 import ReviewList from "@/app/_components/ui/ReviewList";
 import ReviewForm from "@/app/_components/ui/ReviewForm";
 import { sanitizeProductHtml } from "@/app/_lib/product-html";
+import { DEDICATED_FEATURE_KEYS } from "@/app/_lib/product-features";
 import ProductDescriptionSections from "@/app/_components/ui/ProductDescriptionSections";
 import TrustBar from "@/app/_components/ui/TrustBar";
 import { COMPANY } from "@/app/_lib/company";
@@ -34,8 +35,11 @@ import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { buildSizeOptions } from "@/app/_lib/size-groups";
 import { effectivePrice } from "@/app/_lib/pricing";
-import { getFabricImageMap } from "@/app/_lib/fabrics";
-import { FabricImageProvider } from "@/app/_lib/fabric-context";
+import { getFabricImageMap, getFabricMetaMap } from "@/app/_lib/fabrics";
+import { FabricImageProvider, FabricMetaProvider } from "@/app/_lib/fabric-context";
+import { getVariantInfoMap } from "@/app/_lib/variant-info-data";
+import { VariantInfoProvider } from "@/app/_lib/variant-info-context";
+import { getBundlesForProduct } from "@/app/_lib/bundles-server";
 import type { Product } from "@/app/_lib/types";
 
 type Props = { params: Promise<{ id: string }> };
@@ -96,7 +100,7 @@ export default async function ProduktPage({ params }: Props) {
   const product = await getProduct(id, locale);
   if (!product) notFound();
 
-  const [sizeSiblings, related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell, wishlistIds, rate] =
+  const [sizeSiblings, related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell, wishlistIds, rate, bundles] =
     await Promise.all([
       // Selektor rozmiaru: rodzeństwo z tym samym size_group (osobne aukcje per rozmiar).
       product.size_group ? getSizeSiblings(product.size_group, locale) : Promise.resolve([]),
@@ -109,10 +113,18 @@ export default async function ProduktPage({ params }: Props) {
       getCrossSellProducts([product.category], [product.id], 4, locale),
       getUserWishlistIds(),
       getEurRate(),
+      // Zestawy zawierające ten produkt — box „Kup w zestawie" na karcie.
+      getBundlesForProduct(product.id, locale),
     ]);
   const sizeOptions = buildSizeOptions(sizeSiblings, product.id);
   // Mapa zdjęć próbek tkanin (wartość „Nazwa Numer" → URL) do próbek w selektorze.
   const fabricImageMap = await getFabricImageMap();
+  // Mapa wartość wariantu → metadane tkaniny (slug, grupa cenowa) — selektor
+  // grupuje próbki w rozwijane karty grup + link „szczegóły" do /tkaniny/[slug].
+  const fabricMetaMap = await getFabricMetaMap();
+  // Mapa (opcja+wartość) → {info, info_de} — krótkie informacje o wariancie
+  // (tooltip „i" przy wartości w selektorze).
+  const variantInfoMap = await getVariantInfoMap();
 
   // Etykieta cross-sell pochodzi z LABELA pierwszej cross_sell_categories tej
   // kategorii — np. dla łóżek pokaże "Polecane materace".
@@ -163,21 +175,19 @@ export default async function ProduktPage({ params }: Props) {
   // te które już są dedykowane (Kolor, Materiał, Wymiary, Konstrukcja, Czas
   // realizacji, Gwarancja) — żeby nie dublować linii w specyfikacji.
   const DEDICATED_KEYS = new Set(
-    [
-      "kolor",
-      "materiał",
-      "material",
-      "wymiary",
-      "konstrukcja",
-      "czas realizacji",
-      "gwarancja",
-      "waga",
-    ].map((s) => s.toLowerCase())
+    DEDICATED_FEATURE_KEYS.map((s) => s.toLowerCase())
   );
   for (const f of product.features ?? []) {
     if (DEDICATED_KEYS.has(f.key.toLowerCase().trim())) continue;
     details.push({ label: f.key, value: f.value });
   }
+  // Cała specyfikacja alfabetycznie A-Z po etykiecie (pola stałe + parametry
+  // razem). Collation "pl", nieczuła na wielkość liter/diakrytyki, z sortem
+  // numerycznym (spójnie z sortVariantValues). Nie mutuje danych źródłowych —
+  // `details` to lokalna tablica budowana w tym renderze.
+  details.sort((a, b) =>
+    a.label.localeCompare(b.label, "pl", { numeric: true, sensitivity: "base" })
+  );
 
   // Structured data dla Google (schema.org/Product) — rich snippets w SERP-ach:
   // cena, dostępność, gwiazdki/ocena prosto w wynikach wyszukiwania.
@@ -271,13 +281,18 @@ export default async function ProduktPage({ params }: Props) {
           Specyfikacja przeniesiona z osobnej sekcji do ProductMainSection
           żeby wypełniała pustą przestrzeń pod galerią. */}
       <FabricImageProvider map={fabricImageMap}>
-        <ProductMainSection
-          product={product}
-          categoryLabel={categoryLabel ?? null}
-          rating={rating}
-          specifications={details}
-          sizeOptions={sizeOptions}
-        />
+        <FabricMetaProvider map={fabricMetaMap}>
+          <VariantInfoProvider map={variantInfoMap}>
+            <ProductMainSection
+              product={product}
+              categoryLabel={categoryLabel ?? null}
+              rating={rating}
+              specifications={details}
+              sizeOptions={sizeOptions}
+              bundles={bundles}
+            />
+          </VariantInfoProvider>
+        </FabricMetaProvider>
       </FabricImageProvider>
 
       {/* Sekcja: opis produktu.

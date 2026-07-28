@@ -26,8 +26,10 @@ export const RESERVED_SLUGS: Set<string> = new Set([
   "rejestracja",
   "reset-hasla",
   "sklep",
+  "tkaniny",
   "ulubione",
   "zapomnialem-hasla",
+  "zestaw",
   "zwroty",
 ]);
 

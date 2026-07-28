@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { readCollapsed, writeCollapsed } from "@/app/_lib/section-collapse";
+import { uploadProductImage } from "../actions";
 
 export { compressIfNeeded } from "@/app/_lib/image-compress";
 
@@ -11,6 +12,20 @@ export const inputClass =
   "w-full px-3 py-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--fg)] focus:border-[var(--color-gold)] focus:outline-none";
 
 export type Toast = { type: "success" | "error"; message: string } | null;
+
+export type UploadResult = { ok: true; url: string } | { ok: false; error: string };
+
+// Wspólny wrapper uploadu zdjęcia produktu dla RichTextEditor (opis produktu,
+// sekcje opisu, tłumaczenia DE). Zachowuje komunikat błędu z server action,
+// żeby edytor pokazał konkretny powód nieudanego uploadu.
+export async function uploadProductImageFile(file: File): Promise<UploadResult> {
+  const fd = new FormData();
+  fd.set("image", file, file.name);
+  const res = await uploadProductImage(fd);
+  if (!res.ok) return { ok: false, error: res.error };
+  const url = (res.data as { url: string } | undefined)?.url;
+  return url ? { ok: true, url } : { ok: false, error: "Brak URL po uploadzie" };
+}
 
 export function Field({
   label,

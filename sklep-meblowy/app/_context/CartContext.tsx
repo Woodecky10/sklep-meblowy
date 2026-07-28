@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useMemo, useReducer, useCallback, useState, useEffect } from "react";
+import type { CartItemBundle, BundleDiscountType } from "@/app/_lib/bundles";
 
 export type CartItem = {
   id: string;
@@ -15,6 +16,10 @@ export type CartItem = {
   // Uwagi klienta do tej pozycji — np. "róż jak na zdjęciu 2".
   // Optional dla backward compat.
   notes?: string;
+  // Znacznik zestawu (spec 2026-07-16). Pozycje z tym samym unitKey tworzą
+  // jedną grupę „Zestaw" w koszyku. Optional dla backward compat (stare
+  // localStorage bez pola działa bez migracji).
+  bundle?: CartItemBundle;
 };
 
 // Zwalidowany kod rabatowy zastosowany do koszyka. Walidacja na serwerze
@@ -57,6 +62,16 @@ type CartAction =
       id: string;
       variantValues: Record<string, string> | undefined;
       notes: string;
+      bundleUnitKey?: string;
+    }
+  | { type: "ADD_BUNDLE"; items: CartItem[] }
+  | { type: "REMOVE_BUNDLE"; unitKey: string }
+  | { type: "UPDATE_BUNDLE_QTY"; unitKey: string; quantity: number }
+  | {
+      type: "UPDATE_BUNDLE_TERMS";
+      bundleId: string;
+      discountType: BundleDiscountType;
+      discountValue: number;
     }
   | { type: "CLEAR" }
   | { type: "HYDRATE"; items: CartItem[]; appliedPromo: AppliedPromo | null }
@@ -82,22 +97,27 @@ function variantKey(values?: Record<string, string>): string {
     .join("|");
 }
 
-function itemKey(id: string, values?: Record<string, string>): string {
-  return id + "::" + variantKey(values);
+function itemKey(
+  id: string,
+  values?: Record<string, string>,
+  bundleUnitKey?: string
+): string {
+  return id + "::" + variantKey(values) + "::" + (bundleUnitKey ?? "");
 }
 
-function cartReducer(state: CartState, action: CartAction): CartState {
+export type { CartState, CartAction };
+export function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case "ADD": {
-      const key = itemKey(action.item.id, action.item.variantValues);
+      const key = itemKey(action.item.id, action.item.variantValues, action.item.bundle?.unitKey);
       const existing = state.items.find(
-        (i) => itemKey(i.id, i.variantValues) === key
+        (i) => itemKey(i.id, i.variantValues, i.bundle?.unitKey) === key
       );
       if (existing) {
         return {
           ...state,
           items: state.items.map((i) =>
-            itemKey(i.id, i.variantValues) === key
+            itemKey(i.id, i.variantValues, i.bundle?.unitKey) === key
               ? { ...i, quantity: clampQty(i.quantity + action.item.quantity) }
               : i
           ),
@@ -115,7 +135,9 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       const key = itemKey(action.id, action.variantValues);
       return {
         ...state,
-        items: state.items.filter((i) => itemKey(i.id, i.variantValues) !== key),
+        items: state.items.filter(
+          (i) => itemKey(i.id, i.variantValues, i.bundle?.unitKey) !== key
+        ),
       };
     }
     case "UPDATE_QTY": {
@@ -123,23 +145,79 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       return {
         ...state,
         items: state.items.map((i) =>
-          itemKey(i.id, i.variantValues) === key
+          itemKey(i.id, i.variantValues, i.bundle?.unitKey) === key
             ? { ...i, quantity: clampQty(action.quantity) }
             : i
         ),
       };
     }
     case "UPDATE_NOTES": {
-      const key = itemKey(action.id, action.variantValues);
+      const key = itemKey(action.id, action.variantValues, action.bundleUnitKey);
       return {
         ...state,
         items: state.items.map((i) =>
-          itemKey(i.id, i.variantValues) === key
+          itemKey(i.id, i.variantValues, i.bundle?.unitKey) === key
             ? { ...i, notes: action.notes }
             : i
         ),
       };
     }
+    case "ADD_BUNDLE": {
+      if (action.items.length === 0) return state;
+      const unitKey = action.items[0].bundle?.unitKey;
+      if (!unitKey) return state;
+      const exists = state.items.some((i) => i.bundle?.unitKey === unitKey);
+      if (exists) {
+        const inc = clampQty(action.items[0].quantity);
+        return {
+          ...state,
+          items: state.items.map((i) =>
+            i.bundle?.unitKey === unitKey
+              ? { ...i, quantity: clampQty(i.quantity + inc) }
+              : i
+          ),
+        };
+      }
+      return {
+        ...state,
+        items: [
+          ...state.items,
+          ...action.items.map((i) => ({ ...i, quantity: clampQty(i.quantity) })),
+        ],
+      };
+    }
+    case "REMOVE_BUNDLE":
+      return {
+        ...state,
+        items: state.items.filter((i) => i.bundle?.unitKey !== action.unitKey),
+      };
+    case "UPDATE_BUNDLE_QTY":
+      return {
+        ...state,
+        items: state.items.map((i) =>
+          i.bundle?.unitKey === action.unitKey
+            ? { ...i, quantity: clampQty(action.quantity) }
+            : i
+        ),
+      };
+    case "UPDATE_BUNDLE_TERMS":
+      // Odświeżenie warunków rabatu zestawu (admin mógł zmienić po dodaniu do
+      // koszyka). Aktualizuje meta WSZYSTKICH pozycji danego bundle.id.
+      return {
+        ...state,
+        items: state.items.map((i) =>
+          i.bundle && i.bundle.id === action.bundleId
+            ? {
+                ...i,
+                bundle: {
+                  ...i.bundle,
+                  discountType: action.discountType,
+                  discountValue: action.discountValue,
+                },
+              }
+            : i
+        ),
+      };
     case "CLEAR":
       // Czyści też promo — rabat bez koszyka nie ma sensu (wcześniej robił
       // to osobny setAppliedPromo(null) w callbacku clear()).
@@ -182,7 +260,16 @@ type CartContextValue = {
   updateNotes: (
     id: string,
     notes: string,
-    variantValues?: Record<string, string>
+    variantValues?: Record<string, string>,
+    bundleUnitKey?: string
+  ) => void;
+  addBundle: (items: CartItem[]) => void;
+  removeBundle: (unitKey: string) => void;
+  updateBundleQty: (unitKey: string, quantity: number) => void;
+  updateBundleTerms: (
+    bundleId: string,
+    discountType: BundleDiscountType,
+    discountValue: number
   ) => void;
   clear: () => void;
   dismissNotification: () => void;
@@ -258,8 +345,30 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     []
   );
   const updateNotes = useCallback(
-    (id: string, notes: string, variantValues?: Record<string, string>) =>
-      dispatch({ type: "UPDATE_NOTES", id, variantValues, notes }),
+    (
+      id: string,
+      notes: string,
+      variantValues?: Record<string, string>,
+      bundleUnitKey?: string
+    ) => dispatch({ type: "UPDATE_NOTES", id, variantValues, notes, bundleUnitKey }),
+    []
+  );
+  const addBundle = useCallback((items: CartItem[]) => {
+    dispatch({ type: "ADD_BUNDLE", items });
+    if (items[0]) setNotification({ item: items[0], ts: Date.now() });
+  }, []);
+  const removeBundle = useCallback(
+    (unitKey: string) => dispatch({ type: "REMOVE_BUNDLE", unitKey }),
+    []
+  );
+  const updateBundleQty = useCallback(
+    (unitKey: string, quantity: number) =>
+      dispatch({ type: "UPDATE_BUNDLE_QTY", unitKey, quantity }),
+    []
+  );
+  const updateBundleTerms = useCallback(
+    (bundleId: string, discountType: BundleDiscountType, discountValue: number) =>
+      dispatch({ type: "UPDATE_BUNDLE_TERMS", bundleId, discountType, discountValue }),
     []
   );
   const clear = useCallback(() => {
@@ -293,12 +402,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       remove,
       updateQty,
       updateNotes,
+      addBundle,
+      removeBundle,
+      updateBundleQty,
+      updateBundleTerms,
       clear,
       dismissNotification,
       applyPromo,
       clearPromo,
     };
-  }, [state.items, notification, appliedPromo, hydrated, add, remove, updateQty, updateNotes, clear, dismissNotification, applyPromo, clearPromo]);
+  }, [state.items, notification, appliedPromo, hydrated, add, remove, updateQty, updateNotes, addBundle, removeBundle, updateBundleQty, updateBundleTerms, clear, dismissNotification, applyPromo, clearPromo]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

@@ -1,16 +1,19 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { updateProductVariants } from "../actions";
+import { updateProductVariants, upsertVariantInfo } from "../actions";
+import { variantInfoKey, type VariantInfoEntry } from "@/app/_lib/variant-info";
 import type {
   ProductOption,
   ProductVariants,
   Fabric,
+  FabricPriceGroup,
 } from "@/app/_lib/types";
 import { CollapsibleSection, Field, inputClass, type Toast } from "./_shared";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import {
   applyFabricSelection,
+  buildGroupSurchargeMap,
   expandFabrics,
   fabricValueBelongsTo,
   FABRIC_OPTION_NAME,
@@ -21,6 +24,8 @@ import {
   hasCornerSideOption,
   isCornerCategorySlug,
 } from "@/app/_lib/corner-side";
+import ValueImagesPanel from "./ValueImagesPanel";
+import type { VariantImageGroup } from "@/app/_lib/variant-image-suggestions";
 
 // ============================================================
 // Komponent
@@ -31,18 +36,34 @@ export default function VariantsEditor({
   initial,
   categorySlug,
   fabrics,
+  fabricGroups,
+  initialVariantInfo,
+  variantImageGroups,
   onToast,
 }: {
   productId: string;
   initial: ProductVariants | null;
   categorySlug: string;
   fabrics: Fabric[];
+  fabricGroups: FabricPriceGroup[];
+  initialVariantInfo: Record<string, VariantInfoEntry>;
+  // Zdjęcia wartości opcji z innych produktów — do wybieraka w panelu 📷.
+  variantImageGroups: VariantImageGroup[];
   onToast: (t: Toast) => void;
 }) {
   const [variants, setVariants] = useState<ProductVariants | null>(initial);
   const [saving, startSaveTransition] = useTransition();
   const [fabricPickerOpen, setFabricPickerOpen] = useState(false);
   const confirm = useConfirm();
+
+  // Info o wariancie jest GLOBALNE (slownik po parze opcja+wartosc), wiec trzymane
+  // osobno od products.variants. Edytujemy kopie; zapis przez upsertVariantInfo.
+  const [variantInfo, setVariantInfo] = useState<Record<string, VariantInfoEntry>>(initialVariantInfo);
+  const [savedVariantInfo, setSavedVariantInfo] = useState<Record<string, VariantInfoEntry>>(initialVariantInfo);
+  const infoDirty = useMemo(
+    () => JSON.stringify(variantInfo) !== JSON.stringify(savedVariantInfo),
+    [variantInfo, savedVariantInfo]
+  );
 
   // Wybór strony narożnika: stan = obecność opcji side-like (także ręcznej
   // "STRONA"/"STRONA MEBLA"). Toggle widoczny dla kategorii narożników albo
@@ -115,13 +136,16 @@ export default function VariantsEditor({
     if (!variants) return;
     const nextOptions = variants.options.map((o, i) => {
       if (i !== optIdx) return o;
-      // Usuń też ewentualną dopłatę tej wartości.
+      // Usuń też ewentualną dopłatę i zdjęcia tej wartości.
       const nextPrices = { ...(o.value_prices ?? {}) };
       delete nextPrices[value];
+      const nextImages = { ...(o.value_images ?? {}) };
+      delete nextImages[value];
       return {
         ...o,
         values: o.values.filter((v) => v !== value),
         value_prices: Object.keys(nextPrices).length > 0 ? nextPrices : undefined,
+        value_images: Object.keys(nextImages).length > 0 ? nextImages : undefined,
       };
     });
     setVariants({ ...variants, options: nextOptions });
@@ -143,12 +167,53 @@ export default function VariantsEditor({
     setVariants({ ...variants, options: nextOptions });
   }
 
+  // Ustaw info dla pary (nazwa opcji, wartosc). Puste PL → usun wpis z mapy.
+  function setValueInfo(optionName: string, value: string, info: string, infoDe: string) {
+    const key = variantInfoKey(optionName, value);
+    setVariantInfo((prev) => {
+      const next = { ...prev };
+      if (info.trim()) next[key] = { info, info_de: infoDe.trim() ? infoDe : null };
+      else delete next[key];
+      return next;
+    });
+  }
+
+  // Dodaj wgrane zdjęcia do wartości opcji (dopisywane na koniec, bez duplikatów).
+  function addValueImages(optIdx: number, value: string, urls: string[]) {
+    if (!variants) return;
+    const nextOptions = variants.options.map((o, i) => {
+      if (i !== optIdx) return o;
+      const current = o.value_images?.[value] ?? [];
+      const merged = [...current, ...urls.filter((u) => !current.includes(u))];
+      return { ...o, value_images: { ...(o.value_images ?? {}), [value]: merged } };
+    });
+    setVariants({ ...variants, options: nextOptions });
+  }
+
+  // Usuń zdjęcie wartości (pusta lista → wpis znika; pusta mapa → klucz znika).
+  function removeValueImage(optIdx: number, value: string, url: string) {
+    if (!variants) return;
+    const nextOptions = variants.options.map((o, i) => {
+      if (i !== optIdx) return o;
+      const nextImages = { ...(o.value_images ?? {}) };
+      const kept = (nextImages[value] ?? []).filter((u) => u !== url);
+      if (kept.length > 0) nextImages[value] = kept;
+      else delete nextImages[value];
+      return {
+        ...o,
+        value_images: Object.keys(nextImages).length > 0 ? nextImages : undefined,
+      };
+    });
+    setVariants({ ...variants, options: nextOptions });
+  }
+
   // Zastosuj wybor z katalogu → rozwin kolekcje na wartosci „Nazwa Numer" (+doplaty),
   // dolacz zachowane wartosci spoza katalogu, ustaw opcje „Tkanina".
   function applyFabrics(selectedFabrics: Fabric[], keptOrphanValues: string[]) {
     const base = variants ?? { options: [] };
     const { values, valuePrices } = expandFabrics(
-      selectedFabrics.map((f) => ({ name: f.name, colors: f.colors ?? [], price: f.price ?? 0 }))
+      selectedFabrics.map((f) => ({ name: f.name, colors: f.colors ?? [], price: f.price ?? 0, group_id: f.group_id })),
+      buildGroupSurchargeMap(fabricGroups)
     );
     // Zachowaj doplaty istniejacych wartosci-sierot (spoza katalogu).
     const currentVP =
@@ -184,10 +249,20 @@ export default function VariantsEditor({
               }
               if (Object.keys(kept).length > 0) value_prices = kept;
             }
+            let value_images: Record<string, string[]> | undefined;
+            if (o.value_images) {
+              const keptImages: Record<string, string[]> = {};
+              for (const v of values) {
+                const imgs = o.value_images[v];
+                if (Array.isArray(imgs) && imgs.length > 0) keptImages[v] = imgs;
+              }
+              if (Object.keys(keptImages).length > 0) value_images = keptImages;
+            }
             return {
               name: o.name.trim(),
               values,
               ...(value_prices ? { value_prices } : {}),
+              ...(value_images ? { value_images } : {}),
               ...(o.filterable ? { filterable: true } : {}),
             };
           })
@@ -200,7 +275,38 @@ export default function VariantsEditor({
       }
       const res = await updateProductVariants(productId, toSave);
       if (res.ok) {
-        onToast({ type: "success", message: res.message ?? "Zapisano warianty" });
+        if (!infoDirty) {
+          // Nic w info nie zmieniono (np. zapis samej ceny) — nie wywoluj
+          // upsertVariantInfo wcale, zeby nie kasowac par, ktorych admin
+          // nigdy nie dotknal w tej sesji (variantInfo jest zasiane z
+          // 300s-cache'owanej globalnej mapy, wiec moze byc nieaktualne).
+          onToast({ type: "success", message: res.message ?? "Zapisano warianty" });
+          setVariants(toSave);
+          return;
+        }
+        // Rekoncyliacja TYLKO par faktycznie dotknietych w tej sesji: diff
+        // variantInfo vs savedVariantInfo. Zmienione/dodane pary → upsert,
+        // pary usuniete z variantInfo wzgledem baseline → DELETE (info: "").
+        // Klucze sa unikalne (Map/object), wiec bez dodatkowego dedupe.
+        const entries: { option_name: string; value: string; info: string; info_de: string }[] = [];
+        for (const [key, entry] of Object.entries(variantInfo)) {
+          if (JSON.stringify(entry) !== JSON.stringify(savedVariantInfo[key])) {
+            const [option_name, value] = key.split("\u0000");
+            entries.push({ option_name, value, info: entry.info, info_de: entry.info_de ?? "" });
+          }
+        }
+        for (const key of Object.keys(savedVariantInfo)) {
+          if (!(key in variantInfo)) {
+            const [option_name, value] = key.split("\u0000");
+            entries.push({ option_name, value, info: "", info_de: "" });
+          }
+        }
+        const infoRes = await upsertVariantInfo(productId, entries);
+        onToast({
+          type: infoRes.ok ? "success" : "error",
+          message: infoRes.ok ? (res.message ?? "Zapisano warianty") : infoRes.error,
+        });
+        if (infoRes.ok) setSavedVariantInfo(variantInfo);
         setVariants(toSave);
       } else {
         onToast({ type: "error", message: res.error });
@@ -299,7 +405,7 @@ export default function VariantsEditor({
           kontener DOM, do którego mamy dostęp. */}
       <div data-guard-section className="flex flex-col gap-6">
       <p className="text-sm text-[var(--muted)] max-w-2xl">
-        Dodaj opcje (np. „Kolor”, „Tkanina”, „Strona”) i ich wartości — klient wybiera po jednej wartości z każdej opcji. Przy wartości możesz ustawić dopłatę „+zł” (np. droższa tkanina). Stan magazynowy, cena promocyjna i zdjęcia są wspólne dla całego produktu — ustawiasz je w „Podstawowych danych” i „Zdjęciach produktu” wyżej.
+        Dodaj opcje (np. „Kolor”, „Tkanina”, „Strona”) i ich wartości — klient wybiera po jednej wartości z każdej opcji. Przy wartości możesz ustawić dopłatę „+zł” (np. droższa tkanina) oraz zdjęcia (📷) — pokażą się na początku galerii, gdy klient wybierze tę wartość. Stan magazynowy i cena promocyjna są wspólne dla całego produktu — ustawiasz je w „Podstawowych danych”; globalna galeria w „Zdjęciach produktu” wyżej.
       </p>
 
       {/* ============================================================
@@ -324,6 +430,12 @@ export default function VariantsEditor({
             onSetValuePrice={(v, p) => setValuePrice(i, v, p)}
             onRemoveOption={() => removeOption(i)}
             onToggleFilterable={(v) => setOptionFilterable(i, v)}
+            onAddValueImages={(v, urls) => addValueImages(i, v, urls)}
+            onRemoveValueImage={(v, url) => removeValueImage(i, v, url)}
+            onSetValueInfo={(v, info, infoDe) => setValueInfo(opt.name, v, info, infoDe)}
+            infoFor={(v) => variantInfo[variantInfoKey(opt.name, v)]}
+            imageGroups={variantImageGroups}
+            onToast={onToast}
           />
         ))}
         <button
@@ -358,12 +470,12 @@ export default function VariantsEditor({
           ============================================================ */}
       <div className="flex items-center justify-between gap-4 pt-4 border-t border-[var(--border)]">
         <p className="text-xs text-[var(--muted)]">
-          {dirty ? "Masz niezapisane zmiany w wariantach." : "Warianty zapisane."}
+          {dirty || infoDirty ? "Masz niezapisane zmiany w wariantach." : "Warianty zapisane."}
         </p>
         <button
           type="button"
           onClick={save}
-          disabled={saving || !dirty}
+          disabled={saving || (!dirty && !infoDirty)}
           aria-busy={saving}
           data-guard-save
           className="px-6 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
@@ -375,6 +487,7 @@ export default function VariantsEditor({
       {fabricPickerOpen && (
         <FabricPicker
           fabrics={fabrics}
+          priceGroups={fabricGroups}
           initiallySelectedValues={
             variants?.options.find((o) => o.name === FABRIC_OPTION_NAME)?.values ?? []
           }
@@ -399,6 +512,12 @@ function OptionRow({
   onSetValuePrice,
   onRemoveOption,
   onToggleFilterable,
+  onAddValueImages,
+  onRemoveValueImage,
+  onSetValueInfo,
+  infoFor,
+  imageGroups,
+  onToast,
 }: {
   option: ProductOption;
   onNameChange: (name: string) => void;
@@ -407,8 +526,16 @@ function OptionRow({
   onSetValuePrice: (value: string, price: number | null) => void;
   onRemoveOption: () => void;
   onToggleFilterable: (v: boolean) => void;
+  onAddValueImages: (value: string, urls: string[]) => void;
+  onRemoveValueImage: (value: string, url: string) => void;
+  onSetValueInfo: (value: string, info: string, infoDe: string) => void;
+  infoFor: (value: string) => VariantInfoEntry | undefined;
+  imageGroups: VariantImageGroup[];
+  onToast: (t: Toast) => void;
 }) {
   const [newValue, setNewValue] = useState("");
+  const [imagesFor, setImagesFor] = useState<string | null>(null);
+  const [infoForVal, setInfoForVal] = useState<string | null>(null);
   return (
     <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl p-4 flex flex-col gap-3">
       <div className="flex items-center gap-3">
@@ -455,40 +582,111 @@ function OptionRow({
           {option.values.length === 0 && (
             <span className="text-xs text-[var(--muted)] italic">Brak wartości — dodaj poniżej.</span>
           )}
-          {option.values.map((v) => (
-            <div
-              key={v}
-              className="flex items-center gap-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-lg px-3 py-1.5"
-            >
-              <span className="flex-1 text-sm truncate">{v}</span>
-              <div className="flex items-center gap-1 shrink-0">
-                <span className="text-xs text-[var(--muted)]">+</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  inputMode="decimal"
-                  value={option.value_prices?.[v] ?? ""}
-                  onChange={(e) =>
-                    onSetValuePrice(v, e.target.value === "" ? null : Number(e.target.value))
-                  }
-                  placeholder="0"
-                  aria-label={`Dopłata za ${v} (zł)`}
-                  className="w-20 px-2 py-1 bg-[var(--bg)] border border-[var(--border)] rounded text-sm text-right focus:border-[var(--color-gold)] focus:outline-none"
-                />
-                <span className="text-xs text-[var(--muted)]">zł</span>
+          {option.values.map((v) => {
+            const imgCount = option.value_images?.[v]?.length ?? 0;
+            return (
+              <div key={v} className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-lg px-3 py-1.5">
+                  <span className="flex-1 text-sm truncate">{v}</span>
+                  <button
+                    type="button"
+                    onClick={() => setImagesFor(imagesFor === v ? null : v)}
+                    aria-expanded={imagesFor === v}
+                    aria-label={`Zdjęcia wartości ${v} (${imgCount})`}
+                    title="Zdjęcia tej wartości"
+                    className={`shrink-0 px-2 py-1 text-[11px] font-sans rounded-full border transition-colors ${
+                      imagesFor === v || imgCount > 0
+                        ? "border-[var(--color-gold)] text-[var(--color-gold-text)]"
+                        : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold-text)]"
+                    }`}
+                  >
+                    📷{imgCount > 0 ? ` ${imgCount}` : ""}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInfoForVal(infoForVal === v ? null : v)}
+                    aria-expanded={infoForVal === v}
+                    aria-label={`Informacja o wariancie ${v}`}
+                    title="Krótka informacja (tooltip u klienta)"
+                    className={`shrink-0 px-2 py-1 text-[11px] font-sans rounded-full border transition-colors ${
+                      infoForVal === v || infoFor(v)
+                        ? "border-[var(--color-gold)] text-[var(--color-gold-text)]"
+                        : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold-text)]"
+                    }`}
+                  >
+                    ℹ{infoFor(v) ? " •" : ""}
+                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xs text-[var(--muted)]">+</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      inputMode="decimal"
+                      value={option.value_prices?.[v] ?? ""}
+                      onChange={(e) =>
+                        onSetValuePrice(v, e.target.value === "" ? null : Number(e.target.value))
+                      }
+                      placeholder="0"
+                      aria-label={`Dopłata za ${v} (zł)`}
+                      className="w-20 px-2 py-1 bg-[var(--bg)] border border-[var(--border)] rounded text-sm text-right focus:border-[var(--color-gold)] focus:outline-none"
+                    />
+                    <span className="text-xs text-[var(--muted)]">zł</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (imagesFor === v) setImagesFor(null);
+                      onRemoveValue(v);
+                    }}
+                    aria-label={`Usuń ${v}`}
+                    className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-100 dark:hover:bg-red-950 text-red-600 shrink-0"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                {imagesFor === v && (
+                  <ValueImagesPanel
+                    value={v}
+                    urls={option.value_images?.[v] ?? []}
+                    groups={imageGroups}
+                    optionName={option.name}
+                    onAdd={(urls) => onAddValueImages(v, urls)}
+                    onRemove={(url) => onRemoveValueImage(v, url)}
+                    onToast={onToast}
+                  />
+                )}
+                {infoForVal === v && (
+                  <div className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--card-bg)] p-3">
+                    <label className="text-[11px] uppercase tracking-widest text-[var(--muted)]">
+                      Info PL (tooltip, maks. 200 zn.) — zapis globalny dla „{option.name}: {v}&rdquo;
+                    </label>
+                    <textarea
+                      maxLength={200}
+                      value={infoFor(v)?.info ?? ""}
+                      onChange={(e) => onSetValueInfo(v, e.target.value, infoFor(v)?.info_de ?? "")}
+                      placeholder="np. Miękki welur, łatwy w czyszczeniu"
+                      className={`${inputClass} min-h-[3rem]`}
+                    />
+                    <label className="text-[11px] uppercase tracking-widest text-[var(--muted)]">
+                      Info DE (opcjonalnie)
+                    </label>
+                    <textarea
+                      maxLength={200}
+                      value={infoFor(v)?.info_de ?? ""}
+                      onChange={(e) => onSetValueInfo(v, infoFor(v)?.info ?? "", e.target.value)}
+                      placeholder="z. B. Weicher Cord, pflegeleicht"
+                      className={`${inputClass} min-h-[3rem]`}
+                    />
+                    <p className="text-[11px] text-[var(--muted)]">
+                      Uwaga: edycja zmienia info wszędzie, gdzie występuje ta para (opcja + wartość).
+                    </p>
+                  </div>
+                )}
               </div>
-              <button
-                type="button"
-                onClick={() => onRemoveValue(v)}
-                aria-label={`Usuń ${v}`}
-                className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-100 dark:hover:bg-red-950 text-red-600 shrink-0"
-              >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <div className="flex gap-2">
           <input
@@ -523,16 +721,21 @@ function OptionRow({
 
 function FabricPicker({
   fabrics,
+  priceGroups,
   initiallySelectedValues,
   onApply,
   onCancel,
 }: {
   fabrics: Fabric[];
+  // Grupy cenowe (Standard/Premium/…) — INNY byt niż lokalne `groups` (grupowanie
+  // po kategorii do sekcji pickera, z groupFabricsByCategory poniżej).
+  priceGroups: FabricPriceGroup[];
   initiallySelectedValues: string[];
   onApply: (selectedFabrics: Fabric[], keptOrphanValues: string[]) => void;
   onCancel: () => void;
 }) {
-  const toLite = (f: Fabric) => ({ name: f.name, colors: f.colors ?? [], price: f.price ?? 0 });
+  const toLite = (f: Fabric) => ({ name: f.name, colors: f.colors ?? [], price: f.price ?? 0, group_id: f.group_id });
+  const surchargeById = buildGroupSurchargeMap(priceGroups);
 
   const [selectedNames, setSelectedNames] = useState<string[]>(() =>
     fabrics
@@ -596,7 +799,7 @@ function FabricPicker({
   }
 
   const selectedFabrics = fabrics.filter((f) => selectedNames.includes(f.name));
-  const { values: previewValues } = expandFabrics(selectedFabrics.map(toLite));
+  const { values: previewValues } = expandFabrics(selectedFabrics.map(toLite), surchargeById);
   const totalValues =
     previewValues.length + keptOrphans.filter((v) => !previewValues.includes(v)).length;
 
@@ -607,9 +810,12 @@ function FabricPicker({
           <h3 className="font-display text-lg font-semibold text-[var(--fg)]">
             Wybierz tkaniny (wybrano: {selectedNames.length} → {totalValues} wart.)
           </h3>
+          {/* data-guard-ignore — jak w ImagePickerModal: filtrowanie listy to nie
+              edycja danych, a modal siedzi w [data-guard-section]. */}
           <input
             type="text"
             autoFocus
+            data-guard-ignore
             placeholder="Szukaj…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -716,7 +922,10 @@ function FabricPicker({
                               <span className="text-sm text-[var(--fg)]">{f.name}</span>
                               <span className="text-[10px] text-[var(--muted)] ml-auto text-right">
                                 {colorCount > 0 ? `${colorCount} kol.` : "bez kolorów"}
-                                {f.price > 0 && ` · +${f.price.toFixed(2)} zł`}
+                                {(() => {
+                                  const eff = (surchargeById[f.group_id] ?? 0) + (f.price ?? 0);
+                                  return eff > 0 ? ` · +${eff.toFixed(2)} zł` : "";
+                                })()}
                               </span>
                             </label>
                           </li>

@@ -14,6 +14,9 @@ import {
   validateBlockContent,
 } from "@/app/_lib/blocks";
 import { invalidatePageBlocksCache } from "@/app/_lib/blocks-server";
+import { parseTopBarSettings, type TopBarSettingsRow } from "@/app/_lib/topbar-settings";
+import { invalidateContactCache } from "@/app/_lib/contact-server";
+import { invalidatePromoCache } from "@/app/_lib/promo-banner-server";
 
 function sanitize(input: unknown, max = 300): string {
   return typeof input === "string" ? input.trim().slice(0, max) : "";
@@ -326,4 +329,44 @@ export async function reorderPageBlocks(ids: string[]): Promise<ActionResult> {
   if (error) return { ok: false, error: `Reorder zawiódł: ${error.message}` };
   revalidateHome();
   return { ok: true, message: "Zmieniono kolejność" };
+}
+
+// ── Górny pasek: kontakt + baner promocyjny (store_settings) ────────────
+
+// Świeży odczyt dla formularza admina (bez cache — po zapisie widzi stan DB).
+export async function getTopBarSettingsForAdmin(): Promise<TopBarSettingsRow | null> {
+  await requireAdmin();
+  const supabase = await createAdminClient();
+  const { data } = await supabase
+    .from("store_settings")
+    .select("contact_phone, contact_email, promo_enabled, promo_text, promo_text_de, promo_link, promo_color")
+    .eq("id", true)
+    .maybeSingle();
+  return (data as TopBarSettingsRow | null) ?? null;
+}
+
+export async function updateTopBarSettings(formData: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  const row = parseTopBarSettings({
+    contact_phone: formData.get("contact_phone"),
+    contact_email: formData.get("contact_email"),
+    promo_enabled: formData.get("promo_enabled"),
+    promo_text: formData.get("promo_text"),
+    promo_text_de: formData.get("promo_text_de"),
+    promo_link: formData.get("promo_link"),
+    promo_color: formData.get("promo_color"),
+  });
+
+  const supabase = await createAdminClient();
+  const { error } = await supabase
+    .from("store_settings")
+    .update(row as never)
+    .eq("id", true);
+  if (error) return { ok: false, error: error.message };
+
+  invalidateContactCache();
+  invalidatePromoCache();
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/strona-glowna");
+  return { ok: true, message: "Zapisano ustawienia paska" };
 }

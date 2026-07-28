@@ -199,3 +199,15 @@ describe("sanitizeStyleAttr — font-family (zamknięta lista czcionek opisów)"
     );
   });
 });
+
+import { sanitizeRichHtml } from "@/app/_lib/product-html";
+
+describe("sanitizeRichHtml (alias wspoldzielony)", () => {
+  it("zachowuje sie jak sanitizeProductHtml — wycina script, zostawia p", () => {
+    expect(sanitizeRichHtml("<p>ok</p><script>alert(1)</script>")).toBe("<p>ok</p>");
+  });
+  it("null/undefined -> pusty string", () => {
+    expect(sanitizeRichHtml(null)).toBe("");
+    expect(sanitizeRichHtml(undefined)).toBe("");
+  });
+});

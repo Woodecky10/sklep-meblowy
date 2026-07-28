@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useModal } from "@/app/_lib/useModal";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
@@ -198,7 +199,13 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
         )}
       </div>
 
-      {lightbox && (
+      {/* Portal do document.body: bez niego overlay renderuje się wewnątrz
+          lewej kolumny (lg:sticky → własny kontekst stackingu w <main>), więc
+          z-[100] nie wystarcza — nad zdjęciem prześwitywały nagłówek (sticky
+          z-50) i próbki tkanin z prawej kolumny (elementy position:relative w
+          tym samym poziomie stackingu). Portal wynosi overlay poza <main>, do
+          root stacking-context (jak ImageLightbox tkanin). */}
+      {lightbox && typeof document !== "undefined" && createPortal(
         <div
           ref={lightboxRef}
           role="dialog"
@@ -269,7 +276,8 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

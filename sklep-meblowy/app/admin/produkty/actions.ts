@@ -11,11 +11,18 @@ import {
   buildDuplicatePayload,
   type DuplicateSource,
 } from "@/app/_lib/new-product";
-import { imageUrlsToDelete } from "@/app/_lib/product-images";
+import {
+  imageUrlsToDelete,
+  cleanValueImages,
+  collectProductImageUrls,
+} from "@/app/_lib/product-images";
 import { recordPriceHistory } from "@/app/_lib/price-history";
 import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-html";
 import { buildGroupKey, pickGroupKey } from "@/app/_lib/size-groups";
 import { normalizeDeliveryTime, normalizeWarranty } from "@/app/_lib/spec-format";
+import { parseFeatureRows } from "@/app/_lib/product-features";
+import { normalizeVariantInfoInput } from "@/app/_lib/variant-info";
+import { invalidateVariantInfoCache } from "@/app/_lib/variant-info-data";
 import type {
   ActionResult,
   ProductDescriptionSection,
@@ -183,6 +190,9 @@ export async function updateProductBasics(
     delivery_time: emptyToNull(normalizeDeliveryTime(sanitize(formData.get("delivery_time"), 100))),
     warranty: emptyToNull(normalizeWarranty(sanitize(formData.get("warranty"), 100))),
     sale_price: salePriceToSave,
+    // Parametry produktu (sekcja Specyfikacja) — pełny stan wierszy z
+    // formularza nadpisuje całą tablicę (spójnie z resztą pól sekcji).
+    features: parseFeatureRows(formData.get("features_json")),
   };
 
   const { error } = await supabase
@@ -269,12 +279,28 @@ export async function updateProductVariants(
           }
         }
       }
+      if (opt.value_images !== undefined) {
+        if (
+          typeof opt.value_images !== "object" ||
+          opt.value_images === null ||
+          Array.isArray(opt.value_images)
+        ) {
+          return { ok: false, error: "Nieprawidłowa struktura zdjęć wartości" };
+        }
+      }
       if (opt.filterable !== undefined && typeof opt.filterable !== "boolean") {
         return { ok: false, error: "Nieprawidłowa flaga filtra opcji" };
       }
     }
-    // Zapisujemy tylko opcje + overrides.
-    variantsToSave = { options: variants.options, overrides: variants.overrides };
+    // Zapisujemy tylko opcje + overrides. value_images czyszczone serwerowo:
+    // tylko istniejące wartości, tylko URL-e http(s), bez pustych tablic —
+    // klient wysyła stan edytora, akcja jest źródłem prawdy.
+    const cleanedOptions = variants.options.map((opt) => {
+      const { value_images: rawValueImages, ...rest } = opt;
+      const value_images = cleanValueImages(opt.values, rawValueImages);
+      return { ...rest, ...(value_images ? { value_images } : {}) };
+    });
+    variantsToSave = { options: cleanedOptions, overrides: variants.overrides };
   }
 
   const { error } = await supabase
@@ -344,6 +370,7 @@ export async function deleteProduct(formData: FormData): Promise<ActionResult> {
   const productRow = product as {
     name: string;
     images: string[] | null;
+    variants: unknown;
   };
 
   const { error: deleteErr } = await supabase
@@ -359,17 +386,15 @@ export async function deleteProduct(formData: FormData): Promise<ActionResult> {
   // ze storage tylko te pliki, których nie używa żaden inny produkt
   // (imageUrlsToDelete) — inaczej usunięcie jednego bliźniaka rozmiarowego
   // skasowałoby zdjęcia wciąż pokazywane przez pozostałe.
-  const targetImages = Array.isArray(productRow.images)
-    ? productRow.images.filter((u): u is string => typeof u === "string")
-    : [];
+  const targetImages = collectProductImageUrls(productRow.images, productRow.variants);
   if (targetImages.length > 0) {
     const { data: others } = await supabase
       .from("products")
-      .select("images")
+      .select("images, variants")
       .neq("id", id);
-    const otherImages = ((others ?? []) as { images: string[] | null }[]).map(
-      (r) => (Array.isArray(r.images) ? r.images : [])
-    );
+    const otherImages = (
+      (others ?? []) as { images: string[] | null; variants: unknown }[]
+    ).map((r) => collectProductImageUrls(r.images, r.variants));
     const urlsToDelete = imageUrlsToDelete(targetImages, otherImages);
     await Promise.all(urlsToDelete.map((url) => deleteStorageImage(url)));
   }
@@ -861,4 +886,41 @@ export async function updateSizeLabel(
   const ids = key ? await sizeGroupMemberIds(supabase, key) : [pid];
   revalidateProducts(ids.length ? ids : [pid]);
   return { ok: true, message: "Zapisano etykietę" };
+}
+
+// ============================================================
+// upsertVariantInfo — globalny slownik info o wariancie (opcja+wartosc)
+// ============================================================
+// entries = wszystkie pary (opcja,wartosc) biezacego produktu z ich trescia.
+// Niepuste → upsert po (option_name,value); puste → delete. Zapis GLOBALNY.
+export async function upsertVariantInfo(
+  productId: string,
+  entries: { option_name: string; value: string; info: string; info_de: string }[]
+): Promise<ActionResult> {
+  await requireAdmin();
+  if (!Array.isArray(entries)) return { ok: false, error: "Nieprawidłowe dane info" };
+
+  const { upserts, deletes } = normalizeVariantInfoInput(entries);
+  const supabase = await createAdminClient();
+
+  if (upserts.length > 0) {
+    const rows = upserts.map((u) => ({ ...u, updated_at: new Date().toISOString() }));
+    const { error } = await supabase
+      .from("variant_info")
+      .upsert(rows as never, { onConflict: "option_name,value" });
+    if (error) return { ok: false, error: error.message };
+  }
+
+  for (const d of deletes) {
+    const { error } = await supabase
+      .from("variant_info")
+      .delete()
+      .eq("option_name", d.option_name)
+      .eq("value", d.value);
+    if (error) return { ok: false, error: error.message };
+  }
+
+  invalidateVariantInfoCache();
+  if (productId) revalidatePath(`/produkt/${productId}`);
+  return { ok: true, message: "Zapisano informacje o wariantach" };
 }

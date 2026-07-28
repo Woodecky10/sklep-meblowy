@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { COMPANY, formatFullAddress, isFilled } from "@/app/_lib/company";
+import { getContactInfo } from "@/app/_lib/contact-server";
 import { localizeHref } from "@/app/_lib/i18n";
 import { getLocale } from "@/app/_lib/i18n-server";
 
@@ -30,6 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RegulaminPage() {
   const locale = await getLocale();
   const de = locale === "de";
+  const contact = await getContactInfo();
 
   const c = de
     ? {
@@ -323,11 +325,11 @@ export default async function RegulaminPage() {
         </li>
         <li>
           {c.s1_3Before}
-          <strong>{COMPANY.email}</strong>
-          {COMPANY.phone && (
+          <strong>{contact.email}</strong>
+          {contact.phone && (
             <>
               {c.s1_3Phone}
-              {COMPANY.phone}
+              {contact.phone}
             </>
           )}
           {c.s1_3End}
@@ -403,7 +405,7 @@ export default async function RegulaminPage() {
         <li>{c.s6_1}</li>
         <li>
           {c.s6_2Before}
-          <strong>{COMPANY.email}</strong>
+          <strong>{contact.email}</strong>
           {c.s6_2After}
         </li>
         <li>
@@ -421,7 +423,7 @@ export default async function RegulaminPage() {
         <li>{c.s7_1}</li>
         <li>
           {c.s7_2Before}
-          <strong>{COMPANY.email}</strong>
+          <strong>{contact.email}</strong>
           {c.s7_2After}
         </li>
         <li>{c.s7_3}</li>

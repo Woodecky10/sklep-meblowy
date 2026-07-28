@@ -1,16 +1,37 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card, EmptyState, Field, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
+import RichTextEditor from "@/app/admin/_shared/RichTextEditor";
 import { createFabric, updateFabric, deleteFabric, type ActionResult } from "./actions";
 import { uploadProductImage } from "@/app/admin/produkty/actions";
 import { compressIfNeeded } from "@/app/_lib/image-compress";
+import { normalizeSearchText } from "@/app/_lib/search-normalize";
+import { MAX_FEATURED_PRODUCTS } from "@/app/_lib/fabric-featured-products";
 import { useConfirm } from "@/app/_context/ConfirmContext";
-import type { Fabric } from "@/app/_lib/types";
+import FabricGroupsPanel from "./FabricGroupsPanel";
+import FabricPropertiesPanel from "./FabricPropertiesPanel";
+import type { Fabric, FabricPriceGroup, FabricPropertyDefRow } from "@/app/_lib/types";
 
-export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabric[] }) {
+// Produkt w pickerze „Meble w tej tkaninie" (lista z page.tsx — tylko aktywne).
+export type FabricPickerProduct = { id: string; name: string; image: string | null };
+
+export default function FabricsEditor({
+  initialFabrics,
+  groups,
+  propertyDefs,
+  pickerProducts,
+}: {
+  initialFabrics: Fabric[];
+  groups: FabricPriceGroup[];
+  // null = słownika cech nie udało się pobrać (inna sytuacja niż pusta lista):
+  // formularz tkaniny ostrzega i nie rusza zapisanych cech.
+  propertyDefs: FabricPropertyDefRow[] | null;
+  pickerProducts: FabricPickerProduct[];
+}) {
   const confirm = useConfirm();
+  const groupById = new Map(groups.map((g) => [g.id, g]));
   const [fabrics, setFabrics] = useState<Fabric[]>(initialFabrics);
   const [prevInitial, setPrevInitial] = useState(initialFabrics);
   if (initialFabrics !== prevInitial) {
@@ -69,6 +90,15 @@ export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabr
         </button>
       </div>
 
+      <FabricGroupsPanel groups={groups} onResult={(res) => handleResult(res)} />
+
+      <FabricPropertiesPanel
+        defs={propertyDefs ?? []}
+        unavailable={propertyDefs === null}
+        fabrics={fabrics}
+        onResult={(res) => handleResult(res)}
+      />
+
       {toast && <ToastView toast={toast} onClose={() => setToast(null)} />}
 
       {creating && (
@@ -76,6 +106,9 @@ export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabr
           <FabricForm
             mode="create"
             categories={categories}
+            groups={groups}
+            propertyDefs={propertyDefs}
+            pickerProducts={pickerProducts}
             onCancel={() => setCreating(false)}
             onSubmit={async (fd) => {
               const res = await createFabric(fd);
@@ -105,8 +138,9 @@ export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabr
                   <p className="text-xs text-[var(--muted)] mt-0.5">
                     DE: {f.name_de ?? "—"} · kolejność: {f.sort_order} ·{" "}
                     {f.colors?.length ? `${f.colors.length} kolor${f.colors.length < 5 ? "y" : "ów"}` : "bez kolorów"}
+                    {" · "}{groupById.get(f.group_id)?.name ?? "?"}
                     {f.category && ` · ${f.category}`}
-                    {f.price > 0 && ` · +${f.price.toFixed(2)} zł`}
+                    {f.price > 0 && ` · korekta +${f.price.toFixed(2)} zł`}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -137,6 +171,9 @@ export default function FabricsEditor({ initialFabrics }: { initialFabrics: Fabr
                     mode="update"
                     initial={f}
                     categories={categories}
+                    groups={groups}
+                    propertyDefs={propertyDefs}
+                    pickerProducts={pickerProducts}
                     onCancel={() => setEditingId(null)}
                     onSubmit={async (fd) => {
                       const res = await updateFabric(fd);
@@ -160,12 +197,18 @@ function FabricForm({
   mode,
   initial,
   categories,
+  groups,
+  propertyDefs,
+  pickerProducts,
   onSubmit,
   onCancel,
 }: {
   mode: "create" | "update";
   initial?: Fabric;
   categories: string[];
+  groups: FabricPriceGroup[];
+  propertyDefs: FabricPropertyDefRow[] | null;
+  pickerProducts: FabricPickerProduct[];
   onSubmit: (fd: FormData) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -174,6 +217,8 @@ function FabricForm({
     (initial?.colors ?? []).map((c) => ({ code: c, image: initial?.color_images?.[c] ?? "" }))
   );
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [descriptionDe, setDescriptionDe] = useState(initial?.description_de ?? "");
   const catListId = `fabric-categories-${initial?.id ?? "new"}`;
 
   function addRow() {
@@ -200,6 +245,29 @@ function FabricForm({
     } finally {
       setUploadingIdx(null);
     }
+  }
+
+  const [selectedIds, setSelectedIds] = useState<string[]>(
+    initial?.featured_product_ids ?? []
+  );
+  const [productQuery, setProductQuery] = useState("");
+  const productById = useMemo(
+    () => new Map(pickerProducts.map((p) => [p.id, p])),
+    [pickerProducts]
+  );
+  const filteredProducts = useMemo(() => {
+    const q = normalizeSearchText(productQuery);
+    if (!q) return pickerProducts;
+    return pickerProducts.filter((p) => normalizeSearchText(p.name).includes(q));
+  }, [pickerProducts, productQuery]);
+  function toggleProduct(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id)
+        ? prev.filter((x) => x !== id)
+        : prev.length >= MAX_FEATURED_PRODUCTS
+          ? prev
+          : [...prev, id]
+    );
   }
 
   return (
@@ -240,17 +308,24 @@ function FabricForm({
         />
       </Field>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <Field label="Dopłata (zł)" hint="Doliczana do ceny, gdy wybrana ta tkanina. 0 = bez dopłaty.">
-          <input
-            name="price"
-            type="number"
-            step="0.01"
-            min="0"
-            defaultValue={initial?.price ?? 0}
+        <Field label="Grupa cenowa" required>
+          <select
+            name="group_id"
+            defaultValue={initial?.group_id ?? groups.find((g) => g.code === "standard")?.id ?? groups[0]?.id}
             className={inputCls}
-          />
+          >
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+                {g.surcharge > 0 ? ` (+${g.surcharge.toFixed(2)} zł)` : " (bez dopłaty)"}
+              </option>
+            ))}
+          </select>
         </Field>
-        <Field label="Kategoria / typ" hint="Do grupowania przy wyborze (np. welur, sztruks). Puste = bez kategorii." className="md:col-span-2">
+        <Field label="Korekta ceny (zł)" hint="Doliczana PONAD dopłatę grupy. Zwykle 0.">
+          <input name="price" type="number" step="0.01" min="0" defaultValue={initial?.price ?? 0} className={inputCls} />
+        </Field>
+        <Field label="Kategoria / typ" hint="Do grupowania przy wyborze (np. welur, sztruks). Puste = bez kategorii.">
           <input
             name="category"
             list={catListId}
@@ -265,6 +340,85 @@ function FabricForm({
             ))}
           </datalist>
         </Field>
+      </div>
+      <Field label="Opis" hint="Pokazywany na stronie tkaniny (/tkaniny). Obsługuje formatowanie.">
+        <input type="hidden" name="description" value={description} />
+        <RichTextEditor value={description} onChange={setDescription} ariaLabel="Opis tkaniny (PL)" placeholder="Opis tkaniny…" />
+      </Field>
+      <Field label="Opis (DE)" hint="Puste → na /de pokaże się opis PL.">
+        <input type="hidden" name="description_de" value={descriptionDe} />
+        <RichTextEditor value={descriptionDe} onChange={setDescriptionDe} ariaLabel="Opis tkaniny (DE)" />
+      </Field>
+      <Field label="Krótkie info" hint="Krótki tekst w dymku obok „szczegóły” w pickerze (maks. 500 znaków).">
+        <textarea
+          name="short_info"
+          defaultValue={initial?.short_info ?? ""}
+          maxLength={500}
+          rows={2}
+          className={inputCls}
+          placeholder="np. Miękki welur, łatwy w czyszczeniu"
+        />
+      </Field>
+      <Field label="Krótkie info (DE)" hint="Puste → na /de pokaże się PL.">
+        <textarea
+          name="short_info_de"
+          defaultValue={initial?.short_info_de ?? ""}
+          maxLength={500}
+          rows={2}
+          className={inputCls}
+        />
+      </Field>
+
+      {/* Cechy tkaniny — lista z panelu „Cechy tkanin" (fabric_property_defs),
+          nie ze stałej w kodzie: dodana tam cecha pojawia się tu od razu. Blok
+          świadomie NIE używa <Field>: Field renderuje <label>, a <label> w
+          <label> to nieprawidłowy HTML (klik w podpis/podpowiedź zaznaczałby
+          pierwszy checkbox). Ten sam układ co „Kolory / numery" niżej. */}
+      <div className="flex flex-col gap-2">
+        <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
+          Cechy tkaniny
+        </span>
+        <p className="text-[11px] text-[var(--muted)] -mt-1">
+          Pokazują się klientowi jako plakietki przy wyborze tkaniny. Zaznacz
+          tylko to, co potwierdza producent.
+        </p>
+        {propertyDefs === null ? (
+          // Słownika nie udało się wczytać. Nie renderujemy checkboxów ANI
+          // markera `properties_present` — dzięki temu zapis pominie kolumnę
+          // `properties` i nie skasuje cech, których nie było jak pokazać.
+          <p className="text-xs text-red-600 border border-red-300 dark:border-red-900 rounded-lg p-2 leading-snug">
+            Nie udało się wczytać listy cech tkanin. Zapis tej tkaniny{" "}
+            <strong>nie zmieni</strong> jej dotychczasowych cech. Odśwież stronę
+            i spróbuj ponownie.
+          </p>
+        ) : (
+          <>
+            {/* Marker „sekcja cech była wyrenderowana" — odróżnia „admin
+                odznaczył wszystko" od „nie było czego pokazać". */}
+            <input type="hidden" name="properties_present" value="1" />
+            {propertyDefs.length === 0 ? (
+              <span className="text-xs text-[var(--muted)] italic">
+                Brak cech — dodaj je w karcie &bdquo;Cechy tkanin&rdquo; na
+                górze strony.
+              </span>
+            ) : (
+              <div className="flex flex-wrap gap-x-5 gap-y-2">
+                {propertyDefs.map((def) => (
+                  <label key={def.id} className="inline-flex items-center gap-2 text-sm text-[var(--fg)] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="properties"
+                      value={def.code}
+                      defaultChecked={(initial?.properties ?? []).includes(def.code)}
+                      className="w-4 h-4 accent-[var(--color-gold)]"
+                    />
+                    {def.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Kolory (numery) + zdjęcia próbek widoczne dla klienta */}
@@ -343,6 +497,116 @@ function FabricForm({
           + Dodaj kolor
         </button>
       </div>
+
+      {/* Meble w tej tkaninie — wybór produktów (bez wgrywania zdjęć). Strona
+          tkaniny pokazuje je jako siatkę kafelków → /produkt/[id]. */}
+      <div className="flex flex-col gap-2">
+        <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
+          Meble w tej tkaninie
+        </span>
+        <p className="text-[11px] text-[var(--muted)] -mt-1">
+          Wybierz produkty pokazywane w sekcji &bdquo;Meble w tej tkaninie&rdquo;
+          na stronie tkaniny (główne zdjęcie + nazwa, klik → karta produktu).
+          Kolejność = kolejność dodawania. Max {MAX_FEATURED_PRODUCTS}.
+        </p>
+        <input
+          type="hidden"
+          name="featured_product_ids_json"
+          readOnly
+          value={JSON.stringify(selectedIds)}
+        />
+
+        {/* Wybrane (w kolejności wyświetlania) */}
+        {selectedIds.length === 0 ? (
+          <span className="text-xs text-[var(--muted)] italic">
+            Nie wybrano produktów.
+          </span>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {selectedIds.map((id) => {
+              const p = productById.get(id);
+              return (
+                <div
+                  key={id}
+                  className="flex items-center gap-3 bg-[var(--bg)] border border-[var(--border)] rounded-lg p-2"
+                >
+                  <span className="relative w-16 h-12 shrink-0 rounded-lg overflow-hidden border border-[var(--border)] bg-[var(--card-bg)]">
+                    {p?.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.image} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="w-full h-full flex items-center justify-center text-[10px] text-[var(--muted)]">
+                        brak
+                      </span>
+                    )}
+                  </span>
+                  <span className="flex-1 min-w-0 truncate text-sm text-[var(--fg)]">
+                    {p?.name ?? "(produkt nieaktywny lub usunięty)"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => toggleProduct(id)}
+                    aria-label="Usuń produkt"
+                    className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Szukaj i dodaj */}
+        <input
+          value={productQuery}
+          onChange={(e) => setProductQuery(e.target.value)}
+          placeholder="Szukaj produktu do dodania…"
+          className={`${inputCls} mt-1`}
+        />
+        <ul className="max-h-72 overflow-y-auto border border-[var(--border)] rounded-xl divide-y divide-[var(--border)]">
+          {filteredProducts.map((p) => {
+            const active = selectedIds.includes(p.id);
+            const atLimit = selectedIds.length >= MAX_FEATURED_PRODUCTS;
+            return (
+              <li key={p.id}>
+                <label
+                  className={`flex items-center gap-3 p-2 transition-colors ${
+                    active
+                      ? "bg-[var(--color-gold)]/10 cursor-pointer"
+                      : atLimit
+                        ? "opacity-50 cursor-not-allowed"
+                        : "cursor-pointer hover:bg-[var(--bg)]"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={active}
+                    disabled={!active && atLimit}
+                    onChange={() => toggleProduct(p.id)}
+                    className="h-4 w-4 accent-[var(--color-gold)]"
+                  />
+                  <span className="relative w-10 h-10 shrink-0 rounded-lg overflow-hidden bg-[var(--card-bg)] border border-[var(--border)]">
+                    {p.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.image} alt="" className="w-full h-full object-cover" />
+                    ) : null}
+                  </span>
+                  <span className="flex-1 min-w-0 truncate text-sm text-[var(--fg)]">
+                    {p.name}
+                  </span>
+                </label>
+              </li>
+            );
+          })}
+          {filteredProducts.length === 0 && (
+            <li className="p-4 text-xs text-[var(--muted)] italic">Brak dopasowań</li>
+          )}
+        </ul>
+      </div>
+
       <div className="flex gap-2 pt-2">
         <button
           type="submit"

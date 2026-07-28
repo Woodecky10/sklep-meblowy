@@ -18,6 +18,7 @@ import CookieBanner from "./_components/layout/CookieBanner";
 import CartToast from "./_components/layout/CartToast";
 import BackToTop from "./_components/layout/BackToTop";
 import HideOnAdmin from "./_components/layout/HideOnAdmin";
+import PromoBanner from "./_components/layout/PromoBanner";
 import { CartProvider } from "./_context/CartContext";
 import { ToastProvider } from "./_context/ToastContext";
 import { ConfirmProvider } from "./_context/ConfirmContext";
@@ -30,6 +31,7 @@ import { getFabricDeMap } from "@/app/_lib/fabrics";
 import { FabricLabelProvider } from "@/app/_lib/fabric-context";
 import { getThemeSettings } from "@/app/_lib/theme-settings";
 import { buildThemeCss } from "@/app/_lib/theme";
+import { getPromoBanner } from "@/app/_lib/promo-banner-server";
 
 const inter = Inter({
   subsets: ["latin", "latin-ext"],
@@ -128,6 +130,8 @@ export default async function RootLayout({
   const eurRate = await getEurRate();
   const fabricMap = await getFabricDeMap();
   const themeSettings = await getThemeSettings();
+  const t = getDictionary(locale);
+  const promo = await getPromoBanner();
   return (
     <html
       lang={locale}
@@ -146,10 +150,14 @@ export default async function RootLayout({
                 <ToastProvider>
                   <ConfirmProvider>
                     <HideOnAdmin>
+                      <PromoBanner data={promo} locale={locale} closeLabel={t.common.close} />
                       {/* Wspólny sticky na oba paski — jeden element zamiast
                           dwóch osobnych sticky eliminuje 1px szczeliny przy
-                          ułamkowym zoomie. */}
-                      <div className="sticky top-0 z-50">
+                          ułamkowym zoomie.
+                          data-sticky-header: po tym atrybucie dymki „i"
+                          (ValueInfoTip) mierzą realną wysokość nagłówka
+                          (inna na mobile/desktop) i nie chowają się pod nim. */}
+                      <div className="sticky top-0 z-50" data-sticky-header>
                         <TopBar />
                         <Navbar />
                       </div>

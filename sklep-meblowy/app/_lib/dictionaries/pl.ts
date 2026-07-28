@@ -86,6 +86,21 @@ export type PlShape = {
     reviewGuardLoggedOutSuffix: string;
     reviewGuardNotPurchased: string;
   };
+  fabrics: {
+    eyebrow: string;
+    heading: string;
+    intro: string;
+    groupNoSurcharge: string;
+    colorsOne: string;
+    colorsFew: string;
+    colorsMany: string;
+    swatchHeading: string;
+    productionHeading: string;
+    typeLabel: string;
+    detailsLink: string;
+    otherGroupLabel: string;
+    notFoundTitle: string;
+  };
   cart: {
     empty: string;
     emptyHint: string;
@@ -126,6 +141,24 @@ export type PlShape = {
     crossSellHeading: string;
     toastAdded: string;
     viewCart: string;
+  };
+  bundle: {
+    badge: string;
+    savesFrom: string;
+    saves: string;
+    buy: string;
+    see: string;
+    withProducts: string;
+    togetherLabel: string;
+    bundleLabel: string;
+    addToCart: string;
+    chooseOptions: string;
+    cartGroupLabel: string;
+    removeBundle: string;
+    discountLine: string;
+    promoExcluded: string;
+    thisProduct: string;
+    bundlePriceFrom: string;
   };
   common: {
     loading: string;
@@ -399,6 +432,21 @@ export const pl = {
     reviewGuardNotPurchased:
       "Opinię możesz dodać po dokonaniu zakupu tego produktu. Weryfikujemy autentyczność opinii na podstawie historii zamówień.",
   },
+  fabrics: {
+    eyebrow: "Mollien",
+    heading: "Tkaniny",
+    intro: "Poznaj tkaniny dostępne w naszych meblach — pogrupowane według grup cenowych. Kliknij tkaninę, aby zobaczyć opis i pełny wzornik kolorów.",
+    groupNoSurcharge: "bez dopłaty",
+    colorsOne: "kolor",
+    colorsFew: "kolory",
+    colorsMany: "kolorów",
+    swatchHeading: "Wzornik kolorów",
+    productionHeading: "Meble w tej tkaninie",
+    typeLabel: "Typ",
+    detailsLink: "szczegóły",
+    otherGroupLabel: "Pozostałe",
+    notFoundTitle: "Tkanina nie znaleziona",
+  },
   cart: {
     empty: "Koszyk jest pusty",
     emptyHint: "Dodaj produkty do koszyka, aby kontynuować zakupy.",
@@ -440,6 +488,24 @@ export const pl = {
     crossSellHeading: "Może Cię zainteresować",
     toastAdded: "Dodano do koszyka",
     viewCart: "Zobacz koszyk",
+  },
+  bundle: {
+    badge: "W zestawie taniej",
+    savesFrom: "Oszczędzasz od",
+    saves: "Oszczędzasz",
+    buy: "Kup w zestawie",
+    see: "Zobacz zestaw",
+    withProducts: "Razem z:",
+    togetherLabel: "Razem osobno",
+    bundleLabel: "W zestawie",
+    addToCart: "Dodaj zestaw do koszyka",
+    chooseOptions: "Wybierz opcje dla każdego mebla",
+    cartGroupLabel: "Zestaw",
+    removeBundle: "Usuń zestaw",
+    discountLine: "Rabat za zestaw",
+    promoExcluded: "Kod rabatowy nie obejmuje produktów kupionych w zestawie",
+    thisProduct: "ten produkt",
+    bundlePriceFrom: "Cena zestawu: od",
   },
   common: {
     loading: "Ładowanie…",

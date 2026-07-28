@@ -48,6 +48,8 @@ export default async function OrderDetailPage({
         notes: "Anmerkungen",
         products: "Produkte",
         coupon: "Gutschein",
+        bundleDiscountLine: "Set-Rabatt",
+        bundleTag: "Set",
         shipping: "Versand",
         shippingIndividual: "individuell festgelegt",
         total: "Gesamt",
@@ -71,6 +73,8 @@ export default async function OrderDetailPage({
         notes: "Uwagi",
         products: "Produkty",
         coupon: "Kupon",
+        bundleDiscountLine: "Rabat za zestaw",
+        bundleTag: "zestaw",
         shipping: "Dostawa",
         shippingIndividual: "ustalana indywidualnie",
         total: "Razem",
@@ -116,8 +120,10 @@ export default async function OrderDetailPage({
     0
   );
   const promoDiscount = Number(order.promo_discount ?? 0);
-  // total = subtotal - promo_discount + shipping  =>  shipping = total - subtotal + promo_discount
-  const shipping = Number(order.total) - subtotal + promoDiscount;
+  const bundleDiscount = Number(order.bundle_discount ?? 0);
+  // total = subtotal - bundle_discount - promo_discount + shipping
+  //   =>  shipping = total - subtotal + promo_discount + bundle_discount
+  const shipping = Number(order.total) - subtotal + promoDiscount + bundleDiscount;
   const delivery = deliveryView(order);
 
   const canReportIssue = ["paid", "processing", "shipped", "delivered"].includes(order.status);
@@ -189,6 +195,11 @@ export default async function OrderDetailPage({
                   <p className="font-semibold text-[var(--fg)] truncate">
                     {prod?.name ?? c.product}
                   </p>
+                  {item.bundle_label && (
+                    <span className="text-xs text-[var(--color-gold-text)]">
+                      ({c.bundleTag}: {item.bundle_label})
+                    </span>
+                  )}
                   <p className="text-sm text-[var(--muted)]">
                     {item.quantity} × {formatOrderAmount(Number(item.price), order.currency)}
                   </p>
@@ -231,6 +242,12 @@ export default async function OrderDetailPage({
             <dt>{c.products}</dt>
             <dd>{formatOrderAmount(subtotal, order.currency)}</dd>
           </div>
+          {bundleDiscount > 0 && (
+            <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
+              <dt>{c.bundleDiscountLine}</dt>
+              <dd>−{formatOrderAmount(bundleDiscount, order.currency)}</dd>
+            </div>
+          )}
           {promoDiscount > 0 && (
             <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
               <dt>

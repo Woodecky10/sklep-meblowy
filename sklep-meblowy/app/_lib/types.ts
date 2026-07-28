@@ -21,6 +21,12 @@ export type ProductOption = {
   name: string;
   values: string[];
   value_prices?: Record<string, number>;
+  // Zdjęcia per wartość opcji (np. mebel w danej tkaninie). Dla opcji strony
+  // narożnika (Strona) po wyborze idą na początek galerii karty produktu
+  // (getVariantImages); dla pozostałych opcji pokazują się jako swatche
+  // w selektorze (VariantSelector), nie w głównej galerii.
+  // Brak wpisu = brak zdjęć wariantowych. Puste tablice nie są zapisywane.
+  value_images?: Record<string, string[]>;
   // Admin zaznaczył „Filtr w sklepie" — opcja pojawia się jako filtr na /sklep
   // (facety liczone w getFacetSource). Brak/false = opcja nie filtruje.
   filterable?: boolean;
@@ -139,6 +145,52 @@ export type Collection = {
   updated_at: string;
 };
 
+// Zestaw mebli (spec 2026-07-16) — admin łączy 2+ produktów, rabat % lub
+// kwotowy od sumy cen efektywnych składników. Tabele bundles/bundle_items.
+export type Bundle = {
+  id: string;
+  slug: string;
+  name: string;
+  name_de?: string | null;
+  description: string | null;
+  description_de?: string | null;
+  discount_type: "percent" | "amount";
+  discount_value: number;
+  is_active: boolean;
+  created_at: string;
+};
+
+// Zestaw z dociągniętymi (aktywnymi, zlokalizowanymi) produktami-składnikami,
+// w kolejności position. Warstwa odczytu zwraca TYLKO komplety (>= 2 składniki,
+// wszystkie aktywne) — patrz bundles-server.ts.
+export type BundleWithComponents = Bundle & { components: Product[] };
+
+// Grupa cenowa tkanin (migracja 56) — 3 stałe wpisy (code niezmienny), nazwy
+// i kwota dopłaty edytowalne w adminie. Dopłata efektywna tkaniny =
+// surcharge grupy + fabrics.price (korekta). UWAGA: to INNY byt niż
+// FabricGroup z fabric-groups.ts (grupowanie po category w pickerze).
+export type FabricPriceGroup = {
+  id: string;
+  code: string;
+  name: string;
+  name_de: string | null;
+  surcharge: number;
+  sort_order: number;
+  created_at: string;
+};
+
+// Definicja cechy tkaniny (migracja 64) — edytowalna w /admin/tkaniny.
+// `icon` to klucz z biblioteki w app/_lib/fabric-properties.ts, nie plik.
+export type FabricPropertyDefRow = {
+  id: string;
+  code: string;
+  label: string;
+  label_de: string | null;
+  icon: string;
+  sort_order: number;
+  created_at: string;
+};
+
 // Katalog tkanin (migracja 37) — reużywalny zbiór nazw używanych jako wartości
 // opcji wariantu „Tkanina". name_de null → na /de fallback do name.
 export type Fabric = {
@@ -154,6 +206,24 @@ export type Fabric = {
   sort_order: number;
   // Kategoria/typ do grupowania w pickerze wariantów (np. "welur"). Null = bez kategorii.
   category: string | null;
+  // Grupa cenowa (FK fabric_groups.id, NOT NULL — migracja 56).
+  group_id: string;
+  // Adres strony /tkaniny/[slug] — generowany z nazwy przy tworzeniu, stabilny.
+  slug: string;
+  // Opis na stronę tkaniny (sanityzowany HTML). description_de null → fallback PL.
+  description: string | null;
+  description_de: string | null;
+  // Krótkie info o tkaninie (dymek obok „szczegóły" w pickerze). Zwykły tekst,
+  // osobne od description. short_info_de null → fallback PL.
+  short_info: string | null;
+  short_info_de: string | null;
+  // Cechy tkaniny (kody z app/_lib/fabric-properties.ts) — pigułki przy
+  // wyborze tkaniny na karcie produktu. Pusto = nic się nie pokazuje.
+  properties: string[];
+  // Wybrane produkty pokazywane w sekcji „Meble w tej tkaninie" na stronie
+  // tkaniny (kolejność = kolejność w tablicy; max 20 w adminie). Nieznane/
+  // nieaktywne id pomijane przy renderze.
+  featured_product_ids: string[];
   created_at: string;
 };
 
@@ -204,6 +274,8 @@ export type Order = {
   payment_method: PaymentMethod;
   promo_code_id: string | null;
   promo_discount: number;
+  // Suma rabatów zestawów tego zamówienia, w walucie zamówienia (migracja 55).
+  bundle_discount: number;
   created_at: string;
   // Panel admina (migracja 31)
   order_number: number;
@@ -227,6 +299,9 @@ export type OrderItem = {
   price: number;
   variant_values: Record<string, string> | null;
   notes: string | null;
+  // Pozycja kupiona w zestawie: id (FK SET NULL) + nazwa z chwili zakupu.
+  bundle_id: string | null;
+  bundle_label: string | null;
   product?: Product;
 };
 
@@ -265,6 +340,8 @@ type OrderItemInsert = {
   price: number;
   variant_values?: Record<string, string> | null;
   notes?: string | null;
+  bundle_id?: string | null;
+  bundle_label?: string | null;
 };
 
 export type Database = {

@@ -3,8 +3,8 @@
 
 import { useState, useTransition } from "react";
 import { updateProductDescription } from "../actions";
-import RichTextEditor from "./RichTextEditor";
-import { CollapsibleSection, type Toast } from "./_shared";
+import RichTextEditor from "@/app/admin/_shared/RichTextEditor";
+import { CollapsibleSection, uploadProductImageFile, type Toast } from "./_shared";
 
 // Pojedynczy opis produktu (PL). Renderuje sie na karcie TYLKO gdy produkt nie
 // ma sekcji opisu (fallback) — stad hint. Ma wlasny zapis (jak zdjecia/sekcje/
@@ -50,6 +50,8 @@ export default function DescriptionFieldEditor({
         onChange={setValue}
         ariaLabel="Opis produktu"
         placeholder="Napisz opis — użyj paska do pogrubień, list i nagłówków."
+        enableImage
+        uploadImage={uploadProductImageFile}
       />
 
       <div className="flex items-center justify-between gap-4 pt-4 border-t border-[var(--border)]">

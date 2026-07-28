@@ -49,34 +49,40 @@ export function Modal({
       aria-modal="true"
       aria-label={ariaLabel}
       onClick={onClose}
-      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto"
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-2xl flex flex-col gap-5 p-6 my-8"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-1">
-              {eyebrow}
-            </p>
-            <h2 className="font-display text-2xl font-bold text-[var(--fg)] leading-tight">
-              {heading}
-            </h2>
-            {subtitle}
+      {/* Wrapper min-h-full + centrowanie: gdy treść wyższa niż ekran, wrapper
+          rośnie a scroll jest na kontenerze zewnętrznym — góra modala pozostaje
+          osiągalna (wcześniej flex items-center + overflow-y-auto ucinały górę
+          wysokiej treści, np. konfiguratora zestawu). */}
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-lg bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-2xl flex flex-col gap-5 p-6 my-8"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-1">
+                {eyebrow}
+              </p>
+              <h2 className="font-display text-2xl font-bold text-[var(--fg)] leading-tight">
+                {heading}
+              </h2>
+              {subtitle}
+            </div>
+            <button
+              onClick={onClose}
+              aria-label={closeLabel}
+              className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
+            >
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            aria-label={closeLabel}
-            className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
-          >
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
 
-        {children}
+          {children}
+        </div>
       </div>
     </div>
   );

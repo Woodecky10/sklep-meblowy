@@ -1,7 +1,9 @@
-import type { Product, ProductOption } from "./types";
+import type { Product, ProductOption, ProductVariants } from "./types";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "./de-content-maps";
 import { effectivePrice, isOnSale } from "./pricing";
+import { isCornerSideOptionName } from "./corner-side";
+import { resolveFabricProperties, type FabricPropertyDef } from "./fabric-properties";
 
 // Czy produkt ma warianty (i przynajmniej jedną opcję)?
 export function hasVariants(product: Product): boolean {
@@ -65,12 +67,47 @@ export function formatVariantLabel(
     .join(", ");
 }
 
-// Zdjęcia do pokazania klientowi: galeria produktu (model produktowy).
+// Zdjęcia do pokazania klientowi w GŁÓWNEJ galerii. Zdjęcia per wartość
+// (value_images) trafiają na początek galerii TYLKO dla opcji strony narożnika
+// (isCornerSideOptionName) — pozostałe opcje pokazują swoje value_images jako
+// swatche w selektorze (VariantSelector), nie w galerii. Brak wyboru / brak
+// zdjęć narożnika → galeria produktu. Deduplikacja URL-i (pierwsze wygrywa).
 export function getVariantImages(
   product: Product,
-  _selectedValues: Record<string, string>
+  selectedValues: Record<string, string>
 ): string[] {
-  return product.images ?? [];
+  const variantImages: string[] = [];
+  for (const opt of product.variants?.options ?? []) {
+    const v = selectedValues[opt.name];
+    if (v == null) continue;
+    // Tylko narożnik (Strona) dokłada zdjęcia do głównej galerii; inne opcje
+    // mają swoje zdjęcia jako swatche w selektorze (jak tkaniny).
+    if (!isCornerSideOptionName(opt.name)) continue;
+    const imgs = opt.value_images?.[v];
+    if (!Array.isArray(imgs)) continue;
+    for (const url of imgs) {
+      if (typeof url === "string" && url) variantImages.push(url);
+    }
+  }
+  if (variantImages.length === 0) return product.images ?? [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const url of [...variantImages, ...(product.images ?? [])]) {
+    if (seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+  }
+  return out;
+}
+
+// Czy opcja ma jakiekolwiek zdjęcia per wartość (niepusta tablica URL-i).
+// Selektor używa tego, by pokazać wartości jako swatche zamiast chipów tekstowych.
+export function optionHasValueImages(option: ProductOption): boolean {
+  const vi = option.value_images;
+  if (!vi) return false;
+  return Object.values(vi).some(
+    (urls) => Array.isArray(urls) && urls.some((u) => typeof u === "string" && u.length > 0)
+  );
 }
 
 // Display name opcji — jeśli admin nadpisał ("Wariant" → "Kolor"), użyj override.
@@ -209,15 +246,18 @@ export function usesValuePricing(options: ProductOption[]): boolean {
 // ── Tkaniny (katalog) ──
 
 // Minimalny kształt tkaniny potrzebny do rozwijania na wartości wariantu.
-export type FabricLite = { name: string; colors: string[]; price: number };
+// group_id opcjonalne — dopłata grupy dociągana z mapy groupSurcharges.
+export type FabricLite = { name: string; colors: string[]; price: number; group_id?: string | null };
 
 // Rozwija wybrane tkaniny (kolekcje) na wartości opcji „Tkanina":
 // - z kolorami → „Nazwa Numer" dla każdego numeru,
 // - bez kolorów → sama „Nazwa".
-// Dopłata kolekcji trafia do valuePrices każdej jej wartości (gdy > 0).
+// Dopłata wartości = surcharge grupy (z groupSurcharges po group_id) + korekta
+// tkaniny (price). Wpis w valuePrices tylko gdy suma > 0.
 // Zachowuje kolejność, deduplikuje wartości.
 export function expandFabrics(
-  fabrics: FabricLite[]
+  fabrics: FabricLite[],
+  groupSurcharges: Record<string, number> = {}
 ): { values: string[]; valuePrices: Record<string, number> } {
   const values: string[] = [];
   const valuePrices: Record<string, number> = {};
@@ -227,7 +267,9 @@ export function expandFabrics(
     if (!name) continue;
     const colors = (f.colors ?? []).map((c) => c.trim()).filter(Boolean);
     const fabricValues = colors.length > 0 ? colors.map((c) => `${name} ${c}`) : [name];
-    const price = typeof f.price === "number" && Number.isFinite(f.price) ? f.price : 0;
+    const correction = typeof f.price === "number" && Number.isFinite(f.price) ? f.price : 0;
+    const groupPart = f.group_id ? groupSurcharges[f.group_id] ?? 0 : 0;
+    const price = groupPart + correction;
     for (const v of fabricValues) {
       if (seen.has(v)) continue;
       seen.add(v);
@@ -297,4 +339,108 @@ export function buildFabricImageMap(
     }
   }
   return map;
+}
+
+// Mapa id grupy → dopłata. Wejście dla expandFabrics/rebuildFabricValuePrices.
+export function buildGroupSurchargeMap(
+  groups: { id: string; surcharge: number }[]
+): Record<string, number> {
+  const map: Record<string, number> = {};
+  for (const g of groups) map[g.id] = g.surcharge;
+  return map;
+}
+
+// Metadane tkaniny per wartość wariantu — dla klienta (selektor na karcie
+// produktu grupuje próbki w karty grup i linkuje do /tkaniny/[slug]).
+export type FabricValueMeta = {
+  fabricName: string;
+  slug: string;
+  groupCode: string;
+  groupName: string;
+  groupNameDe: string | null;
+  groupSurcharge: number;
+  groupSort: number;
+  shortInfo: string | null;
+  shortInfoDe: string | null;
+  // Rozwiązane definicje (podpis + ikonka), nie same kody — komponenty renderują
+  // pigułki bez sięgania do słownika.
+  properties: FabricPropertyDef[];
+};
+
+// Buduje mapę wartość wariantu („Nazwa Numer"/„Nazwa") → FabricValueMeta.
+// Tkaniny z group_id spoza `groups` pomijane (teoretyczne — FK NOT NULL).
+export function buildFabricMetaMap(
+  fabrics: {
+    name: string;
+    colors: string[];
+    slug: string;
+    group_id: string;
+    short_info?: string | null;
+    short_info_de?: string | null;
+    // unknown, bo kolumna bywa nieobecna (stary cache) — parser to znosi.
+    properties?: unknown;
+  }[],
+  groups: { id: string; code: string; name: string; name_de: string | null; surcharge: number; sort_order: number }[],
+  // Słownik cech z fabric_property_defs; pusty (np. błąd zapytania) → zero pigułek.
+  propertyDefs: FabricPropertyDef[]
+): Record<string, FabricValueMeta> {
+  const byId = new Map(groups.map((g) => [g.id, g]));
+  const map: Record<string, FabricValueMeta> = {};
+  for (const f of fabrics) {
+    const g = byId.get(f.group_id);
+    const name = f.name.trim();
+    if (!g || !name) continue;
+    const colors = (f.colors ?? []).map((c) => c.trim()).filter(Boolean);
+    const values = colors.length > 0 ? colors.map((c) => `${name} ${c}`) : [name];
+    const meta: FabricValueMeta = {
+      fabricName: name,
+      slug: f.slug,
+      groupCode: g.code,
+      groupName: g.name,
+      groupNameDe: g.name_de,
+      groupSurcharge: g.surcharge,
+      groupSort: g.sort_order,
+      shortInfo: (f.short_info ?? "").trim() || null,
+      shortInfoDe: (f.short_info_de ?? "").trim() || null,
+      properties: resolveFabricProperties(f.properties, propertyDefs),
+    };
+    for (const v of values) map[v] = meta;
+  }
+  return map;
+}
+
+// Przelicza value_prices opcji „Tkanina" produktu wg aktualnego katalogu:
+// wartość z katalogu → surcharge grupy + korekta; orphan (spoza katalogu) →
+// zachowuje dotychczasową dopłatę. Inne opcje nietknięte. Zwraca null gdy
+// produkt nie ma opcji „Tkanina"; changed=false gdy nic się nie zmieniło.
+// Propagacja: wołane z akcji admina po każdej zmianie tkaniny/grupy.
+export function rebuildFabricValuePrices(
+  variants: ProductVariants | null,
+  fabrics: FabricLite[],
+  groupSurcharges: Record<string, number>
+): { variants: ProductVariants; changed: boolean } | null {
+  const opt = variants?.options.find((o) => o.name === FABRIC_OPTION_NAME);
+  if (!variants || !opt) return null;
+  const nextPrices: Record<string, number> = {};
+  for (const v of opt.values) {
+    const owner = fabrics.find((f) => fabricValueBelongsTo(v, f));
+    if (owner) {
+      const correction =
+        typeof owner.price === "number" && Number.isFinite(owner.price) ? owner.price : 0;
+      const total = (owner.group_id ? groupSurcharges[owner.group_id] ?? 0 : 0) + correction;
+      if (total > 0) nextPrices[v] = total;
+    } else {
+      const existing = opt.value_prices?.[v];
+      if (typeof existing === "number" && Number.isFinite(existing) && existing !== 0) {
+        nextPrices[v] = existing;
+      }
+    }
+  }
+  const vp = Object.keys(nextPrices).length > 0 ? nextPrices : undefined;
+  const changed = JSON.stringify(opt.value_prices ?? null) !== JSON.stringify(vp ?? null);
+  if (!changed) return { variants, changed: false };
+  const nextOptions = variants.options.map((o) =>
+    o.name === FABRIC_OPTION_NAME ? { ...o, value_prices: vp } : o
+  );
+  return { variants: { ...variants, options: nextOptions }, changed: true };
 }

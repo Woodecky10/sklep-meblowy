@@ -1,5 +1,6 @@
 import Image from "next/image";
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
+import { sanitizeRichHtml } from "@/app/_lib/product-html";
 import type { LocalizedBannerContent } from "@/app/_lib/blocks";
 
 // CTA: wewnętrzne ścieżki przez LocalizedLink (zachowuje /de), zewnętrzne <a>.
@@ -36,13 +37,10 @@ export default function BannerBlock({ content }: { content: LocalizedBannerConte
         </h2>
       )}
       {body && (
-        <p
-          className={`whitespace-pre-wrap leading-relaxed mb-8 ${
-            layout === "background" ? "text-white/90" : "text-[var(--muted)]"
-          }`}
-        >
-          {body}
-        </p>
+        <div
+          className={`rich-text mb-8 ${layout === "background" ? "text-white [&_a]:text-white" : "text-[var(--muted)]"}`}
+          dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(body) }}
+        />
       )}
       {cta_label && cta_href && <Cta label={cta_label} href={cta_href} />}
     </div>
@@ -62,16 +60,41 @@ export default function BannerBlock({ content }: { content: LocalizedBannerConte
     );
   }
 
+  if (layout === "center" || layout === "full") {
+    const imgWrap = layout === "full" ? "w-full" : "max-w-3xl mx-auto";
+    return (
+      <section className="max-w-7xl mx-auto px-6 py-24">
+        {image_url && (
+          <div className={`${imgWrap} rounded-2xl overflow-hidden mb-10`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={image_url} alt={heading ?? ""} loading="lazy" decoding="async" className="w-full h-auto" />
+          </div>
+        )}
+        <div className="max-w-3xl mx-auto text-center">{text}</div>
+      </section>
+    );
+  }
+
   return (
     <section className="max-w-7xl mx-auto px-6 py-24">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16 items-center">
         {image_url && (
           <div
-            className={`relative aspect-[4/3] rounded-2xl overflow-hidden ${
+            className={`rounded-2xl overflow-hidden ${
               layout === "right" ? "md:order-2" : ""
             }`}
           >
-            <Image src={image_url} alt={heading ?? ""} fill className="object-cover" />
+            {/* Naturalne proporcje — zdjęcie w banerze nie jest przycinane (jak
+                w galerii). Zwykły <img> bo images.unoptimized=true; patrz
+                GalleryBlock. Wysokość dopasowuje się do zdjęcia. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={image_url}
+              alt={heading ?? ""}
+              loading="lazy"
+              decoding="async"
+              className="w-full h-auto"
+            />
           </div>
         )}
         {text}

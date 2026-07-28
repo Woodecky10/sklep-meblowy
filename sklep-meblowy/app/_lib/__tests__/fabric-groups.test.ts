@@ -7,6 +7,11 @@ import {
 } from "@/app/_lib/fabric-groups";
 import type { Fabric } from "@/app/_lib/types";
 
+// Slug testowy — wystarczy unikalny w ramach jednej tablicy fixture'ów.
+function slugify(name: string): string {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
 // Minimalna fabryka tkaniny — tylko pola używane przez grupowanie.
 function fab(name: string, category: string | null): Fabric {
   return {
@@ -18,6 +23,14 @@ function fab(name: string, category: string | null): Fabric {
     price: 0,
     sort_order: 0,
     category,
+    group_id: "g-standard",
+    slug: slugify(name),
+    description: null,
+    description_de: null,
+    short_info: null,
+    short_info_de: null,
+    properties: [],
+    featured_product_ids: [],
     created_at: "",
   };
 }
