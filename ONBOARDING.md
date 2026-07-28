@@ -80,4 +80,4 @@ brainstorming → spec (`docs/superpowers/specs/`) → plan TDD (`docs/superpowe
 ## Drobne follow-upy (nieblokujące)
 - `schema.sql` jest niekompletnym baseline'em (pre-existing) — fresh-DB bootstrap z samego pliku byłby niepełny; źródłem prawdy są **migracje**.
 - `.env.local` może mieć puste `BASELINKER_*` (gitignored) — można wyczyścić ręcznie.
-- `scripts/rehost-bl-images.mjs` — jednorazowy, idempotentny skrypt migracji obrazów; zostaje w repo jako ślad (nieszkodliwy).
+- `scripts/rehost-bl-images.mjs` — jednorazowy skrypt migracji obrazów z CDN BaseLinkera; wykonany 2026-06-24, **usunięty z repo** (PR #62). Ślad w historii gita i w `docs/superpowers/plans/2026-06-24-rehost-bl-images.md`.
