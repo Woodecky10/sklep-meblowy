@@ -3,6 +3,7 @@ import type Stripe from "stripe";
 import { getStripe } from "@/app/_lib/stripe";
 import { createClient, createAdminClient } from "@/app/_lib/supabase/server";
 import { createOrder } from "@/app/_lib/orders";
+import { notifyOrderPlaced } from "@/app/_lib/mail/notify-order";
 import { validatePromoCode, incrementPromoUsage } from "@/app/_lib/promo";
 import { isValidCodPhone } from "@/app/_lib/cod";
 import {
@@ -424,6 +425,11 @@ export async function POST(request: NextRequest) {
     // który by to zrobił po płatności) — best-effort jak w webhooku,
     // used_count to miękka statystyka.
     if (isCod) {
+      // COD nie przechodzi przez webhook płatności, więc potwierdzenie idzie
+      // tu — zamówienie właśnie powstało, więc to wywołanie jest jednorazowe.
+      // Zamówienia online czekają na webhook: mail dopiero po zapłacie.
+      await notifyOrderPlaced(order.id);
+
       if (promoCodeId) {
         try {
           await incrementPromoUsage(promoCodeId);

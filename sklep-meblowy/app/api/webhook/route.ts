@@ -5,6 +5,7 @@ import { shouldSettleOrder } from "@/app/_lib/stripe-events";
 import { markOrderPaid } from "@/app/_lib/orders";
 import { incrementPromoUsage } from "@/app/_lib/promo";
 import { createAdminClient } from "@/app/_lib/supabase/server";
+import { notifyOrderPlaced } from "@/app/_lib/mail/notify-order";
 import type { OrderStatus } from "@/app/_lib/types";
 
 // Rozliczenie FAKTYCZNIE opłaconego zamówienia: dedup eventów Stripe,
@@ -122,6 +123,13 @@ async function settlePaidOrder(
     } catch (err) {
       console.error("[promo] increment used_count nieudany:", err);
     }
+  }
+
+  // Mail tylko dla zwycięzcy CAS-a pending→paid — duplikat webhooka Stripe
+  // nie wyśle drugiego potwierdzenia. notifyOrderPlaced nie rzuca, więc
+  // nieudany mail nie zamieni się w 500 i ponowienie eventu.
+  if (claimedFirst) {
+    await notifyOrderPlaced(orderId);
   }
 
   return NextResponse.json({ received: true });
