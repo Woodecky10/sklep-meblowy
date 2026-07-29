@@ -14,6 +14,7 @@ import { getEurRate } from "./_lib/store-settings";
 import { pluralForm } from "./_lib/plural";
 import { localizePath } from "./_lib/i18n";
 import { alternatesFor } from "./_lib/sitemap-i18n";
+import { baseOpenGraph } from "./_lib/seo-og";
 import { getDictionary } from "./_lib/dictionaries";
 import ProductCard from "./_components/ui/ProductCard";
 import TrustBar from "./_components/ui/TrustBar";
@@ -33,9 +34,9 @@ export async function generateMetadata(): Promise<Metadata> {
       canonical: localizePath("/", locale),
       languages: alternatesFor("/", { hasDe: true }).languages,
     },
-    openGraph: {
-      locale: locale === "de" ? "de_DE" : "pl_PL",
-    },
+    // Pełny blok OG (z obrazkiem) — samo `locale` gubiło og:image i og:site_name
+    // z layoutu, bo Next nadpisuje `openGraph` w całości. Patrz seo-og.ts.
+    openGraph: baseOpenGraph(locale),
   };
 }
 

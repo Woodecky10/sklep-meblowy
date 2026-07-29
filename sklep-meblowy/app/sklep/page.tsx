@@ -17,6 +17,7 @@ import { getEurRate } from "@/app/_lib/store-settings";
 import { localizePath } from "@/app/_lib/i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { alternatesFor } from "@/app/_lib/sitemap-i18n";
+import { baseOpenGraph } from "@/app/_lib/seo-og";
 import ProductCard from "@/app/_components/ui/ProductCard";
 import FilterBar from "@/app/_components/ui/FilterBar";
 import CollectionIntro from "./CollectionIntro";
@@ -34,9 +35,9 @@ export async function generateMetadata(): Promise<Metadata> {
       canonical: localizePath("/sklep", locale),
       languages: alternatesFor("/sklep", { hasDe: true }).languages,
     },
-    openGraph: {
-      locale: locale === "de" ? "de_DE" : "pl_PL",
-    },
+    // Pełny blok OG (z obrazkiem) — patrz seo-og.ts: `openGraph` jest nadpisywane
+    // w całości, więc samo `locale` gubiło og:image z layoutu.
+    openGraph: baseOpenGraph(locale),
   };
 }
 

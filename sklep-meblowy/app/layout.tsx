@@ -32,6 +32,8 @@ import { FabricLabelProvider } from "@/app/_lib/fabric-context";
 import { getThemeSettings } from "@/app/_lib/theme-settings";
 import { buildThemeCss } from "@/app/_lib/theme";
 import { getPromoBanner } from "@/app/_lib/promo-banner-server";
+import { baseOpenGraph } from "@/app/_lib/seo-og";
+import { buildOrganizationJsonLd, serializeJsonLd } from "@/app/_lib/seo-jsonld";
 
 const inter = Inter({
   subsets: ["latin", "latin-ext"],
@@ -106,16 +108,17 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     description: t.meta.description,
     keywords: [...t.meta.keywords.split(", "), COMPANY.brandName],
-    openGraph: {
-      type: "website",
-      locale: locale === "de" ? "de_DE" : "pl_PL",
-      siteName: COMPANY.brandName,
-      images: [{ url: "/logo.svg", width: 945, height: 618, alt: COMPANY.brandName }],
-    },
+    // Pełny blok OG z jednego helpera — patrz seo-og.ts: Next NADPISUJE pole
+    // `openGraph` w każdym segmencie, który je eksportuje, więc podstrony też
+    // muszą używać baseOpenGraph, a nie dokładać pojedynczych pól.
+    // Obrazek: /og (PNG 1200×630), nie /logo.svg — FB/LinkedIn nie renderują SVG.
+    openGraph: baseOpenGraph(locale),
     twitter: {
       card: "summary_large_image",
       title,
-      images: ["/logo.svg"],
+      // Bez `images`: Next auto-uzupełnia twitter:image z openGraph.images
+      // (resolve-metadata.js: `if (!hasTwImages) autoFillProps.images = openGraph.images`).
+      // Podanie ich tutaj rozjeżdżałoby się z obrazkiem OG na podstronach.
     },
   };
 }
@@ -139,6 +142,16 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-screen flex flex-col antialiased">
+        {/* Organization (schema.org) — kim jest sklep: nazwa, logo, adres, NIP,
+            kontakt. W layoucie, więc obecne na KAŻDEJ stronie: spina domenę z
+            danymi firmy i z wizytówką Google. nonce wymagany przez CSP. */}
+        <script
+          type="application/ld+json"
+          nonce={nonce}
+          dangerouslySetInnerHTML={{
+            __html: serializeJsonLd(buildOrganizationJsonLd()),
+          }}
+        />
         {/* Motyw z /admin/wyglad — nadpisuje defaulty z globals.css
             specyficznością :root:root. SSR = zero mignięcia. CSP: style-src
             ma 'unsafe-inline' (csp.ts), nonce niepotrzebny. */}
