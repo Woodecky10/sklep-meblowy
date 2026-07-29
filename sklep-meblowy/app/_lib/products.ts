@@ -359,7 +359,10 @@ export async function getSizeMatchedCrossSell(
     const { data: candidates } = await supabase
       .from("products")
       .select("id, category, name, size_label, price, sale_price")
-      .in("category", targetSlugs);
+      .in("category", targetSlugs)
+      // Scan świadomie szerszy niż limit wyświetlania — dzieje się PRZED
+      // filtrowaniem po rozmiarze, więc musi objąć więcej niż finalnie pokazane `limit` sztuk.
+      .limit(500);
 
     const ids = pickSizeMatched(
       (candidates ?? []) as SizeCandidate[],
@@ -378,7 +381,12 @@ export async function getSizeMatchedCrossSell(
         .map((id) => byId.get(id))
         .filter((p): p is Product => p !== undefined)
         .map((p) => localizeProduct(p, locale));
-      return { products, sizeMatched: true };
+      // Wcześnie zwracamy tylko gdy faktycznie mamy produkty do pokazania —
+      // pusty wynik (np. `full` null po błędzie zapytania, albo wszystkie ID
+      // nie znalezione) ma spaść do fallbacku niżej, żeby sekcja nie znikła.
+      if (products.length > 0) {
+        return { products, sizeMatched: true };
+      }
     }
   }
 

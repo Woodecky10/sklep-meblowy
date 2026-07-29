@@ -69,7 +69,7 @@ export const de: DeepPartial<PlShape> = {
     crossSellRecommendedPrefix: "Empfohlene",
     crossSellFallbackHeading: "Das könnte Sie interessieren",
     crossSellSizeEyebrow: "Passende Matratze",
-    crossSellSizeHeading: "Matratzen in Größe",
+    crossSellSizeHeading: "Matratzen in der Größe",
     fullCollectionEyebrow: "Vollständige Kollektion",
     specWidth: "Maße",
     specWeight: "Gewicht",

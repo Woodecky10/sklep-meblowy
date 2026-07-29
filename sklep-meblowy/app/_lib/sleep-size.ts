@@ -10,8 +10,10 @@ import { effectivePrice } from "./pricing";
 export type SleepSize = string;
 
 // Pierwsza para "liczba x liczba" w tekście. Wymaga sąsiedztwa przez sam
-// separator, więc "H3 25 cm 120x200 cm" daje 120x200, a nie 25x120.
-const SIZE_RE = /(\d{2,3})\s*[x×]\s*(\d{2,3})/i;
+// separator, więc "H3 25 cm 120x200 cm" daje 120x200, a nie 25x120. Granice
+// (?<!\d)/(?!\d) pilnują też, żeby żadna z liczb nie była urwanym kawałkiem
+// dłuższej liczby — bez nich "1200x200" dawałoby fałszywe "200x200".
+const SIZE_RE = /(?<!\d)(\d{2,3})\s*[x×]\s*(\d{2,3})(?!\d)/i;
 
 function matchSize(raw: string | null | undefined): SleepSize | null {
   if (!raw) return null;

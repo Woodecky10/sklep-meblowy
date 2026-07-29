@@ -33,6 +33,24 @@ describe("sleepSizeOf", () => {
       sleepSizeOf({ size_label: null, name: "Materac kieszeniowy Lorena Visco H3 25 cm 120x200 cm" })
     ).toBe("120x200");
   });
+
+  it("nie patrzy na dimensions (wymiar zewnętrzny łóżka)", () => {
+    // 160x200 to rozmiar spania, ale dimensions (wymiar zewnętrzny mebla)
+    // dla takiego łóżka to np. 180x210 — dopasowanie po nim dałoby błędną parę.
+    const item = {
+      size_label: "160x200",
+      name: "Łóżko tapicerowane Alice",
+      dimensions: { width: 180, depth: 210 },
+    };
+    expect(sleepSizeOf(item)).toBe("160x200");
+  });
+
+  it("4-cyfrowy sąsiad nie tworzy fałszywego dopasowania", () => {
+    // Bez granic (?<!\d)/(?!\d) w SIZE_RE "1200x200" dawałoby "200x200",
+    // a "1400x2000 mm" dawałoby "400x200" — obie to śmieciowe dopasowania.
+    expect(sleepSizeOf({ size_label: "1200x200", name: null })).toBeNull();
+    expect(sleepSizeOf({ size_label: "1400x2000 mm", name: null })).toBeNull();
+  });
 });
 
 describe("formatSleepSize", () => {

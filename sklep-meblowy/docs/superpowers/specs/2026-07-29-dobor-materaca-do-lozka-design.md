@@ -141,7 +141,7 @@ Nowe klucze w `pl.ts` (typ `PlShape` + wartości) i `de.ts` — test parytetu
 
 - `product.crossSellSizeEyebrow`: PL „Dobierz materac", DE „Passende Matratze"
 - `product.crossSellSizeHeading`: PL „Materace w rozmiarze", DE „Matratzen in
-  Größe" — rozmiar dokleja się w JSX (`${...crossSellSizeHeading} ${formatSleepSize(size)}`),
+  der Größe" — rozmiar dokleja się w JSX (`${...crossSellSizeHeading} ${formatSleepSize(size)}`),
   bez interpolacji `{placeholder}`, zgodnie z konwencją reszty słownika
   (por. `crossSellRecommendedPrefix` w `page.tsx:349`)
 - `a11y.prevProducts` / `a11y.nextProducts`: PL „Poprzednie produkty" /
