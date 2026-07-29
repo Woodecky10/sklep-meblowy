@@ -13,14 +13,12 @@ Sklep meblowy **Mollien** (meble na zamówienie). **Next.js 16** (App Router, Se
 Ostatnio scalone:
 - **PR #41** — domknięcie wycieków PL na `/de` (redirecty/linki gubiły prefiks `/de`, komunikaty błędów po DE).
 - **PR #42** — **ceny w EUR na `/de`** (patrz sekcja niżej).
-- **PR #43** — **pełne wycięcie BaseLinkera** (kod, API, cron, panel admina, env, migr. 34 drop kolumn/tabeli).
-- **PR #44** — przehostowanie obrazów 15 produktów z CDN BaseLinkera → Supabase storage (skrypt `scripts/rehost-bl-images.mjs`).
 - **PR #45** — fix przełącznika języka DE/PL: `<Link>`→natywny `<a>` (pełny reload). Locale niesie nagłówek `x-locale` (proxy), a chrome (TopBar/Navbar/Footer) jest serwerowy w root layoucie — App Router NIE re-renderuje root layoutu przy soft-nav, więc soft-switch tłumaczył tylko stronę. **Nie zamieniać `<a>` z powrotem na `<Link>` w `LanguageSwitcher`.**
 
-## Duży kierunek: rezygnacja z BaseLinkera — ZAKOŃCZONA
-Decyzja właścicielki (2026-06-17): sklep przejął funkcje BaseLinkera natywnie. **BaseLinker został KOMPLETNIE wycięty** z kodu, configu, env, kolumn DB i danych (obrazy przehostowane). `grep -ri baselinker app/` = pusty. **Konto BaseLinker można zamknąć** bez utraty obrazów ani funkcji. Dawne audyty BL (`docs/audyt-baselinker-*`, `docs/bl-*`) są nieaktualne (legacy).
+## Duży kierunek: sklep obsługuje wszystko natywnie
+Decyzja właścicielki (2026-06-17): sklep prowadzi produkty, kategorie i zamówienia **u siebie** — żadnego zewnętrznego systemu magazynowego, żadnej synchronizacji, żadnego crona. Produkty dodaje się w `/admin/produkty`, kategorie w `/admin/kategorie`, zamówienia obsługuje `/admin/zamowienia`. Zdjęcia leżą w Supabase Storage.
 
-4 podprojekty programu „zastąpienie BL":
+4 podprojekty tego programu:
 1. ✅ **Panel zarządzania zamówieniami** — na `main`.
 2. ✅ **Natywne tworzenie produktów** — na `main`.
 3. ⬜ **Faktury / VAT — przez KSeF** — TODO, czeka na odpowiedzi właścicielki. USTALENIE 2026-06-18: faktury **MUSZĄ być w KSeF** (obowiązkowy od 1.04.2026 dla „pozostałych przedsiębiorców"). **Rekomendacja: NIE budować bezpośredniej integracji KSeF** — sklep zbiera dane → API programu fakturowego (Fakturownia/wFirma/inFakt/Comarch), który robi KSeF+FA(3)+numerację+PDF+UPO. W kodzie ZERO podstaw (brak NIP/danych firmy/VAT/podziału netto-brutto). Najważniejsze pytanie: z jakiego programu fakturowego korzysta księgowa.
@@ -47,11 +45,10 @@ npm run dev
 ```
 Niezbędne env do dev (nazwy — wartości z Vercel/starego `.env.local`):
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_APP_URL`. Pełny szablon: `sklep-meblowy/.env.example`.
-> Zmienne `BASELINKER_*`/`BL_STATUS_*`/`CRON_SECRET` zostały USUNIĘTE (BL wycięty) — nie są już potrzebne.
 > **Baza i storage są ZDALNE/współdzielone (Supabase).** Migracje (29–34) już wgrane, obrazy w storage. Nowy komp **nie robi setupu bazy** — wystarczy `.env.local` wskazujący na ten sam projekt Supabase. `.env.local` i `node_modules` są gitignored, więc nie przychodzą z klonem.
 
 ## Baza — migracje
-**WSZYSTKIE migracje (przez 34) są ODPALONE** na produkcyjnym Supabase (29–32: 2026-06-23; 33 EUR + 34 drop BL: 2026-06-24). Wspólna baza → świeży klon nic nie re-uruchamia. Przyszłe migracje: kolejny numer w `sklep-meblowy/supabase/migrations/`; odpala **człowiek** w Supabase SQL Editorze (agent NIE ma dostępu DDL).
+**WSZYSTKIE migracje (przez 34) są ODPALONE** na produkcyjnym Supabase (29–32: 2026-06-23; 33–34: 2026-06-24). Wspólna baza → świeży klon nic nie re-uruchamia. Przyszłe migracje: kolejny numer w `sklep-meblowy/supabase/migrations/`; odpala **człowiek** w Supabase SQL Editorze (agent NIE ma dostępu DDL).
 
 ## Bramki jakości (uruchamiać z `sklep-meblowy/`)
 `npx tsc --noEmit` (0 błędów) · `npm run lint` (0) · `npm test` (vitest — ~208 zielonych) · `npm run build` (Turbopack przechodzi).
@@ -73,11 +70,10 @@ brainstorming → spec (`docs/superpowers/specs/`) → plan TDD (`docs/superpowe
 
 ## Następny krok
 1. **EUR go-live:** ustaw realny kurs w `/admin/ustawienia`; testowa sesja EUR (card+p24) na `/de`.
-2. **Zamknięcie konta BaseLinker** — można (obrazy przehostowane, kod/dane czyste).
-3. **Podprojekt 3 (faktury KSeF)** — czeka na odpowiedź: z jakiego programu fakturowego korzysta księgowa (przesądza drogę); potem spec → plan → wdrożenie.
-4. **Reszta podprojektu 4 (wysyłka)** — termin dostawy, dane transportu, model kosztu.
+2. **Podprojekt 3 (faktury KSeF)** — czeka na odpowiedź: z jakiego programu fakturowego korzysta księgowa (przesądza drogę); potem spec → plan → wdrożenie.
+3. **Reszta podprojektu 4 (wysyłka)** — termin dostawy, dane transportu, model kosztu.
 
 ## Drobne follow-upy (nieblokujące)
 - `schema.sql` jest niekompletnym baseline'em (pre-existing) — fresh-DB bootstrap z samego pliku byłby niepełny; źródłem prawdy są **migracje**.
-- `.env.local` może mieć puste `BASELINKER_*` (gitignored) — można wyczyścić ręcznie.
-- `scripts/rehost-bl-images.mjs` — jednorazowy, idempotentny skrypt migracji obrazów; zostaje w repo jako ślad (nieszkodliwy).
+- Stary `.env.local` (gitignored, nie przychodzi z klonem) może mieć nieużywane już zmienne po dawnej integracji magazynowej — można wyczyścić ręcznie, aplikacja ich nie czyta.
+- Migracje `07`, `11`, `24`, `25` tworzyły, a `34` usunęła strukturę dawnej integracji magazynowej. Pliki zostają jako rejestr tego, co realnie odpalono na bazie — nie kasować, bo numeracja i historia schematu przestałyby się zgadzać.
