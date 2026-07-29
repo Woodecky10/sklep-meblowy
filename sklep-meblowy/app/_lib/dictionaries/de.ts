@@ -274,6 +274,8 @@ export const de: DeepPartial<PlShape> = {
     slideOf: "von",
     prevSlide: "Vorheriger Slide",
     nextSlide: "Nächster Slide",
+    prevProducts: "Vorherige Produkte",
+    nextProducts: "Nächste Produkte",
     goToSlide: "Zu Slide",
     zoomImage: "Bild vergrößern",
     showImage: "Bild anzeigen",

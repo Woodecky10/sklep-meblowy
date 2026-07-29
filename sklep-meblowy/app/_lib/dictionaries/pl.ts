@@ -265,6 +265,8 @@ export type PlShape = {
     slideOf: string;
     prevSlide: string;
     nextSlide: string;
+    prevProducts: string;
+    nextProducts: string;
     goToSlide: string;
     zoomImage: string;
     showImage: string;
@@ -618,6 +620,8 @@ export const pl = {
     slideOf: "z",
     prevSlide: "Poprzedni slajd",
     nextSlide: "Następny slajd",
+    prevProducts: "Poprzednie produkty",
+    nextProducts: "Następne produkty",
     goToSlide: "Przejdź do slajdu",
     zoomImage: "Powiększ zdjęcie",
     showImage: "Pokaż zdjęcie",
