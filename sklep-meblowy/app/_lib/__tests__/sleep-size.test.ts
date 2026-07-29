@@ -27,6 +27,29 @@ describe("sleepSizeOf", () => {
     expect(sleepSizeOf({})).toBeNull();
   });
 
+  it("przyjmuje inne separatory niż x — slash, gwiazdka, słowo „na”", () => {
+    expect(sleepSizeOf({ size_label: "160/200" })).toBe("160x200");
+    expect(sleepSizeOf({ size_label: "160 / 200 cm" })).toBe("160x200");
+    expect(sleepSizeOf({ size_label: "160*200" })).toBe("160x200");
+    expect(sleepSizeOf({ size_label: "160 na 200" })).toBe("160x200");
+    expect(sleepSizeOf({ size_label: null, name: "Materac Nova 90 na 200 cm" })).toBe("90x200");
+  });
+
+  it("odwrócona kolejność liczb daje ten sam rozmiar", () => {
+    // Powierzchnia spania jest symetryczna: 200x160 to to samo co 160x200.
+    // Bez tego materac z odwrotnie wpisaną etykietą nie dopasowałby się do łóżka.
+    expect(sleepSizeOf({ size_label: "200x160" })).toBe("160x200");
+    expect(sleepSizeOf({ size_label: "200/90 cm" })).toBe("90x200");
+  });
+
+  it("H2/H3 w nazwie materaca nie udaje rozmiaru", () => {
+    // Twardości są jednocyfrowe, wiec nie lapia sie w \d{2,3} — ale slash jako
+    // separator podnosi ryzyko, wiec pilnujemy tego testem.
+    expect(
+      sleepSizeOf({ size_label: null, name: "Materac Marlo dwustronny H2/H3 26 cm" })
+    ).toBeNull();
+  });
+
   it("pomija wymiary z opisu przed rozmiarem spania", () => {
     // "H3 25 cm 120x200 cm" — 25 nie łączy się z 120, bo między nimi jest "cm"
     expect(

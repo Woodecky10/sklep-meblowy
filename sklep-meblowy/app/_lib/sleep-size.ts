@@ -9,17 +9,26 @@ import { effectivePrice } from "./pricing";
 // Porównania zawsze na tej formie; do wyświetlenia formatSleepSize.
 export type SleepSize = string;
 
-// Pierwsza para "liczba x liczba" w tekście. Wymaga sąsiedztwa przez sam
+// Pierwsza para "liczba SEPARATOR liczba" w tekście. Wymaga sąsiedztwa przez sam
 // separator, więc "H3 25 cm 120x200 cm" daje 120x200, a nie 25x120. Granice
 // (?<!\d)/(?!\d) pilnują też, żeby żadna z liczb nie była urwanym kawałkiem
 // dłuższej liczby — bez nich "1200x200" dawałoby fałszywe "200x200".
-const SIZE_RE = /(?<!\d)(\d{2,3})\s*[x×]\s*(\d{2,3})(?!\d)/i;
+//
+// Separatory poza x/×: `/`, `*` i słowo „na" — spotykane w ręcznie wpisywanych
+// etykietach ("160/200", "160 na 200"). Twardości materacy ("H2/H3") się nie
+// łapią, bo mają jednocyfrowe liczby, a wzorzec wymaga 2–3 cyfr.
+const SIZE_RE = /(?<!\d)(\d{2,3})\s*(?:[x×*/]|\bna\b)\s*(\d{2,3})(?!\d)/i;
 
 function matchSize(raw: string | null | undefined): SleepSize | null {
   if (!raw) return null;
   const m = SIZE_RE.exec(raw);
   if (!m) return null;
-  return `${Number(m[1])}x${Number(m[2])}`;
+  // Powierzchnia spania jest symetryczna, więc kanonizujemy kolejność: mniejsza
+  // liczba pierwsza. Bez tego materac z etykietą "200x160" nie dopasowałby się
+  // do łóżka "160x200", choć fizycznie to ten sam rozmiar.
+  const a = Number(m[1]);
+  const b = Number(m[2]);
+  return `${Math.min(a, b)}x${Math.max(a, b)}`;
 }
 
 // Rozmiar spania produktu: size_label (znormalizowany), a gdy go nie ma albo

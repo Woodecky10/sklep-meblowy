@@ -148,6 +148,25 @@ export default async function ProduktPage({ params }: Props) {
 
   const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
 
+  // Gdy WSZYSTKIE dopasowane karty są z jednej kategorii, nagłówek bierze jej
+  // etykietę — np. dla łóżek kontynentalnych (cross-sell = tylko nawierzchniowe)
+  // zamiast „Materace w rozmiarze…" wyjdzie „Materace nawierzchniowe w
+  // rozmiarze…". Te łóżka mają materac w komplecie, więc zachęcanie do zakupu
+  // „materaca" byłoby mylące.
+  //
+  // Na /de używamy etykiety tylko gdy kategoria MA tłumaczenie — inaczej
+  // wyszłaby mieszanka „Materace nawierzchniowe in der Größe…".
+  const crossSellCategorySlugs = new Set(crossSell.products.map((p) => p.category));
+  const singleCrossSellCat =
+    crossSell.sizeMatched && crossSellCategorySlugs.size === 1
+      ? allCategories.find((c) => c.slug === [...crossSellCategorySlugs][0])
+      : undefined;
+  const singleCrossSellLabel =
+    singleCrossSellCat &&
+    (locale !== "de" || (singleCrossSellCat.label_de?.trim() ?? "") !== "")
+      ? singleCrossSellCat.label
+      : null;
+
   // Kolekcja: jeśli produkt jest w kolekcji, pobierz inne produkty z niej.
   const [collection, collectionSiblings] = product.collection_id
     ? await Promise.all([
@@ -363,7 +382,9 @@ export default async function ProduktPage({ params }: Props) {
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
               {crossSell.sizeMatched && sleepSize
-                ? `${t.product.crossSellSizeHeading} ${formatSleepSize(sleepSize)}`
+                ? singleCrossSellLabel
+                  ? `${singleCrossSellLabel} ${t.product.crossSellSizeIn} ${formatSleepSize(sleepSize)}`
+                  : `${t.product.crossSellSizeHeading} ${formatSleepSize(sleepSize)}`
                 : crossSellLabel
                   ? `${t.product.crossSellRecommendedPrefix} ${crossSellLabel.toLowerCase()}`
                   : t.product.crossSellFallbackHeading}
