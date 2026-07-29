@@ -49,11 +49,32 @@ Wszystkie kroki są wykonywalne bez dodatkowych pytań.
 >
 > Dlatego `MAIL_REPLY_TO` traktujemy jako **wymaganą** zmienną, nie
 > opcjonalną, choć kod się bez niej nie wywali (`sendMail` po prostu nie
-> doda nagłówka Reply-To). `app/_lib/company.ts` już teraz podaje
-> `mollien.shop@gmail.com` jako kontaktowy adres sklepu (`COMPANY.email`) —
-> to działająca skrzynka i naturalny kandydat na `MAIL_REPLY_TO`.
-> Alternatywa: założyć skrzynkę na domenie w home.pl i dopiero wtedy dodać
-> rekordy MX (co jest osobnym, większym zadaniem niż samo wysyłanie maili).
+> doda nagłówka Reply-To).
+
+### Decyzja właściciela (2026-07-29): jeden adres kontaktowy
+
+`mollien.julia@gmail.com` — ten sam adres w trzech rolach:
+
+| Gdzie | Wartość |
+|---|---|
+| `MAIL_REPLY_TO` | `mollien.julia@gmail.com` |
+| `MAIL_ADMIN_TO` | `mollien.julia@gmail.com` |
+| `COMPANY.email` (pasek kontaktu na stronie, treść maila o anulowaniu) | `mollien.julia@gmail.com` |
+
+Powód: klient ma widzieć **jeden** adres, niezależnie czy odpisuje na maila,
+czy przepisuje kontakt ze strony. Poprzednio w kodzie był
+`mollien.shop@gmail.com` i przy reply-to na innej skrzynce mail o anulowaniu
+podawałby klientowi dwa różne adresy.
+
+**Jedyny inny adres, jaki widzi klient, to nadawca** — `MAIL_FROM`, czyli
+`Mollien <zamowienia@mollien.pl>`. Nie da się nadawać z gmail.com: Resend
+wysyła tylko z domeny, którą się zweryfikowało, a gmail.com nie jest Twoją
+domeną. Adres `zamowienia@mollien.pl` nie musi istnieć jako skrzynka — do
+wysyłki wystarcza zweryfikowana domena. Odpowiedzi i tak prowadzi `Reply-To`.
+
+Alternatywa na przyszłość: skrzynka na domenie w home.pl + rekordy MX — wtedy
+wszystkie trzy role mogłyby być na `@mollien.pl`. To osobne, większe zadanie
+niż samo wysyłanie maili.
 
 ## 3. Mail weryfikacyjny konta (Supabase)
 
