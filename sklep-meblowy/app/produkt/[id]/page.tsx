@@ -42,7 +42,6 @@ import { VariantInfoProvider } from "@/app/_lib/variant-info-context";
 import { getBundlesForProduct } from "@/app/_lib/bundles-server";
 import { sleepSizeOf, formatSleepSize } from "@/app/_lib/sleep-size";
 import ProductCarousel from "@/app/_components/ui/ProductCarousel";
-import type { Product } from "@/app/_lib/types";
 import { productPlainText } from "@/app/_lib/product-text";
 import { baseOpenGraph } from "@/app/_lib/seo-og";
 import { buildBreadcrumbJsonLd, serializeJsonLd } from "@/app/_lib/seo-jsonld";
