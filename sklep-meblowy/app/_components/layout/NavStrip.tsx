@@ -54,7 +54,12 @@ export default function NavStrip({
     // min-w-0 jest tu nośne: bez niego kontener nie może zwężyć się poniżej
     // szerokości treści, więc nic by się nie zawinęło.
     <div className="hidden lg:flex items-center flex-1 justify-center min-w-0">
-      <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1">
+      {/* justify-start, NIE center: przy zawinięciu każdy rząd startuje z tej
+          samej linii co pierwsza pozycja u góry. Przy center rzędy centrowałyby
+          się niezależnie i dolny „wisiał" w środku. Sam pasek pozostaje
+          wyśrodkowany, dopóki mieści się w jednym rzędzie — wtedy jego szerokość
+          to max-content, a centruje go justify-center rodzica. */}
+      <nav className="flex flex-wrap items-center justify-start gap-x-6 gap-y-1">
         {sections.map((section) => (
           <div key={section.slug} className="relative group shrink-0">
             {/* Sam HEADER sekcji jest klikalny — prowadzi do /sklep?sekcja=<slug>
