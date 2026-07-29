@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  FILTERABLE_FEATURE_KEYS,
   FEATURE_PARAM_PREFIX,
   FEATURE_PARAM_SEPARATOR,
   collectFeatureFacets,
