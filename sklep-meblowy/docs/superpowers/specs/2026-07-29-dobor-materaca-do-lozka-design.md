@@ -177,7 +177,16 @@ przed nim dodanie kategorii `materace` zmieniłoby dzisiejszy nagłówek na
 
 ### Poza zakresem
 
-- Cross-sell w koszyku (zostaje na 4 najnowszych, bez rozmiaru).
+- ~~Cross-sell w koszyku (zostaje na 4 najnowszych, bez rozmiaru).~~
+  **Zmiana 2026-07-29 (po wdrożeniu):** klient zgłosił „nie dobiera po
+  rozmiarze" — patrzył na koszyk, gdzie przy łóżku 140×200 wyskakiwały toppery
+  140/160/180/200×200. Koszyk został objęty dopasowaniem: `getCartCrossSellAction`
+  dociąga `size_label`/`name` pozycji z bazy (klient trzyma w localStorage tylko
+  id/name/category), liczy rozmiary przez `sleepSizeOf` i woła
+  `getSizeMatchedCrossSell`. `pickSizeMatched` i `getSizeMatchedCrossSell`
+  przyjmują LISTĘ rozmiarów i listę kategorii źródłowych, bo w koszyku mogą leżeć
+  dwa łóżka różnej wielkości — wtedy proponujemy materace do każdego z nich.
+  Nagłówek koszyka zostaje bez zmian („Polecane do koszyka").
 - Dodawanie materaca do koszyka wprost z karuzeli.
 - Ręczne nadpisywanie listy materacy per produkt w panelu.
 - Zamiana pozostałych siatek produktów na karuzele.
