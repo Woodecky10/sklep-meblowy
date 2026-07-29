@@ -25,13 +25,30 @@ const NAV_ITEMS = [
   { href: "/admin/reklamacje", label: "Reklamacje", icon: ComplaintsIcon },
 ];
 
+// Licznik przy pozycji nawigacji — jedna reguła dla wszystkich badge'y.
+// `label` idzie w aria-label, bo sama cyfra nic czytnikowi ekranu nie mówi.
+function navBadge(
+  href: string,
+  counts: { newIssues: number; newOrders: number }
+): { count: number; label: string } | null {
+  if (href === "/admin/reklamacje" && counts.newIssues > 0) {
+    return { count: counts.newIssues, label: "nowe zgłoszenia" };
+  }
+  if (href === "/admin/zamowienia" && counts.newOrders > 0) {
+    return { count: counts.newOrders, label: "nowe zamówienia" };
+  }
+  return null;
+}
+
 export default function AdminShell({
   userEmail,
   newIssues,
+  newOrders,
   children,
 }: {
   userEmail: string | null;
   newIssues: number;
+  newOrders: number;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -107,22 +124,28 @@ export default function AdminShell({
         </div>
 
         <nav className="flex-1 py-4 overflow-y-auto">
-          {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 px-6 py-3 text-sm font-sans text-[var(--fg)] hover:bg-[var(--bg)] hover:text-[var(--color-gold)] transition-colors"
-            >
-              <item.icon />
-              <span className="flex-1">{item.label}</span>
-              {item.href === "/admin/reklamacje" && newIssues > 0 && (
-                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-[var(--color-gold)] text-[var(--color-navy)]">
-                  {newIssues}
-                </span>
-              )}
-            </Link>
-          ))}
+          {NAV_ITEMS.map((item) => {
+            const badge = navBadge(item.href, { newIssues, newOrders });
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-3 px-6 py-3 text-sm font-sans text-[var(--fg)] hover:bg-[var(--bg)] hover:text-[var(--color-gold)] transition-colors"
+              >
+                <item.icon />
+                <span className="flex-1">{item.label}</span>
+                {badge && (
+                  <span
+                    aria-label={`${badge.count} — ${badge.label}`}
+                    className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-[var(--color-gold)] text-[var(--color-navy)]"
+                  >
+                    {badge.count}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="px-6 py-4 border-t border-[var(--border)]">
