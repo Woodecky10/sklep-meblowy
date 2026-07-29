@@ -53,7 +53,9 @@ const missing = [
 if (missing.length > 0) {
   console.error(`\n✖ Brak w .env.local (albo w env): ${missing.join(", ")}`);
   console.error(`
-Skąd wziąć wartości (panel sandboxa: https://sandbox.przelewy24.pl):
+Skąd wziąć wartości — panel sandboxa: https://sandbox.przelewy24.pl/panel
+(⚠ sam korzeń https://sandbox.przelewy24.pl zwraca HTTP 400 — jako P24_BASE_URL
+jest poprawny, ale w przeglądarce trzeba wejść na /panel):
   P24_MERCHANT_ID  — ID sprzedawcy (zwykle to samo co POS ID)
   P24_POS_ID       — ID sklepu
   P24_API_KEY      — klucz do REST API (Konfiguracja → dostęp do API)
