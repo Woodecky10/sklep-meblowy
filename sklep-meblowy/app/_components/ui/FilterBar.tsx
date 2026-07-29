@@ -5,6 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { localizeHref } from "@/app/_lib/i18n";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
+import {
+  FEATURE_PARAM_PREFIX,
+  FEATURE_PARAM_SEPARATOR,
+} from "@/app/_lib/feature-filter";
 
 export type FilterBarSection = {
   slug: string;
@@ -17,14 +21,14 @@ export type FilterBarCollection = {
   label: string;
 };
 
-// Facet kolor/materiał: `value` = kanoniczna wartość PL (niesie ?kolor= i filtr
+// Wartość facetu: `value` = kanoniczna wartość PL (niesie parametr URL i filtr
 // DB), `label` = zlokalizowana etykieta do wyświetlenia (DE gdy dostępna).
 export type FilterBarFacet = {
   value: string;
   label: string;
 };
 
-// Facet opcji wariantu (?opcja_<slug>=): values jak kolor/tkanina.
+// Facet opcji wariantu (?opcja_<slug>=): values jak facety parametrów.
 export type FilterBarOptionFacet = {
   slug: string;
   label: string;
@@ -38,8 +42,8 @@ export type FilterBarDimensionBounds = {
 };
 
 type Props = {
-  colors: FilterBarFacet[];
-  materials: FilterBarFacet[];
+  // Facety parametrów produktu (?cecha_<slug>=) — sekcje filtrów z cech.
+  featureFacets?: FilterBarOptionFacet[];
   optionFacets?: FilterBarOptionFacet[];
   dimensionBounds?: FilterBarDimensionBounds;
   sections?: FilterBarSection[];
@@ -48,21 +52,19 @@ type Props = {
 
 type DropdownKey =
   | "category"
-  | "color"
-  | "material"
   | "collection"
   | "price"
   | "sort"
   | "dimensions"
   | `option:${string}`
+  | `cecha:${string}`
   | null;
 
 // Parametry URL zakresów wymiarów (cm) — kolejność = kolejność pól w panelu.
 const DIM_KEYS = ["szer_od", "szer_do", "gl_od", "gl_do", "wys_od", "wys_do"] as const;
 
 export default function FilterBar({
-  colors,
-  materials,
+  featureFacets = [],
   optionFacets = [],
   dimensionBounds,
   sections = [],
@@ -115,14 +117,23 @@ export default function FilterBar({
   const collection = effectiveParams.get("kolekcja") ?? "";
   const sort = effectiveParams.get("sortuj") ?? "alphabetic";
   const inStockOnly = effectiveParams.get("dostepne") === "1";
-  const selectedColors = (effectiveParams.get("kolor") ?? "").split(",").filter(Boolean);
-  const selectedMaterials = (effectiveParams.get("tkanina") ?? "").split(",").filter(Boolean);
 
-  // Wybrane wartości per opcja (z URL — jak selectedMaterials).
+  // Wybrane wartości per opcja (z URL).
   const selectedOptions = new Map(
     optionFacets.map((g) => [
       g.slug,
       (effectiveParams.get(`opcja_${g.slug}`) ?? "").split(",").filter(Boolean),
+    ])
+  );
+
+  // Wybrane wartości per parametr (z URL — jak selectedOptions; separator "|"
+  // bo wartości typu "4,5 cm" mają przecinek).
+  const selectedFeatures = new Map(
+    featureFacets.map((g) => [
+      g.slug,
+      (effectiveParams.get(`${FEATURE_PARAM_PREFIX}${g.slug}`) ?? "")
+        .split(FEATURE_PARAM_SEPARATOR)
+        .filter(Boolean),
     ])
   );
 
@@ -235,11 +246,11 @@ export default function FilterBar({
     navigate(params);
   }
 
-  function toggleMulti(key: string, current: string[], value: string) {
+  function toggleMulti(key: string, current: string[], value: string, sep = ",") {
     const next = current.includes(value)
       ? current.filter((v) => v !== value)
       : [...current, value];
-    update(key, next.join(","));
+    update(key, next.join(sep));
   }
 
   function toggleDropdown(key: Exclude<DropdownKey, null>) {
@@ -252,19 +263,12 @@ export default function FilterBar({
 
   const activeCollection = collections.find((c) => c.slug === collection);
 
-  // Lookup value(PL) → label(zlokalizowany) dla chipów aktywnych filtrów.
-  // Fallback do surowej wartości gdy zaznaczony value nie istnieje w bieżącym
-  // zestawie facetów (np. stary link z wartością, która zniknęła z katalogu).
-  const colorLabel = (value: string) =>
-    colors.find((c) => c.value === value)?.label ?? value;
-  const materialLabel = (value: string) =>
-    materials.find((m) => m.value === value)?.label ?? value;
-
   const priceActive = priceMin !== "" || priceMax !== "";
   const categoryCount = category ? 1 : 0;
   const collectionCount = collection ? 1 : 0;
   const priceCount = priceActive ? 1 : 0;
   const optionCount = [...selectedOptions.values()].reduce((s, v) => s + v.length, 0);
+  const featureCount = [...selectedFeatures.values()].reduce((s, v) => s + v.length, 0);
   const dimsActive = DIM_KEYS.some((k) => dims[k] !== "");
   const hasDimensionBounds = !!(
     dimensionBounds &&
@@ -274,11 +278,10 @@ export default function FilterBar({
   const totalActiveFilters =
     categoryCount +
     collectionCount +
-    selectedColors.length +
-    selectedMaterials.length +
     priceCount +
     (inStockOnly ? 1 : 0) +
     optionCount +
+    featureCount +
     (dimsActive ? 1 : 0);
 
   const activeSort = SORTS.find((s) => s.value === sort) ?? SORTS[0];
@@ -326,22 +329,6 @@ export default function FilterBar({
             onClick={() => toggleDropdown("collection")}
           />
         )}
-        {colors.length > 0 && (
-          <FilterPill
-            label={t.filter.color}
-            count={selectedColors.length}
-            open={openDropdown === "color"}
-            onClick={() => toggleDropdown("color")}
-          />
-        )}
-        {materials.length > 0 && (
-          <FilterPill
-            label={t.filter.material}
-            count={selectedMaterials.length}
-            open={openDropdown === "material"}
-            onClick={() => toggleDropdown("material")}
-          />
-        )}
         {optionFacets.map((g) => (
           <FilterPill
             key={g.slug}
@@ -349,6 +336,15 @@ export default function FilterBar({
             count={selectedOptions.get(g.slug)?.length ?? 0}
             open={openDropdown === `option:${g.slug}`}
             onClick={() => toggleDropdown(`option:${g.slug}`)}
+          />
+        ))}
+        {featureFacets.map((g) => (
+          <FilterPill
+            key={`cecha:${g.slug}`}
+            label={g.label}
+            count={selectedFeatures.get(g.slug)?.length ?? 0}
+            open={openDropdown === `cecha:${g.slug}`}
+            onClick={() => toggleDropdown(`cecha:${g.slug}`)}
           />
         ))}
         {hasDimensionBounds && (
@@ -480,52 +476,6 @@ export default function FilterBar({
         </DropdownPanel>
       )}
 
-      {openDropdown === "color" && (
-        <DropdownPanel align="left">
-          <div className="flex flex-wrap gap-1.5">
-            {colors.map((c) => {
-              const active = selectedColors.includes(c.value);
-              return (
-                <button
-                  key={c.value}
-                  onClick={() => toggleMulti("kolor", selectedColors, c.value)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-sans capitalize transition-colors ${
-                    active
-                      ? "bg-[var(--color-gold)] text-white"
-                      : "border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
-                  }`}
-                >
-                  {c.label}
-                </button>
-              );
-            })}
-          </div>
-        </DropdownPanel>
-      )}
-
-      {openDropdown === "material" && (
-        <DropdownPanel align="left">
-          <div className="flex flex-wrap gap-1.5">
-            {materials.map((m) => {
-              const active = selectedMaterials.includes(m.value);
-              return (
-                <button
-                  key={m.value}
-                  onClick={() => toggleMulti("tkanina", selectedMaterials, m.value)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-sans capitalize transition-colors ${
-                    active
-                      ? "bg-[var(--color-gold)] text-white"
-                      : "border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
-                  }`}
-                >
-                  {m.label}
-                </button>
-              );
-            })}
-          </div>
-        </DropdownPanel>
-      )}
-
       {optionFacets.map((g) =>
         openDropdown === `option:${g.slug}` ? (
           <DropdownPanel key={g.slug} align="left">
@@ -538,6 +488,39 @@ export default function FilterBar({
                     key={val.value}
                     onClick={() => toggleMulti(`opcja_${g.slug}`, selected, val.value)}
                     className={`px-3 py-1.5 rounded-full text-xs font-sans capitalize transition-colors ${
+                      active
+                        ? "bg-[var(--color-gold)] text-white"
+                        : "border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
+                    }`}
+                  >
+                    {val.label}
+                  </button>
+                );
+              })}
+            </div>
+          </DropdownPanel>
+        ) : null
+      )}
+
+      {featureFacets.map((g) =>
+        openDropdown === `cecha:${g.slug}` ? (
+          <DropdownPanel key={g.slug} align="left">
+            <div className="flex flex-wrap gap-1.5">
+              {g.values.map((val) => {
+                const selected = selectedFeatures.get(g.slug) ?? [];
+                const active = selected.includes(val.value);
+                return (
+                  <button
+                    key={val.value}
+                    onClick={() =>
+                      toggleMulti(
+                        `${FEATURE_PARAM_PREFIX}${g.slug}`,
+                        selected,
+                        val.value,
+                        FEATURE_PARAM_SEPARATOR
+                      )
+                    }
+                    className={`px-3 py-1.5 rounded-full text-xs font-sans transition-colors ${
                       active
                         ? "bg-[var(--color-gold)] text-white"
                         : "border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
@@ -672,22 +655,6 @@ export default function FilterBar({
               onRemove={() => update("kolekcja", "")}
             />
           )}
-          {selectedColors.map((c) => (
-            <ActiveChip
-              key={`color-${c}`}
-              label={`${t.filter.color}: ${colorLabel(c)}`}
-              removeLabel={t.filter.removeFilter}
-              onRemove={() => toggleMulti("kolor", selectedColors, c)}
-            />
-          ))}
-          {selectedMaterials.map((m) => (
-            <ActiveChip
-              key={`material-${m}`}
-              label={`${t.filter.material}: ${materialLabel(m)}`}
-              removeLabel={t.filter.removeFilter}
-              onRemove={() => toggleMulti("tkanina", selectedMaterials, m)}
-            />
-          ))}
           {optionFacets.flatMap((g) => {
             const selected = selectedOptions.get(g.slug) ?? [];
             return selected.map((val) => (
@@ -696,6 +663,24 @@ export default function FilterBar({
                 label={`${g.label}: ${g.values.find((x) => x.value === val)?.label ?? val}`}
                 removeLabel={t.filter.removeFilter}
                 onRemove={() => toggleMulti(`opcja_${g.slug}`, selected, val)}
+              />
+            ));
+          })}
+          {featureFacets.flatMap((g) => {
+            const selected = selectedFeatures.get(g.slug) ?? [];
+            return selected.map((val) => (
+              <ActiveChip
+                key={`cecha-${g.slug}-${val}`}
+                label={`${g.label}: ${g.values.find((x) => x.value === val)?.label ?? val}`}
+                removeLabel={t.filter.removeFilter}
+                onRemove={() =>
+                  toggleMulti(
+                    `${FEATURE_PARAM_PREFIX}${g.slug}`,
+                    selected,
+                    val,
+                    FEATURE_PARAM_SEPARATOR
+                  )
+                }
               />
             ));
           })}

@@ -71,6 +71,7 @@ export const FEATURE_KEY_DE: Record<string, string> = {
   Kolor: "Farbe",
   "Kolor obicia": "Bezugsfarbe",
   Model: "Modell",
+  "Pojemnik na pościel": "Bettkasten",
   "Powierzchnia spania": "Liegefläche",
   Powłoka: "Bezug",
   "Rodzaj Łóżka": "Bettart",
@@ -78,8 +79,10 @@ export const FEATURE_KEY_DE: Record<string, string> = {
   "System Boxspring": "Boxspring-System",
   "Szerokość mebla": "Möbelbreite",
   Tkanina: "Stoff",
+  "Tył mebla tapicerowany": "Gepolsterte Rückseite",
   "Waga produktu z opakowaniem jednostkowym": "Produktgewicht mit Einzelverpackung",
   "Wysokość mebla": "Möbelhöhe",
+  "Wysokość nóżek": "Fußhöhe",
   "Wysokość zagłowia": "Kopfteilhöhe",
 };
 

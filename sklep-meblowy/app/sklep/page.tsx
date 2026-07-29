@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { getProducts, getFilterFacets } from "@/app/_lib/products";
 import { parseOptionFilterParams } from "@/app/_lib/option-filter";
+import { parseFeatureFilterParams } from "@/app/_lib/feature-filter";
 import { getRatingsForProducts } from "@/app/_lib/reviews";
 import {
   getCategoryLabel,
@@ -51,8 +52,6 @@ type SearchParams = Promise<
     cena_od?: string;
     cena_do?: string;
     dostepne?: string;
-    kolor?: string;
-    tkanina?: string;
     kolekcja?: string;
     szer_od?: string;
     szer_do?: string;
@@ -89,10 +88,9 @@ export default async function SklepPage({
   const priceMin = parsePositiveNumber(sp.cena_od);
   const priceMax = parsePositiveNumber(sp.cena_do);
   const inStockOnly = sp.dostepne === "1";
-  const colors = sp.kolor?.split(",").filter(Boolean);
-  const materials = sp.tkanina?.split(",").filter(Boolean);
   const collectionSlug = sp.kolekcja?.trim() || undefined;
   const optionFilters = parseOptionFilterParams(sp);
+  const featureFilters = parseFeatureFilterParams(sp);
   const dimensionRanges = {
     widthMin: parsePositiveNumber(sp.szer_od),
     widthMax: parsePositiveNumber(sp.szer_do),
@@ -121,9 +119,8 @@ export default async function SklepPage({
       priceMin,
       priceMax,
       inStockOnly,
-      colors,
-      materials,
       optionFilters,
+      featureFilters,
       dimensionRanges,
       collectionSlug,
       sectionSlug,
@@ -154,15 +151,18 @@ export default async function SklepPage({
   if (sp.cena_od) rawParams.cena_od = sp.cena_od;
   if (sp.cena_do) rawParams.cena_do = sp.cena_do;
   if (sp.dostepne) rawParams.dostepne = sp.dostepne;
-  if (sp.kolor) rawParams.kolor = sp.kolor;
-  if (sp.tkanina) rawParams.tkanina = sp.tkanina;
   if (sp.kolekcja) rawParams.kolekcja = sp.kolekcja;
   for (const k of ["szer_od", "szer_do", "gl_od", "gl_do", "wys_od", "wys_do"] as const) {
     const v = sp[k];
     if (typeof v === "string" && v) rawParams[k] = v;
   }
   for (const [k, val] of Object.entries(sp)) {
-    if (k.startsWith("opcja_") && typeof val === "string" && val) rawParams[k] = val;
+    if (
+      (k.startsWith("opcja_") || k.startsWith("cecha_")) &&
+      typeof val === "string" &&
+      val
+    )
+      rawParams[k] = val;
   }
 
   // Label sekcji z `sections` (np. "Narożniki" zamiast surowego slug "naroznik").
@@ -241,8 +241,7 @@ export default async function SklepPage({
 
       <Suspense>
         <FilterBar
-          colors={facets.colors}
-          materials={facets.materials}
+          featureFacets={facets.features}
           optionFacets={facets.options}
           dimensionBounds={facets.dimensions}
           sections={filterSections}
