@@ -64,6 +64,7 @@ export type PlShape = {
     crossSellFallbackHeading: string;
     crossSellSizeEyebrow: string;
     crossSellSizeHeading: string;
+    crossSellSizeIn: string;
     fullCollectionEyebrow: string;
     specWidth: string;
     specWeight: string;
@@ -415,8 +416,9 @@ export const pl = {
     crossSellEyebrow: "Dopełnienie",
     crossSellRecommendedPrefix: "Polecane",
     crossSellFallbackHeading: "Może Cię zainteresować",
-    crossSellSizeEyebrow: "Dobierz materac",
+    crossSellSizeEyebrow: "Dobierz do tego łóżka",
     crossSellSizeHeading: "Materace w rozmiarze",
+    crossSellSizeIn: "w rozmiarze",
     fullCollectionEyebrow: "Pełna kolekcja",
     specWidth: "Wymiary",
     specWeight: "Waga",

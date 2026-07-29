@@ -9,6 +9,7 @@ import {
 import { getAllCategories } from "@/app/_lib/categories";
 import { getAllFabrics, getFabricPriceGroups } from "@/app/_lib/fabrics";
 import { getVariantInfoMap } from "@/app/_lib/variant-info-data";
+import { sleepSizeOf } from "@/app/_lib/sleep-size";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import ProductEditor from "./ProductEditor";
 import type { ProductDeFields } from "./TranslationEditor";
@@ -49,8 +50,41 @@ export default async function AdminProductEditPage({
     ? await getSizeGroupMembersAdmin(product.size_group)
     : [{ id: product.id, name: product.name, size_label: product.size_label }];
 
+  // Czy ten produkt bierze udział w dobieraniu rozmiaru (łóżko ↔ materac)?
+  // Liczone z KONFIGURACJI cross-sellu, nie z zaszytej listy kategorii: źródłem
+  // jest kategoria, która ma ustawione `cross_sell_categories`, celem — kategoria
+  // wskazana przez inną. Bez rozpoznawalnego rozmiaru taki produkt cicho wypada
+  // z dopasowań (sekcja zjeżdża do „Polecane …" z 4 najnowszymi), dlatego admin
+  // dostaje o tym wyraźny komunikat zamiast domyślać się po fakcie.
+  const crossSellTargets = new Set(
+    categories.flatMap((c) => c.crossSellCategories ?? [])
+  );
+  const isCrossSellSource = (categories.find((c) => c.slug === product.category)
+    ?.crossSellCategories?.length ?? 0) > 0;
+  const participatesInSizeMatching =
+    isCrossSellSource || crossSellTargets.has(product.category);
+  const missingSleepSize =
+    participatesInSizeMatching && sleepSizeOf(product) === null;
+
   return (
-    <ProductEditor
+    <>
+      {missingSleepSize && (
+        <div className="mb-6 rounded-xl border border-amber-500/60 bg-amber-500/10 p-4">
+          <p className="font-sans text-sm font-semibold text-amber-600 dark:text-amber-400">
+            Brak rozpoznawalnego rozmiaru — ten produkt nie pojawi się w
+            dopasowaniu materacy do łóżek
+          </p>
+          <p className="mt-1 text-sm text-[var(--fg)] leading-relaxed">
+            Kategoria <strong>{product.category}</strong> uczestniczy w dobieraniu
+            po rozmiarze, ale ani etykieta rozmiaru, ani nazwa produktu nie
+            zawierają rozmiaru spania. Uzupełnij pole w sekcji{" "}
+            <strong>&bdquo;Rozmiary tego mebla&rdquo;</strong> niżej — format{" "}
+            <code>160x200</code> (działa też <code>160/200</code> i{" "}
+            <code>160 na 200</code>).
+          </p>
+        </div>
+      )}
+      <ProductEditor
       product={product}
       categories={categories}
       de={de}
@@ -61,7 +95,8 @@ export default async function AdminProductEditPage({
       featureKeySuggestions={featureSuggestions.keys}
       featureValueSuggestions={featureSuggestions.valuesByKey}
       variantImageGroups={variantImageGroups}
-    />
+      />
+    </>
   );
 }
 
