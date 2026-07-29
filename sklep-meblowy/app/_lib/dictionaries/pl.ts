@@ -62,6 +62,8 @@ export type PlShape = {
     crossSellEyebrow: string;
     crossSellRecommendedPrefix: string;
     crossSellFallbackHeading: string;
+    crossSellSizeEyebrow: string;
+    crossSellSizeHeading: string;
     fullCollectionEyebrow: string;
     specWidth: string;
     specWeight: string;
@@ -265,6 +267,8 @@ export type PlShape = {
     slideOf: string;
     prevSlide: string;
     nextSlide: string;
+    prevProducts: string;
+    nextProducts: string;
     goToSlide: string;
     zoomImage: string;
     showImage: string;
@@ -411,6 +415,8 @@ export const pl = {
     crossSellEyebrow: "Dopełnienie",
     crossSellRecommendedPrefix: "Polecane",
     crossSellFallbackHeading: "Może Cię zainteresować",
+    crossSellSizeEyebrow: "Dobierz materac",
+    crossSellSizeHeading: "Materace w rozmiarze",
     fullCollectionEyebrow: "Pełna kolekcja",
     specWidth: "Wymiary",
     specWeight: "Waga",
@@ -618,6 +624,8 @@ export const pl = {
     slideOf: "z",
     prevSlide: "Poprzedni slajd",
     nextSlide: "Następny slajd",
+    prevProducts: "Poprzednie produkty",
+    nextProducts: "Następne produkty",
     goToSlide: "Przejdź do slajdu",
     zoomImage: "Powiększ zdjęcie",
     showImage: "Pokaż zdjęcie",
