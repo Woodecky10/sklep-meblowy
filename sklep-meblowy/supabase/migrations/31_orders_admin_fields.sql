@@ -1,4 +1,4 @@
--- 31: pola admina dla zamówień (panel zarządzania, etap 1a zastąpienia BaseLinker)
+-- 31: pola admina dla zamówień (panel zarządzania zamówieniami, etap 1a)
 -- Uruchomić RĘCZNIE w Supabase SQL Editorze (DDL).
 
 alter table public.orders add column if not exists admin_note       text;
