@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import {
   getProduct,
   getRelatedProducts,
-  getCrossSellProducts,
+  getSizeMatchedCrossSell,
   getSizeSiblings,
 } from "@/app/_lib/products";
 import { getCategoryLabel, getAllCategories } from "@/app/_lib/categories";
@@ -40,6 +40,8 @@ import { FabricImageProvider, FabricMetaProvider } from "@/app/_lib/fabric-conte
 import { getVariantInfoMap } from "@/app/_lib/variant-info-data";
 import { VariantInfoProvider } from "@/app/_lib/variant-info-context";
 import { getBundlesForProduct } from "@/app/_lib/bundles-server";
+import { sleepSizeOf, formatSleepSize } from "@/app/_lib/sleep-size";
+import ProductCarousel from "@/app/_components/ui/ProductCarousel";
 import type { Product } from "@/app/_lib/types";
 
 type Props = { params: Promise<{ id: string }> };
@@ -100,6 +102,10 @@ export default async function ProduktPage({ params }: Props) {
   const product = await getProduct(id, locale);
   if (!product) notFound();
 
+  // Rozmiar spania łóżka ("160x200") — klucz doboru materacy. null dla mebli
+  // bez rozmiaru (sofy, fotele) → cross-sell leci starą ścieżką.
+  const sleepSize = sleepSizeOf(product);
+
   const [sizeSiblings, related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell, wishlistIds, rate, bundles] =
     await Promise.all([
       // Selektor rozmiaru: rodzeństwo z tym samym size_group (osobne aukcje per rozmiar).
@@ -110,7 +116,7 @@ export default async function ProduktPage({ params }: Props) {
       getReviewStatus(product.id),
       getCategoryLabel(product.category, locale),
       getAllCategories(locale),
-      getCrossSellProducts([product.category], [product.id], 4, locale),
+      getSizeMatchedCrossSell(product.category, sleepSize, [product.id], 12, locale),
       getUserWishlistIds(),
       getEurRate(),
       // Zestawy zawierające ten produkt — box „Kup w zestawie" na karcie.
@@ -338,24 +344,30 @@ export default async function ProduktPage({ params }: Props) {
         <TrustBar locale={locale} />
       </section>
 
-      {/* Cross-sell — np. dla łóżka pokaż "Polecane materace" */}
-      {crossSell.length > 0 && (
+      {/* Cross-sell — dla łóżka materace w JEGO rozmiarze spania, w karuzeli.
+          Gdy produkt nie ma rozmiaru albo nic nie pasuje (sizeMatched=false)
+          → stara kopia i 4 najnowsze z kategorii docelowych. */}
+      {crossSell.products.length > 0 && (
         <section className="mb-24">
           <div className="mb-8">
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-              {t.product.crossSellEyebrow}
+              {crossSell.sizeMatched
+                ? t.product.crossSellSizeEyebrow
+                : t.product.crossSellEyebrow}
             </p>
             <h2 className="font-display text-3xl font-bold text-[var(--fg)]">
-              {crossSellLabel
-                ? `${t.product.crossSellRecommendedPrefix} ${crossSellLabel.toLowerCase()}`
-                : t.product.crossSellFallbackHeading}
+              {crossSell.sizeMatched && sleepSize
+                ? `${t.product.crossSellSizeHeading} ${formatSleepSize(sleepSize)}`
+                : crossSellLabel
+                  ? `${t.product.crossSellRecommendedPrefix} ${crossSellLabel.toLowerCase()}`
+                  : t.product.crossSellFallbackHeading}
             </h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {crossSell.map((p) => (
+          <ProductCarousel>
+            {crossSell.products.map((p) => (
               <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} locale={locale} rate={rate} />
             ))}
-          </div>
+          </ProductCarousel>
         </section>
       )}
 
