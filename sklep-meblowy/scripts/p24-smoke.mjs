@@ -133,4 +133,43 @@ if (ok) {
   }
 }
 
+// ── 3. Czy urlStatus faktycznie trafia w NASZ handler? ────────────────────
+// Podaj adres wdrożenia jako argument:  npm run p24:smoke -- https://preview...
+//
+// Po co: nieistniejąca ścieżka pod /api/ oddaje w tym Next-cie stronę not-found
+// jako odpowiedź STRUMIENIOWANĄ, a te wg dokumentacji mają status 200 (patrz
+// docs/01-app/03-api-reference/03-file-conventions/not-found.md). Skutek: gdyby
+// urlStatus miał literówkę, P24 dostałoby 200, uznało notyfikację za
+// dostarczoną i NIE ponowiło jej — zamówienie zostałoby pending bez śladu.
+// Dlatego sprawdzamy, że pod adresem odpowiada nasz handler, a nie strona HTML.
+const target = process.argv[2]?.replace(/\/+$/, "");
+if (target) {
+  const url = `${target}/api/p24/status`;
+  console.log(`Sprawdzam urlStatus: ${url}`);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}", // celowo bez podpisu — ma odbić się o bramkę podpisu
+    });
+    const ct = res.headers.get("content-type") ?? "";
+    const body = (await res.text()).slice(0, 200);
+    if (res.status === 400 && ct.includes("json")) {
+      console.log(`✔ urlStatus: HTTP 400 ${body} — odpowiada NASZ handler, bramka podpisu działa`);
+    } else if (res.status === 500) {
+      console.error(`✖ urlStatus: HTTP 500 — trasa istnieje, ale temu wdrożeniu brakuje zmiennych P24_* (getP24Config rzuca)`);
+    } else if (ct.includes("html")) {
+      console.error(`✖ urlStatus: HTTP ${res.status} i HTML zamiast JSON-a — pod tym adresem NIE MA naszej trasy.`);
+      console.error("  ⚠ To jest cicha awaria: P24 zobaczy 200, uzna notyfikację za dostarczoną i jej NIE ponowi.");
+      console.error("  → sprawdź, czy gałąź z /api/p24/status jest wdrożona pod tym adresem i czy ścieżka nie ma literówki");
+    } else {
+      console.error(`✖ urlStatus: nieoczekiwane HTTP ${res.status} (${ct}) ${body}`);
+    }
+  } catch (err) {
+    console.error(`✖ urlStatus: brak połączenia — ${err.message}`);
+  }
+} else {
+  console.log("Pominięto sprawdzenie urlStatus (podaj adres: npm run p24:smoke -- https://twoj-deploy)");
+}
+
 console.log("");
