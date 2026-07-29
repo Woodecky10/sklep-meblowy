@@ -115,9 +115,29 @@ export async function verifyTransaction(p: {
       sign,
     }),
   });
-  if (!res.ok) return false;
+  if (!res.ok) {
+    // Treść odpowiedzi jest tu KRYTYCZNA, bo rozróżnia dwie zupełnie różne
+    // przyczyny, które bez niej wyglądają w logach identycznie:
+    //   "Invalid CRC"  → zły podpis albo zły klucz CRC = błąd KONFIGURACJI,
+    //                    żadna płatność się nie rozliczy (alarm),
+    //   "Error call 2" → transakcja nie jest opłacona / nie zgadza się orderId
+    //                    = normalna ścieżka (klient porzucił płatność).
+    // Rozróżnienie potwierdzone empirycznie na sandboxie 2026-07-29: celowo
+    // zepsuty podpis zwrócił "Invalid CRC", nasz podpis "Error call 2".
+    const detail = await res.text().catch(() => "");
+    console.error(
+      `[p24] verify nieudany (HTTP ${res.status}) dla sessionId=${p.sessionId}, orderId=${p.orderId}: ${detail}`
+    );
+    return false;
+  }
   const json = (await res.json()) as { data?: { status?: string } };
-  return json.data?.status === "success";
+  if (json.data?.status !== "success") {
+    console.error(
+      `[p24] verify: P24 nie potwierdził płatności dla sessionId=${p.sessionId} (status=${json.data?.status ?? "brak"})`
+    );
+    return false;
+  }
+  return true;
 }
 
 export async function refundTransaction(p: {
@@ -136,7 +156,17 @@ export async function refundTransaction(p: {
       refundsUuid: p.requestId,
     }),
   });
-  return res.ok;
+  if (!res.ok) {
+    // Zwrot to operacja na pieniądzach klienta — nieudana próba bez powodu
+    // w logach jest bezużyteczna. Funkcja nie ma dziś UI (zwroty robi się
+    // w panelu P24), ale gdy dostanie przycisk, to jest jedyne źródło diagnozy.
+    const detail = await res.text().catch(() => "");
+    console.error(
+      `[p24] refund nieudany (HTTP ${res.status}) dla sessionId=${p.sessionId}, requestId=${p.requestId}: ${detail}`
+    );
+    return false;
+  }
+  return true;
 }
 
 export function trnRequestUrl(token: string): string {
