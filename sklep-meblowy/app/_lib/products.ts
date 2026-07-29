@@ -344,17 +344,20 @@ export async function getCrossSellProducts(
 // sizeMatched=false → wołający ma pokazać zwykłą kopię „Polecane …" zamiast
 // nagłówka z rozmiarem. Filtr is_active zapewnia RLS (jak w pozostałych
 // publicznych zapytaniach).
+// `sleepSizes` to LISTA, bo w koszyku mogą leżeć dwa łóżka o różnych
+// rozmiarach — wtedy pokazujemy materace pasujące do któregokolwiek z nich.
+// Karta produktu podaje jeden rozmiar (albo pustą listę, gdy mebel go nie ma).
 export async function getSizeMatchedCrossSell(
-  categorySlug: string,
-  sleepSize: string | null,
+  categorySlugs: string[],
+  sleepSizes: string[],
   excludeProductIds: string[] = [],
   limit = 12,
   locale: Locale = DEFAULT_LOCALE
 ): Promise<{ products: Product[]; sizeMatched: boolean }> {
-  const targetSlugs = await resolveCrossSellTargets([categorySlug]);
+  const targetSlugs = await resolveCrossSellTargets(categorySlugs);
   if (targetSlugs.length === 0) return { products: [], sizeMatched: false };
 
-  if (sleepSize) {
+  if (sleepSizes.length > 0) {
     const supabase = await createClient();
     const { data: candidates } = await supabase
       .from("products")
@@ -366,7 +369,7 @@ export async function getSizeMatchedCrossSell(
 
     const ids = pickSizeMatched(
       (candidates ?? []) as SizeCandidate[],
-      sleepSize,
+      sleepSizes,
       targetSlugs
     )
       .filter((p) => !excludeProductIds.includes(p.id))
@@ -392,7 +395,7 @@ export async function getSizeMatchedCrossSell(
 
   // Brak rozmiaru albo zero dopasowań → dotychczasowe zachowanie, żeby sekcja
   // nie zniknęła: 4 najnowsze produkty z kategorii docelowych.
-  const products = await getCrossSellProducts([categorySlug], excludeProductIds, 4, locale);
+  const products = await getCrossSellProducts(categorySlugs, excludeProductIds, 4, locale);
   return { products, sizeMatched: false };
 }
 

@@ -116,7 +116,13 @@ export default async function ProduktPage({ params }: Props) {
       getReviewStatus(product.id),
       getCategoryLabel(product.category, locale),
       getAllCategories(locale),
-      getSizeMatchedCrossSell(product.category, sleepSize, [product.id], 12, locale),
+      getSizeMatchedCrossSell(
+        [product.category],
+        sleepSize ? [sleepSize] : [],
+        [product.id],
+        12,
+        locale
+      ),
       getUserWishlistIds(),
       getEurRate(),
       // Zestawy zawierające ten produkt — box „Kup w zestawie" na karcie.

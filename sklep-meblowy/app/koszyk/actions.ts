@@ -1,7 +1,8 @@
 "use server";
 
 import { validatePromoCode } from "@/app/_lib/promo";
-import { getCrossSellProducts } from "@/app/_lib/products";
+import { getSizeMatchedCrossSell } from "@/app/_lib/products";
+import { sleepSizeOf } from "@/app/_lib/sleep-size";
 import { getUserWishlistIds } from "@/app/_lib/wishlist";
 import { getCategories } from "@/app/_lib/categories";
 import { createAdminClient } from "@/app/_lib/supabase/server";
@@ -95,32 +96,50 @@ export async function getCartCrossSellAction(
   if (items.length === 0)
     return { products: [], wishlistIds: [], categoryLabels: {} };
 
-  // Uzupełnij brakujące category z DB
-  const missing = items.filter((i) => !i.category).map((i) => i.id);
-  let resolved: { id: string; category: string }[] = items
-    .filter((i): i is { id: string; category: string } => !!i.category)
-    .map((i) => ({ id: i.id, category: i.category }));
+  // Kategoria ORAZ rozmiar spania każdej pozycji lecą z bazy, nie z
+  // localStorage: klient trzyma tylko id/name/category, a rozmiar jest
+  // potrzebny do dopasowania materacy (łóżko 140×200 → materace 140×200).
+  // Czytanie z DB zamiast z przekazanej nazwy jest też odporne na przestarzały
+  // wpis w localStorage.
+  const cartProductIds = items.map((i) => i.id);
+  const supabase = await createAdminClient();
+  const { data: rows } = await supabase
+    .from("products")
+    .select("id, category, name, size_label")
+    .in("id", cartProductIds);
 
-  if (missing.length > 0) {
-    const supabase = await createAdminClient();
-    const { data } = await supabase
-      .from("products")
-      .select("id, category")
-      .in("id", missing);
-    resolved = [
-      ...resolved,
-      ...((data ?? []) as { id: string; category: string }[]),
-    ];
-  }
+  const resolved = (rows ?? []) as {
+    id: string;
+    category: string;
+    name: string;
+    size_label: string | null;
+  }[];
 
   const cartCategories = Array.from(
-    new Set(resolved.map((r) => r.category).filter(Boolean))
+    new Set(
+      // Fallback do kategorii z localStorage dla pozycji, których nie ma już
+      // w bazie (produkt usunięty/ukryty) — zachowanie jak dotychczas.
+      [
+        ...resolved.map((r) => r.category),
+        ...items.map((i) => i.category).filter((c): c is string => !!c),
+      ].filter(Boolean)
+    )
   );
-  const cartProductIds = items.map((i) => i.id);
+
+  // Rozmiary łóżek w koszyku. Kilka pozycji → kilka rozmiarów; materac pasujący
+  // do któregokolwiek z nich jest sensowną propozycją.
+  const cartSizes = Array.from(
+    new Set(
+      resolved
+        .map((r) => sleepSizeOf(r))
+        .filter((s): s is string => s !== null)
+    )
+  );
 
   const locale = await getLocale();
-  const products = await getCrossSellProducts(
+  const { products } = await getSizeMatchedCrossSell(
     cartCategories,
+    cartSizes,
     cartProductIds,
     4,
     locale

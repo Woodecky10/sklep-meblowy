@@ -73,7 +73,7 @@ describe("pickSizeMatched", () => {
   it("zostawia tylko dopasowany rozmiar", () => {
     const out = pickSizeMatched(
       [c("a", "materace", "160x200", 1000), c("b", "materace", "180x200", 1000)],
-      "160x200",
+      ["160x200"],
       ORDER
     );
     expect(out.map((p) => p.id)).toEqual(["a"]);
@@ -86,7 +86,7 @@ describe("pickSizeMatched", () => {
         c("kieszeniowy-drozszy", "materace", "160x200", 2000),
         c("piankowy", "materace-piankowe", "160x200", 900),
       ],
-      "160x200",
+      ["160x200"],
       ORDER
     );
     expect(out.map((p) => p.id)).toEqual(["kieszeniowy-drozszy", "piankowy", "topper-tanszy"]);
@@ -98,7 +98,7 @@ describe("pickSizeMatched", () => {
         c("regularny-1200", "materace", "160x200", 1200),
         c("przeceniony-z-2000-na-800", "materace", "160x200", 2000, 800),
       ],
-      "160x200",
+      ["160x200"],
       ORDER
     );
     expect(out.map((p) => p.id)).toEqual(["przeceniony-z-2000-na-800", "regularny-1200"]);
@@ -110,7 +110,7 @@ describe("pickSizeMatched", () => {
         { ...c("b", "materace", "160x200", 1000), name: "Materac Bali" },
         { ...c("a", "materace", "160x200", 1000), name: "Materac Alice" },
       ],
-      "160x200",
+      ["160x200"],
       ORDER
     );
     expect(out.map((p) => p.name)).toEqual(["Materac Alice", "Materac Bali"]);
@@ -119,20 +119,43 @@ describe("pickSizeMatched", () => {
   it("kategoria poza categoryOrder idzie na koniec", () => {
     const out = pickSizeMatched(
       [c("obcy", "poduszki", "160x200", 50), c("swoj", "materace", "160x200", 2000)],
-      "160x200",
+      ["160x200"],
       ORDER
     );
     expect(out.map((p) => p.id)).toEqual(["swoj", "obcy"]);
   });
 
   it("brak dopasowań → pusta tablica", () => {
-    expect(pickSizeMatched([c("a", "materace", "90x200", 500)], "160x200", ORDER)).toEqual([]);
+    expect(pickSizeMatched([c("a", "materace", "90x200", 500)], ["160x200"], ORDER)).toEqual([]);
+  });
+
+  it("kilka rozmiarów (dwa łóżka w koszyku) → materace do każdego z nich", () => {
+    const out = pickSizeMatched(
+      [
+        c("a", "materace", "160x200", 1000),
+        c("b", "materace", "90x200", 500),
+        c("c", "materace", "180x200", 700),
+      ],
+      ["160x200", "90x200"],
+      ORDER
+    );
+    // Bez 180x200; sort po cenie efektywnej w obrębie tej samej kategorii.
+    expect(out.map((p) => p.id)).toEqual(["b", "a"]);
+  });
+
+  it("pusta lista rozmiarów → pusta tablica (nie „wszystko pasuje”)", () => {
+    expect(pickSizeMatched([c("a", "materace", "160x200", 1000)], [], ORDER)).toEqual([]);
+  });
+
+  it("kandydat bez rozmiaru nie wpada do wyniku", () => {
+    const bezRozmiaru = { ...c("x", "materace", "160x200", 100), size_label: null, name: "Materac bez rozmiaru" };
+    expect(pickSizeMatched([bezRozmiaru], ["160x200"], ORDER)).toEqual([]);
   });
 
   it("nie mutuje wejścia", () => {
     const input = [c("b", "materace", "160x200", 2000), c("a", "materace", "160x200", 500)];
     const snapshot = input.map((p) => p.id);
-    pickSizeMatched(input, "160x200", ORDER);
+    pickSizeMatched(input, ["160x200"], ORDER);
     expect(input.map((p) => p.id)).toEqual(snapshot);
   });
 });

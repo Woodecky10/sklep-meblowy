@@ -50,20 +50,30 @@ export type SizeCandidate = {
   sale_price: number | null;
 };
 
-// Kandydaci w danym rozmiarze, posortowani: kolejność kategorii z
-// categoryOrder (czyli cross_sell_categories — realne materace przed
-// topperami), potem cena efektywna rosnąco, na koniec nazwa dla determinizmu.
-// Kategoria poza categoryOrder trafia na koniec. Nie mutuje wejścia (filter
-// tworzy nową tablicę).
+// Kandydaci pasujący do KTÓREGOKOLWIEK z podanych rozmiarów, posortowani:
+// kolejność kategorii z categoryOrder (czyli cross_sell_categories — realne
+// materace przed topperami), potem cena efektywna rosnąco, na koniec nazwa dla
+// determinizmu. Kategoria poza categoryOrder trafia na koniec.
+//
+// Lista rozmiarów, a nie jeden rozmiar, bo w koszyku mogą leżeć dwa łóżka o
+// różnych rozmiarach — wtedy sensowne są materace pasujące do każdego z nich.
+// Karta produktu podaje jednoelementową listę.
+//
+// Nie mutuje wejścia (filter tworzy nową tablicę).
 export function pickSizeMatched<T extends SizeCandidate>(
   candidates: T[],
-  size: SleepSize,
+  sizes: SleepSize[],
   categoryOrder: string[]
 ): T[] {
+  const wanted = new Set(sizes);
+  if (wanted.size === 0) return [];
   const rank = new Map(categoryOrder.map((slug, i) => [slug, i]));
   const last = categoryOrder.length;
   return candidates
-    .filter((c) => sleepSizeOf(c) === size)
+    .filter((c) => {
+      const s = sleepSizeOf(c);
+      return s !== null && wanted.has(s);
+    })
     .sort((a, b) => {
       const ra = rank.get(a.category) ?? last;
       const rb = rank.get(b.category) ?? last;
