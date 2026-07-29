@@ -6,6 +6,7 @@ import { buildSearchOrFilter, rankByNameMatch } from "./search-filter";
 import { sizeLabelOf } from "./size-groups";
 import { localizeProduct, buildLocalizedFacets } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
+import { pickSizeMatched, type SizeCandidate } from "./sleep-size";
 import type { Category, Product } from "./types";
 import { deriveFabricFamilies, productMatchesFabric } from "./fabric-filter";
 import { getAllFabrics } from "./fabrics";
@@ -276,6 +277,32 @@ export async function getProduct(id: string, locale: Locale = DEFAULT_LOCALE) {
 // ============================================================
 // Cross-sell: produkty z kategorii powiązanych z koszykiem
 // ============================================================
+// Slugi kategorii docelowych cross-sellu dla podanych kategorii źródłowych.
+// Kolejność z bazy (cross_sell_categories to text[]) jest znacząca — steruje
+// sortem karuzeli w getSizeMatchedCrossSell (realne materace przed topperami).
+// Pomija kategorie już obecne w źródle — to byłby same-sell, nie cross-sell.
+async function resolveCrossSellTargets(
+  sourceCategorySlugs: string[]
+): Promise<string[]> {
+  const supabase = await createClient();
+  const { data: cats } = await supabase
+    .from("categories")
+    .select("slug, cross_sell_categories")
+    .in("slug", sourceCategorySlugs);
+
+  const targets: string[] = [];
+  for (const c of (cats ?? []) as {
+    slug: string;
+    cross_sell_categories: string[] | null;
+  }[]) {
+    for (const s of c.cross_sell_categories ?? []) {
+      if (sourceCategorySlugs.includes(s)) continue;
+      if (!targets.includes(s)) targets.push(s);
+    }
+  }
+  return targets;
+}
+
 // Bierze unikalne slugi kategorii produktów w koszyku, dla każdej szuka
 // jej `cross_sell_categories` (np. lozko-tapicerowane → ['materace']),
 // łączy je w jeden set i pobiera produkty z tych kategorii (max limit).
@@ -288,30 +315,15 @@ export async function getCrossSellProducts(
 ): Promise<Product[]> {
   if (cartCategorySlugs.length === 0) return [];
 
+  const targetSlugs = await resolveCrossSellTargets(cartCategorySlugs);
+  if (targetSlugs.length === 0) return [];
+
   const supabase = await createClient();
-
-  // Wczytaj cross_sell_categories dla wszystkich kategorii w koszyku
-  const { data: cats } = await supabase
-    .from("categories")
-    .select("slug, cross_sell_categories")
-    .in("slug", cartCategorySlugs);
-
-  const targetSlugs = new Set<string>();
-  for (const c of (cats ?? []) as {
-    slug: string;
-    cross_sell_categories: string[] | null;
-  }[]) {
-    for (const s of c.cross_sell_categories ?? []) {
-      // Nie polecamy kategorii już w koszyku (to nie cross-sell, to same-sell)
-      if (!cartCategorySlugs.includes(s)) targetSlugs.add(s);
-    }
-  }
-  if (targetSlugs.size === 0) return [];
 
   let query = supabase
     .from("products")
     .select("*")
-    .in("category", Array.from(targetSlugs))
+    .in("category", targetSlugs)
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -321,6 +333,59 @@ export async function getCrossSellProducts(
 
   const { data } = await query;
   return ((data ?? []) as Product[]).map((p) => localizeProduct(p, locale));
+}
+
+// Cross-sell dopasowany rozmiarem spania — dla łóżka pokazuje materace w jego
+// rozmiarze. Dwa zapytania zamiast jednego świadomie: wiersz produktu niesie
+// ciężkie `variants` z listami tkanin, więc select("*") po całych kategoriach
+// materacy to megabajty transferu przy każdym renderze, z czego ~90% do
+// odrzucenia. Najpierw wąski scan kandydatów, potem pełne wiersze tylko dla
+// wybranych ID.
+// sizeMatched=false → wołający ma pokazać zwykłą kopię „Polecane …" zamiast
+// nagłówka z rozmiarem. Filtr is_active zapewnia RLS (jak w pozostałych
+// publicznych zapytaniach).
+export async function getSizeMatchedCrossSell(
+  categorySlug: string,
+  sleepSize: string | null,
+  excludeProductIds: string[] = [],
+  limit = 12,
+  locale: Locale = DEFAULT_LOCALE
+): Promise<{ products: Product[]; sizeMatched: boolean }> {
+  const targetSlugs = await resolveCrossSellTargets([categorySlug]);
+  if (targetSlugs.length === 0) return { products: [], sizeMatched: false };
+
+  if (sleepSize) {
+    const supabase = await createClient();
+    const { data: candidates } = await supabase
+      .from("products")
+      .select("id, category, name, size_label, price, sale_price")
+      .in("category", targetSlugs);
+
+    const ids = pickSizeMatched(
+      (candidates ?? []) as SizeCandidate[],
+      sleepSize,
+      targetSlugs
+    )
+      .filter((p) => !excludeProductIds.includes(p.id))
+      .slice(0, limit)
+      .map((p) => p.id);
+
+    if (ids.length > 0) {
+      const { data: full } = await supabase.from("products").select("*").in("id", ids);
+      // `in` nie gwarantuje kolejności — odtwarzamy sort z pickSizeMatched.
+      const byId = new Map(((full ?? []) as Product[]).map((p) => [p.id, p]));
+      const products = ids
+        .map((id) => byId.get(id))
+        .filter((p): p is Product => p !== undefined)
+        .map((p) => localizeProduct(p, locale));
+      return { products, sizeMatched: true };
+    }
+  }
+
+  // Brak rozmiaru albo zero dopasowań → dotychczasowe zachowanie, żeby sekcja
+  // nie zniknęła: 4 najnowsze produkty z kategorii docelowych.
+  const products = await getCrossSellProducts([categorySlug], excludeProductIds, 4, locale);
+  return { products, sizeMatched: false };
 }
 
 export async function getFeaturedProducts(
