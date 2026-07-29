@@ -2,10 +2,10 @@
 // lokalizacja etykiet. Fetch żyje w menu-server.ts (split pure/server jak
 // pages.ts / blocks.ts).
 //
-// Podziału na inline/„Więcej" tu NIE MA: pasek zwija się po zmierzonej
-// szerokości w NavStrip.tsx (arytmetyka w nav-overflow.ts). Wcześniejszy
-// sztywny limit 4 pozycji nie brał pod uwagę ani grup kategorii, ani długości
-// etykiet, ani szerokości okna — i to on pozwalał uciąć prawą część headera.
+// Podziału na inline/„Więcej" tu NIE MA: pozycje paska zawijają się do
+// kolejnego rzędu (flex-wrap w NavStrip.tsx). Wcześniejszy sztywny limit 4
+// pozycji nie brał pod uwagę ani grup kategorii, ani długości etykiet, ani
+// szerokości okna — i to on pozwalał uciąć prawą część headera.
 
 import type { Locale } from "./i18n";
 

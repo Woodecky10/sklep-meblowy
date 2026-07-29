@@ -61,7 +61,10 @@ export default async function Navbar() {
 
   return (
     <header className="bg-[var(--bg)] border-b border-[var(--border)] backdrop-blur-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-24 flex items-center justify-between gap-2 sm:gap-6 relative">
+      {/* min-h-24 zamiast h-24: gdy pasek nawigacji zawinie się do drugiego
+          rzędu (dużo grup kategorii), header rośnie w dół zamiast wypychać
+          ikony poza prawą krawędź. */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 min-h-24 py-2 flex items-center justify-between gap-2 sm:gap-6 relative">
         {/* Logo */}
         <LocalizedLink
           href="/"
@@ -81,13 +84,13 @@ export default async function Navbar() {
           </span>
         </LocalizedLink>
 
-        {/* Nawigacja (desktop) — grupy kategorii + podstrony z menu. Zwija
-            nadmiar do dropdownu „Więcej" na podstawie zmierzonego miejsca, żeby
-            dodanie kolejnej grupy w panelu nie wypchnęło ikon za krawędź. */}
+        {/* Nawigacja (desktop) — grupy kategorii + podstrony z menu. Przy braku
+            miejsca pozycje zawijają się do kolejnego rzędu, więc dodanie grupy
+            w panelu nigdy nie ucina prawej części strony. */}
         <NavStrip
           sections={clientSections}
           pageLinks={navbarItems}
-          labels={{ allInSection: t.nav.allInSection, more: t.common.more }}
+          labels={{ allInSection: t.nav.allInSection }}
         />
 
         {/* Searchbar inline na desktopie + ikony */}

@@ -84,7 +84,8 @@ describe("prepareMenuItems", () => {
   });
 });
 
-// splitNavbarItems / NAVBAR_MAX_INLINE usunięte — pasek zwija nadmiar po
-// ZMIERZONEJ szerokości (nav-overflow.ts + NavStrip.tsx), bo sztywny limit 4
-// nie widział grup kategorii ani szerokości okna i pozwalał uciąć prawą część
-// headera. Testy arytmetyki: app/_lib/__tests__/nav-overflow.test.ts
+// splitNavbarItems / NAVBAR_MAX_INLINE usunięte — nadmiar pozycji paska zawija
+// się do kolejnego rzędu (flex-wrap w NavStrip.tsx), bo sztywny limit 4 nie
+// widział grup kategorii ani szerokości okna i pozwalał uciąć prawą część
+// headera. Zawijanie to czysty CSS, więc nie ma tu czego testować jednostkowo;
+// weryfikacja jest wizualna (Playwright na kilku szerokościach okna).
