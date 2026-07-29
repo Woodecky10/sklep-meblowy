@@ -43,30 +43,11 @@ import { getBundlesForProduct } from "@/app/_lib/bundles-server";
 import { sleepSizeOf, formatSleepSize } from "@/app/_lib/sleep-size";
 import ProductCarousel from "@/app/_components/ui/ProductCarousel";
 import type { Product } from "@/app/_lib/types";
+import { productPlainText } from "@/app/_lib/product-text";
+import { baseOpenGraph } from "@/app/_lib/seo-og";
+import { buildBreadcrumbJsonLd, serializeJsonLd } from "@/app/_lib/seo-jsonld";
 
 type Props = { params: Promise<{ id: string }> };
-
-// Strip HTML tagów dla meta description (Google nie chce tagów w meta).
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
-}
-
-// Plain-text opis dla SEO/JSON-LD. Po wyłączeniu sync opisów plain `description`
-// bywa puste dla nowych produktów — wtedy składamy z widocznych tekstowych
-// sekcji (jedyne źródło opisu, wpisywane ręcznie w panelu).
-function productPlainDescription(product: Product): string {
-  if (product.description && product.description.trim().length > 0) {
-    return product.description;
-  }
-  return (product.description_sections ?? [])
-    .filter(
-      (s): s is Extract<typeof s, { kind: "text" }> =>
-        s.kind === "text" && s.hidden !== true
-    )
-    .map((s) => (s.admin_body ?? s.body).trim())
-    .filter((b) => b.length > 0)
-    .join("\n\n");
-}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
@@ -80,18 +61,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const plPath = `/produkt/${id}`;
   return {
     title: product.name,
-    // Meta description = plain text (bez HTML, max 160 znaków)
-    description: stripHtml(productPlainDescription(product)).slice(0, 160),
+    // Meta description = plain text (bez HTML, max 160 znaków). Ten sam helper
+    // karmi JSON-LD i feed do Merchant Center — patrz product-text.ts.
+    description: productPlainText(product).slice(0, 160),
     alternates: {
       // canonical = self dla bieżącego locale (relatywne, rozwiązane przez
       // metadataBase z app/layout.tsx). Na PL → /produkt/X, na DE → /de/produkt/X.
       canonical: localizePath(plPath, locale),
       languages: alternatesFor(plPath, { hasDe }).languages,
     },
-    openGraph: {
-      locale: locale === "de" ? "de_DE" : "pl_PL",
-      images: product.images?.[0] ? [{ url: product.images[0] }] : [],
-    },
+    // Zdjęcie produktu jako obrazek udostępnienia; gdy produkt nie ma zdjęć,
+    // baseOpenGraph degraduje do brandowego /og zamiast zostawić link bez obrazka.
+    openGraph: baseOpenGraph(locale, { images: [product.images?.[0]] }),
   };
 }
 
@@ -223,8 +204,10 @@ export default async function ProduktPage({ params }: Props) {
   // Structured data dla Google (schema.org/Product) — rich snippets w SERP-ach:
   // cena, dostępność, gwiazdki/ocena prosto w wynikach wyszukiwania.
   // Plain text description (bez HTML tagów) wymagany przez Google.
-  const plainDescription = stripHtml(productPlainDescription(product)).slice(0, 5000);
-  const productUrl = `https://${COMPANY.domain}/produkt/${product.id}`;
+  const plainDescription = productPlainText(product).slice(0, 5000);
+  // URL oferty w bieżącym locale — na /de musi wskazywać stronę DE, inaczej
+  // Google widzi rozjazd między canonical (/de/produkt/X) a offers.url.
+  const productUrl = `https://${COMPANY.domain}${localizePath(`/produkt/${product.id}`, locale)}`;
   // Cena w danych strukturalnych = cena EFEKTYWNA (promocyjna gdy obniżka), żeby
   // zgadzała się z ceną widoczną na stronie — inaczej Google (Merchant/rich
   // snippets) zgłasza rozjazd "structured data ≠ visible price". Dla produktów
@@ -261,9 +244,24 @@ export default async function ProduktPage({ params }: Props) {
     };
   }
 
-  // Escape `<` → <: bez tego product.name/description zawierające
-  // </script> wybiłyby się z bloku JSON-LD i wstrzyknęły skrypt (audyt LOW).
-  const jsonLdHtml = JSON.stringify(jsonLd).replace(/</g, "\\u003c");
+  // serializeJsonLd escapuje `<` → <: bez tego product.name/description
+  // zawierające </script> wybiłyby się z bloku i wstrzyknęły skrypt (audyt LOW).
+  const jsonLdHtml = serializeJsonLd(jsonLd);
+
+  // BreadcrumbList — te same okruchy, które widzi klient (nawigacja niżej).
+  // Google pokazuje je w wyniku wyszukiwania zamiast surowego URL-a.
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(
+    [
+      { name: t.product.breadcrumbHome, path: "/" },
+      { name: t.product.breadcrumbShop, path: "/sklep" },
+      {
+        name: categoryLabel ?? product.category,
+        path: `/sklep?kategoria=${product.category}`,
+      },
+      { name: product.name },
+    ],
+    locale
+  );
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   // Sekcje opisu (IKEA-style akordeony). Pre-process: aplikuj admin overrides
@@ -291,6 +289,13 @@ export default async function ProduktPage({ params }: Props) {
         nonce={nonce}
         dangerouslySetInnerHTML={{ __html: jsonLdHtml }}
       />
+      {breadcrumbJsonLd && (
+        <script
+          type="application/ld+json"
+          nonce={nonce}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
+        />
+      )}
 
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-xs font-sans text-[var(--muted)] mb-12 uppercase tracking-widest">

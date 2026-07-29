@@ -12,6 +12,8 @@ import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import FabricSwatchGrid from "@/app/_components/ui/FabricSwatchGrid";
 import FabricFeaturedProducts from "@/app/_components/ui/FabricFeaturedProducts";
 import { createAdminClient } from "@/app/_lib/supabase/server";
+import { headers } from "next/headers";
+import { buildBreadcrumbJsonLd, serializeJsonLd } from "@/app/_lib/seo-jsonld";
 
 // Strona tkaniny (spec 2026-07-21): opis + wzornik (siatka kolorów z
 // color_images) + plakietka grupy cenowej + sekcja „Meble w tej tkaninie"
@@ -86,8 +88,27 @@ export default async function TkaninaPage({ params }: Props) {
       }));
   }
 
+  // BreadcrumbList dla Google — te same okruchy, które widzi klient poniżej.
+  const fabricName = pickLocalized(fabric.name, fabric.name_de, locale);
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(
+    [
+      { name: t.product.breadcrumbHome, path: "/" },
+      { name: t.fabrics.heading, path: "/tkaniny" },
+      { name: fabricName },
+    ],
+    locale
+  );
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <div className="max-w-5xl mx-auto px-6 py-16">
+      {breadcrumbJsonLd && (
+        <script
+          type="application/ld+json"
+          nonce={nonce}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
+        />
+      )}
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-xs font-sans text-[var(--muted)] mb-12 uppercase tracking-widest">
         <LocalizedLink href="/" className="hover:text-[var(--color-gold)] transition-colors">
