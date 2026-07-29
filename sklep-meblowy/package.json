@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "preview:mail": "tsx scripts/preview-mail.mjs",
-    "p24:smoke": "tsx scripts/p24-smoke.mjs"
+    "p24:smoke": "tsx scripts/p24-smoke.mjs",
+    "p24:methods": "tsx scripts/p24-methods.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
