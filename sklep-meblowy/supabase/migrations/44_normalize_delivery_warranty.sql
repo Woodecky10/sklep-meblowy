@@ -1,5 +1,5 @@
 -- Migracja 44: normalizacja pól delivery_time i warranty produktów.
--- Import z BaseLinkera zostawił niespójne/surowe wartości ("21", "2", "2 lat",
+-- Dawny import produktów zostawił niespójne/surowe wartości ("21", "2", "2 lat",
 -- "21 dni"), które renderowały się dosłownie na karcie produktu zamiast
 -- "21 dni roboczych" / "2 lata" i nie tłumaczyły się poprawnie na /de.
 --

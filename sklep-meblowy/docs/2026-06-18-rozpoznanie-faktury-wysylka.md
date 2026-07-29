@@ -1,7 +1,7 @@
 # Rozpoznanie: Faktury (KSeF) + Wysyłka — pytania do właścicielki
 
 **Data:** 2026-06-18
-**Kontekst:** Podprojekty 3 (faktury/VAT) i 4 (wysyłka) z planu rezygnacji z BaseLinkera.
+**Kontekst:** Podprojekty 3 (faktury/VAT) i 4 (wysyłka) z programu przejęcia obsługi sklepu w całości przez panel.
 Przed napisaniem spec/planu trzeba poznać obieg biznesowy. Poniżej pytania do właścicielki
 + notatki techniczne dla dewelopera. **Odpowiedzi wpisuj pod każdym pytaniem.**
 
@@ -112,7 +112,6 @@ Właścicielka (2026-06-18): **żadna firma kurierska nie przewozi gabarytów**,
 - status: `status` (enum: pending/paid/processing/shipped/delivered/cancelled), `order_number`, `status_updated_at`
 - **dostawa (migr. 31):** `carrier`, `tracking_number`, `delivery_cost`, `delivery_paid` ✅
 - admin: `admin_note`; rabat: `promo_code_id`, `promo_discount`
-- BL legacy: `baselinker_order_id`, `baselinker_push_error`
 - `order_items`: `product_id`, `quantity`, `price` (jednostkowa, **bez VAT**), `variant_values`, `notes`
 
 ### FAKTURY — luki (zero podstaw)

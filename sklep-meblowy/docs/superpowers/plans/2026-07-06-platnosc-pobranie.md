@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16.2.4 (App Router), Supabase (Postgres), Stripe (tylko ścieżka online), Tailwind v4, vitest.
 
-**Spec:** `docs/superpowers/specs/2026-07-06-platnosc-pobranie-design.md`
+**Spec:** usunięty z repo (dokument archiwalny); ten plan jest teraz jedynym opisem projektu tej funkcji.
 
 ## Global Constraints
 

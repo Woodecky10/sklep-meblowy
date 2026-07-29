@@ -5,7 +5,7 @@
 -- + zdjęcia per wariant) do storage bucketa 'products'. Bucket jest public
 -- (zdjęcia widoczne dla wszystkich), zapis tylko dla roli admin.
 --
--- URL-e zewnętrzne (np. z BaseLinkera) dalej mogą trafiać do
+-- URL-e zewnętrzne dalej mogą trafiać do
 -- products.images / variants.combinations[].images — bez zmian.
 -- ============================================================
 
