@@ -7,8 +7,22 @@ Sklep meblowy **Mollien** (meble na zamówienie). **Next.js 16** (App Router, Se
 
 > ⚠️ To NIE jest Next.js z treningu — wersja 16 ma breaking changes. Przed kodem Server Component/Action sprawdź `node_modules/next/dist/docs/`. `params`/`searchParams` to Promise. (Patrz `sklep-meblowy/AGENTS.md`.)
 
-## Stan repo (2026-06-24)
-`origin/main` = `73382b2`, **na produkcji** (Vercel auto-deployuje z `main`). Bramki na `main`: `tsc` 0 · `lint` 0 · **208 testów** (vitest) · `build` przechodzi (Turbopack).
+## Stan repo (2026-07-29)
+`origin/main` = `396e3f4`, **na produkcji** (Vercel auto-deployuje z `main`). Bramki na `main`: `tsc` 0 · `lint` 0 błędów (4 znane warningi) · **797 testów** (vitest) · `build` przechodzi (Turbopack).
+
+### Maile transakcyjne — UZBROJONE i przetestowane na produkcji (2026-07-29)
+Kod był gotowy od 2026-07-28, brakowało konfiguracji — zrobione i sprawdzone realnym zamówieniem na mollien.pl. Działa: potwierdzenie zamówienia, „Nowe zamówienie" do właścicielki, „w drodze" (z przewoźnikiem i trackingiem), „anulowane". Maile wychodzą TYLKO przy statusach `shipped` i `cancelled` (`NOTIFY_STATUSES` w `app/_lib/mail/status-notify.ts`) — „Dostarczone"/„W realizacji"/„Opłacone" świadomie nie mailują.
+
+- **Adresy — jeden kontaktowy, celowo:** `MAIL_FROM` = `Mollien <zamowienia@mollien.pl>` (ten adres **nie jest skrzynką** i nie musi być — do wysyłki wystarcza zweryfikowana domena; nie „naprawiaj" tego zakładaniem skrzynki). `MAIL_REPLY_TO` = `MAIL_ADMIN_TO` = `COMPANY.email` = **mollien.julia@gmail.com**.
+- **DNS:** strefa w **home.pl** (Domeny → mollien.pl → karta „Hosting DNS" → DZIAŁANIA → „Zarządzaj rekordami DNS"), NIE w Vercelu. Cztery rekordy: `TXT resend._domainkey`, `MX send` (prio 10), `TXT send` (SPF), `TXT _dmarc`. Domena w Resend = Verified. **MX na apex świadomie NIE ma** („Enable Receiving" w Resend wyłączone) — dlatego na `@mollien.pl` nie da się nic odebrać i dlatego reply-to jest na Gmailu.
+- **Gdy maile nie dochodzą:** `sendMail` nigdy nie rzuca, tylko loguje. Vercel → zakładka **Logs** (Runtime, nie Build) → filtr `[mail]`. `brak RESEND_API_KEY`/`brak MAIL_FROM` = zmienna nie dojechała do wdrożenia (**po zmianie zmiennej trzeba Redeploy** — wdrożenie ma zamrożony zestaw z builda). Drugie źródło: Resend → Logs, jedyne miejsce gdzie widać nieudaną wysyłkę (kod nie zapisuje i nie ponawia).
+- **ZOSTAŁO:** mail weryfikacyjny konta idzie wbudowanym mailerem Supabase (limit kilku/godzinę, domyślny szablon). Podpięcie: `docs/maile-konfiguracja.md` sekcja 3.
+
+### Inne otwarte drobiazgi po 2026-07-29
+- **Zamówienia #36 i #37** w produkcyjnej bazie to testy maili — czekają na decyzję, czy usunąć (usuwać: najpierw `order_items`, potem `orders`).
+- **5 plików migracji po BaseLinkerze** (`07`, `11`, `24`, `25`, `34`) — do usunięcia ręcznie; `grep -ri baselinker` nie będzie pusty i to NIE regresja czystki. Stan spójny: `09` nie tworzy kolumny, `34` dropuje z `if exists`.
+- **Zmienne `BASELINKER_*`/`CRON_SECRET` w Vercelu** — do sprawdzenia i usunięcia, jeśli zostały. Nic ich nie czyta.
+- **Sesja e2e admina wygasła**, a `.env.e2e` nie ma `E2E_ADMIN_EMAIL`/`E2E_ADMIN_PASSWORD` — bez tego nie da się fotografować panelu ani testować akcji admina.
 
 Ostatnio scalone:
 - **PR #41** — domknięcie wycieków PL na `/de` (redirecty/linki gubiły prefiks `/de`, komunikaty błędów po DE).
@@ -45,6 +59,7 @@ npm run dev
 ```
 Niezbędne env do dev (nazwy — wartości z Vercel/starego `.env.local`):
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_APP_URL`. Pełny szablon: `sklep-meblowy/.env.example`.
+> Maile: `RESEND_API_KEY`, `MAIL_FROM`, `MAIL_REPLY_TO`, `MAIL_ADMIN_TO` są ustawione **w Vercelu (Production)**. Lokalnie NIE są potrzebne — bez `RESEND_API_KEY` kod działa w trybie no-op (loguje `[mail] brak RESEND_API_KEY` i nic nie wysyła), więc dev nie zaśmieca skrzynek. Dodaj je do `.env.local` tylko gdy chcesz testować maile z lokalnego builda.
 > **Baza i storage są ZDALNE/współdzielone (Supabase).** Migracje (29–34) już wgrane, obrazy w storage. Nowy komp **nie robi setupu bazy** — wystarczy `.env.local` wskazujący na ten sam projekt Supabase. `.env.local` i `node_modules` są gitignored, więc nie przychodzą z klonem.
 
 ## Baza — migracje
