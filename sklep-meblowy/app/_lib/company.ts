@@ -28,8 +28,10 @@ export const COMPANY = {
   // Jeśli JDG – CEIDG; jeśli sp. z o.o. – KRS. Zostaw null jeśli nie dotyczy.
   krs: null as string | null,
 
-  // Kontakt z klientami
-  email: "mollien.shop@gmail.com",
+  // Kontakt z klientami. TEN SAM adres co MAIL_REPLY_TO i MAIL_ADMIN_TO —
+  // klient ma widzieć jeden adres, niezależnie czy odpisuje na maila ze sklepu,
+  // czy przepisuje adres ze strony. Zmieniając tu, zmień też zmienne w Vercelu.
+  email: "mollien.julia@gmail.com",
   // Format: "+48 XXX XXX XXX"
   phone: "+48 789 826 403" as string | null,
 
