@@ -15,7 +15,8 @@ import { COMPANY } from "@/app/_lib/company";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { getMenuItems } from "@/app/_lib/menu-server";
-import { prepareMenuItems, splitNavbarItems } from "@/app/_lib/menu";
+import { prepareMenuItems } from "@/app/_lib/menu";
+import NavStrip from "./NavStrip";
 
 export default async function Navbar() {
   const supabase = await createClient();
@@ -38,8 +39,6 @@ export default async function Navbar() {
   ]);
 
   const navbarItems = prepareMenuItems(menuRows, "navbar", locale);
-  const { inline: navbarInline, overflow: navbarOverflow } =
-    splitNavbarItems(navbarItems);
 
   // Grupowanie kategorii pod sekcjami — jedna iteracja zamiast N+1 zapytań.
   const categoriesBySection = new Map<string, typeof categories>();
@@ -49,8 +48,9 @@ export default async function Navbar() {
     categoriesBySection.set(c.group_slug, arr);
   }
 
-  // Lekka projekcja dla MobileMenu (klient) — bez rzeczy nie potrzebnych.
-  const mobileSections = sections.map((s) => ({
+  // Lekka projekcja dla komponentów klienckich (NavStrip, MobileMenu) — bez
+  // rzeczy nie potrzebnych.
+  const clientSections = sections.map((s) => ({
     slug: s.slug,
     label: s.label,
     categories: (categoriesBySection.get(s.slug) ?? []).map((c) => ({
@@ -81,106 +81,14 @@ export default async function Navbar() {
           </span>
         </LocalizedLink>
 
-        {/* Nawigacja + searchbar (desktop) */}
-        <div className="hidden lg:flex items-center gap-8 flex-1 justify-center">
-          <nav className="flex items-center gap-6">
-            {sections.map((section) => {
-              const cats = categoriesBySection.get(section.slug) ?? [];
-              // Sam HEADER sekcji jest klikalny — prowadzi do /sklep?sekcja=<slug>
-              // pokazując WSZYSTKIE produkty z tej sekcji (bez wyboru
-              // sub-kategorii). Hover wciąż otwiera dropdown z sub-kategoriami
-              // dla bardziej precyzyjnego filtra. CSS group-hover na divie
-              // działa tak samo niezależnie od tego czy headerem jest Link
-              // czy button.
-              return (
-                <div key={section.slug} className="relative group shrink-0">
-                  <LocalizedLink
-                    href={`/sklep?sekcja=${section.slug}`}
-                    className="font-sans text-xs uppercase tracking-widest text-[var(--muted)] group-hover:text-[var(--color-gold)] transition-colors flex items-center gap-1 h-24 whitespace-nowrap"
-                  >
-                    {section.label}
-                    <svg
-                      width="10"
-                      height="10"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                  </LocalizedLink>
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 min-w-[220px] bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-2xl py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
-                    {/* Pierwszy item = link do całej sekcji (skrót dla użytkownika
-                        który najechał na dropdown i chce zobaczyć wszystko). */}
-                    <LocalizedLink
-                      href={`/sklep?sekcja=${section.slug}`}
-                      className="block px-5 py-2.5 text-sm text-[var(--color-gold)] hover:bg-[var(--bg)] transition-colors border-b border-[var(--border)] mb-1 font-medium"
-                    >
-                      {t.nav.allInSection} {section.label.toLowerCase()}
-                    </LocalizedLink>
-                    {cats.map((c) => (
-                      <LocalizedLink
-                        key={c.slug}
-                        href={`/sklep?kategoria=${c.slug}`}
-                        className="block px-5 py-2.5 text-sm text-[var(--fg)] hover:bg-[var(--bg)] hover:text-[var(--color-gold)] transition-colors"
-                      >
-                        {c.label}
-                      </LocalizedLink>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-            {/* Podstrony z menu (admin: /admin/podstrony) — max 4 inline. */}
-            {navbarInline.map((item) => (
-              <div key={item.id} className="shrink-0">
-                <LocalizedLink
-                  href={item.href}
-                  className="font-sans text-xs uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors flex items-center h-24 whitespace-nowrap"
-                >
-                  {item.label}
-                </LocalizedLink>
-              </div>
-            ))}
-            {/* Nadmiar >4 — dropdown „Więcej", idiom CSS 1:1 z dropdownami sekcji. */}
-            {navbarOverflow.length > 0 && (
-              <div className="relative group shrink-0">
-                <button
-                  type="button"
-                  className="font-sans text-xs uppercase tracking-widest text-[var(--muted)] group-hover:text-[var(--color-gold)] transition-colors flex items-center gap-1 h-24 whitespace-nowrap"
-                >
-                  {t.common.more}
-                  <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
-                </button>
-                <div className="absolute top-full left-1/2 -translate-x-1/2 min-w-[220px] bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-2xl py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all">
-                  {navbarOverflow.map((item) => (
-                    <LocalizedLink
-                      key={item.id}
-                      href={item.href}
-                      className="block px-5 py-2.5 text-sm text-[var(--fg)] hover:bg-[var(--bg)] hover:text-[var(--color-gold)] transition-colors"
-                    >
-                      {item.label}
-                    </LocalizedLink>
-                  ))}
-                </div>
-              </div>
-            )}
-          </nav>
-        </div>
+        {/* Nawigacja (desktop) — grupy kategorii + podstrony z menu. Zwija
+            nadmiar do dropdownu „Więcej" na podstawie zmierzonego miejsca, żeby
+            dodanie kolejnej grupy w panelu nie wypchnęło ikon za krawędź. */}
+        <NavStrip
+          sections={clientSections}
+          pageLinks={navbarItems}
+          labels={{ allInSection: t.nav.allInSection, more: t.common.more }}
+        />
 
         {/* Searchbar inline na desktopie + ikony */}
         <div className="flex items-center gap-2 shrink-0">
@@ -201,7 +109,7 @@ export default async function Navbar() {
           <MobileMenu
             isLoggedIn={!!user}
             isAdmin={isAdmin(user)}
-            sections={mobileSections}
+            sections={clientSections}
             pageLinks={navbarItems}
             labels={{
               menu: t.nav.menu,

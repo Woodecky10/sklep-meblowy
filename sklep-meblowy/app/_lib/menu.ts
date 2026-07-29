@@ -1,6 +1,11 @@
 // Pozycje menu (spec 2026-07-14, krok D) — CZYSTY moduł: filtr, sort,
-// lokalizacja etykiet, podział Navbara na inline/„Więcej". Fetch żyje
-// w menu-server.ts (split pure/server jak pages.ts / blocks.ts).
+// lokalizacja etykiet. Fetch żyje w menu-server.ts (split pure/server jak
+// pages.ts / blocks.ts).
+//
+// Podziału na inline/„Więcej" tu NIE MA: pasek zwija się po zmierzonej
+// szerokości w NavStrip.tsx (arytmetyka w nav-overflow.ts). Wcześniejszy
+// sztywny limit 4 pozycji nie brał pod uwagę ani grup kategorii, ani długości
+// etykiet, ani szerokości okna — i to on pozwalał uciąć prawą część headera.
 
 import type { Locale } from "./i18n";
 
@@ -10,9 +15,6 @@ export type MenuLocation = (typeof MENU_LOCATIONS)[number];
 export function isMenuLocation(v: string): v is MenuLocation {
   return (MENU_LOCATIONS as readonly string[]).includes(v);
 }
-
-// Limit paska: powyżej 4 pozycji nadmiar ląduje w dropdownie „Więcej".
-export const NAVBAR_MAX_INLINE = 4;
 
 export type MenuItemRow = {
   id: string;
@@ -62,15 +64,4 @@ export function prepareMenuItems(
           : pick(page.title_de, page.title) ?? page.title;
       return { id: r.id, href: `/${page.slug}`, label };
     });
-}
-
-export function splitNavbarItems(items: LocalizedMenuItem[]): {
-  inline: LocalizedMenuItem[];
-  overflow: LocalizedMenuItem[];
-} {
-  if (items.length <= NAVBAR_MAX_INLINE) return { inline: items, overflow: [] };
-  return {
-    inline: items.slice(0, NAVBAR_MAX_INLINE),
-    overflow: items.slice(NAVBAR_MAX_INLINE),
-  };
 }

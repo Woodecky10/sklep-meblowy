@@ -2,11 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   MENU_LOCATIONS,
   isMenuLocation,
-  NAVBAR_MAX_INLINE,
   prepareMenuItems,
-  splitNavbarItems,
   type MenuItemRow,
-  type LocalizedMenuItem,
 } from "@/app/_lib/menu";
 
 const row = (over: Partial<MenuItemRow>): MenuItemRow => ({
@@ -87,19 +84,7 @@ describe("prepareMenuItems", () => {
   });
 });
 
-describe("splitNavbarItems", () => {
-  const make = (n: number): LocalizedMenuItem[] =>
-    Array.from({ length: n }, (_, i) => ({ id: `i${i}`, href: `/p${i}`, label: `P${i}` }));
-  it("do 4 pozycji wszystko inline, bez overflow", () => {
-    expect(splitNavbarItems(make(0))).toEqual({ inline: [], overflow: [] });
-    const four = splitNavbarItems(make(4));
-    expect(four.inline).toHaveLength(4);
-    expect(four.overflow).toHaveLength(0);
-  });
-  it("powyżej 4: pierwsze 4 inline, reszta w overflow (Więcej)", () => {
-    const six = splitNavbarItems(make(6));
-    expect(six.inline.map((i) => i.id)).toEqual(["i0", "i1", "i2", "i3"]);
-    expect(six.overflow.map((i) => i.id)).toEqual(["i4", "i5"]);
-    expect(NAVBAR_MAX_INLINE).toBe(4);
-  });
-});
+// splitNavbarItems / NAVBAR_MAX_INLINE usunięte — pasek zwija nadmiar po
+// ZMIERZONEJ szerokości (nav-overflow.ts + NavStrip.tsx), bo sztywny limit 4
+// nie widział grup kategorii ani szerokości okna i pozwalał uciąć prawą część
+// headera. Testy arytmetyki: app/_lib/__tests__/nav-overflow.test.ts
