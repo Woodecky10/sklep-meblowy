@@ -20,7 +20,7 @@ Kod był gotowy od 2026-07-28, brakowało konfiguracji — zrobione i sprawdzone
 
 ### Inne otwarte drobiazgi po 2026-07-29
 - **Zamówienia #36 i #37** w produkcyjnej bazie to testy maili — czekają na decyzję, czy usunąć (usuwać: najpierw `order_items`, potem `orders`).
-- **5 plików migracji po BaseLinkerze** (`07`, `11`, `24`, `25`, `34`) — do usunięcia ręcznie; `grep -ri baselinker` nie będzie pusty i to NIE regresja czystki. Stan spójny: `09` nie tworzy kolumny, `34` dropuje z `if exists`.
+- **Migracje po BaseLinkerze — ZROBIONE 2026-07-29, ale nie wszystkie 5.** Usunięte trzy czysto BL-owe: `07_baselinker_integration`, `11_baselinker_sync_log`, `24_baselinker_sync_log_report`. ⚠️ **`25_bl_push_hardening` MUSI ZOSTAĆ** — mimo nazwy zawiera dwie rzeczy, które nadal żyją: RPC `increment_promo_usage` (atomowy licznik kodów rabatowych, wołany z `markOrderPaid`) i **polityki RLS write na `products`** dla admina (bez nich panel nie zapisuje produktów). ⚠️ **`34_drop_baselinker` też ZOSTAJE**, dopóki zostaje `25` — dropuje kolumnę `orders.baselinker_push_error`, którą `25` wciąż tworzy, więc świeży build bazy kończy bez śladów BL. Dlatego `grep -ri baselinker` nadal daje 2 trafienia i to NIE regresja czystki.
 - **Zmienne `BASELINKER_*`/`CRON_SECRET` w Vercelu** — do sprawdzenia i usunięcia, jeśli zostały. Nic ich nie czyta.
 - **Sesja e2e admina wygasła**, a `.env.e2e` nie ma `E2E_ADMIN_EMAIL`/`E2E_ADMIN_PASSWORD` — bez tego nie da się fotografować panelu ani testować akcji admina.
 
