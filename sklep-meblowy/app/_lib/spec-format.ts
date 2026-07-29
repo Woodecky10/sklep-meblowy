@@ -1,5 +1,5 @@
 // Normalizacja i lokalizacja pól „Czas dostawy" (delivery_time) i „Gwarancja"
-// (warranty). Oba są wolnotekstowe w DB, więc import z BaseLinkera zostawił surowe
+// (warranty). Oba są wolnotekstowe w DB, więc dawny import produktów zostawił surowe
 // wartości typu "21" / "2" / "2 lat", które renderowały się dosłownie na karcie
 // produktu. Te helpery kanonizują wejście do formatu "N dni roboczych" / "N lata"
 // (z poprawną polską odmianą) i dają ogólny fallback DE, żeby liczbowe wartości

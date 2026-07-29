@@ -15,11 +15,15 @@ export const RESERVED_SLUGS: Set<string> = new Set([
   "checkout",
   "de",
   "dostawa",
+  // Feed produktowy dla Google Merchant Center (app/feed.xml/route.ts).
+  "feed.xml",
   "konto",
   "kontakt",
   "koszyk",
   "logowanie",
   "o-nas",
+  // Brandowy obrazek og:image 1200×630 (app/og/route.tsx).
+  "og",
   "produkt",
   "prywatnosc",
   "regulamin",

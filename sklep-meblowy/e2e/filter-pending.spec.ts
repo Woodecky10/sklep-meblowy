@@ -1,12 +1,12 @@
 import { test, expect } from "@playwright/test";
 
-// Regresja płynności filtrów: po kliknięciu opcji tkaniny UI reaguje
+// Regresja płynności filtrów: po kliknięciu wartości parametru UI reaguje
 // NATYCHMIAST (optymistyczne podświetlenie + aria-busy na kontenerze),
-// zanim serwer odpowie. Dławimy odpowiedzi nawigacji z ?tkanina= o ~1,5 s,
+// zanim serwer odpowie. Dławimy odpowiedzi nawigacji z ?cecha_ o ~1,5 s,
 // żeby okno pending było deterministycznie obserwowalne.
-test("filtr tkaniny — natychmiastowy feedback przed odpowiedzią serwera", async ({ page }) => {
+test("filtr parametru — natychmiastowy feedback przed odpowiedzią serwera", async ({ page }) => {
   await page.route("**/sklep*", async (route) => {
-    if (route.request().url().includes("tkanina=")) {
+    if (route.request().url().includes("cecha_")) {
       await new Promise((r) => setTimeout(r, 1500));
     }
     await route.continue();
@@ -14,8 +14,8 @@ test("filtr tkaniny — natychmiastowy feedback przed odpowiedzią serwera", asy
 
   await page.goto("/sklep");
 
-  // Otwórz dropdown "Tkanina" i kliknij pierwszą opcję.
-  await page.getByRole("button", { name: "Tkanina", exact: false }).first().click();
+  // Otwórz dropdown "Powierzchnia spania" i kliknij pierwszą wartość.
+  await page.getByRole("button", { name: "Powierzchnia spania", exact: false }).first().click();
   const option = page
     .locator("div.flex.flex-wrap.gap-1\\.5 > button")
     .first();
@@ -23,13 +23,13 @@ test("filtr tkaniny — natychmiastowy feedback przed odpowiedzią serwera", asy
   await option.click();
 
   // NATYCHMIAST (przed upływem dławienia): kontener FilterBara w stanie busy
-  // i kliknięta opcja optymistycznie aktywna (złote tło).
+  // i kliknięta wartość optymistycznie aktywna (złote tło).
   const busy = page.locator('div[aria-busy="true"]');
   await expect(busy).toBeVisible({ timeout: 500 });
   await expect(option).toHaveClass(/bg-\[var\(--color-gold\)\]/, { timeout: 500 });
 
-  // Po zatwierdzeniu nawigacji: URL niesie ?tkanina=, busy znika.
-  await expect(page).toHaveURL(/tkanina=/, { timeout: 10_000 });
+  // Po zatwierdzeniu nawigacji: URL niesie ?cecha_powierzchnia-spania=, busy znika.
+  await expect(page).toHaveURL(/cecha_powierzchnia-spania=/, { timeout: 10_000 });
   await expect(page.locator('div[aria-busy="true"]')).toHaveCount(0, { timeout: 10_000 });
   expect(optionLabel.length).toBeGreaterThan(0);
 });

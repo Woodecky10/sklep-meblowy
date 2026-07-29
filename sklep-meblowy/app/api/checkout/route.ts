@@ -1,7 +1,8 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import { registerTransaction, trnRequestUrl, type P24RegisterParams } from "@/app/_lib/p24";
 import { createClient, createAdminClient } from "@/app/_lib/supabase/server";
 import { createOrder } from "@/app/_lib/orders";
+import { notifyOrderPlaced } from "@/app/_lib/mail/notify-order";
 import { validatePromoCode, incrementPromoUsage } from "@/app/_lib/promo";
 import { isValidCodPhone } from "@/app/_lib/cod";
 import {
@@ -19,6 +20,11 @@ import {
   computeBundleDiscount,
   eligiblePromoBase,
 } from "@/app/_lib/bundles";
+
+// Ogranicza czas pracy handlera PO odpowiedzi (patrz after() nizej) —
+// wysylka maila nie moze wisiec bez limitu. 30s jest w limicie Node
+// kazdego planu Vercela.
+export const maxDuration = 30;
 
 type CheckoutBody = {
   items: {
@@ -382,6 +388,13 @@ export async function POST(request: NextRequest) {
           console.error("[promo] increment used_count (COD) nieudany:", err);
         }
       }
+      // Mail NA KONIEC i przez after(): wysylka nie moze opoznic odpowiedzi ani
+      // wywalic zakupu. Zamowienie jest juz utworzone, wiec blad tutaj kosztowalby
+      // klienta drugie zamowienie po ponownym kliknieciu.
+      // POST-response: to wywolanie nigdy nie moze opoznic ani zepsuc odpowiedzi
+      // do klienta — sendMail i tak nigdy nie rzuca, ale after() dodatkowo
+      // gwarantuje, ze nawet powolny Resend nie wydluzy czasu checkoutu.
+      after(() => notifyOrderPlaced(order.id));
       return NextResponse.json({
         url: `${origin}${localePrefix}/checkout/success?order_id=${order.id}`,
       });

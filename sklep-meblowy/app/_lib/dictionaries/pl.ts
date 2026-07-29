@@ -62,6 +62,9 @@ export type PlShape = {
     crossSellEyebrow: string;
     crossSellRecommendedPrefix: string;
     crossSellFallbackHeading: string;
+    crossSellSizeEyebrow: string;
+    crossSellSizeHeading: string;
+    crossSellSizeIn: string;
     fullCollectionEyebrow: string;
     specWidth: string;
     specWeight: string;
@@ -183,12 +186,20 @@ export type PlShape = {
     wishlistTitle: string;
   };
   shop: {
-    eyebrow: string;
+    // Nadkreślenie nad tytułem /sklep — zależne od widoku. Wcześniej była tu
+    // jedna wartość „Kolekcja", pokazywana także nad „Wszystkie produkty".
+    eyebrowShop: string;
+    eyebrowCollection: string;
+    eyebrowCategory: string;
+    eyebrowSearch: string;
     title: string;
     allProducts: string;
     searchPrefix: string;
     emptyTitle: string;
     emptyHint: string;
+    // Rozwijanie dłuższego opisu kolekcji nad filtrami (>1 akapit).
+    descriptionMore: string;
+    descriptionLess: string;
   };
   filter: {
     sortAlpha: string;
@@ -257,6 +268,8 @@ export type PlShape = {
     slideOf: string;
     prevSlide: string;
     nextSlide: string;
+    prevProducts: string;
+    nextProducts: string;
     goToSlide: string;
     zoomImage: string;
     showImage: string;
@@ -404,6 +417,9 @@ export const pl = {
     crossSellEyebrow: "Dopełnienie",
     crossSellRecommendedPrefix: "Polecane",
     crossSellFallbackHeading: "Może Cię zainteresować",
+    crossSellSizeEyebrow: "Dobierz do tego łóżka",
+    crossSellSizeHeading: "Materace w rozmiarze",
+    crossSellSizeIn: "w rozmiarze",
     fullCollectionEyebrow: "Pełna kolekcja",
     specWidth: "Wymiary",
     specWeight: "Waga",
@@ -531,12 +547,17 @@ export const pl = {
     wishlistTitle: "Ulubione",
   },
   shop: {
-    eyebrow: "Kolekcja",
+    eyebrowShop: "Sklep",
+    eyebrowCollection: "Kolekcja",
+    eyebrowCategory: "Kategoria",
+    eyebrowSearch: "Wyszukiwanie",
     title: "Sklep",
     allProducts: "Wszystkie produkty",
     searchPrefix: "Wyniki",
     emptyTitle: "Brak produktów",
     emptyHint: "Spróbuj zmienić filtry lub frazę wyszukiwania.",
+    descriptionMore: "Czytaj więcej",
+    descriptionLess: "Zwiń opis",
   },
   filter: {
     sortAlpha: "Alfabetycznie A-Z",
@@ -606,6 +627,8 @@ export const pl = {
     slideOf: "z",
     prevSlide: "Poprzedni slajd",
     nextSlide: "Następny slajd",
+    prevProducts: "Poprzednie produkty",
+    nextProducts: "Następne produkty",
     goToSlide: "Przejdź do slajdu",
     zoomImage: "Powiększ zdjęcie",
     showImage: "Pokaż zdjęcie",

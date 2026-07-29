@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { localizePath } from "@/app/_lib/i18n";
 import { alternatesFor } from "@/app/_lib/sitemap-i18n";
+import { baseOpenGraph } from "@/app/_lib/seo-og";
 import {
   PAGE_SLUG_RE,
   localizePageMeta,
@@ -45,7 +46,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       canonical: localizePath(plPath, locale),
       languages: alternatesFor(plPath, { hasDe: pageHasDe(page) }).languages,
     },
-    openGraph: { locale: locale === "de" ? "de_DE" : "pl_PL" },
+    // Pełny blok OG (z obrazkiem) — patrz seo-og.ts.
+    openGraph: baseOpenGraph(locale),
   };
 }
 

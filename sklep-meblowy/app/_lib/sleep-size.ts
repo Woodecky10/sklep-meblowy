@@ -1,0 +1,95 @@
+// Czysta logika doboru materaca do łóżka po rozmiarze spania — bez zależności
+// server-only, żeby była testowalna bez mockowania Supabase (wzorzec jak
+// size-groups.ts / pricing.ts). Server-owe pobranie kandydatów jest w
+// products.ts (getSizeMatchedCrossSell).
+
+import { effectivePrice } from "./pricing";
+
+// Kanoniczna forma rozmiaru spania: "160x200" — małe x, bez spacji, bez "cm".
+// Porównania zawsze na tej formie; do wyświetlenia formatSleepSize.
+export type SleepSize = string;
+
+// Pierwsza para "liczba SEPARATOR liczba" w tekście. Wymaga sąsiedztwa przez sam
+// separator, więc "H3 25 cm 120x200 cm" daje 120x200, a nie 25x120. Granice
+// (?<!\d)/(?!\d) pilnują też, żeby żadna z liczb nie była urwanym kawałkiem
+// dłuższej liczby — bez nich "1200x200" dawałoby fałszywe "200x200".
+//
+// Separatory poza x/×: `/`, `*` i słowo „na" — spotykane w ręcznie wpisywanych
+// etykietach ("160/200", "160 na 200"). Twardości materacy ("H2/H3") się nie
+// łapią, bo mają jednocyfrowe liczby, a wzorzec wymaga 2–3 cyfr.
+const SIZE_RE = /(?<!\d)(\d{2,3})\s*(?:[x×*/]|\bna\b)\s*(\d{2,3})(?!\d)/i;
+
+function matchSize(raw: string | null | undefined): SleepSize | null {
+  if (!raw) return null;
+  const m = SIZE_RE.exec(raw);
+  if (!m) return null;
+  // Powierzchnia spania jest symetryczna, więc kanonizujemy kolejność: mniejsza
+  // liczba pierwsza. Bez tego materac z etykietą "200x160" nie dopasowałby się
+  // do łóżka "160x200", choć fizycznie to ten sam rozmiar.
+  const a = Number(m[1]);
+  const b = Number(m[2]);
+  return `${Math.min(a, b)}x${Math.max(a, b)}`;
+}
+
+// Rozmiar spania produktu: size_label (znormalizowany), a gdy go nie ma albo
+// jest śmieciowy — z nazwy. `dimensions` świadomie pominięte: dla łóżka to
+// wymiar zewnętrzny (160x200 → dimensions 180×210), więc dopasowanie po nim
+// dawałoby błędne pary.
+export function sleepSizeOf(item: {
+  size_label?: string | null;
+  name?: string | null;
+}): SleepSize | null {
+  return matchSize(item.size_label) ?? matchSize(item.name);
+}
+
+// "160x200" → "160×200 cm" (typograficzny × tylko do wyświetlenia).
+export function formatSleepSize(size: SleepSize): string {
+  return `${size.replace(/x/i, "×")} cm`;
+}
+
+// Minimum, które musi mieć kandydat, żeby dał się dopasować i posortować.
+// Generyk w pickSizeMatched pozwala wołać to na pełnym Product albo na wąskim
+// wierszu z selecta (id, category, name, size_label, price, sale_price).
+export type SizeCandidate = {
+  id: string;
+  category: string;
+  name: string;
+  size_label: string | null;
+  price: number;
+  sale_price: number | null;
+};
+
+// Kandydaci pasujący do KTÓREGOKOLWIEK z podanych rozmiarów, posortowani:
+// kolejność kategorii z categoryOrder (czyli cross_sell_categories — realne
+// materace przed topperami), potem cena efektywna rosnąco, na koniec nazwa dla
+// determinizmu. Kategoria poza categoryOrder trafia na koniec.
+//
+// Lista rozmiarów, a nie jeden rozmiar, bo w koszyku mogą leżeć dwa łóżka o
+// różnych rozmiarach — wtedy sensowne są materace pasujące do każdego z nich.
+// Karta produktu podaje jednoelementową listę.
+//
+// Nie mutuje wejścia (filter tworzy nową tablicę).
+export function pickSizeMatched<T extends SizeCandidate>(
+  candidates: T[],
+  sizes: SleepSize[],
+  categoryOrder: string[]
+): T[] {
+  const wanted = new Set(sizes);
+  if (wanted.size === 0) return [];
+  const rank = new Map(categoryOrder.map((slug, i) => [slug, i]));
+  const last = categoryOrder.length;
+  return candidates
+    .filter((c) => {
+      const s = sleepSizeOf(c);
+      return s !== null && wanted.has(s);
+    })
+    .sort((a, b) => {
+      const ra = rank.get(a.category) ?? last;
+      const rb = rank.get(b.category) ?? last;
+      if (ra !== rb) return ra - rb;
+      const pa = effectivePrice(a.price, a.sale_price);
+      const pb = effectivePrice(b.price, b.sale_price);
+      if (pa !== pb) return pa - pb;
+      return a.name.localeCompare(b.name, "pl", { numeric: true });
+    });
+}

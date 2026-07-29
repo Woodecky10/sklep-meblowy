@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { getPendingTranslationCount } from "@/app/_lib/translations";
+import { getNewOrdersCount } from "@/app/_lib/orders";
+import { pluralForm } from "@/app/_lib/plural";
 
 const CARDS = [
   { href: "/admin/zamowienia", title: "Zamówienia", cta: "Zarządzaj zamówieniami" },
@@ -17,7 +19,10 @@ const CARDS = [
 ];
 
 export default async function AdminDashboardPage() {
-  const pendingTranslations = await getPendingTranslationCount();
+  const [pendingTranslations, newOrders] = await Promise.all([
+    getPendingTranslationCount(),
+    getNewOrdersCount(),
+  ]);
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -28,6 +33,28 @@ export default async function AdminDashboardPage() {
           Pulpit
         </h1>
       </div>
+
+      {/* Nowe zamówienia nad tłumaczeniami — pilniejsze. Licznik gaśnie sam,
+          gdy admin pierwszy raz zmieni status zamówienia. */}
+      {newOrders > 0 && (
+        <div className="bg-[var(--card-bg)] border border-[var(--color-gold)] rounded-2xl p-5">
+          <p className="text-sm text-[var(--fg)]">
+            Czeka na obsługę:{" "}
+            <strong className="text-[var(--color-gold-text)]">
+              {newOrders}{" "}
+              {pluralForm(newOrders, {
+                one: "zamówienie",
+                few: "zamówienia",
+                many: "zamówień",
+              })}
+            </strong>{" "}
+            —{" "}
+            <Link href="/admin/zamowienia" className="text-[var(--color-gold)] underline">
+              przejdź do zamówień
+            </Link>
+          </p>
+        </div>
+      )}
 
       {pendingTranslations > 0 && (
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5">

@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { requireAdmin } from "@/app/_lib/admin";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { canTransition } from "@/app/_lib/order-status";
 import type { OrderStatus } from "@/app/_lib/types";
+import { notifyStatusChange } from "@/app/_lib/mail/notify-order";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -57,12 +59,29 @@ export async function updateOrderStatus(
   }
 
   // CAS po odczytanym statusie — nie nadpisujemy równoległej zmiany.
-  const { error } = await supabase
+  // `.select("id")` jest tu KONIECZNE: bez niego `error` jest null także gdy
+  // update trafił 0 wierszy (przegrany wyścig), a wtedy wysłalibyśmy maila
+  // o zmianie, której to wywołanie nie dokonało.
+  const { data: updated, error } = await supabase
     .from("orders")
     .update({ status: to, status_updated_at: new Date().toISOString() } as never)
     .eq("id", orderId)
-    .eq("status", from);
+    .eq("status", from)
+    .select("id");
   if (error) return { ok: false, error: error.message };
+  if (!updated || updated.length === 0) {
+    return { ok: false, error: "Status zmienił się w innej sesji — odśwież stronę" };
+  }
+
+  // Tylko zwycięzca CAS-a wysyła maila. Funkcja nie rzuca, więc nieudany
+  // mail nie zamieni udanej zmiany statusu w błąd w panelu.
+  // after(): wysylka jest POST-response i nigdy nie moze opoznic ani zepsuc
+  // tej akcji — bez tego zawieszony Resend blokowalby akcje admina, aż
+  // platforma by ja przerwala, a admin zobaczylby "blad" dla statusu, ktory
+  // faktycznie sie zmienil. Next 16 (`after.md`): "after" moze byc uzyte w
+  // Server Components, Server Functions, Route Handlers i Proxy — ten plik
+  // ma "use server" na poziomie modulu, wiec to jest Server Function.
+  after(() => notifyStatusChange(orderId, to, from));
 
   revalidatePath(`/admin/zamowienia/${orderId}`);
   revalidatePath("/admin/zamowienia");

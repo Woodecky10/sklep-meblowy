@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { getProducts, getFilterFacets } from "@/app/_lib/products";
 import { parseOptionFilterParams } from "@/app/_lib/option-filter";
+import { parseFeatureFilterParams } from "@/app/_lib/feature-filter";
 import { getRatingsForProducts } from "@/app/_lib/reviews";
 import {
   getCategoryLabel,
@@ -17,8 +18,10 @@ import { getEurRate } from "@/app/_lib/store-settings";
 import { localizePath } from "@/app/_lib/i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { alternatesFor } from "@/app/_lib/sitemap-i18n";
+import { baseOpenGraph } from "@/app/_lib/seo-og";
 import ProductCard from "@/app/_components/ui/ProductCard";
 import FilterBar from "@/app/_components/ui/FilterBar";
+import CollectionIntro from "./CollectionIntro";
 import Pagination from "@/app/_components/ui/Pagination";
 
 // /sklep jest w pełni przetłumaczone przez słownik UI → DE zawsze (hasDe: true).
@@ -33,9 +36,9 @@ export async function generateMetadata(): Promise<Metadata> {
       canonical: localizePath("/sklep", locale),
       languages: alternatesFor("/sklep", { hasDe: true }).languages,
     },
-    openGraph: {
-      locale: locale === "de" ? "de_DE" : "pl_PL",
-    },
+    // Pełny blok OG (z obrazkiem) — patrz seo-og.ts: `openGraph` jest nadpisywane
+    // w całości, więc samo `locale` gubiło og:image z layoutu.
+    openGraph: baseOpenGraph(locale),
   };
 }
 
@@ -49,8 +52,6 @@ type SearchParams = Promise<
     cena_od?: string;
     cena_do?: string;
     dostepne?: string;
-    kolor?: string;
-    tkanina?: string;
     kolekcja?: string;
     szer_od?: string;
     szer_do?: string;
@@ -87,10 +88,9 @@ export default async function SklepPage({
   const priceMin = parsePositiveNumber(sp.cena_od);
   const priceMax = parsePositiveNumber(sp.cena_do);
   const inStockOnly = sp.dostepne === "1";
-  const colors = sp.kolor?.split(",").filter(Boolean);
-  const materials = sp.tkanina?.split(",").filter(Boolean);
   const collectionSlug = sp.kolekcja?.trim() || undefined;
   const optionFilters = parseOptionFilterParams(sp);
+  const featureFilters = parseFeatureFilterParams(sp);
   const dimensionRanges = {
     widthMin: parsePositiveNumber(sp.szer_od),
     widthMax: parsePositiveNumber(sp.szer_do),
@@ -119,9 +119,8 @@ export default async function SklepPage({
       priceMin,
       priceMax,
       inStockOnly,
-      colors,
-      materials,
       optionFilters,
+      featureFilters,
       dimensionRanges,
       collectionSlug,
       sectionSlug,
@@ -152,15 +151,18 @@ export default async function SklepPage({
   if (sp.cena_od) rawParams.cena_od = sp.cena_od;
   if (sp.cena_do) rawParams.cena_do = sp.cena_do;
   if (sp.dostepne) rawParams.dostepne = sp.dostepne;
-  if (sp.kolor) rawParams.kolor = sp.kolor;
-  if (sp.tkanina) rawParams.tkanina = sp.tkanina;
   if (sp.kolekcja) rawParams.kolekcja = sp.kolekcja;
   for (const k of ["szer_od", "szer_do", "gl_od", "gl_do", "wys_od", "wys_do"] as const) {
     const v = sp[k];
     if (typeof v === "string" && v) rawParams[k] = v;
   }
   for (const [k, val] of Object.entries(sp)) {
-    if (k.startsWith("opcja_") && typeof val === "string" && val) rawParams[k] = val;
+    if (
+      (k.startsWith("opcja_") || k.startsWith("cecha_")) &&
+      typeof val === "string" &&
+      val
+    )
+      rawParams[k] = val;
   }
 
   // Label sekcji z `sections` (np. "Narożniki" zamiast surowego slug "naroznik").
@@ -179,6 +181,20 @@ export default async function SklepPage({
   }
   const heading = resolveHeading();
 
+  // Nadkreślenie musi opisywać TEN widok, nie zawsze „Kolekcja" — wcześniej nad
+  // „Wszystkie produkty" i nad kategorią stało nieprawdziwe „KOLEKCJA".
+  // Ta sama kolejność pierwszeństwa co w resolveHeading, żeby nadkreślenie i
+  // tytuł nie mogły się rozjechać (np. „Kategoria" nad nazwą kolekcji).
+  function resolveEyebrow(): string {
+    if (collection) return t.shop.eyebrowCollection;
+    if (search) return t.shop.eyebrowSearch;
+    if (category) return t.shop.eyebrowCategory;
+    // Sekcja to grupa kategorii (np. „Narożniki”), więc też „Kategoria”.
+    if (sectionLabel) return t.shop.eyebrowCategory;
+    return t.shop.eyebrowShop;
+  }
+  const eyebrow = resolveEyebrow();
+
   // Projekcja dla FilterBar (client) — slug + label per sekcja.
   const filterSections = sections.map((s) => ({
     slug: s.slug,
@@ -190,9 +206,15 @@ export default async function SklepPage({
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
-      <div className="mb-10">
+      {/* Nagłówek wyśrodkowany TYLKO dla widoku kolekcji — tam tworzy jedną
+          kompozycję z wyśrodkowanym opisem pod nim. Ten sam blok obsługuje
+          kategorie, wyszukiwanie i „wszystkie produkty"; tam centrowanie dałoby
+          wyśrodkowany nagłówek nad lewo-wyrównanymi filtrami, bez niczego, co by
+          to uzasadniało. Warunek na `collection`, nie na `collection.description`,
+          żeby wszystkie kolekcje wyglądały tak samo — dziś 3 z 4 mają pusty opis. */}
+      <div className={`mb-10 ${collection ? "text-center" : ""}`}>
         <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
-          {t.shop.eyebrow}
+          {eyebrow}
         </p>
         <h1 className="font-display text-4xl font-bold text-[var(--fg)]">
           {heading}
@@ -207,10 +229,19 @@ export default async function SklepPage({
         </p>
       </div>
 
+      {/* Opis kolekcji NAD filtrami — tylko gdy wybrana jest kolekcja i ma opis.
+          Puste opisy (dziś 3 z 4 kolekcji) nie zostawiają po sobie odstępu. */}
+      {collection?.description && (
+        <CollectionIntro
+          description={collection.description}
+          moreLabel={t.shop.descriptionMore}
+          lessLabel={t.shop.descriptionLess}
+        />
+      )}
+
       <Suspense>
         <FilterBar
-          colors={facets.colors}
-          materials={facets.materials}
+          featureFacets={facets.features}
           optionFacets={facets.options}
           dimensionBounds={facets.dimensions}
           sections={filterSections}

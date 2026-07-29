@@ -16,6 +16,7 @@
 # playwright e2e (sesja, zrzuty, raporty)
 /e2e/.auth
 /e2e/screens
+/mail-preview
 /test-results
 /playwright-report
 

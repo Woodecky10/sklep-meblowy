@@ -2,13 +2,18 @@ import { unstable_cache, revalidateTag } from "next/cache";
 import { createClient as createBareAnonClient } from "@supabase/supabase-js";
 import { createClient, createAdminClient } from "./supabase/server";
 import { getCategories } from "./categories";
-import { buildSearchOrFilter, rankByNameMatch } from "./search-filter";
+import { searchTokens, rankByNameMatch, escapeIlike } from "./search-filter";
 import { sizeLabelOf } from "./size-groups";
-import { localizeProduct, buildLocalizedFacets } from "./localize";
+import { localizeProduct } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
+import { pickSizeMatched, type SizeCandidate } from "./sleep-size";
 import type { Category, Product } from "./types";
-import { deriveFabricFamilies, productMatchesFabric } from "./fabric-filter";
-import { getAllFabrics } from "./fabrics";
+import {
+  productMatchesFeatureFilters,
+  collectFeatureFacets,
+  localizeFeatureFacets,
+  type FeatureFacetGroup,
+} from "./feature-filter";
 import {
   collectFeatureKeySuggestions,
   collectFeatureValueSuggestions,
@@ -61,13 +66,12 @@ export type ProductFilters = {
   priceMin?: number;
   priceMax?: number;
   inStockOnly?: boolean;
-  colors?: string[];
-  // Filtr tkanin (?tkanina=). Wartości: rodziny tkanin z katalogu fabrics
-  // (dopasowywane do opcji wariantów) ∪ legacy wartości kolumny material.
-  materials?: string[];
   // Filtry opcji wariantów (?opcja_<slug>=w1,w2): slug → wybrane wartości.
   // Parsowane w sklep/page.tsx przez parseOptionFilterParams.
   optionFilters?: Record<string, string[]>;
+  // Filtry parametrów produktu (?cecha_<slug>=w1|w2): slug → wybrane wartości.
+  // Parsowane w sklep/page.tsx przez parseFeatureFilterParams.
+  featureFilters?: Record<string, string[]>;
   // Zakresy wymiarów w cm (?szer_od= / ?szer_do= / gl / wys).
   dimensionRanges?: DimensionRanges;
   // Slug kolekcji — filtruje produkty należące do konkretnej kolekcji
@@ -96,9 +100,8 @@ export async function getProducts(filters: ProductFilters = {}) {
     priceMin,
     priceMax,
     inStockOnly,
-    colors,
-    materials,
     optionFilters,
+    featureFilters,
     dimensionRanges,
     collectionSlug,
     sectionSlug,
@@ -144,53 +147,57 @@ export async function getProducts(filters: ProductFilters = {}) {
     }
   }
 
-  // Sanityzacja + budowa filtra .or() w search-filter.ts (escape składni
-  // .or() i wildcardów ILIKE). null = po sanityzacji nic nie zostało.
-  // DE szuka po name_de/description_de (bez fallbacku — patrz search-filter).
-  const searchOrFilter =
-    search && search.trim() ? buildSearchOrFilter(search, locale) : null;
-  if (searchOrFilter) query = query.or(searchOrFilter);
+  // Wyszukiwanie odporne na spacje/kolejność: frazę tniemy na słowa i każde
+  // słowo dopasowujemy do kolumny search_key (odspacjowana, bez tagów) przez
+  // ILIKE — wiele .ilike() na tej samej kolumnie PostgREST ANDuje, więc każde
+  // słowo musi wystąpić, niezależnie od kolejności. DE → search_key_de.
+  const searchTerms = searchTokens(search ?? "");
+  const searchActive = searchTerms.length > 0;
+  if (searchActive) {
+    const keyCol = locale === "de" ? "search_key_de" : "search_key";
+    for (const token of searchTerms) {
+      query = query.ilike(keyCol, `%${escapeIlike(token)}%`);
+    }
+  }
   // Aktywne wyszukiwanie zmienia tryb paginacji: ranking (nazwa > opis)
   // wymaga całego zestawu dopasowań naraz, więc paginujemy w JS (patrz niżej).
-  const searchActive = searchOrFilter !== null;
 
   if (typeof priceMin === "number") query = query.gte("price", priceMin);
   if (typeof priceMax === "number") query = query.lte("price", priceMax);
 
   if (inStockOnly) query = query.gt("stock", 0);
 
-  if (colors?.length) query = query.in("color", colors);
-
-  // Filtry liczone w JS (tkanina / opcje wariantów / wymiary) — nie da się ich
-  // wyrazić w .in() na kolumnie (prawda żyje w JSONB variants/dimensions), więc
-  // liczymy pasujące id w JS (skala: dziesiątki produktów; RLS i tak ogranicza
-  // odczyt do aktywnych) i zawężamy główne zapytanie przez .in("id", ids).
-  // Paginacja/sort/AND z pozostałymi filtrami zostają w DB.
+  // Filtry liczone w JS (opcje wariantów / parametry / wymiary) — nie da się ich
+  // wyrazić w .in() na kolumnie (prawda żyje w JSONB variants/features/
+  // dimensions), więc liczymy pasujące id w JS (skala: dziesiątki produktów;
+  // RLS i tak ogranicza odczyt do aktywnych) i zawężamy główne zapytanie przez
+  // .in("id", ids). Paginacja/sort/AND z pozostałymi filtrami zostają w DB.
   const optionFiltersActive = Object.values(optionFilters ?? {}).some(
     (v) => v.length > 0
   );
+  const featureFiltersActive = Object.values(featureFilters ?? {}).some(
+    (v) => v.length > 0
+  );
   const dimensionsActive = hasActiveDimensionRanges(dimensionRanges ?? {});
-  if (materials?.length || optionFiltersActive || dimensionsActive) {
-    const [{ data: jsFilterRows }, fabrics] = await Promise.all([
-      // Bez .limit() — świadomie (katalog ~dziesiątki produktów). Przy dużym wzroście katalogu PostgREST utnie wiersze i filtr/facety po cichu zgubią produkty — wtedy zdenormalizować rodziny do kolumny.
-      supabase.from("products").select("id, variants, material, dimensions"),
-      materials?.length ? getAllFabrics() : Promise.resolve([]),
-    ]);
-    const familyNames = fabrics.map((f) => f.name);
+  if (optionFiltersActive || featureFiltersActive || dimensionsActive) {
+    // Bez .limit() — świadomie (katalog ~dziesiątki produktów). Przy dużym wzroście katalogu PostgREST utnie wiersze i filtr/facety po cichu zgubią produkty — wtedy zdenormalizować rodziny do kolumny.
+    const { data: jsFilterRows } = await supabase
+      .from("products")
+      .select("id, variants, features, dimensions");
     const ids = (
       (jsFilterRows ?? []) as {
         id: string;
         variants: Product["variants"];
-        material: string | null;
+        features: unknown;
         dimensions: Product["dimensions"];
       }[]
     )
       .filter(
         (r) =>
-          (!materials?.length ||
-            productMatchesFabric(r.variants, r.material, materials, familyNames)) &&
           (!optionFiltersActive ||
             productMatchesOptionFilters(r.variants, optionFilters!)) &&
+          (!featureFiltersActive ||
+            productMatchesFeatureFilters(r.features, featureFilters!)) &&
           (!dimensionsActive ||
             productMatchesDimensions(r.dimensions, dimensionRanges!))
       )
@@ -232,7 +239,7 @@ export async function getProducts(filters: ProductFilters = {}) {
     const ranked = rankByNameMatch(
       (data ?? []) as Product[],
       search!,
-      // DE dopasowuje name_de bez fallbacku do PL — spójnie z buildSearchOrFilter.
+      // DE dopasowuje name_de bez fallbacku do PL — spójnie z search_key_de.
       (p) =>
         locale === "de"
           ? (p as { name_de?: string | null }).name_de ?? ""
@@ -276,6 +283,32 @@ export async function getProduct(id: string, locale: Locale = DEFAULT_LOCALE) {
 // ============================================================
 // Cross-sell: produkty z kategorii powiązanych z koszykiem
 // ============================================================
+// Slugi kategorii docelowych cross-sellu dla podanych kategorii źródłowych.
+// Kolejność z bazy (cross_sell_categories to text[]) jest znacząca — steruje
+// sortem karuzeli w getSizeMatchedCrossSell (realne materace przed topperami).
+// Pomija kategorie już obecne w źródle — to byłby same-sell, nie cross-sell.
+async function resolveCrossSellTargets(
+  sourceCategorySlugs: string[]
+): Promise<string[]> {
+  const supabase = await createClient();
+  const { data: cats } = await supabase
+    .from("categories")
+    .select("slug, cross_sell_categories")
+    .in("slug", sourceCategorySlugs);
+
+  const targets: string[] = [];
+  for (const c of (cats ?? []) as {
+    slug: string;
+    cross_sell_categories: string[] | null;
+  }[]) {
+    for (const s of c.cross_sell_categories ?? []) {
+      if (sourceCategorySlugs.includes(s)) continue;
+      if (!targets.includes(s)) targets.push(s);
+    }
+  }
+  return targets;
+}
+
 // Bierze unikalne slugi kategorii produktów w koszyku, dla każdej szuka
 // jej `cross_sell_categories` (np. lozko-tapicerowane → ['materace']),
 // łączy je w jeden set i pobiera produkty z tych kategorii (max limit).
@@ -288,30 +321,15 @@ export async function getCrossSellProducts(
 ): Promise<Product[]> {
   if (cartCategorySlugs.length === 0) return [];
 
+  const targetSlugs = await resolveCrossSellTargets(cartCategorySlugs);
+  if (targetSlugs.length === 0) return [];
+
   const supabase = await createClient();
-
-  // Wczytaj cross_sell_categories dla wszystkich kategorii w koszyku
-  const { data: cats } = await supabase
-    .from("categories")
-    .select("slug, cross_sell_categories")
-    .in("slug", cartCategorySlugs);
-
-  const targetSlugs = new Set<string>();
-  for (const c of (cats ?? []) as {
-    slug: string;
-    cross_sell_categories: string[] | null;
-  }[]) {
-    for (const s of c.cross_sell_categories ?? []) {
-      // Nie polecamy kategorii już w koszyku (to nie cross-sell, to same-sell)
-      if (!cartCategorySlugs.includes(s)) targetSlugs.add(s);
-    }
-  }
-  if (targetSlugs.size === 0) return [];
 
   let query = supabase
     .from("products")
     .select("*")
-    .in("category", Array.from(targetSlugs))
+    .in("category", targetSlugs)
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -321,6 +339,70 @@ export async function getCrossSellProducts(
 
   const { data } = await query;
   return ((data ?? []) as Product[]).map((p) => localizeProduct(p, locale));
+}
+
+// Cross-sell dopasowany rozmiarem spania — dla łóżka pokazuje materace w jego
+// rozmiarze. Dwa zapytania zamiast jednego świadomie: wiersz produktu niesie
+// ciężkie `variants` z listami tkanin, więc select("*") po całych kategoriach
+// materacy to megabajty transferu przy każdym renderze, z czego ~90% do
+// odrzucenia. Najpierw wąski scan kandydatów, potem pełne wiersze tylko dla
+// wybranych ID.
+// sizeMatched=false → wołający ma pokazać zwykłą kopię „Polecane …" zamiast
+// nagłówka z rozmiarem. Filtr is_active zapewnia RLS (jak w pozostałych
+// publicznych zapytaniach).
+// `sleepSizes` to LISTA, bo w koszyku mogą leżeć dwa łóżka o różnych
+// rozmiarach — wtedy pokazujemy materace pasujące do któregokolwiek z nich.
+// Karta produktu podaje jeden rozmiar (albo pustą listę, gdy mebel go nie ma).
+export async function getSizeMatchedCrossSell(
+  categorySlugs: string[],
+  sleepSizes: string[],
+  excludeProductIds: string[] = [],
+  limit = 12,
+  locale: Locale = DEFAULT_LOCALE
+): Promise<{ products: Product[]; sizeMatched: boolean }> {
+  const targetSlugs = await resolveCrossSellTargets(categorySlugs);
+  if (targetSlugs.length === 0) return { products: [], sizeMatched: false };
+
+  if (sleepSizes.length > 0) {
+    const supabase = await createClient();
+    const { data: candidates } = await supabase
+      .from("products")
+      .select("id, category, name, size_label, price, sale_price")
+      .in("category", targetSlugs)
+      // Scan świadomie szerszy niż limit wyświetlania — dzieje się PRZED
+      // filtrowaniem po rozmiarze, więc musi objąć więcej niż finalnie pokazane `limit` sztuk.
+      .limit(500);
+
+    const ids = pickSizeMatched(
+      (candidates ?? []) as SizeCandidate[],
+      sleepSizes,
+      targetSlugs
+    )
+      .filter((p) => !excludeProductIds.includes(p.id))
+      .slice(0, limit)
+      .map((p) => p.id);
+
+    if (ids.length > 0) {
+      const { data: full } = await supabase.from("products").select("*").in("id", ids);
+      // `in` nie gwarantuje kolejności — odtwarzamy sort z pickSizeMatched.
+      const byId = new Map(((full ?? []) as Product[]).map((p) => [p.id, p]));
+      const products = ids
+        .map((id) => byId.get(id))
+        .filter((p): p is Product => p !== undefined)
+        .map((p) => localizeProduct(p, locale));
+      // Wcześnie zwracamy tylko gdy faktycznie mamy produkty do pokazania —
+      // pusty wynik (np. `full` null po błędzie zapytania, albo wszystkie ID
+      // nie znalezione) ma spaść do fallbacku niżej, żeby sekcja nie znikła.
+      if (products.length > 0) {
+        return { products, sizeMatched: true };
+      }
+    }
+  }
+
+  // Brak rozmiaru albo zero dopasowań → dotychczasowe zachowanie, żeby sekcja
+  // nie zniknęła: 4 najnowsze produkty z kategorii docelowych.
+  const products = await getCrossSellProducts(categorySlugs, excludeProductIds, 4, locale);
+  return { products, sizeMatched: false };
 }
 
 export async function getFeaturedProducts(
@@ -411,88 +493,52 @@ export function invalidateFacetsCache(): void {
 // ⚠️ Wewnątrz unstable_cache nie wolno używać cookies() → products czytamy
 // CZYSTYM klientem anon (RLS widzi dokładnie to co gość: tylko is_active —
 // przy okazji facety przestają zawierać dane produktów ukrytych, gdy ogląda
-// je zalogowany admin). fabrics ma RLS admin-only → createAdminClient
-// (wzorzec fetchAllFabrics, działa w unstable_cache).
+// je zalogowany admin).
 const getFacetSource = unstable_cache(
   async (): Promise<{
-    colorRows: { value: string | null; value_de: string | null }[];
-    fabricFacetRows: { value: string | null; value_de: string | null }[];
     optionGroups: OptionFacetGroup[];
+    featureGroups: FeatureFacetGroup[];
     dimensionBounds: DimensionBounds;
   }> => {
     const anon = createBareAnonClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
-    const admin = await createAdminClient();
-    const [{ data: colorsData }, { data: fabricSourceData }, { data: fabricsData }] =
-      await Promise.all([
-        anon.from("products").select("color, color_de").not("color", "is", null),
-        // Bez .limit() — świadomie (katalog ~dziesiątki produktów). Przy dużym
-        // wzroście katalogu PostgREST utnie wiersze i facety po cichu zgubią
-        // produkty — wtedy zdenormalizować rodziny do kolumny.
-        anon.from("products").select("variants, material, material_de, dimensions"),
-        admin
-          .from("fabrics")
-          .select("name, name_de")
-          .order("sort_order", { ascending: true })
-          .order("name", { ascending: true }),
-      ]);
+    // Bez .limit() — świadomie (katalog ~dziesiątki produktów). Przy dużym
+    // wzroście katalogu PostgREST utnie wiersze i facety po cichu zgubią
+    // produkty — wtedy zdenormalizować rodziny do kolumny.
+    const { data: sourceData } = await anon
+      .from("products")
+      .select("variants, features, dimensions");
 
-    const colorRows = (
-      (colorsData ?? []) as { color: string | null; color_de: string | null }[]
-    ).map((r) => ({ value: r.color, value_de: r.color_de }));
-
-    // Facet „Tkanina" = rodziny tkanin UŻYTE w widocznych produktach (value =
-    // nazwa PL z katalogu, label DE = fabrics.name_de) ∪ legacy wartości kolumny
-    // material (label DE = material_de). Dedupe po PL value robi
-    // buildLocalizedFacets (rodzina z name_de wygrywa etykietę nad legacy).
-    const fabricRows = (fabricSourceData ?? []) as {
+    const rows = (sourceData ?? []) as {
       variants: Product["variants"];
-      material: string | null;
-      material_de: string | null;
+      features: unknown;
       dimensions: Product["dimensions"];
     }[];
-    const fabrics = (fabricsData ?? []) as { name: string; name_de: string | null }[];
-    const familyNames = fabrics.map((f) => f.name);
-    const usedFamilies = new Set<string>();
-    for (const row of fabricRows) {
-      for (const fam of deriveFabricFamilies(row.variants, familyNames)) {
-        usedFamilies.add(fam);
-      }
-    }
-    const fabricFacetRows = [
-      ...fabrics
-        .filter((f) => usedFamilies.has(f.name))
-        .map((f) => ({ value: f.name as string | null, value_de: f.name_de })),
-      ...fabricRows
-        .filter((r) => r.material)
-        .map((r) => ({ value: r.material, value_de: r.material_de })),
-    ];
 
-    // Facety opcji wariantów (filterable=true) + granice wymiarów — z tych
-    // samych wierszy co facet tkanin (jeden skan, ten sam cache).
-    const optionGroups = collectOptionFacets(fabricRows);
-    const dimensionBounds = collectDimensionBounds(fabricRows);
+    // Facety opcji wariantów (filterable=true), parametrów produktu (features)
+    // i granice wymiarów — z tych samych wierszy (jeden skan, ten sam cache).
+    const optionGroups = collectOptionFacets(rows);
+    const featureGroups = collectFeatureFacets(rows);
+    const dimensionBounds = collectDimensionBounds(rows);
 
-    return { colorRows, fabricFacetRows, optionGroups, dimensionBounds };
+    return { optionGroups, featureGroups, dimensionBounds };
   },
-  ["facet-source-v2"],
+  ["facet-source-v3"],
   { tags: [FACETS_CACHE_TAG], revalidate: 300 }
 );
 
 // Pobiera facety filtrów na /sklep. Wartości cachowane (getFacetSource);
-// lokalizacja/sortowanie per request (tania, czysta buildLocalizedFacets).
+// lokalizacja/sortowanie per request (tania, czysta localizeOptionFacets).
 // Decyzja historyczna: nie ograniczamy facets do bieżącego search/category
 // (pełna paleta zawsze; pusta lista po kliknięciu jest akceptowana).
 export async function getFilterFacets(locale: Locale = DEFAULT_LOCALE) {
-  const { colorRows, fabricFacetRows, optionGroups, dimensionBounds } =
-    await getFacetSource();
+  const { optionGroups, featureGroups, dimensionBounds } = await getFacetSource();
   return {
-    colors: buildLocalizedFacets(colorRows, locale),
-    materials: buildLocalizedFacets(fabricFacetRows, locale),
     options: localizeOptionFacets(optionGroups, locale),
     dimensions: dimensionBounds,
+    features: localizeFeatureFacets(featureGroups, locale),
   };
 }
 

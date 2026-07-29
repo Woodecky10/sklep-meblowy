@@ -1,7 +1,7 @@
 -- ============================================================
 -- Migracja 23: widoczność produktu (is_active) + auto/ręczne ukrywanie
 -- ============================================================
--- Produkt usunięty z BaseLinkera ma być automatycznie i ODWRACALNIE ukrywany.
+-- Produkt wycofany z oferty ma być ukrywany automatycznie i ODWRACALNIE.
 -- Admin może też ukryć/przywrócić ręcznie. Widoczność egzekwowana W RLS —
 -- jeden punkt prawdy. Sync używa service_role (omija RLS), więc dalej widzi
 -- i zapisuje wszystko, łącznie z ukrytymi (potrzebne do reaktywacji).

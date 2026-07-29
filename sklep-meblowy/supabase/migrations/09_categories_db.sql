@@ -33,7 +33,6 @@ create table if not exists public.categories (
   slug                     text not null unique,
   label                    text not null,
   group_id                 uuid not null references public.category_groups(id) on delete restrict,
-  baselinker_category_id   bigint,
   sort_order               integer not null default 0,
   active                   boolean not null default true,
   created_at               timestamptz not null default now(),
@@ -42,8 +41,6 @@ create table if not exists public.categories (
 
 create index if not exists idx_categories_group on public.categories (group_id);
 create index if not exists idx_categories_sort  on public.categories (sort_order);
-create index if not exists idx_categories_bl    on public.categories (baselinker_category_id)
-  where baselinker_category_id is not null;
 
 -- ============================================================
 -- 3. Seed — istniejące grupy + kategorie z hardkodu app/_lib/categories.ts
@@ -62,17 +59,17 @@ begin
   select id into salon_id     from public.category_groups where slug = 'salon';
   select id into sypialnia_id from public.category_groups where slug = 'sypialnia';
 
-  insert into public.categories (slug, label, group_id, baselinker_category_id, sort_order) values
-    ('sofa-2-osobowa',      'Sofa 2-osobowa',                    salon_id,     null,     0),
-    ('sofa-3-osobowa',      'Sofa 3-osobowa',                    salon_id,     null,     1),
-    ('naroznik-l',          'Narożnik w kształcie L',            salon_id,     7489758,  2),
-    ('naroznik-u',          'Narożnik w kształcie U',            salon_id,     7489759,  3),
-    ('fotele',              'Fotele',                            salon_id,     7489760,  4),
-    ('pufy',                'Pufy',                              salon_id,     7489761,  5),
-    ('zestawy',             'Zestawy (narożnik + fotel + pufa)', salon_id,     null,     6),
-    ('lozko-kontynentalne', 'Łóżka kontynentalne',               sypialnia_id, 7489762,  0),
-    ('lozko-tapicerowane',  'Łóżka tapicerowane',                sypialnia_id, 7489763,  1),
-    ('materace',            'Materace i toppery',                sypialnia_id, 7489764,  2)
+  insert into public.categories (slug, label, group_id, sort_order) values
+    ('sofa-2-osobowa',      'Sofa 2-osobowa',                    salon_id,     0),
+    ('sofa-3-osobowa',      'Sofa 3-osobowa',                    salon_id,     1),
+    ('naroznik-l',          'Narożnik w kształcie L',            salon_id,     2),
+    ('naroznik-u',          'Narożnik w kształcie U',            salon_id,     3),
+    ('fotele',              'Fotele',                            salon_id,     4),
+    ('pufy',                'Pufy',                              salon_id,     5),
+    ('zestawy',             'Zestawy (narożnik + fotel + pufa)', salon_id,     6),
+    ('lozko-kontynentalne', 'Łóżka kontynentalne',               sypialnia_id, 0),
+    ('lozko-tapicerowane',  'Łóżka tapicerowane',                sypialnia_id, 1),
+    ('materace',            'Materace i toppery',                sypialnia_id, 2)
   on conflict (slug) do nothing;
 end $$;
 

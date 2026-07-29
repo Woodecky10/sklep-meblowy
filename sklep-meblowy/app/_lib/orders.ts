@@ -186,6 +186,40 @@ export async function getAdminOrders({
   };
 }
 
+// Statusy, w których zamówienie czeka na PIERWSZE spojrzenie admina.
+// `paid` — zapłacone online (webhook przestawił z pending).
+// `processing` — tu wpada zamówienie za pobraniem: createOrder nadaje mu
+//   `processing` od razu, bo COD nie ma płatności do potwierdzenia. Bez tego
+//   statusu licznik przegapiłby WSZYSTKIE zamówienia COD.
+// Świadomie NIE ma `pending` — to porzucone checkouty, które nigdy nie doszły
+// do zapłaty; admin nie ma się nimi zajmować.
+const AWAITING_LOOK_STATUSES: OrderStatus[] = ["paid", "processing"];
+
+// Liczba zamówień czekających na uwagę admina (badge w nawigacji + Pulpit).
+//
+// „Nietknięte" rozpoznajemy po `status_updated_at IS NULL`. Ta kolumna jest
+// zapisywana WYŁĄCZNIE przez updateOrderStatus (akcja admina) — ani createOrder,
+// ani markOrderPaid (webhook) jej nie ustawiają. Więc NULL ⟺ admin ani razu nie
+// ruszył statusu tego zamówienia, a pierwsza zmiana statusu sama gasi licznik.
+// Gdyby ktoś kiedyś zaczął ustawiać status_updated_at przy tworzeniu zamówienia
+// albo w webhooku, licznik zacznie pokazywać 0 — wtedy trzeba tu wprowadzić
+// osobny znacznik (np. admin_seen_at).
+export async function getNewOrdersCount(): Promise<number> {
+  const supabase = await createAdminClient();
+  const { count, error } = await supabase
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .in("status", AWAITING_LOOK_STATUSES)
+    .is("status_updated_at", null);
+  if (error) {
+    // Badge nie może wywalić całego panelu — layout admina renderuje się na
+    // każdej podstronie. Spójne z getPendingTranslationCount.
+    console.error("[admin] odczyt licznika nowych zamowien nieudany:", error.message);
+    return 0;
+  }
+  return count ?? 0;
+}
+
 // Mapa profili (email + nazwisko) po id usera — do wyświetlenia klienta na liście.
 export async function getProfilesByIds(
   ids: string[]

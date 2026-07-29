@@ -1,132 +1,113 @@
 # Jak dodać kategorię — instrukcja krok po kroku
 
-Ta instrukcja pokazuje, jak dodać nową kategorię produktów (np. „Komoda", „Stół", „Półka") tak, żeby:
+Kategorie tworzysz w panelu sklepu i widać je natychmiast — nie ma żadnego
+drugiego systemu ani synchronizacji. Wszystko dzieje się na
+**https://mollien.pl/admin/kategorie**.
 
-1. Pojawiła się w nawigacji **na stronie sklepu**
-2. Produkty z **BaseLinkera** automatycznie się do niej zsynchronizowały
-
-> **Najważniejsze:** kategoria musi istnieć **w dwóch miejscach**:
-> - w panelu **BaseLinkera** (gdzie wgrywasz produkty)
-> - w panelu **sklepu** (`/admin/kategorie` — ten ekran)
->
-> Sklep i BaseLinker to **dwa osobne systemy**. Łączymy je przez liczbowe **ID kategorii BL**.
+> **Jak to jest zorganizowane:** kategorie leżą w **grupach**. Grupa to pozycja
+> w górnym menu sklepu (np. „SOFY", „ŁÓŻKA"), a kategorie w niej to rozwijana
+> lista pod nią (np. „Sofa 2-osobowa", „Sofa 3-osobowa"). Produkt przypisujesz
+> do **kategorii**, nie do grupy.
 
 ---
 
-## Krok 1 — Dodaj kategorię w BaseLinkerze
+## Krok 1 — Wejdź w kategorie
 
-1. Wejdź w **panel BaseLinker** → **Magazyn** → **Kategorie**
-2. Kliknij **„Dodaj kategorię"** (przycisk + lub „Nowa kategoria" w prawym górnym rogu)
-3. Wpisz nazwę (np. `Komody`)
-4. Zapisz
-5. **Zapisz sobie ID tej kategorii** — to liczba, np. `7489800`. Zobaczysz ją:
-   - W URL przeglądarki po kliknięciu w kategorię (np. `…?category_id=7489800`)
-   - Albo w liście kategorii — po prawej stronie nazwy
+1. Wejdź na **https://mollien.pl/admin/kategorie** (zaloguj się jako admin, jeśli trzeba)
+2. Zobaczysz listę grup, a w każdej jej kategorie
 
-> 💡 **Tip:** możesz też pobrać listę wszystkich ID przez specjalny adres:
-> `https://mollien.pl/api/baselinker/test`
-> **Najpierw zaloguj się jako admin na mollien.pl** (adres działa tylko dla
-> admina — bez zalogowania zobaczysz „Brak uprawnień").
-> Otworzy się JSON — w sekcji `categories` zobaczysz wszystkie kategorie z BL razem z ich `category_id`.
+## Krok 2 — Dodaj kategorię do grupy
 
----
+1. Znajdź grupę, w której kategoria ma się znaleźć — np. „SOFY", „ŁÓŻKA", „PUFY"
+2. Kliknij **„+ Dodaj kategorię do tej grupy"** pod jej listą
+   - Jeśli potrzebujesz zupełnie nowej pozycji w menu, użyj **„+ Nowa grupa"** na górze strony
+3. Wypełnij formularz:
+   - **Nazwa wyświetlana** *(wymagane)* → tekst, który zobaczy klient, np. `Komody`
+   - **Nazwa po niemiecku (DE)** → nazwa na `/de`. Puste = pokaże się polska
+   - **Grupa** *(wymagane)* → już wybrana, jeśli kliknęłaś „Dodaj do tej grupy"
+   - **Slug (link)** → zostaw puste, wygeneruje się z nazwy (`komody`)
+   - **Kolejność** → mniejsze liczby idą pierwsze (`0`, `1`, `2`…). Można zmienić później
+4. Kliknij **„Dodaj kategorię"**
 
-## Krok 2 — Dodaj kategorię w panelu sklepu
+> ✅ Kategoria pojawia się w menu sklepu i w filtrach **od razu**, bez czekania
+> i bez deployu.
 
-1. Wejdź na **https://mollien.pl/admin/kategorie** (zaloguj się jako admin jeśli trzeba)
-2. Znajdź odpowiednią **grupę** w której kategoria ma się znaleźć:
-   - „Salon" — sofy, narożniki, fotele, pufy, zestawy, **meble pokojowe** (komody, stoły)
-   - „Sypialnia" — łóżka, materace
-   - Albo dodaj nową grupę przyciskiem **„+ Nowa grupa"** na górze (np. „Jadalnia")
-3. W odpowiedniej grupie kliknij **„+ Dodaj kategorię do tej grupy"**
-4. Wypełnij formularz:
-   - **Nazwa wyświetlana** → tekst który zobaczy klient w nawigacji (np. `Komody`)
-   - **Slug (link)** → zostaw puste, system wygeneruje sam (np. `komody`). Albo wpisz własny.
-   - **Grupa** → już wybrana
-   - **ID kategorii w BaseLinker** → liczba z **kroku 1** (np. `7489800`)
-   - **Kolejność** → mniejsze pierwsze (np. `0`, `1`, `2`...). Możesz później zmienić.
-5. Kliknij **„Dodaj kategorię"**
-
-> ✅ Od tego momentu kategoria pojawia się w menu nawigacji sklepu (Salon → Komody / Sypialnia → ...) oraz na liście filtrów.
-
-> 🇩🇪 **Wersja niemiecka:** nowa kategoria na `/de` pokaże się **po polsku**, dopóki deweloper nie doda jej tłumaczenia (mapa w kodzie — patrz `docs/i18n-tlumaczenia-de.md`). Daj znać deweloperowi nazwę + slug nowej kategorii.
+> ⚠️ Nowa kategoria jest na starcie **pusta** — dopóki nie przypiszesz do niej
+> produktów, klient zobaczy komunikat o braku produktów.
 
 ---
 
-## Krok 3 — Synchronizuj produkty z BaseLinkera
+## Krok 3 — Wrzuć do niej produkty
 
-Produkty z BL **nie pojawiają się automatycznie** na stronie. Trzeba uruchomić synchronizację:
+Produkty dodajesz i edytujesz w **https://mollien.pl/admin/produkty**.
 
-1. Wejdź na **https://mollien.pl/admin/baselinker**
-2. Kliknij duży złoty przycisk **„Synchronizuj teraz"**
-3. Poczekaj 5–30 sekund (zależy ile produktów masz w BL)
-4. Zobaczysz wynik:
-   - **Dodanych** — nowe produkty zaciągnięte z BL
-   - **Zaktualizowanych** — istniejące produkty których dane zmieniłaś w BL
-   - **Pominiętych** — produkty których z jakiegoś powodu nie udało się zaciągnąć (lista poniżej z powodami)
+**Nowy produkt:** przycisk **„+ Nowy produkt"** → wypełnij **Nazwa**,
+**Cena (zł)** i **Kategoria** (tam wybierasz właśnie tę nową kategorię) →
+zapisz. Potem w edycji produktu dodasz zdjęcia, opis, warianty, wymiary itd.
 
----
-
-## Częste problemy
-
-### ❌ „kategoria BL X nie zmapowana"
-**Przyczyna:** Produkt w BL ma kategorię (ID `X`), której **nie ma jeszcze w panelu sklepu**.
-**Rozwiązanie:** Wróć do **kroku 2**, dodaj kategorię w admin panelu z tym `X` jako BL ID. Potem znowu „Synchronizuj teraz".
-
-### ❌ „brak ceny lub cena = 0"
-**Przyczyna:** Produkt w BL nie ma ustawionej ceny.
-**Rozwiązanie:** Wejdź w BL → Magazyn → produkt → Ceny → ustaw cenę → zapisz. Potem ponów synchronizację.
-
-### ❌ „brak nazwy"
-**Przyczyna:** Pole „nazwa" w BL jest puste.
-**Rozwiązanie:** Wpisz nazwę w BL → zapisz → ponów synchronizację.
-
-### ❌ „brak kategorii w BL"
-**Przyczyna:** Produkt w BL nie jest przypisany do żadnej kategorii.
-**Rozwiązanie:** W BL wejdź w produkt → Kategoria → wybierz odpowiednią → zapisz → ponów synchronizację.
+**Istniejący produkt przenieść do nowej kategorii:** wejdź w produkt na liście
+i zmień pole **Kategoria** → zapisz.
 
 ---
 
-## Zmiana lub usunięcie kategorii
+## Dobór materacy do łóżek (tylko kategorie łóżek)
 
-### Edycja kategorii
+W formularzu **edycji kategorii**, na samym dole, jest sekcja **„Polecaj
+klientom z tych kategorii (cross-sell)"**. Tam zaznaczasz, z jakich kategorii
+mają się proponować produkty pod danym produktem i w koszyku — dla łóżek są to
+kategorie materacy. Rozmiar dobiera się sam (łóżko 160×200 → materace 160×200),
+na podstawie etykiety rozmiaru produktu.
 
-`/admin/kategorie` → znajdź kategorię → kliknij **„Edytuj"** → zmień co potrzeba → **„Zapisz"**.
+> ⚠️ **Kolejność klikania = kolejność wyświetlania.** Kafelki zapisują się w tej
+> kolejności, w jakiej je klikasz, i w takiej klient zobaczy materace. Dziś jest
+> kieszeniowe → piankowe → nawierzchniowe, żeby pełnowartościowe materace szły
+> przed cienkimi topperami. Żeby przestawić: odklikaj wszystkie i kliknij od nowa.
 
-Zmiany widać na stronie **natychmiast**.
+---
 
-> ⚠️ Jeśli zmienisz **slug**, to wszystkie linki do tej kategorii automatycznie się zaktualizują (FK z `ON UPDATE CASCADE` w bazie). Klient który ma starą zakładkę otwartą zobaczy 404 — ale to rzadki przypadek.
+## Zmiana, ukrycie i usunięcie kategorii
 
-### Ukrycie kategorii (np. czasowo)
+### Edycja
 
-Lepsze niż usuwanie. Edytuj kategorię → odznacz **„Pokazuj w sklepie"** → Zapisz.
+`/admin/kategorie` → **„Edytuj"** przy kategorii → zmień → **„Zapisz"**.
+Zmiany widać na stronie natychmiast.
 
-Kategoria znika z nawigacji ale produkty w niej zostają. Możesz ją włączyć z powrotem później.
+> ⚠️ Zmiana **slugu** przestawia linki do kategorii (baza aktualizuje powiązania
+> sama). Klient z otwartą starą zakładką zobaczy 404 — rzadki przypadek, ale
+> lepiej nie zmieniać slugów bez potrzeby.
+
+### Ukrycie (zalecane zamiast usuwania)
+
+Edytuj kategorię → odznacz **„Pokazuj w sklepie"** → Zapisz.
+Kategoria znika z nawigacji, produkty w niej zostają. Można ją włączyć z powrotem.
 
 ### Trwałe usunięcie
 
-`/admin/kategorie` → kategoria → przycisk **„Usuń"**.
+`/admin/kategorie` → kategoria → **„Usuń"**.
 
-> ⚠️ **Nie da się usunąć kategorii która ma produkty.** System pokaże komunikat ile produktów trzeba najpierw przenieść.
-> Co zrobić: w admin panelu zmienić tym produktom kategorię, ALBO w BL zmienić im przypisanie do innej kategorii i ponownie zsynchronizować.
+> ⚠️ **Nie da się usunąć kategorii, która ma produkty.** System pokaże, ile
+> produktów trzeba najpierw przenieść. Przenieś je (pole **Kategoria** w edycji
+> produktu) albo ukryj kategorię zamiast usuwać.
 
 ---
 
-## Streszczenie — flow przy dodaniu nowej kategorii
+## Wersja niemiecka
+
+Jeśli wypełnisz **Nazwa po niemiecku (DE)**, kategoria od razu ma poprawną nazwę
+na `/de`. Bez tego pola na `/de` pokaże się nazwa polska — nic się nie psuje,
+ale wygląda niespójnie.
+
+---
+
+## Streszczenie
 
 ```
-1. BL → Magazyn → Kategorie → Dodaj „Komody" → zapisz ID (np. 7489800)
-       ↓
-2. Sklep → /admin/kategorie → wybierz grupę → Dodaj kategorię
-   - Nazwa: Komody
-   - BL ID: 7489800
-   - Zapisz
-       ↓
-3. (Opcjonalnie) Dodaj w BL produkty w kategorii „Komody"
-       ↓
-4. Sklep → /admin/baselinker → „Synchronizuj teraz"
-       ↓
-5. ✅ Produkty pojawiają się w nawigacji Salon → Komody na stronie
+/admin/kategorie → grupa → „+ Dodaj kategorię do tej grupy"
+        ↓
+Nazwa (+ DE), kolejność → „Dodaj kategorię"
+        ↓
+/admin/produkty → „+ Nowy produkt" (albo edycja istniejącego)
+   → pole Kategoria = nowa kategoria
+        ↓
+✅ Kategoria w menu, produkty w niej widoczne od razu
 ```
-
-To wszystko. Cały proces zajmuje 2-3 minuty po pierwszym razie.

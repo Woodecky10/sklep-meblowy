@@ -7,20 +7,36 @@ Sklep meblowy **Mollien** (meble na zamówienie). **Next.js 16** (App Router, Se
 
 > ⚠️ To NIE jest Next.js z treningu — wersja 16 ma breaking changes. Przed kodem Server Component/Action sprawdź `node_modules/next/dist/docs/`. `params`/`searchParams` to Promise. (Patrz `sklep-meblowy/AGENTS.md`.)
 
-## Stan repo (2026-06-29)
-`origin/main` = `f7ea7b6`, **na produkcji** (Vercel auto-deployuje z `main`). Bramki na `main`: `tsc` 0 · `lint` 0 · **258 testów** (vitest) · `build` przechodzi (Turbopack).
+## Stan repo (2026-07-29)
+`origin/main` = `18bba5af`, **na produkcji** (Vercel auto-deployuje z `main`). Bramki na `main`: `tsc` 0 · `lint` 0 błędów (4 znane warningi) · **856 testów** (vitest, 70 plików) · `build` przechodzi (Turbopack).
+
+Wieczorem 2026-07-29 domknięta cała kolejka PR-ów: **#110** (pakiet techniczny SEO — `/og`, `/feed.xml`, JSON-LD Organization + breadcrumby), **#78** (BackToTop w adminie + wyszukiwanie odporne na spacje i kolejność słów), **#100** (licznik nowych zamówień w panelu), **#92** (filtry z parametrów produktu zamiast koloru/tkaniny), **#111** (sprzątanie migracji po BL). Zamknięte bez merge jako zdublowane dzisiejszą pracą: **#99** (ONBOARDING, zastąpiony przez #109) i **#62** (skrypt rehost, usunięty w #105/#106). Otwarty zostaje tylko **#48** (Przelewy24) — konfliktuje po dzisiejszym w `app/api/checkout/route.ts`, `app/api/webhook/route.ts` i `package.json`/lock (doszły `resend`/`react-email`), a przed merge wymaga migracji 47 na prodzie i transakcji w sandboxie P24.
+
+### Maile transakcyjne — UZBROJONE i przetestowane na produkcji (2026-07-29)
+Kod był gotowy od 2026-07-28, brakowało konfiguracji — zrobione i sprawdzone realnym zamówieniem na mollien.pl. Działa: potwierdzenie zamówienia, „Nowe zamówienie" do właścicielki, „w drodze" (z przewoźnikiem i trackingiem), „anulowane". Maile wychodzą TYLKO przy statusach `shipped` i `cancelled` (`NOTIFY_STATUSES` w `app/_lib/mail/status-notify.ts`) — „Dostarczone"/„W realizacji"/„Opłacone" świadomie nie mailują.
+
+- **Adresy — jeden kontaktowy, celowo:** `MAIL_FROM` = `Mollien <zamowienia@mollien.pl>` (ten adres **nie jest skrzynką** i nie musi być — do wysyłki wystarcza zweryfikowana domena; nie „naprawiaj" tego zakładaniem skrzynki). `MAIL_REPLY_TO` = `MAIL_ADMIN_TO` = `COMPANY.email` = **mollien.julia@gmail.com**.
+- **DNS:** strefa w **home.pl** (Domeny → mollien.pl → karta „Hosting DNS" → DZIAŁANIA → „Zarządzaj rekordami DNS"), NIE w Vercelu. Cztery rekordy: `TXT resend._domainkey`, `MX send` (prio 10), `TXT send` (SPF), `TXT _dmarc`. Domena w Resend = Verified. **MX na apex świadomie NIE ma** („Enable Receiving" w Resend wyłączone) — dlatego na `@mollien.pl` nie da się nic odebrać i dlatego reply-to jest na Gmailu.
+- **Gdy maile nie dochodzą:** `sendMail` nigdy nie rzuca, tylko loguje. Vercel → zakładka **Logs** (Runtime, nie Build) → filtr `[mail]`. `brak RESEND_API_KEY`/`brak MAIL_FROM` = zmienna nie dojechała do wdrożenia (**po zmianie zmiennej trzeba Redeploy** — wdrożenie ma zamrożony zestaw z builda). Drugie źródło: Resend → Logs, jedyne miejsce gdzie widać nieudaną wysyłkę (kod nie zapisuje i nie ponawia).
+- **ZOSTAŁO:** mail weryfikacyjny konta idzie wbudowanym mailerem Supabase (limit kilku/godzinę, domyślny szablon). Podpięcie: `docs/maile-konfiguracja.md` sekcja 3.
+
+### Inne otwarte drobiazgi po 2026-07-29
+- ~~**Zamówienia #36 i #37**~~ — ZROBIONE 2026-07-29: `#36` już nie istniało, `#37` (COD 139 zł, „Test Testowy", tracking `TEST123`) usunięte na życzenie Mikołaja — najpierw `order_items`, potem `orders`; zweryfikowane: 0 osieroconych pozycji, zostało 6 zamówień. Numeracja idzie dalej od 38 (luka po 35–37 zostaje, `order_number` to sekwencja).
+- ⚠️ **Prod serwuje `www.mollien.pl`, a kod deklaruje apex.** `https://mollien.pl` → **308** → `https://www.mollien.pl`, ale canonicale, `sitemap.xml`, `og:image` i URL-e w JSON-LD wskazują apex (`metadataBase` z `NEXT_PUBLIC_APP_URL`, `COMPANY.domain`). Google podąża za 308 i skanonikalizuje do `www`, więc nie jest to awaria, ale **przed dodaniem usługi w Search Console trzeba wybrać jeden host**. Najprościej: ustawić apex jako primary domain w Vercelu (wtedy `www` → apex i cały kod jest już poprawny). Druga droga: przestawić `NEXT_PUBLIC_APP_URL` + `COMPANY.domain` na `www` i zredeployować.
+- ⚠️ **Trzy aktywne produkty nie mają żadnego opisu** (ani plain `description`, ani sekcji tekstowych): `Fotel Luma…` `d0fb2cff`, `Narożnik Vegas Mini…` `60c7ccb6`, `schodki dla psa/kotka pupila` `965951d6`. Skutek: pusty `<g:description>` w `/feed.xml` (Merchant Center odrzuci te 3 oferty) i pusta meta description tych stron. Do uzupełnienia w panelu.
+- **Migracje po BaseLinkerze — ZROBIONE 2026-07-29, ale nie wszystkie 5.** Usunięte trzy czysto BL-owe: `07_baselinker_integration`, `11_baselinker_sync_log`, `24_baselinker_sync_log_report`. ⚠️ **`25_bl_push_hardening` MUSI ZOSTAĆ** — mimo nazwy zawiera dwie rzeczy, które nadal żyją: RPC `increment_promo_usage` (atomowy licznik kodów rabatowych, wołany z `markOrderPaid`) i **polityki RLS write na `products`** dla admina (bez nich panel nie zapisuje produktów). ⚠️ **`34_drop_baselinker` też ZOSTAJE**, dopóki zostaje `25` — dropuje kolumnę `orders.baselinker_push_error`, którą `25` wciąż tworzy, więc świeży build bazy kończy bez śladów BL. Dlatego `grep -ri baselinker` nadal daje 2 trafienia i to NIE regresja czystki.
+- **Zmienne `BASELINKER_*`/`CRON_SECRET` w Vercelu** — do sprawdzenia i usunięcia, jeśli zostały. Nic ich nie czyta.
+- **Sesja e2e admina wygasła**, a `.env.e2e` nie ma `E2E_ADMIN_EMAIL`/`E2E_ADMIN_PASSWORD` — bez tego nie da się fotografować panelu ani testować akcji admina.
 
 Ostatnio scalone:
 - **PR #41** — domknięcie wycieków PL na `/de` (redirecty/linki gubiły prefiks `/de`, komunikaty błędów po DE).
 - **PR #42** — **ceny w EUR na `/de`** (patrz sekcja niżej).
-- **PR #43** — **pełne wycięcie BaseLinkera** (kod, API, cron, panel admina, env, migr. 34 drop kolumn/tabeli).
-- **PR #44** — przehostowanie obrazów 15 produktów z CDN BaseLinkera → Supabase storage (skrypt `scripts/rehost-bl-images.mjs`).
 - **PR #45** — fix przełącznika języka DE/PL: `<Link>`→natywny `<a>` (pełny reload). Locale niesie nagłówek `x-locale` (proxy), a chrome (TopBar/Navbar/Footer) jest serwerowy w root layoucie — App Router NIE re-renderuje root layoutu przy soft-nav, więc soft-switch tłumaczył tylko stronę. **Nie zamieniać `<a>` z powrotem na `<Link>` w `LanguageSwitcher`.**
 
-## Duży kierunek: rezygnacja z BaseLinkera — ZAKOŃCZONA
-Decyzja właścicielki (2026-06-17): sklep przejął funkcje BaseLinkera natywnie. **BaseLinker został KOMPLETNIE wycięty** z kodu, configu, env, kolumn DB i danych (obrazy przehostowane). `grep -ri baselinker app/` = pusty. **Konto BaseLinker można zamknąć** bez utraty obrazów ani funkcji. Dawne audyty BL (`docs/audyt-baselinker-*`, `docs/bl-*`) są nieaktualne (legacy).
+## Duży kierunek: sklep obsługuje wszystko natywnie
+Decyzja właścicielki (2026-06-17): sklep prowadzi produkty, kategorie i zamówienia **u siebie** — żadnego zewnętrznego systemu magazynowego, żadnej synchronizacji, żadnego crona. Produkty dodaje się w `/admin/produkty`, kategorie w `/admin/kategorie`, zamówienia obsługuje `/admin/zamowienia`. Zdjęcia leżą w Supabase Storage.
 
-4 podprojekty programu „zastąpienie BL":
+4 podprojekty tego programu:
 1. ✅ **Panel zarządzania zamówieniami** — na `main`.
 2. ✅ **Natywne tworzenie produktów** — na `main`.
 3. ⬜ **Faktury / VAT — przez KSeF** — TODO, czeka na odpowiedzi właścicielki. USTALENIE 2026-06-18: faktury **MUSZĄ być w KSeF** (obowiązkowy od 1.04.2026 dla „pozostałych przedsiębiorców"). **Rekomendacja: NIE budować bezpośredniej integracji KSeF** — sklep zbiera dane → API programu fakturowego (Fakturownia/wFirma/inFakt/Comarch), który robi KSeF+FA(3)+numerację+PDF+UPO. W kodzie ZERO podstaw (brak NIP/danych firmy/VAT/podziału netto-brutto). Najważniejsze pytanie: z jakiego programu fakturowego korzysta księgowa.
@@ -72,12 +88,14 @@ npm run dev
 ```
 Niezbędne env do dev (nazwy — wartości z Vercel/starego `.env.local`):
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `P24_MERCHANT_ID`, `P24_POS_ID`, `P24_API_KEY`, `P24_CRC`, `P24_BASE_URL`, `NEXT_PUBLIC_APP_URL`. Pełny szablon: `sklep-meblowy/.env.example`.
-> Zmienne `STRIPE_*`, `BASELINKER_*`/`BL_STATUS_*`/`CRON_SECRET` zostały USUNIĘTE — nie są już potrzebne.
-> **Baza i storage są ZDALNE/współdzielone (Supabase).** Migracje (29–34) już wgrane, obrazy w storage. Nowy komp **nie robi setupu bazy** — wystarczy `.env.local` wskazujący na ten sam projekt Supabase. `.env.local` i `node_modules` są gitignored, więc nie przychodzą z klonem.
+> ⚠️ **Ta gałąź zamienia Stripe'a na bezpośredni Przelewy24.** Po merge `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` przestają być czytane przez cokolwiek, a `P24_*` stają się **wymagane** — bez nich `/api/checkout` nie zarejestruje transakcji. `BASELINKER_*`/`BL_STATUS_*`/`CRON_SECRET` usunięte dawno.
+> Maile: `RESEND_API_KEY`, `MAIL_FROM`, `MAIL_REPLY_TO`, `MAIL_ADMIN_TO` są ustawione **w Vercelu (Production)**. Lokalnie NIE są potrzebne — bez `RESEND_API_KEY` kod działa w trybie no-op (loguje `[mail] brak RESEND_API_KEY` i nic nie wysyła), więc dev nie zaśmieca skrzynek. Dodaj je do `.env.local` tylko gdy chcesz testować maile z lokalnego builda.
+> **Baza i storage są ZDALNE/współdzielone (Supabase).** Migracje już wgrane, obrazy w storage. Nowy komp **nie robi setupu bazy** — wystarczy `.env.local` wskazujący na ten sam projekt Supabase. `.env.local` i `node_modules` są gitignored, więc nie przychodzą z klonem.
 
 ## Baza — migracje
-**Migracje 29–38 są ODPALONE** na produkcyjnym Supabase (29–32: 2026-06-23; 33+34: 2026-06-24; 35+36: 2026-06-25; 37+38: 2026-06-25). Wspólna baza → świeży klon nic nie re-uruchamia. Przyszłe migracje: kolejny numer w `sklep-meblowy/supabase/migrations/` (kanoniczny katalog); odpala **człowiek** w Supabase SQL Editorze (agent NIE ma dostępu DDL).
-> Migracja **40** (`40_p24_payment_ref.sql`) jest w repo ale **NIE odpalona** — uruchomić przy cutoverze P24 na produkcję. Migracja **41** (`41_drop_stripe_payment_intent.sql`) jest w repo ale **NIE odpalać teraz** — patrz sekcja Płatności.
+**Wszystkie migracje z repo są ODPALONE na produkcyjnym Supabase Z WYJĄTKIEM `47` i `48` (P24).** Wspólna baza → świeży klon nic nie re-uruchamia. Przyszłe migracje: kolejny numer w `sklep-meblowy/supabase/migrations/` (kanoniczny katalog); odpala człowiek w Supabase SQL Editorze albo agent przez Supabase MCP (model: pokaż SQL → potwierdź → wykonaj).
+> Migracja **47** (`47_p24_payment_ref.sql`) jest **addytywna (expand)** — dodaje `payment_ref` + `payment_provider` i backfilluje istniejące zamówienia jako `stripe`, **nie rusza `stripe_payment_intent`**. Dlatego jest bezpieczna przy żywym kodzie Stripe i odpala się **PRZED** merge tej gałęzi (preview dzieli bazę z produkcją).
+> Migracja **48** (`48_drop_stripe_payment_intent.sql`) — **NIE odpalać teraz.** Dopiero ~30 dni po cutoverze, gdy minie okno zwrotów/reklamacji ostatniego zamówienia opłaconego Stripe'em. Po niej: usunąć `stripe_payment_intent` z `types.ts` i z fallbacku w panelu admina.
 
 ## Bramki jakości (uruchamiać z `sklep-meblowy/`)
 `npx tsc --noEmit` (0 błędów) · `npm run lint` (0) · `npm test` (vitest — 268 zielonych) · `npm run build` (Turbopack przechodzi).
@@ -98,14 +116,13 @@ Origin wymaga konta **Woodecky10** — `mwlo1403` NIE ma write (push → 403). K
 brainstorming → spec (`docs/superpowers/specs/`) → plan TDD (`docs/superpowers/plans/`) → implementacja subagent-driven (świeży subagent na task + recenzja po każdym + final whole-branch review) → merge. Panel admina jest **PL-only** (bez i18n). Server actions: `"use server"` + `requireAdmin()` + `createAdminClient()` + `revalidatePath`, zwracają `ActionResult` (typ w `app/_lib/types.ts`), updaty castowane `as never`. Komponenty klienckie używają `app/admin/_shared` + `useTransition`.
 
 ## Następny krok
-1. **P24 sandbox go-live (po stronie człowieka):** wpisz klucze sandbox P24 w `.env.local`; wykonaj E2E checklist (karta PL/DE, BLIK, przelew, porzucona, duplikat notyfikacji, podrobiony sign). Patrz sekcja Płatności wyżej.
-2. **EUR go-live:** ustaw realny kurs w `/admin/ustawienia`; testowa sesja EUR (card) na `/de` w sandboxie P24.
-3. **Migracja 41 (cleanup Stripe):** ~30 dni po cutoverze odpal `41_drop_stripe_payment_intent.sql`, potem usuń `stripe_payment_intent` z `types.ts` i panelu admina.
-4. **Zamknięcie konta BaseLinker** — można (obrazy przehostowane, kod/dane czyste).
-5. **Podprojekt 3 (faktury KSeF)** — czeka na odpowiedź: z jakiego programu fakturowego korzysta księgowa (przesądza drogę); potem spec → plan → wdrożenie.
-6. **Reszta podprojektu 4 (wysyłka)** — termin dostawy, dane transportu, model kosztu.
+1. **Cutover P24 (kolejność jest istotna):** ① migracja `47` na prodzie (addytywna, bezpieczna przy żywym Stripe) → ② `P24_*` (sandbox) w Vercelu + `urlStatus`/`urlReturn` w panelu P24 → ③ realna transakcja w sandboxie na preview (karta PL, karta EUR na `/de`, BLIK, przelew, płatność porzucona, duplikat notyfikacji, podrobiony podpis) → ④ merge + `P24_*` produkcyjne → ⑤ nie zamykać Stripe'a przez ~30 dni (okno zwrotów).
+2. **Migracja 48 (cleanup Stripe):** ~30 dni po cutoverze; potem usunąć `stripe_payment_intent` z `types.ts` i panelu admina.
+3. **EUR go-live:** ustaw realny kurs w `/admin/ustawienia`; testowa sesja EUR (karta) na `/de` w sandboxie P24. ⚠️ P24 jest PLN-centryczny — EUR działa realnie tylko dla kart, więc na `/de` P24 sam pokaże klientowi wyłącznie kartę. Konto PayPro musi mieć włączone rozliczenia EUR.
+4. **Podprojekt 3 (faktury KSeF)** — czeka na odpowiedź: z jakiego programu fakturowego korzysta księgowa (przesądza drogę); potem spec → plan → wdrożenie.
+5. **Reszta podprojektu 4 (wysyłka)** — termin dostawy, dane transportu, model kosztu.
 
 ## Drobne follow-upy (nieblokujące)
 - `schema.sql` jest niekompletnym baseline'em (pre-existing) — fresh-DB bootstrap z samego pliku byłby niepełny; źródłem prawdy są **migracje**.
-- `.env.local` może mieć puste `BASELINKER_*` (gitignored) — można wyczyścić ręcznie.
-- `scripts/rehost-bl-images.mjs` — jednorazowy, idempotentny skrypt migracji obrazów; zostaje w repo jako ślad (nieszkodliwy).
+- Stary `.env.local` (gitignored, nie przychodzi z klonem) może mieć nieużywane już zmienne po dawnej integracji magazynowej — można wyczyścić ręcznie, aplikacja ich nie czyta.
+- Migracje `07`, `11`, `24`, `25` tworzyły, a `34` usunęła strukturę dawnej integracji magazynowej. Pliki zostają jako rejestr tego, co realnie odpalono na bazie — nie kasować, bo numeracja i historia schematu przestałyby się zgadzać.

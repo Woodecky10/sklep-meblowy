@@ -1,6 +1,6 @@
 // Filtry opcji wariantów (?opcja_<slug>=w1,w2) i wymiarów (?szer_od= itd.)
 // na /sklep. Czyste funkcje (bez importów server-only), testowalne w node —
-// wzorzec fabric-filter.ts. Nazwy opcji to wolne stringi admina z mieszanym
+// wzorzec feature-filter.ts. Nazwy opcji to wolne stringi admina z mieszanym
 // casingiem (ROZMIAR/Rozmiar), więc grupujemy po znormalizowanej nazwie.
 
 import type { ProductVariants, ProductDimensions } from "./types";
@@ -9,8 +9,9 @@ import type { Locale } from "./i18n";
 
 export const OPTION_PARAM_PREFIX = "opcja_";
 
-// „Tkanina" ma dedykowany filtr rodzin tkanin (fabric-filter.ts) — nie
-// dublujemy jej w generycznych filtrach opcji.
+// Opcja „Tkanina" w wariantach to kody kolorów tkanin (np. „Poso 105"), nie
+// nadaje się na generyczny facet — wykluczamy ją ŚWIADOMIE z filtrów opcji.
+// (Dawniej miała dedykowany filtr rodzin tkanin; został usunięty.)
 export const EXCLUDED_OPTION_SLUGS: Set<string> = new Set(["tkanina"]);
 
 // "  POWIERZCHNIA   SPANIA " → "powierzchnia spania" (klucz grupowania).

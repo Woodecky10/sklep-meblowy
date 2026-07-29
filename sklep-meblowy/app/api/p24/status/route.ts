@@ -1,10 +1,16 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import { getP24Config, verifyTransaction } from "@/app/_lib/p24";
 import { isValidNotification, type P24Notification } from "@/app/_lib/p24-events";
 import { markOrderPaid } from "@/app/_lib/orders";
 import { incrementPromoUsage } from "@/app/_lib/promo";
 import { createAdminClient } from "@/app/_lib/supabase/server";
+import { notifyOrderPlaced } from "@/app/_lib/mail/notify-order";
 import type { OrderStatus } from "@/app/_lib/types";
+
+// Ogranicza czas pracy handlera PO odpowiedzi (patrz after() nizej) — wysylka
+// maila nie moze wisiec bez limitu. 30s jest w limicie Node kazdego planu
+// Vercela. Parytet z dawnym webhookiem Stripe.
+export const maxDuration = 30;
 
 // Oczekiwana kwota transakcji w groszach/eurocentach z total zamówienia
 // (jednostki główne). Wydzielone do testu.
@@ -121,6 +127,19 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       console.error("[promo] increment used_count nieudany:", err);
     }
+  }
+
+  // Maile (potwierdzenie do klienta + „Nowe zamówienie" do właścicielki) —
+  // wyłącznie dla zwycięzcy CAS-a pending→paid, więc ponowiona notyfikacja P24
+  // nie wyśle drugiego potwierdzenia. notifyOrderPlaced nigdy nie rzuca, więc
+  // nieudany mail nie zamieni się w 500 i kolejne ponowienie.
+  //
+  // after(): wysyłka jest POST-response. Zawieszone `await` trzymałoby
+  // połączenie notyfikacji otwarte — P24 ponawia, dopóki nie dostanie 200, więc
+  // wolna wysyłka maila wyglądałaby jak nieudana notyfikacja, mimo że
+  // zamówienie jest już rozliczone.
+  if (claimedFirst) {
+    after(() => notifyOrderPlaced(orderId));
   }
 
   return NextResponse.json({ received: true });

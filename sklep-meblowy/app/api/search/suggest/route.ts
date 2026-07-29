@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/app/_lib/supabase/server";
-import { buildSearchOrFilter } from "@/app/_lib/search-filter";
+import { searchTokens, escapeIlike } from "@/app/_lib/search-filter";
 import { pickLocalized, isLocale, DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
 import { getCategories } from "@/app/_lib/categories";
 
@@ -22,20 +22,25 @@ export async function GET(request: NextRequest) {
     return NextResponse.json<SearchSuggestion[]>([]);
   }
 
-  // Sanityzacja + budowa filtra .or() (escape składni .or() i wildcardów
-  // ILIKE) w search-filter.ts. null = sama interpunkcja → brak podpowiedzi.
-  const orFilter = buildSearchOrFilter(q);
-  if (!orFilter) {
+  // Wyszukiwanie odporne na spacje/kolejność: frazę tniemy na słowa i każde
+  // dopasowujemy do kolumny search_key (odspacjowana, bez tagów) przez ILIKE —
+  // wiele .ilike() na tej samej kolumnie PostgREST ANDuje (każde słowo musi
+  // wystąpić). Brak tokenów (sama interpunkcja) → brak podpowiedzi.
+  const tokens = searchTokens(q);
+  if (tokens.length === 0) {
     return NextResponse.json<SearchSuggestion[]>([]);
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("products")
     .select("id, name, name_de, price, images, category")
-    .or(orFilter)
     .order("created_at", { ascending: false })
     .limit(6);
+  for (const token of tokens) {
+    query = query.ilike("search_key", `%${escapeIlike(token)}%`);
+  }
+  const { data, error } = await query;
 
   if (error) {
     return NextResponse.json<SearchSuggestion[]>([], { status: 200 });
