@@ -112,19 +112,23 @@ dzisiejsza siatka.
 Nowy `app/_components/ui/ProductCarousel.tsx`, `"use client"`, w środku
 istniejący `ProductCard` (ulubione, ceny, przeliczenie EUR działają bez zmian).
 
-- Kontener: `flex gap-8 overflow-x-auto snap-x snap-mandatory scroll-smooth`,
-  ukryty scrollbar (`scrollbar-width: none` + `::-webkit-scrollbar`).
+- Mechanika: **`embla-carousel-react` ^8.6.0** — już w zależnościach, używany
+  przez `HomeHeroSlider.tsx:44`. Daje przeciąganie na mobile, snap i gotowe
+  `canScrollPrev()` / `canScrollNext()` do stanu strzałek, więc nie piszemy
+  własnych listenerów `scroll` + `ResizeObserver`. Opcje:
+  `{ align: "start", slidesToScroll: "auto", containScroll: "trimSnaps" }`
+  (bez `loop` i bez autoplay — to lista produktów, nie hero).
 - Szerokości kart: 1 na mobile (~78% szerokości, żeby następna wystawała jako
-  afordancja), 2 od `sm`, 3 od `md`, 4 od `lg` — te same proporcje co dzisiejsza
-  siatka `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`.
+  afordancja), 2 od `sm`, 4 od `lg` — te same proporcje co dzisiejsza siatka
+  `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`.
 - Strzałki: okrągłe przyciski `type="button"` w stylu sekcji (border
   `--border`, hover `--color-gold`), wyśrodkowane pionowo na pasku kart.
-  Ukryte na mobile (swipe wystarcza, `hidden sm:flex`), wyszarzone i
-  `disabled` na krawędziach listy, całkowicie ukryte gdy treść się mieści
-  (brak overflow). Stan krawędzi z listenera `scroll` + `ResizeObserver`.
-- Klik `scrollBy({ left: ±clientWidth * 0.9, behavior: "smooth" })`.
-- `aria-label` przycisków z dictionary (PL „Poprzednie produkty" /
-  „Następne produkty", DE „Vorherige Produkte" / „Nächste Produkte").
+  Ukryte na mobile (przeciąganie wystarcza, `hidden sm:flex`), wyszarzone i
+  `disabled` gdy `canScroll*()` zwraca `false` — przy liście mieszczącej się w
+  całości oba są nieaktywne, więc pasek nie udaje przewijalnego.
+- `aria-label` przycisków z dictionary, sekcja `a11y` (obok istniejących
+  `prevSlide` / `nextSlide`): nowe `prevProducts` / `nextProducts`. Locale w
+  komponencie klienckim przez `useClientLocale()`, jak w `HomeHeroSlider`.
 - Klik w kartę = przejście na stronę materaca (standardowy `ProductCard`).
   Dodawania do koszyka z karuzeli **nie ma**.
 - Pozostałe sekcje strony produktu („Podobne produkty", „Pełna kolekcja")
@@ -132,12 +136,16 @@ istniejący `ProductCard` (ulubione, ceny, przeliczenie EUR działają bez zmian
 
 ### Nagłówek i i18n
 
-Nowe klucze w `product` (`app/_lib/dictionaries/pl.ts` + `de.ts` + typ):
+Nowe klucze w `pl.ts` (typ `PlShape` + wartości) i `de.ts` — test parytetu
+`dictionaries.test.ts` wymaga niepustego tłumaczenia DE dla każdego klucza PL:
 
-- `crossSellSizeEyebrow`: PL „Dobierz materac", DE „Passende Matratze"
-- `crossSellSizeHeading`: PL „Materace w rozmiarze {size}", DE „Matratzen in
-  Größe {size}" — `{size}` podstawiane przez `formatSleepSize`
-- `carouselPrev` / `carouselNext` (aria-labels, jak wyżej)
+- `product.crossSellSizeEyebrow`: PL „Dobierz materac", DE „Passende Matratze"
+- `product.crossSellSizeHeading`: PL „Materace w rozmiarze", DE „Matratzen in
+  Größe" — rozmiar dokleja się w JSX (`${...crossSellSizeHeading} ${formatSleepSize(size)}`),
+  bez interpolacji `{placeholder}`, zgodnie z konwencją reszty słownika
+  (por. `crossSellRecommendedPrefix` w `page.tsx:349`)
+- `a11y.prevProducts` / `a11y.nextProducts`: PL „Poprzednie produkty" /
+  „Następne produkty", DE „Vorherige Produkte" / „Nächste Produkte"
 
 Ścieżka `sizeMatched === false` zostaje przy dzisiejszej kopii („Dopełnienie" /
 „Polecane {label pierwszej kategorii}" / fallback „Może Cię zainteresować").
