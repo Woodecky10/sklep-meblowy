@@ -19,6 +19,7 @@ import {
   FABRIC_OPTION_NAME,
 } from "@/app/_lib/variants";
 import { groupFabricsByCategory, groupSelectionState } from "@/app/_lib/fabric-groups";
+import { searchMatches } from "@/app/_lib/search-normalize";
 import {
   applyCornerSideSelection,
   hasCornerSideOption,
@@ -771,7 +772,7 @@ function FabricPicker({
 
   const q = search.trim().toLowerCase();
   const base = onlySelected ? fabrics.filter((f) => selectedNames.includes(f.name)) : fabrics;
-  const filtered = q ? base.filter((f) => f.name.toLowerCase().includes(q)) : base;
+  const filtered = q ? base.filter((f) => searchMatches(f.name, search)) : base;
   const groups = groupFabricsByCategory(filtered);
   const selectedSet = new Set(selectedNames);
   const searching = q.length > 0;

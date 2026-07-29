@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   escapeIlike,
   sanitizeSearchTerm,
-  buildSearchOrFilter,
+  searchTokens,
   rankByNameMatch,
 } from "@/app/_lib/search-filter";
 
@@ -37,41 +37,34 @@ describe("sanitizeSearchTerm — ochrona przed injection w .or() (audyt MED)", (
   });
 });
 
-describe("buildSearchOrFilter", () => {
-  it("buduje filtr .or() z czystej frazy", () => {
-    expect(buildSearchOrFilter("sofa")).toBe(
-      "name.ilike.%sofa%,description.ilike.%sofa%"
-    );
+describe("searchTokens — tokenizacja frazy", () => {
+  it("tnie na słowa, zwija spacje", () => {
+    expect(searchTokens("  sofa   modena ")).toEqual(["sofa", "modena"]);
   });
-
-  it("null gdy po sanityzacji nic nie zostaje (nie zawężaj wyników)", () => {
-    expect(buildSearchOrFilter(",.()")).toBeNull();
-    expect(buildSearchOrFilter("   ")).toBeNull();
-    expect(buildSearchOrFilter("")).toBeNull();
+  it("sanityzuje jak sanitizeSearchTerm (usuwa składnię .or())", () => {
+    expect(searchTokens("x,price.gt.0")).toEqual(["xpricegt0"]);
   });
-
-  it("wstrzyknięta składnia .or() nie przechodzi do filtra", () => {
-    const filter = buildSearchOrFilter("x,price.gt.0");
-    // Tylko JEDEN przecinek (separator name/description), żaden z user inputu.
-    expect(filter).toBe("name.ilike.%xpricegt0%,description.ilike.%xpricegt0%");
-    expect(filter?.split(",").length).toBe(2);
+  it("sama interpunkcja / pusta → []", () => {
+    expect(searchTokens(",.()")).toEqual([]);
+    expect(searchTokens("")).toEqual([]);
   });
-
-  it("locale de → kolumny _de", () => {
-    expect(buildSearchOrFilter("sofa", "de")).toBe(
-      "name_de.ilike.%sofa%,description_de.ilike.%sofa%"
-    );
-  });
-
-  it("locale pl (domyślnie) → kolumny PL", () => {
-    expect(buildSearchOrFilter("sofa")).toBe(
-      "name.ilike.%sofa%,description.ilike.%sofa%"
-    );
+  it("limit MAX_SEARCH_TOKENS (10)", () => {
+    const raw = Array.from({ length: 15 }, (_, i) => `w${i}`).join(" ");
+    expect(searchTokens(raw)).toHaveLength(10);
   });
 });
 
 describe("rankByNameMatch — trafienia w nazwie przed trafieniami w opisie", () => {
   const get = (r: { name: string }) => r.name;
+
+  it("wiele słów w dowolnej kolejności — wszystkie muszą być w nazwie", () => {
+    const rows = [
+      { name: "Sofa Modena szara" },
+      { name: "Narożnik VEGAS L Duża Funkcja SPANIA" },
+    ];
+    const ranked = rankByNameMatch(rows, "spania vegas", get);
+    expect(ranked[0]).toEqual({ name: "Narożnik VEGAS L Duża Funkcja SPANIA" });
+  });
 
   it("produkty z frazą w nazwie idą przed dopasowanymi tylko przez opis", () => {
     // Scenariusz z bugu: „materac" łapie materac (nazwa) + łóżka kontynentalne
@@ -129,7 +122,7 @@ describe("rankByNameMatch — trafienia w nazwie przed trafieniami w opisie", ()
     expect(rankByNameMatch(rows, ",.()", get)).toEqual(rows);
   });
 
-  it("sanityzuje frazę tak jak buildSearchOrFilter (spójne dopasowanie)", () => {
+  it("sanityzuje frazę tak jak sanitizeSearchTerm (spójne dopasowanie)", () => {
     // „materac,x" sanityzuje się do „materacx" — nie trafia w „Materac ...".
     const rows = [{ name: "Materac kieszeniowy" }, { name: "Sofa" }];
     expect(rankByNameMatch(rows, "materac", get)[0]).toEqual({

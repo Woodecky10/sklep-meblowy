@@ -6,7 +6,7 @@ import { Card, EmptyState, Field, ToastView, inputCls, type Toast } from "@/app/
 import RichTextEditor from "@/app/admin/_shared/RichTextEditor";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { Bundle } from "@/app/_lib/types";
-import { normalizeSearchText } from "@/app/_lib/search-normalize";
+import { searchMatches } from "@/app/_lib/search-normalize";
 import { effectivePrice } from "@/app/_lib/pricing";
 import { computeBundleDiscount, type BundleDiscountType } from "@/app/_lib/bundles";
 import { formatPrice } from "@/app/_lib/format";
@@ -151,11 +151,10 @@ function BundleForm({
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
 
   // Wyszukiwarka jak w /admin/produkty — filtr kliencki po znormalizowanym tekście.
-  const filtered = useMemo(() => {
-    const q = normalizeSearchText(query);
-    if (!q) return products;
-    return products.filter((p) => normalizeSearchText(p.name).includes(q));
-  }, [products, query]);
+  const filtered = useMemo(
+    () => products.filter((p) => searchMatches(p.name, query)),
+    [products, query]
+  );
 
   // Podgląd na żywo: suma cen bazowych (efektywnych) → cena zestawu.
   const baseSum = selectedIds.reduce((s, id) => {

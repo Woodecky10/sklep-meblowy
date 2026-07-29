@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { normalizeSearchText } from "@/app/_lib/search-normalize";
+import { searchMatches } from "@/app/_lib/search-normalize";
 import DeleteProductButton from "./DeleteProductButton";
 import ToggleProductActiveButton from "./ToggleProductActiveButton";
 
@@ -29,12 +29,9 @@ function productsWord(n: number): string {
 // przy każdej literze jest natychmiastowe, bez podróży na serwer.
 export default function ProductsList({ products }: { products: AdminProductRow[] }) {
   const [query, setQuery] = useState("");
-  const q = normalizeSearchText(query);
-  const visible = q
+  const visible = query.trim()
     ? products.filter(
-        (p) =>
-          normalizeSearchText(p.name).includes(q) ||
-          normalizeSearchText(p.category).includes(q)
+        (p) => searchMatches(p.name, query) || searchMatches(p.category, query)
       )
     : products;
 
@@ -63,7 +60,7 @@ export default function ProductsList({ products }: { products: AdminProductRow[]
       </div>
 
       <p className="text-sm text-[var(--muted)]">
-        {q
+        {query.trim()
           ? `${visible.length} z ${products.length} ${products.length === 1 ? "produktu" : "produktów"}`
           : `Łącznie: ${products.length} ${productsWord(products.length)}`}
       </p>

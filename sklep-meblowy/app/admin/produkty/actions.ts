@@ -19,6 +19,7 @@ import {
 import { recordPriceHistory } from "@/app/_lib/price-history";
 import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-html";
 import { buildGroupKey, pickGroupKey } from "@/app/_lib/size-groups";
+import { searchTokens, escapeIlike } from "@/app/_lib/search-filter";
 import { normalizeDeliveryTime, normalizeWarranty } from "@/app/_lib/spec-format";
 import { parseFeatureRows } from "@/app/_lib/product-features";
 import { normalizeVariantInfoInput } from "@/app/_lib/variant-info";
@@ -740,15 +741,17 @@ export async function searchProductsForSizeGroup(
   query: string
 ): Promise<ActionResult> {
   await requireAdmin();
-  const q = sanitize(query, 100);
-  if (q.length < 2) return { ok: true, data: { results: [] } };
+  const tokens = searchTokens(query);
+  if (tokens.join("").length < 2) return { ok: true, data: { results: [] } };
   const supabase = await createAdminClient();
-  const { data, error } = await supabase
+  let q = supabase
     .from("products")
     .select("id, name, size_group, size_label")
-    .ilike("name", `%${q}%`)
-    .neq("id", sanitize(currentId))
-    .limit(10);
+    .neq("id", sanitize(currentId));
+  for (const token of tokens) {
+    q = q.ilike("search_key", `%${escapeIlike(token)}%`);
+  }
+  const { data, error } = await q.limit(10);
   if (error) return { ok: false, error: error.message };
   return { ok: true, data: { results: data ?? [] } };
 }

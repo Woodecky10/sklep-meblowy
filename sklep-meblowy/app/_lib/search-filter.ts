@@ -22,34 +22,26 @@ export function sanitizeSearchTerm(raw: string): string {
     .trim();
 }
 
-// Buduje filtr .or() (name/description ILIKE) z odsanityzowanej frazy.
-// Zwraca null gdy po sanityzacji nic nie zostaje (pusta/sama-interpunkcja
-// fraza = nie zawężaj wyników).
-//
-// `locale==='de'` szuka po kolumnach _de (name_de/description_de). UWAGA:
-// celowo NIE fallbackujemy do PL przy wyszukiwaniu — produkty bez tłumaczenia
-// DE nie matchują się na DE search dopóki nie zostaną przetłumaczone (decyzja
-// projektowa: wyniki DE pokazują tylko przetłumaczoną treść).
-export function buildSearchOrFilter(
-  raw: string,
-  locale: "pl" | "de" = "pl"
-): string | null {
+// Maksymalna liczba słów frazy branych pod uwagę (ochrona przed abuse/długim
+// zapytaniem). Fraza jest tokenizowana; każde słowo → osobny warunek ILIKE.
+export const MAX_SEARCH_TOKENS = 10;
+
+// Tokeny frazy: sanityzacja (allowlist + zwinięcie spacji) → słowa → limit.
+export function searchTokens(raw: string): string[] {
   const term = sanitizeSearchTerm(raw);
-  if (!term) return null;
-  const nameCol = locale === "de" ? "name_de" : "name";
-  const descCol = locale === "de" ? "description_de" : "description";
-  return `${nameCol}.ilike.%${term}%,${descCol}.ilike.%${term}%`;
+  if (!term) return [];
+  return term.split(" ").filter(Boolean).slice(0, MAX_SEARCH_TOKENS);
 }
 
 // Ranking wyników wyszukiwania: produkty z frazą w NAZWIE przed tymi, które
 // dopasowały się tylko przez opis. Wyszukiwarka szuka po name+description
-// (buildSearchOrFilter), więc np. „materac" łapie też łóżka kontynentalne
-// (boxspring z materacem w opisie). Ten ranking wypycha faktyczne materace na
-// górę, zachowując trafienia z opisu niżej — bez utraty wyszukiwania po treści.
+// (search_key), więc np. „materac" łapie też łóżka kontynentalne (boxspring z
+// materacem w opisie). Ten ranking wypycha faktyczne materace na górę,
+// zachowując trafienia z opisu niżej — bez utraty wyszukiwania po treści.
 //
 // Kolejność wewnątrz każdej grupy jest zachowana (stabilna), więc sort z DB
 // (alfabetyczny/cena/nowość) pozostaje w mocy. Dopasowanie case-insensitive
-// (jak ILIKE) i po tej samej sanityzowanej frazie co filtr DB — bez
+// (jak ILIKE) i po tych samych tokenach co filtr DB — bez
 // diakrytyko-niezależności (identycznie jak zapytanie). Fraza pusta po
 // sanityzacji → wejście bez zmian (nie ma czego rankować).
 export function rankByNameMatch<T>(
@@ -57,12 +49,15 @@ export function rankByNameMatch<T>(
   raw: string,
   getName: (row: T) => string | null | undefined
 ): T[] {
-  const term = sanitizeSearchTerm(raw).toLowerCase();
-  if (!term) return rows;
+  const tokens = searchTokens(raw);
+  if (tokens.length === 0) return rows;
   const nameHits: T[] = [];
   const rest: T[] = [];
   for (const row of rows) {
-    if ((getName(row) ?? "").toLowerCase().includes(term)) nameHits.push(row);
+    // Odspacjowana, małoliterowa nazwa — spójnie z kolumną search_key (bez
+    // zdejmowania diakrytyków). Trafienie w nazwie = KAŻDE słowo obecne.
+    const key = (getName(row) ?? "").toLowerCase().replace(/\s+/g, "");
+    if (tokens.every((t) => key.includes(t.toLowerCase()))) nameHits.push(row);
     else rest.push(row);
   }
   return [...nameHits, ...rest];

@@ -132,5 +132,8 @@ na cokolwiek i bez czytania opisu.
   (kolumna przy kolorze, nie przy rodzinie). Dziś takiego przypadku nie ma.
 - Migracja 63 rezerwuje numer. Otwarty PR #48 (Przelewy24) rezerwuje 47/48,
   PR #92 nie dokłada migracji — bez kolizji. Uwaga niezależna od tego zadania:
-  numer **61 jest już zdublowany** — `main` ma `61_variant_info.sql`, a otwarty
-  PR #78 `61_products_search_key.sql`; do rozstrzygnięcia przy merge'u #78.
+  numer **61 był zdublowany** — `main` ma `61_variant_info.sql`, a PR #78
+  `61_products_search_key.sql`. Rozstrzygnięte 2026-07-28 przy merge'u main do
+  #78: plik z #78 przenumerowany na `65_products_search_key.sql` (na prodzie
+  zaaplikowany 2026-07-21 pod starą nazwą; migracja idempotentna, więc ponowne
+  uruchomienie to no-op).

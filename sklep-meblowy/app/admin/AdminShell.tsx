@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { signOut } from "@/app/_lib/auth-actions";
 import UnsavedChangesGuard from "./UnsavedChangesGuard";
+import BackToTop from "@/app/_components/layout/BackToTop";
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Pulpit", icon: DashboardIcon },
@@ -38,6 +39,7 @@ export default function AdminShell({
   return (
     <div className="min-h-screen bg-[var(--bg)] lg:flex">
       <UnsavedChangesGuard />
+      <BackToTop />
       {/* Pasek mobilny z hamburgerem (tylko < lg) */}
       <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between h-14 px-4 border-b border-[var(--border)] bg-[var(--card-bg)]">
         <Link

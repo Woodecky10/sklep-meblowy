@@ -2,7 +2,7 @@ import { unstable_cache, revalidateTag } from "next/cache";
 import { createClient as createBareAnonClient } from "@supabase/supabase-js";
 import { createClient, createAdminClient } from "./supabase/server";
 import { getCategories } from "./categories";
-import { buildSearchOrFilter, rankByNameMatch } from "./search-filter";
+import { searchTokens, rankByNameMatch, escapeIlike } from "./search-filter";
 import { sizeLabelOf } from "./size-groups";
 import { localizeProduct, buildLocalizedFacets } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
@@ -145,15 +145,20 @@ export async function getProducts(filters: ProductFilters = {}) {
     }
   }
 
-  // Sanityzacja + budowa filtra .or() w search-filter.ts (escape składni
-  // .or() i wildcardów ILIKE). null = po sanityzacji nic nie zostało.
-  // DE szuka po name_de/description_de (bez fallbacku — patrz search-filter).
-  const searchOrFilter =
-    search && search.trim() ? buildSearchOrFilter(search, locale) : null;
-  if (searchOrFilter) query = query.or(searchOrFilter);
+  // Wyszukiwanie odporne na spacje/kolejność: frazę tniemy na słowa i każde
+  // słowo dopasowujemy do kolumny search_key (odspacjowana, bez tagów) przez
+  // ILIKE — wiele .ilike() na tej samej kolumnie PostgREST ANDuje, więc każde
+  // słowo musi wystąpić, niezależnie od kolejności. DE → search_key_de.
+  const searchTerms = searchTokens(search ?? "");
+  const searchActive = searchTerms.length > 0;
+  if (searchActive) {
+    const keyCol = locale === "de" ? "search_key_de" : "search_key";
+    for (const token of searchTerms) {
+      query = query.ilike(keyCol, `%${escapeIlike(token)}%`);
+    }
+  }
   // Aktywne wyszukiwanie zmienia tryb paginacji: ranking (nazwa > opis)
   // wymaga całego zestawu dopasowań naraz, więc paginujemy w JS (patrz niżej).
-  const searchActive = searchOrFilter !== null;
 
   if (typeof priceMin === "number") query = query.gte("price", priceMin);
   if (typeof priceMax === "number") query = query.lte("price", priceMax);
@@ -233,7 +238,7 @@ export async function getProducts(filters: ProductFilters = {}) {
     const ranked = rankByNameMatch(
       (data ?? []) as Product[],
       search!,
-      // DE dopasowuje name_de bez fallbacku do PL — spójnie z buildSearchOrFilter.
+      // DE dopasowuje name_de bez fallbacku do PL — spójnie z search_key_de.
       (p) =>
         locale === "de"
           ? (p as { name_de?: string | null }).name_de ?? ""
