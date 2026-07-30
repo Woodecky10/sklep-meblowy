@@ -42,26 +42,24 @@ test("pigułki cech tkaniny są widoczne w rozwiniętej liście tkanin", async (
 
   await page.goto(`/produkt/${PRODUCT_ID}`);
 
-  // Warianty renderuje komponent kliencki — czekamy na „Zobacz więcej", a gdy
-  // go nie ma (produkt bez tkanin albo mniej niż 6 próbek), pomijamy test
-  // zamiast fałszywie failować.
-  const more = page.getByRole("button", { name: /Zobacz więcej/ });
-  const hasMore = await more
-    .first()
+  // Warianty renderuje komponent kliencki — czekamy na karty grup cenowych
+  // (od 2026-07-30 widoczne OD WEJŚCIA, bez kroku „Zobacz więcej"), a gdy ich
+  // nie ma (produkt bez tkanin z katalogu), pomijamy test zamiast fałszywie
+  // failować.
+  const groupCards = page.getByTestId("fabric-groups");
+  const hasGroups = await groupCards
     .waitFor({ state: "visible", timeout: 15_000 })
     .then(() => true)
     .catch(() => false);
   test.skip(
-    !hasMore,
-    "produkt nie ma rozwijanej listy tkanin (dane katalogu mogły się zmienić)"
+    !hasGroups,
+    "produkt nie ma kart grup tkanin (dane katalogu mogły się zmienić)"
   );
 
-  await more.first().click();
-
-  // Po rozwinięciu widać karty GRUP cenowych, domyślnie otwarta jest tylko
-  // jedna. Pigułki zwiniętych grup nie są w DOM-ie, więc rozwijamy wszystkie —
-  // inaczej test pomijałby się tylko dlatego, że tkanina z cechą siedzi
-  // w zamkniętej karcie. Nagłówek zwiniętej grupy ma marker „▸".
+  // Karty grup startują zwinięte. Pigułki zwiniętych grup nie są w DOM-ie,
+  // więc rozwijamy wszystkie — inaczej test pomijałby się tylko dlatego, że
+  // tkanina z cechą siedzi w zamkniętej karcie. Nagłówek zwiniętej grupy ma
+  // marker „▸".
   const collapsed = page.getByRole("button").filter({ hasText: "▸" });
   for (let i = 0; i < 20; i++) {
     const count = await collapsed.count();
