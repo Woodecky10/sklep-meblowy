@@ -89,6 +89,27 @@ Niezbędne env do dev (nazwy — wartości z Vercel/starego `.env.local`):
 > Maile: `RESEND_API_KEY`, `MAIL_FROM`, `MAIL_REPLY_TO`, `MAIL_ADMIN_TO` są ustawione **w Vercelu (Production)**. Lokalnie NIE są potrzebne — bez `RESEND_API_KEY` kod działa w trybie no-op (loguje `[mail] brak RESEND_API_KEY` i nic nie wysyła), więc dev nie zaśmieca skrzynek. Dodaj je do `.env.local` tylko gdy chcesz testować maile z lokalnego builda.
 > **Baza i storage są ZDALNE/współdzielone (Supabase).** Migracje (29–34) już wgrane, obrazy w storage. Nowy komp **nie robi setupu bazy** — wystarczy `.env.local` wskazujący na ten sam projekt Supabase. `.env.local` i `node_modules` są gitignored, więc nie przychodzą z klonem.
 
+### Dostęp agenta do bazy (MCP Supabase)
+Agent czyta i zmienia bazę przez serwer MCP Supabase, a ten wymaga **osobistego tokenu dostępowego** — to NIE jest żaden z kluczy z `.env.local`. Token generujesz w `https://supabase.com/dashboard/account/tokens` (pokazywany raz).
+
+Konfiguracja siedzi w **`sklep-meblowy/.mcp.json`**, który jest **gitignorowany** (od 2026-07-30) właśnie dlatego, że zawiera ten token — nie przychodzi z klonem i trzeba go utworzyć lokalnie:
+```json
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "cmd",
+      "args": ["/c","npx","--yes","@supabase/mcp-server-supabase@latest",
+               "--project-ref=tlvgsddpiikolgdwuwmc","--access-token=TWOJ_TOKEN"]
+    }
+  }
+}
+```
+⚠️ **Nie przez zmienną `SUPABASE_ACCESS_TOKEN`.** Ta droga działa, dopóki token jest ważny, ale gdy wygaśnie w trakcie pracy, **nie da się jej naprawić bez ubicia procesu**: środowisko proces dostaje raz, przy starcie, więc ani `/mcp` → Reconnect, ani `setx` nie podmienią wartości w działającej sesji. Objaw: wszystkie narzędzia Supabase zwracają `Unauthorized. Please provide a valid access token…`, mimo że `claude mcp get supabase` pokazuje „Connected". Sprawdzenie, czy token jest w ogóle ważny (bez wypisywania go):
+```
+curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" https://api.supabase.com/v1/projects
+```
+`200` = token dobry, `401` = do wymiany. Straciliśmy na tym pół godziny 2026-07-30.
+
 ## Baza — migracje
 **WSZYSTKIE migracje z `main` są ODPALONE** na produkcyjnym Supabase — sprawdzone 2026-07-30 przez `list_migrations`. Uwaga na dwa mylące wpisy: migracja `65_products_search_key` figuruje w bazie pod starą nazwą `61_products_search_key` (plik przenumerowano w repo z powodu kolizji z `61_variant_info`; jest w całości wgrana — `search_key` i `search_key_de` + dwa indeksy GIN), a `47_p24_payment_ref` jest wgrana na prodzie, choć pliku nie ma na `main` (leży na gałęzi PR #48). Wspólna baza → świeży klon nic nie re-uruchamia. Przyszłe migracje: kolejny numer w `sklep-meblowy/supabase/migrations/`; odpala **człowiek** w Supabase SQL Editorze (agent NIE ma dostępu DDL).
 
