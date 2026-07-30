@@ -1,5 +1,13 @@
 # Tkaniny — zwijane sekcje grup cenowych: plan wdrożenia
 
+> ## ⚠️ NIE WYKONYWAĆ — plan zrealizowany i COFNIĘTY tego samego dnia
+>
+> Plan wykonano w całości 2026-07-30 (commity `d35765bb`, `b7778db5`), po czym
+> właściciel doprecyzował, że zwijanie miało dotyczyć **karty produktu**, nie
+> `/tkaniny` — Task 2 cofnięto (`fe370115`), a właściwą zmianę zrobiono
+> w `VariantSelector` (`86e1d52e`). Szczegóły w nagłówku speca. Z planu przeżył
+> Task 1 w okrojonej formie (`colorsLabel` w `app/_lib/fabric-labels.ts`).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Na `/tkaniny` trzy sekcje grup cenowych startują zwinięte, z podglądem pięciu miniatur w nagłówku, i rozwijają się niezależnie po kliknięciu.

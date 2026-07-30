@@ -1,5 +1,21 @@
 # Tkaniny — zwijane sekcje grup cenowych (spec, 2026-07-30)
 
+> ## ⚠️ KOREKTA (2026-07-30 wieczór) — ten spec trafił w złe miejsce
+>
+> Właściciel po obejrzeniu implementacji doprecyzował (zrzutem ekranu):
+> zgłoszenie „grupy zwinięte" dotyczyło **wyboru tkaniny na KARCIE PRODUKTU**
+> (`VariantSelector` → `FabricSwatchGroup`), nie katalogu `/tkaniny`.
+> `/tkaniny` ma pokazywać wszystko bez zwijania — implementację z tego speca
+> **cofnięto** (commit `fe370115`), zanim weszła na produkcję.
+>
+> Wykonane zamiast tego (commit `86e1d52e`): na karcie produktu karty grup
+> cenowych widoczne **od wejścia, wszystkie zwinięte**, bez kroku „5 próbek +
+> Zobacz więcej"; wyjątek — produkt bez tkanin z katalogu zostaje przy widoku
+> kompaktowym. Guard: `e2e/fabric-group-cards.spec.ts`.
+>
+> Z tego speca przeżyło: wydzielenie `colorsLabel` do `app/_lib/fabric-labels.ts`
+> z testami. Reszty poniższego tekstu **nie implementować ponownie**.
+
 ## Problem
 
 `/tkaniny` wyświetla wszystkie tkaniny naraz: trzy sekcje grup cenowych, każda z
