@@ -6,12 +6,17 @@ import { pickLocalized, localizePath } from "@/app/_lib/i18n";
 import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import { getEurRate } from "@/app/_lib/store-settings";
 import { formatMoney } from "@/app/_lib/money";
+import { colorsLabel } from "@/app/_lib/fabric-labels";
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import type { Fabric } from "@/app/_lib/types";
 
 // Katalog tkanin (spec 2026-07-21): sekcje wg grup cenowych, kafelki tkanin
 // linkują do /tkaniny/[slug]. Route statyczny — przykrywa dawną podstronę CMS
 // o slugu "tkaniny" (slug zarezerwowany w pages.ts).
+//
+// Sekcje NIE są zwijane — decyzja właściciela z 2026-07-30 (wieczorna korekta
+// speca): zwijane karty grup cenowych żyją na karcie produktu (VariantSelector),
+// a katalog pokazuje wszystko od razu.
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
@@ -24,15 +29,6 @@ export async function generateMetadata(): Promise<Metadata> {
       languages: alternatesFor("/tkaniny", { hasDe: true }).languages,
     },
   };
-}
-
-// Polska liczba mnoga: 1 kolor / 2-4 kolory / 5+ kolorów (12-14 → "kolorów").
-function colorsLabel(n: number, t: ReturnType<typeof getDictionary>): string {
-  if (n === 1) return t.fabrics.colorsOne;
-  const d10 = n % 10;
-  const d100 = n % 100;
-  if (d10 >= 2 && d10 <= 4 && !(d100 >= 12 && d100 <= 14)) return t.fabrics.colorsFew;
-  return t.fabrics.colorsMany;
 }
 
 function fabricThumb(f: Fabric): string | undefined {
