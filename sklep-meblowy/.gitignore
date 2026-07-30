@@ -50,3 +50,6 @@ next-env.d.ts
 
 # Makiety z brainstormingu (superpowers) — lokalne, nie do repo
 .superpowers/
+
+# Konfiguracja MCP zawiera token dostepowy Supabase - NIGDY do repo
+.mcp.json

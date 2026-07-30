@@ -7,7 +7,7 @@ import CheckoutForm from "./CheckoutForm";
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
   const de = locale === "de";
-  return { title: de ? "Kasse — MeblePremium" : "Kasa — MeblePremium" };
+  return { title: de ? "Kasse" : "Kasa" };
 }
 
 export default async function CheckoutPage() {

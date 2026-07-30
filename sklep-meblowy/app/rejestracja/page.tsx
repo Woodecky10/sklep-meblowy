@@ -9,7 +9,7 @@ import RegisterForm from "./RegisterForm";
 export async function generateMetadata(): Promise<Metadata> {
   const de = (await getLocale()) === "de";
   return {
-    title: de ? "Registrierung — MeblePremium" : "Rejestracja — MeblePremium",
+    title: de ? "Registrierung" : "Rejestracja",
   };
 }
 

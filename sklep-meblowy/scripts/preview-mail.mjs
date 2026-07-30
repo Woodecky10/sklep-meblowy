@@ -11,6 +11,7 @@ import { OrderShipped } from "../app/_lib/mail/templates/OrderShipped.tsx";
 import { OrderCancelled } from "../app/_lib/mail/templates/OrderCancelled.tsx";
 import { AdminNewOrder } from "../app/_lib/mail/templates/AdminNewOrder.tsx";
 import { AuthConfirm } from "../app/_lib/mail/templates/AuthConfirm.tsx";
+import { PasswordReset } from "../app/_lib/mail/templates/PasswordReset.tsx";
 import { wasOrderPaid } from "../app/_lib/mail/status-notify.ts";
 
 const OUT = "mail-preview";
@@ -175,22 +176,45 @@ const cases = [
     el: AuthConfirm({
       branding,
       locale: "pl",
-      // Placeholder Supabase — po wyrenderowaniu zostaje w HTML dosłownie
-      // i to Supabase podstawia pod niego prawdziwy link.
-      confirmationUrl: "{{ .ConfirmationURL }}",
+      // Placeholdery Supabase — po wyrenderowaniu zostają w HTML dosłownie
+      // i to Supabase podstawia pod nie prawdziwe wartości przy wysyłce.
+      //
+      // NIE używamy {{ .ConfirmationURL }}: on prowadzi do endpointu
+      // /auth/v1/verify Supabase, który sam zużywa token i przekierowuje na
+      // `redirect_to` BEZ `token_hash`. Nasza trasa app/auth/confirm/route.ts
+      // czeka dokładnie na `token_hash` + `type` (woła verifyOtp), więc przy
+      // ConfirmationURL dostawała pusty query i odbijała klienta na
+      // /logowanie?error=invalid_link — mimo że konto zostało już aktywowane.
+      // Sprawdzone na produkcji 2026-07-30 (konto testowe: email potwierdzony,
+      // a przeglądarka pokazała {"error":"requested path is invalid"}).
+      // Forma poniżej to wzorzec z dokumentacji Supabase dla SSR: link idzie
+      // wprost do naszej trasy, a weryfikację robimy sami.
+      confirmationUrl:
+        "{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=signup&next=/konto",
+    }),
+  },
+  {
+    name: "auth-reset-pl",
+    el: PasswordReset({
+      branding,
+      locale: "pl",
+      // `type=recovery` (nie `signup`) — ten sam token_hash, inny typ weryfikacji.
+      // Trafia do app/auth/confirm/route.ts, które woła verifyOtp i tworzy sesję
+      // recovery; bez niej /reset-hasla nie ma czym zapisać nowego hasła.
+      resetUrl:
+        "{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/reset-hasla",
     }),
   },
 ];
 
 for (const c of cases) {
   let html = await render(c.el);
-  // Supabase wymaga, żeby {{ .ConfirmationURL }} przeżyło render dosłownie w
-  // atrybucie href — React/serializer HTML ma tendencję do percent-encodowania
-  // nawiasów klamrowych i spacji w atrybutach URL. Naprawiamy to na wypadek,
-  // gdyby render() zakodował placeholder.
-  if (html.includes(encodeURI("{{ .ConfirmationURL }}"))) {
-    html = html.replaceAll(encodeURI("{{ .ConfirmationURL }}"), "{{ .ConfirmationURL }}");
-  }
+  // Supabase wymaga, żeby placeholdery {{ .Cokolwiek }} przeżyły render
+  // dosłownie w atrybucie href — React/serializer HTML ma tendencję do
+  // percent-encodowania nawiasów klamrowych i spacji w atrybutach URL.
+  // Naprawiamy to generycznie (nie per nazwa placeholdera), żeby dodanie
+  // kolejnego szablonu Auth nie wymagało pamiętania o tym miejscu.
+  html = html.replaceAll("%7B%7B%20", "{{ ").replaceAll("%20%7D%7D", " }}");
   writeFileSync(`${OUT}/${c.name}.html`, html, "utf8");
   console.log(`OK ${OUT}/${c.name}.html`);
 }
