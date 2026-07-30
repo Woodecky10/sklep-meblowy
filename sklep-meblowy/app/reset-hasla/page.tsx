@@ -9,7 +9,7 @@ import ResetForm from "./ResetForm";
 export async function generateMetadata(): Promise<Metadata> {
   const de = (await getLocale()) === "de";
   return {
-    title: de ? "Neues Passwort festlegen — Mollien" : "Ustaw nowe hasło — Mollien",
+    title: de ? "Neues Passwort festlegen" : "Ustaw nowe hasło",
   };
 }
 

@@ -17,7 +17,7 @@ export async function generateMetadata() {
   const locale = await getLocale();
   const de = locale === "de";
   return {
-    title: de ? "Bestelldetails — Mollien" : "Szczegóły zamówienia — Mollien",
+    title: de ? "Bestelldetails" : "Szczegóły zamówienia",
   };
 }
 
