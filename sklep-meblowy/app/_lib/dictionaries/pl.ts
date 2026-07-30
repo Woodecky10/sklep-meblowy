@@ -97,9 +97,6 @@ export type PlShape = {
     colorsOne: string;
     colorsFew: string;
     colorsMany: string;
-    fabricsOne: string;
-    fabricsFew: string;
-    fabricsMany: string;
     swatchHeading: string;
     productionHeading: string;
     typeLabel: string;
@@ -458,9 +455,6 @@ export const pl = {
     colorsOne: "kolor",
     colorsFew: "kolory",
     colorsMany: "kolorów",
-    fabricsOne: "tkanina",
-    fabricsFew: "tkaniny",
-    fabricsMany: "tkanin",
     swatchHeading: "Wzornik kolorów",
     productionHeading: "Meble w tej tkaninie",
     typeLabel: "Typ",

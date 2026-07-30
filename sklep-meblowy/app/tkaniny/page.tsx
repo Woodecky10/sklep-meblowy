@@ -2,18 +2,21 @@ import type { Metadata } from "next";
 import { getAllFabrics, getFabricPriceGroups } from "@/app/_lib/fabrics";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { getDictionary } from "@/app/_lib/dictionaries";
-import { localizePath } from "@/app/_lib/i18n";
+import { pickLocalized, localizePath } from "@/app/_lib/i18n";
 import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import { getEurRate } from "@/app/_lib/store-settings";
-import FabricGroupSection from "./FabricGroupSection";
+import { formatMoney } from "@/app/_lib/money";
+import { colorsLabel } from "@/app/_lib/fabric-labels";
+import LocalizedLink from "@/app/_components/ui/LocalizedLink";
+import type { Fabric } from "@/app/_lib/types";
 
 // Katalog tkanin (spec 2026-07-21): sekcje wg grup cenowych, kafelki tkanin
 // linkują do /tkaniny/[slug]. Route statyczny — przykrywa dawną podstronę CMS
 // o slugu "tkaniny" (slug zarezerwowany w pages.ts).
 //
-// Od 2026-07-30 sekcje są zwijane (spec 2026-07-30-tkaniny-grupy-rozwijanie):
-// cały markup sekcji siedzi w FabricGroupSection, tutaj zostaje pobranie
-// danych, metadane i nagłówek strony.
+// Sekcje NIE są zwijane — decyzja właściciela z 2026-07-30 (wieczorna korekta
+// speca): zwijane karty grup cenowych żyją na karcie produktu (VariantSelector),
+// a katalog pokazuje wszystko od razu.
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
@@ -26,6 +29,10 @@ export async function generateMetadata(): Promise<Metadata> {
       languages: alternatesFor("/tkaniny", { hasDe: true }).languages,
     },
   };
+}
+
+function fabricThumb(f: Fabric): string | undefined {
+  return (f.colors ?? []).map((c) => f.color_images?.[c]).find(Boolean);
 }
 
 export default async function TkaninyPage() {
@@ -51,13 +58,52 @@ export default async function TkaninyPage() {
       </div>
 
       {sections.map(({ group, items }) => (
-        <FabricGroupSection
-          key={group.id}
-          group={group}
-          items={items}
-          locale={locale}
-          rate={rate}
-        />
+        <section key={group.id} className="mb-16">
+          <div className="flex items-baseline gap-3 mb-6 flex-wrap">
+            <h2 className="font-display text-2xl font-bold text-[var(--fg)]">
+              {pickLocalized(group.name, group.name_de, locale)}
+            </h2>
+            <span className="text-sm font-sans text-[var(--color-gold-text)] font-semibold">
+              {group.surcharge > 0
+                ? `+${formatMoney(group.surcharge, locale, rate)}`
+                : t.fabrics.groupNoSurcharge}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
+            {items.map((f) => {
+              const thumb = fabricThumb(f);
+              const n = (f.colors ?? []).length;
+              return (
+                <LocalizedLink
+                  key={f.id}
+                  href={`/tkaniny/${f.slug}`}
+                  className="group flex flex-col gap-3 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-4 hover:border-[var(--color-gold)] transition-colors"
+                >
+                  <span className="relative block aspect-square rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--bg)]">
+                    {thumb ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={thumb} alt={pickLocalized(f.name, f.name_de, locale)} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                    ) : (
+                      <span className="absolute inset-0 flex items-center justify-center text-xs text-[var(--muted)]">
+                        {f.name.slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                  </span>
+                  <span>
+                    <span className="block font-display text-base font-semibold text-[var(--fg)] group-hover:text-[var(--color-gold)] transition-colors">
+                      {pickLocalized(f.name, f.name_de, locale)}
+                    </span>
+                    {n > 0 && (
+                      <span className="block text-xs text-[var(--muted)] mt-0.5">
+                        {n} {colorsLabel(n, t)}
+                      </span>
+                    )}
+                  </span>
+                </LocalizedLink>
+              );
+            })}
+          </div>
+        </section>
       ))}
     </div>
   );

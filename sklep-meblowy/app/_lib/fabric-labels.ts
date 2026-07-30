@@ -3,11 +3,10 @@ import { getDictionary } from "./dictionaries";
 type Dict = ReturnType<typeof getDictionary>;
 
 // Polska liczba mnoga: 1 → "one", 2-4 → "few", 5+ → "many". Wyjątek 12-14
-// dostaje "many", mimo końcówki 2-4 ("13 tkanin", nie "13 tkaniny").
+// dostaje "many", mimo końcówki 2-4 ("13 kolorów", nie "13 kolory").
 //
-// Wydzielone z app/tkaniny/page.tsx: funkcja siedziała tam jako lokalna i
-// nieprzetestowana, a od 2026-07-30 potrzebuje jej też nagłówek zwijanej sekcji
-// grupy (licznik "5 tkanin"). Czysta funkcja bez Reacta → da się przetestować
+// Wydzielone z app/tkaniny/page.tsx (2026-07-30): funkcja siedziała tam jako
+// lokalna i nieprzetestowana. Czysta funkcja bez Reacta → da się przetestować
 // vitestem, którego projekt używa do wszystkiego w _lib.
 function pluralPl(n: number, one: string, few: string, many: string): string {
   if (n === 1) return one;
@@ -19,8 +18,4 @@ function pluralPl(n: number, one: string, few: string, many: string): string {
 
 export function colorsLabel(n: number, t: Dict): string {
   return pluralPl(n, t.fabrics.colorsOne, t.fabrics.colorsFew, t.fabrics.colorsMany);
-}
-
-export function fabricsLabel(n: number, t: Dict): string {
-  return pluralPl(n, t.fabrics.fabricsOne, t.fabrics.fabricsFew, t.fabrics.fabricsMany);
 }
