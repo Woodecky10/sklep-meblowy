@@ -240,10 +240,15 @@ export default function VariantSelector({
 // Ile próbek pokazać zanim „Zobacz więcej" (jak na referencji dealmeble).
 const SWATCH_LIMIT = 5;
 
-// Widok kompaktowy: pierwsze SWATCH_LIMIT próbek + „Zobacz więcej (+N)".
-// Po rozwinięciu: próbki pogrupowane w rozwijane karty GRUP CENOWYCH
-// (spec 2026-07-21), w karcie podsekcje per tkanina z linkiem „szczegóły"
-// do /tkaniny/[slug]. Wartości spoza katalogu → karta „Pozostałe".
+// Tkaniny z katalogu: OD WEJŚCIA rozwijane karty GRUP CENOWYCH, wszystkie
+// zwinięte (decyzja właściciela 2026-07-30 — klient najpierw widzi „ile
+// kosztuje która półka", dopiero po kliknięciu próbki). W karcie podsekcje
+// per tkanina z linkiem „szczegóły" do /tkaniny/[slug]; wartości spoza
+// katalogu → karta „Pozostałe".
+//
+// Wyjątek: gdy ŻADNA wartość nie jest w katalogu tkanin (brak grup cenowych),
+// grupowanie nic nie wnosi — zostaje dawny widok kompaktowy: pierwsze
+// SWATCH_LIMIT próbek + „Zobacz więcej (+N)".
 function FabricSwatchGroup({
   values,
   current,
@@ -269,6 +274,10 @@ function FabricSwatchGroup({
   const t = getDictionary(locale);
   const [expanded, setExpanded] = useState(false);
   const [openGroups, setOpenGroups] = useState<Set<string> | null>(null);
+
+  // Czy jakakolwiek wartość jest tkaniną z katalogu (ma grupę cenową)?
+  // Tak → karty grup od razu; nie → widok kompaktowy z „Zobacz więcej".
+  const hasCatalogGroups = values.some((v) => meta[v]?.groupCode);
 
   const swatch = (v: string) => {
     const active = current === v;
@@ -315,8 +324,8 @@ function FabricSwatchGroup({
     );
   };
 
-  // ── Widok kompaktowy (jak dotąd) ──
-  if (!expanded) {
+  // ── Widok kompaktowy — TYLKO dla wartości spoza katalogu tkanin ──
+  if (!hasCatalogGroups && !expanded) {
     const shown = values.slice(0, SWATCH_LIMIT);
     const hidden = values.length - shown.length;
     return (
@@ -388,7 +397,11 @@ function FabricSwatchGroup({
   }
   const ordered = [...buckets.values()].sort((a, b) => a.sort - b.sort);
   const currentGroup = current ? meta[current]?.groupCode ?? "__other" : null;
-  const open = openGroups ?? new Set([currentGroup ?? ordered[0]?.code]);
+  // Start: przy kartach grup od wejścia WSZYSTKIE zwinięte (klient porównuje
+  // dopłaty, zanim wejdzie w próbki). W trybie kompaktowym (dojście przez
+  // „Zobacz więcej") — jak dotąd: otwarta grupa bieżącego wyboru albo pierwsza.
+  const open =
+    openGroups ?? (hasCatalogGroups ? new Set<string>() : new Set([currentGroup ?? ordered[0]?.code]));
 
   function toggleGroup(code: string) {
     const next = new Set(open);
@@ -453,13 +466,17 @@ function FabricSwatchGroup({
           </div>
         );
       })}
-      <button
-        type="button"
-        onClick={() => setExpanded(false)}
-        className="self-start px-4 py-2 text-xs font-sans rounded-full border border-[var(--border)] text-[var(--color-gold)] hover:border-[var(--color-gold)] transition-colors"
-      >
-        {locale === "de" ? "Weniger anzeigen" : "Zobacz mniej"}
-      </button>
+      {/* „Zobacz mniej" tylko gdy tu się weszło przez „Zobacz więcej" —
+          przy kartach grup od wejścia nie ma do czego wracać. */}
+      {!hasCatalogGroups && (
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          className="self-start px-4 py-2 text-xs font-sans rounded-full border border-[var(--border)] text-[var(--color-gold)] hover:border-[var(--color-gold)] transition-colors"
+        >
+          {locale === "de" ? "Weniger anzeigen" : "Zobacz mniej"}
+        </button>
+      )}
     </div>
   );
 }
