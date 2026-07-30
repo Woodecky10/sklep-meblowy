@@ -85,27 +85,99 @@ prawdy do generowania tej treści (żeby dało się ją wersjonować i odtworzy�
 razem z pozostałymi szablonami), ale trzeba go ręcznie „wypuścić" do panelu
 Supabase po każdej zmianie.
 
-1. Panel Supabase → **Authentication → SMTP Settings**: włącz custom SMTP i
-   wpisz dane SMTP z Resenda (host, port, użytkownik, hasło/klucz API).
-   Zdejmuje to limit kilku maili na godzinę wbudowanego mailera Supabase i
-   wypuszcza wiadomość z waszym DKIM (czyli mail wygląda jak wysłany przez
-   `mollien.pl`, nie przez Supabase).
-2. Wygeneruj HTML: z katalogu `sklep-meblowy/` uruchom
+> Ścieżki w panelu: nowszy dashboard Supabase scalił „SMTP Settings" i
+> „Email Templates" w jedną pozycję **Authentication → Emails** (sekcja
+> NOTIFICATIONS w menu), z zakładkami SMTP i Templates. Osobno, w sekcji
+> CONFIGURATION, są **URL Configuration** i **Rate Limits**.
+
+1. **Authentication → Emails → SMTP**: włącz custom SMTP i wpisz dane z
+   Resenda — host `smtp.resend.com`, port `465`, **username `resend`**
+   (dosłownie to słowo, nie adres e-mail), hasło = `RESEND_API_KEY`,
+   **sender `no-reply@mollien.pl`**, sender name `Mollien`. Zdejmuje to limit
+   kilku maili na godzinę wbudowanego mailera Supabase i wypuszcza wiadomość
+   z waszym DKIM (czyli mail wygląda jak wysłany przez `mollien.pl`, nie
+   przez Supabase). Supabase przy zapisie próbuje się połączyć, więc złe
+   dane zobaczysz od razu jako błąd na tym ekranie.
+   > **Nadawca maili Auth jest CELOWO inny niż `MAIL_FROM`.** To pole w panelu
+   > Supabase jest niezależne od zmiennej w Vercelu: maile o zamówieniach
+   > wysyła kod aplikacji z `zamowienia@mollien.pl`, a maile konta
+   > (rejestracja, reset hasła) Supabase z `no-reply@mollien.pl` — decyzja
+   > właściciela 2026-07-30, bo „zamówienia" przy mailu o haśle wyglądało jak
+   > pomyłka systemu. Żaden z tych adresów NIE jest skrzynką i nie musi być;
+   > `no-reply` jest przy tym uczciwy, bo na maile Auth faktycznie nie da się
+   > odpowiedzieć — Supabase nie ma pola Reply-To.
+2. **Authentication → URL Configuration** — bez tego kroku link z maila
+   kończy się błędem:
+   - **Site URL** = `https://www.mollien.pl`. To on podstawia się pod
+     `{{ .SiteURL }}` w szablonie. Jeśli zostanie tu `http://localhost:3000`
+     z czasów dewelopmentu, klient dostanie link na Twój localhost.
+   - **Redirect URLs** muszą zawierać `https://www.mollien.pl/**`,
+     `https://mollien.pl/**` (prod serwuje `www`, ale kod deklaruje apex —
+     patrz ONBOARDING) i `http://localhost:3000/**` do dewelopmentu.
+     Dotyczy to też logowania Google, które wraca na `/auth/callback`.
+3. Wygeneruj HTML: z katalogu `sklep-meblowy/` uruchom
    `npm run preview:mail`. Wynik trafia do gitignorowanego
    katalogu `mail-preview/` — weź `mail-preview/auth-confirm-pl.html`.
-3. Panel Supabase → **Authentication → Email Templates → Confirm signup**:
-   wklej całą zawartość pliku (surowe HTML, nie tylko fragment) w pole
-   treści szablonu. Znacznik `{{ .ConfirmationURL }}` musi zostać
-   nietknięty — to Supabase podstawia pod niego prawdziwy, jednorazowy link
-   aktywacyjny w momencie wysyłki. Skrypt podglądu ma wbudowaną asekurację:
-   jeśli render przypadkiem zakoduje ten znacznik w atrybucie `href`
-   (np. na `%7B%7B .ConfirmationURL %7D%7D`), skrypt to wykrywa i naprawia
-   przed zapisem pliku — ale i tak warto zerknąć w plik przed wklejeniem i
-   sprawdzić, że `{{ .ConfirmationURL }}` w atrybucie `href` wygląda
-   dosłownie tak (bez `%7B`/`%20`).
-4. Zarejestruj konto testowe i sprawdź, że mail dochodzi, wygląda jak sklep
-   (branding, nie domyślny szablon Supabase), a kliknięcie linku aktywuje
-   konto.
+4. **Authentication → Emails → Templates → Confirm signup**:
+   - **Subject**: `Potwierdź adres e-mail` (domyślnie jest tam angielskie
+     „Confirm Your Signup"; konwencja tematów w sklepie — patrz
+     `notify-order.ts` — to polski tekst bez nazwy marki i bez emoji).
+   - **Treść**: usuń domyślny szablon i wklej całą zawartość pliku (surowe
+     HTML, nie fragment). Znaczniki `{{ .SiteURL }}` i `{{ .TokenHash }}`
+     muszą zostać nietknięte — Supabase podstawia pod nie prawdziwe wartości
+     w momencie wysyłki. W podglądzie panelu link pokaże się jako tekst,
+     nie jako działający adres; to normalne.
+   - Skrypt podglądu ma asekurację: gdyby render zakodował klamry w `href`
+     (`%7B%7B`/`%20`), naprawia to przed zapisem pliku. Warto i tak zerknąć,
+     czy w `href` widać dosłownie `{{ .SiteURL }}` i `{{ .TokenHash }}`.
+5. Zarejestruj konto testowe i sprawdź, że mail dochodzi, wygląda jak sklep
+   (branding, nie domyślny szablon Supabase), a kliknięcie linku **aktywuje
+   konto i wraca na sklep** (nie na `/logowanie?error=...`).
+
+> ⚠️ **Nie używaj `{{ .ConfirmationURL }}` w tym szablonie.** Ten znacznik
+> prowadzi do endpointu `/auth/v1/verify` Supabase, który sam zużywa token i
+> przekierowuje na `redirect_to` **bez** `token_hash`. Nasza trasa
+> `app/auth/confirm/route.ts` czeka dokładnie na `token_hash` + `type`
+> (woła `verifyOtp`), więc dostaje pusty query i odbija klienta na
+> `/logowanie?error=invalid_link` — mimo że konto w tym momencie jest już
+> aktywne. Tak zachowywał się domyślny szablon Supabase; sprawdzone na
+> produkcji 2026-07-30 (konto testowe potwierdzone w bazie, a przeglądarka
+> pokazała `{"error":"requested path is invalid"}`, bo adres powrotu nie był
+> na liście Redirect URLs). Dlatego link w szablonie idzie **wprost do naszej
+> trasy** z `token_hash`, a weryfikację robimy sami.
+>
+## 3b. Mail resetu hasła (Supabase) — ta sama procedura, drugi szablon
+
+Źródło: `app/_lib/mail/templates/PasswordReset.tsx` → po `npm run preview:mail`
+plik `mail-preview/auth-reset-pl.html`.
+
+1. **Authentication → Emails → Templates → Reset password**:
+   - **Subject**: `Ustaw nowe hasło`
+   - **Treść**: usuń domyślny (angielski) szablon i wklej całość pliku.
+2. Link w tym szablonie ma `type=recovery&next=/reset-hasla` — w Confirm signup
+   jest `type=signup&next=/konto`. Ten sam `token_hash`, inny typ weryfikacji;
+   `EmailOtpType` w `@supabase/auth-js` dopuszcza oba.
+3. Test end-to-end: `/zapomnialem-hasla` → podaj adres istniejącego konta → klik
+   w mail → powinno wylądować na `/reset-hasla` z formularzem i adresem konta w
+   nagłówku → ustaw hasło → zaloguj się nowym.
+   > Testuj **na wylogowanej przeglądarce (incognito)**. `app/reset-hasla/page.tsx`
+   > wymaga JAKIEJKOLWIEK sesji, nie konkretnie recovery — zalogowany user
+   > ustawi hasło nawet gdy mailowa droga jest zepsuta, więc aktywna sesja
+   > maskuje dokładnie ten błąd.
+   >
+   > Dowód, że zadziałał właściwy flow: po kliknięciu w link **jesteś od razu
+   > zalogowany** (sesję tworzy `verifyOtp` w naszej trasie). Do weryfikacji
+   > używaj Resend → Logs, a **nie** kolumny `auth.users.recovery_sent_at` —
+   > przy udanym resecie 2026-07-30 została `null` i doprowadziła do błędnego
+   > wniosku, że maila nie było.
+
+> ⚠️ **Bez tego kroku reset hasła NIE DZIAŁA i wygląda jak pętla.**
+> `requestPasswordReset` (`app/_lib/auth-actions.ts`) kieruje link recovery na
+> `/auth/confirm?next=/reset-hasla`. Przy domyślnym szablonie opartym na
+> `{{ .ConfirmationURL }}` nasza trasa nie dostaje `token_hash`, więc nie tworzy
+> sesji recovery — a `app/reset-hasla/page.tsx` bez usera odsyła z powrotem na
+> `/zapomnialem-hasla`. Klient krąży między formularzem i mailem, nigdy nie
+> ustawiając hasła. Wykryte 2026-07-30 przy uruchamianiu maila weryfikacyjnego.
 
 Źródło szablonu: `app/_lib/mail/templates/AuthConfirm.tsx`. Po każdej zmianie
 tego pliku trzeba powtórzyć kroki 2–3 — panel Supabase nie aktualizuje się
