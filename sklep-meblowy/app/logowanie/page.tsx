@@ -9,7 +9,7 @@ import LoginForm from "./LoginForm";
 
 export async function generateMetadata(): Promise<Metadata> {
   const de = (await getLocale()) === "de";
-  return { title: de ? "Anmeldung — MeblePremium" : "Logowanie — MeblePremium" };
+  return { title: de ? "Anmeldung" : "Logowanie" };
 }
 
 export default async function LoginPage() {

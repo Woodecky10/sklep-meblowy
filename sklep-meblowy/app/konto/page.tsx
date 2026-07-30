@@ -6,7 +6,7 @@ import ProfileForm from "./ProfileForm";
 export async function generateMetadata() {
   // "Profil" jest identyczny w PL i DE (glosariusz: Profil→Profil), marka zostaje.
   await getLocale();
-  return { title: "Profil — MeblePremium" };
+  return { title: "Profil" };
 }
 
 export default async function AccountPage() {

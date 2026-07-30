@@ -7,7 +7,7 @@ import OrdersList from "./OrdersList";
 export async function generateMetadata() {
   const locale = await getLocale();
   const de = locale === "de";
-  return { title: de ? "Bestellungen — Mollien" : "Zamówienia — Mollien" };
+  return { title: de ? "Bestellungen" : "Zamówienia" };
 }
 
 export default async function OrdersPage() {
