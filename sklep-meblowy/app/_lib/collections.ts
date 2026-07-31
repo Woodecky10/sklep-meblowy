@@ -1,5 +1,13 @@
 // Helpery do tabeli collections — grupowanie produktów (np. "Kolekcja Lisbon").
 // Edytowane przez admin panel /admin/kolekcje.
+//
+// Ten moduł ma server-only importy (next/cache, supabase/server → next/headers)
+// — `import "server-only"` niżej zamienia ciche wysypanie builda Turbopacka na
+// jawny błąd, gdyby ktoś zaimportował ten plik z komponentu klienckiego.
+// Czysta logika kafelków (bez I/O) żyje w collection-tiles.ts — importuj
+// stamtąd, NIE re-eksportu tutaj (patrz historia w commitach: re-eksport
+// maskował, że collections.ts jest "zatruty" server-only importami).
+import "server-only";
 
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
@@ -7,18 +15,7 @@ import { createAdminClient } from "./supabase/server";
 import { localizeProduct, localizeCollection } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Collection, Product } from "./types";
-import {
-  HOME_COLLECTIONS_VISIBLE,
-  type CollectionProductRow,
-  type CollectionTile,
-} from "./collection-tiles-shared";
-
-// Re-eksport: reszta kodu (testy, przyszli konsumenci) importuje te nazwy
-// z "@/app/_lib/collections" jak dotąd. Definicje źródłowe są w
-// collection-tiles-shared.ts, bo ten plik (collections.ts) ma server-only
-// importy (next/cache, supabase/server → next/headers) i nie może być
-// bezpiecznie importowany z komponentu klienckiego (HomeCollections.tsx).
-export { HOME_COLLECTIONS_VISIBLE, type CollectionProductRow, type CollectionTile };
+import { buildCollectionTiles, type CollectionProductRow, type CollectionTile } from "./collection-tiles";
 
 export const COLLECTIONS_CACHE_TAG = "collections";
 
@@ -77,72 +74,9 @@ export async function getCollectionSiblings(
 // ============================================================
 // Kafelki kolekcji na stronę główną
 // ============================================================
-// HOME_COLLECTIONS_VISIBLE, CollectionProductRow, CollectionTile:
-// definicje w collection-tiles-shared.ts (re-eksport wyżej).
-
-// Wspólne dla strony głównej i panelu — żeby "aktywny produkt" miał jedną
-// definicję po obu stronach i nie rozjechał się przy zmianie warunku.
-export function countActiveProductsByCollection(
-  rows: CollectionProductRow[]
-): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const r of rows) {
-    if (!r.collection_id) continue;
-    counts.set(r.collection_id, (counts.get(r.collection_id) ?? 0) + 1);
-  }
-  return counts;
-}
-
-// Cała logika składania kafelków — bez I/O, więc testowalna bez bazy.
-export function buildCollectionTiles(
-  collections: Collection[],
-  rows: CollectionProductRow[],
-  locale: Locale
-): CollectionTile[] {
-  const counts = countActiveProductsByCollection(rows);
-
-  // Zdjęcia tylko z produktów, KTÓRE JE MAJĄ. Dotąd produkt bez zdjęcia
-  // zajmował miejsce w mozaice i zostawał po nim szary prostokąt.
-  const thumbnails = new Map<string, string[]>();
-  for (const r of rows) {
-    if (!r.collection_id) continue;
-    const first = r.images?.[0];
-    if (!first) continue;
-    const arr = thumbnails.get(r.collection_id) ?? [];
-    if (arr.length < 4) arr.push(first);
-    thumbnails.set(r.collection_id, arr);
-  }
-
-  return collections
-    .filter((c) => c.show_on_home && (counts.get(c.id) ?? 0) > 0)
-    .sort(
-      (a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label, "pl")
-    )
-    .map((c) => ({
-      collection: localizeCollection(c, locale),
-      thumbnails: thumbnails.get(c.id) ?? [],
-      productCount: counts.get(c.id) ?? 0,
-    }));
-}
-
-// Indeks pozycji, PO której panel rysuje kreskę "poniżej dopiero po
-// rozwinięciu". Liczy tylko kolekcje, które realnie trafią na stronę —
-// liczenie wszystkich wierszy pokazywałoby granicę w złym miejscu.
-// null = widocznych jest 6 lub mniej, więc kreski nie ma.
-export function foldAfterIndex(
-  collections: Collection[],
-  counts: Map<string, number>
-): number | null {
-  let shown = 0;
-  for (let i = 0; i < collections.length; i++) {
-    const c = collections[i];
-    if (c.show_on_home && (counts.get(c.id) ?? 0) > 0) shown++;
-    if (shown === HOME_COLLECTIONS_VISIBLE) return i;
-  }
-  return null;
-}
-
-// Cienka skorupa nad buildCollectionTiles: dwa zapytania i nic więcej.
+// Cienka skorupa nad buildCollectionTiles (collection-tiles.ts): dwa
+// zapytania i nic więcej — cała logika filtrowania/sortowania/liczenia jest
+// w czystym module, testowana bez bazy.
 export async function getCollectionTilesForHome(
   locale: Locale = DEFAULT_LOCALE
 ): Promise<CollectionTile[]> {
@@ -152,7 +86,11 @@ export async function getCollectionTilesForHome(
   const supabase = await createAdminClient();
   const { data, error } = await supabase
     .from("products")
-    .select("collection_id, images")
+    .select("collection_id, images, is_active")
+    // Optymalizacja pasma (nie ściągamy nieaktywnych produktów) — NIE jest
+    // źródłem prawdy o aktywności. Źródło prawdy: isActiveProductRow w
+    // collection-tiles.ts, którego Task 4 (panel, bez tego filtra SQL) też
+    // używa. Nie usuwaj tego `.eq` myśląc, że jest zbędny — to tylko wydajność.
     .eq("is_active", true)
     .not("collection_id", "is", null)
     .order("name", { ascending: true });

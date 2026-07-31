@@ -5,11 +5,11 @@ import Image from "next/image";
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { pluralForm } from "@/app/_lib/plural";
-// Uwaga: z "@/app/_lib/collection-tiles-shared", NIE z "@/app/_lib/collections".
-// Ten drugi ma server-only importy (next/cache, supabase/server) — import
-// wartości (HOME_COLLECTIONS_VISIBLE) stąd w komponencie "use client" wciągnąłby
-// je do bundla przeglądarki i wysadził build (patrz komentarz w tamtym pliku).
-import { HOME_COLLECTIONS_VISIBLE, type CollectionTile } from "@/app/_lib/collection-tiles-shared";
+// Uwaga: z "@/app/_lib/collection-tiles" (czysty moduł), NIE z
+// "@/app/_lib/collections" (ma `import "server-only"` i next/cache/next/headers
+// — import wartości stąd w komponencie "use client" wciągnąłby je do bundla
+// przeglądarki i wysadził build).
+import { HOME_COLLECTIONS_VISIBLE, type CollectionTile } from "@/app/_lib/collection-tiles";
 import type { Locale } from "@/app/_lib/i18n";
 
 // Klasa grid dla i-tego zdjęcia w mozaice kolekcji (do 4 zdjęć). Pojedyncze

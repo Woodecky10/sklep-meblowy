@@ -5,7 +5,7 @@ import {
   foldAfterIndex,
   HOME_COLLECTIONS_VISIBLE,
   type CollectionProductRow,
-} from "@/app/_lib/collections";
+} from "@/app/_lib/collection-tiles";
 import type { Collection } from "@/app/_lib/types";
 
 // Fabryka kolekcji — pełny typ, żeby test nie rozjechał się przy dodaniu pola.
@@ -23,8 +23,18 @@ function col(over: Partial<Collection> & { id: string; label: string }): Collect
   } as Collection;
 }
 
-function row(collectionId: string | null, image?: string | null): CollectionProductRow {
-  return { collection_id: collectionId, images: image === undefined ? ["img.jpg"] : image ? [image] : [] };
+// isActive domyślnie true — większość testów nie testuje aktywności, więc nie
+// chcemy jej powtarzać w każdym wywołaniu.
+function row(
+  collectionId: string | null,
+  image?: string | null,
+  isActive = true
+): CollectionProductRow {
+  return {
+    collection_id: collectionId,
+    images: image === undefined ? ["img.jpg"] : image ? [image] : [],
+    is_active: isActive,
+  };
 }
 
 describe("countActiveProductsByCollection", () => {
@@ -38,6 +48,14 @@ describe("countActiveProductsByCollection", () => {
   it("produkt bez zdjęcia też się liczy", () => {
     const counts = countActiveProductsByCollection([row("a", null), row("a")]);
     expect(counts.get("a")).toBe(2);
+  });
+
+  it("produkt nieaktywny (is_active=false) nie liczy się do licznika", () => {
+    const counts = countActiveProductsByCollection([
+      row("a", "img1.jpg", false),
+      row("a", "img2.jpg"),
+    ]);
+    expect(counts.get("a")).toBe(1);
   });
 });
 
@@ -96,6 +114,38 @@ describe("buildCollectionTiles", () => {
     );
     expect(tile.collection.label).toBe("Sofas");
   });
+
+  it("deduplikuje powtórzone zdjęcie w mozaice, licznik liczy wszystkie produkty", () => {
+    const rows = [
+      row("a", "img1.jpg"),
+      row("a", "img1.jpg"), // to samo zdjęcie co wyżej (np. ta sama sofa w innym rozmiarze)
+      row("a", "img2.jpg"),
+      row("a", "img3.jpg"),
+    ];
+    const [tile] = buildCollectionTiles([col({ id: "a", label: "Oslo" })], rows, "pl");
+    expect(tile.thumbnails).toEqual(["img1.jpg", "img2.jpg", "img3.jpg"]);
+    expect(tile.productCount).toBe(4);
+  });
+
+  it("dedupe nie zabiera miejsca w mozaice — cztery różne zdjęcia mimo powtórzenia na początku", () => {
+    const rows = [
+      row("a", "img1.jpg"),
+      row("a", "img1.jpg"), // duplikat na samym początku — nie może zająć jednego z 4 slotów
+      row("a", "img2.jpg"),
+      row("a", "img3.jpg"),
+      row("a", "img4.jpg"),
+    ];
+    const [tile] = buildCollectionTiles([col({ id: "a", label: "Oslo" })], rows, "pl");
+    expect(tile.thumbnails).toEqual(["img1.jpg", "img2.jpg", "img3.jpg", "img4.jpg"]);
+    expect(tile.productCount).toBe(5);
+  });
+
+  it("produkt nieaktywny nie liczy się do licznika ani nie daje miniatury", () => {
+    const rows = [row("a", "img1.jpg", false), row("a", "img2.jpg")];
+    const [tile] = buildCollectionTiles([col({ id: "a", label: "Oslo" })], rows, "pl");
+    expect(tile.thumbnails).toEqual(["img2.jpg"]);
+    expect(tile.productCount).toBe(1);
+  });
 });
 
 describe("foldAfterIndex", () => {
@@ -124,5 +174,15 @@ describe("foldAfterIndex", () => {
   it("zwraca null gdy widocznych kolekcji jest 6 lub mniej", () => {
     const few = many.slice(0, 5);
     expect(foldAfterIndex(few, counts)).toBeNull();
+  });
+
+  it("zwraca null przy dokładnie 6 widocznych kolekcjach — nie ma nic pod kreską", () => {
+    const exactlySix = many.slice(0, HOME_COLLECTIONS_VISIBLE);
+    expect(foldAfterIndex(exactlySix, counts)).toBeNull();
+  });
+
+  it("zwraca indeks szóstej kolekcji przy dokładnie 7 widocznych", () => {
+    const exactlySeven = many.slice(0, HOME_COLLECTIONS_VISIBLE + 1);
+    expect(foldAfterIndex(exactlySeven, counts)).toBe(HOME_COLLECTIONS_VISIBLE - 1);
   });
 });
