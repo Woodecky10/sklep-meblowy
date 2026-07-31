@@ -36,6 +36,8 @@ export const de: DeepPartial<PlShape> = {
     seriesEyebrow: "Möbelserien",
     seriesHeading: "Unsere Kollektionen",
     seeCollection: "Kollektion ansehen",
+    collectionsShowAll: "Alle Kollektionen anzeigen",
+    collectionsCollapse: "Einklappen",
     productOne: "Produkt",
     productFew: "Produkte",
     productMany: "Produkte",
