@@ -108,7 +108,10 @@ Operator płatności: **Przelewy24** (PayPro SA), direct REST API v1. Stripe zos
 > - **produkcja:** `p24:smoke` zielony na `secure.przelewy24.pl`, a `POST /api/checkout` zwraca URL bramki produkcyjnej → zmienne dojechały.
 > - Duplikat notyfikacji sprawdzony **inspekcją kodu, nie E2E** (brak dostępu do ponowienia w panelu): wczesne wyjście przy `status != pending` + atomowy CAS `UPDATE ... WHERE status='pending'` w `markOrderPaid` → drugie wywołanie zwraca 0 wierszy, więc promo nie rośnie i drugi mail nie wychodzi.
 >
-> ⬜ **ZOSTAŁO:** jedna prawdziwa transakcja kontrolna na produkcji (najtaniej: materac 139 zł) + zwrot w panelu P24 — sandbox nie potwierdzi realnego rozliczenia i wypłaty. Oraz usunięcie `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` z Vercela (nic ich już nie czyta).
+> - ✅ **PRAWDZIWA TRANSAKCJA KONTROLNA, 2026-07-31** — zamówienie **#43**: 1,00 zł BLIKiem od realnego kupującego, `payment_ref 4603319576`, samo przeszło na `paid` z notyfikacji; na koncie P24 wpłynęło **0,69 zł** (31 gr prowizji — BLIK ma stawkę minimalną, przy realnych kwotach to ~1,5%). Zamówienie **zostawione w bazie celowo**, z wyjaśnieniem w `admin_note`, żeby wyciąg z P24 zgadzał się z zamówieniami. Produkt testowy `8b02b071-…718756` tylko wyłączony (`is_active=false`) — usunąć go NIE DA SIĘ, bo `order_items.product_id` ma FK `RESTRICT` (i dobrze: historia zamówień nie może tracić zawartości). Zwrotu nie robiliśmy — prowizja przy zwrocie nie wraca.
+> - ⚠️ **Kupujący nie dostaje maila od Przelewy24.** Potwierdzenie płatności to **nasz** mail (+ powiadomienie z aplikacji banku przy BLIKu). Brak maila od P24 nie jest awarią — to pytanie wraca przy każdym teście.
+>
+> ⬜ **ZOSTAŁO:** nic po stronie płatności. Zwroty nadal robi się ręcznie w panelu P24 — `refundTransaction` istnieje w `p24.ts`, ale nie jest wpięta w żaden endpoint ani UI, więc zwrot w P24 **nie zmieni statusu zamówienia u nas**.
 
 ## Edytor WYSIWYG opisów produktu (2026-06-22)
 Opisy produktu edytuje się w panelu pełnym edytorem WYSIWYG (**TipTap**) — bez ręcznego HTML. Komponent `app/admin/produkty/[id]/RichTextEditor.tsx` (TipTap, client-only, `immediatelyRender:false`), wpięty w sekcje opisu (PL custom, override, DE) oraz pojedyncze pole „Opis produktu"/„Opis (DE)". Pasek: cofnij/ponów, B/I/U/S, listy, cytat, H2–H4, wyrównanie, kolor, marker, link, obraz (upload przez `uploadProductImage` + `compressIfNeeded`).
@@ -178,9 +181,9 @@ Origin wymaga konta **Woodecky10** — `mwlo1403` NIE ma write (push → 403). K
 ## Metoda pracy (tak prowadzone są podprojekty)
 brainstorming → spec (`docs/superpowers/specs/`) → plan TDD (`docs/superpowers/plans/`) → implementacja subagent-driven (świeży subagent na task + recenzja po każdym + final whole-branch review) → merge. Panel admina jest **PL-only** (bez i18n). Server actions: `"use server"` + `requireAdmin()` + `createAdminClient()` + `revalidatePath`, zwracają `ActionResult` (typ w `app/_lib/types.ts`), updaty castowane `as never`. Komponenty klienckie używają `app/admin/_shared` + `useTransition`.
 
-## ⏸ Gdzie stanęliśmy — P24, 2026-07-29 wieczór (czytaj to pierwsze po przesiadce na inny komputer)
+## 🗄 Archiwum — jak wyglądał cutover P24 (stan na 2026-07-29 wieczór)
 
-**Ta gałąź (`feat/platnosci-direct-p24`, PR #48) jest przetestowana w sandboxie i gotowa do cutoveru. Na produkcji NADAL płaci Stripe** — dopóki nie ma merge'a, nic się nie zmieniło dla klientów.
+> **To zapis historyczny, nie lista zadań.** Cutover jest zrobiony (PR #48 zmergowany, transakcja kontrolna potwierdzona 2026-07-31 — patrz sekcja „Płatności" wyżej). Zostawione, bo opisuje pomiary i gotchy, które wrócą przy każdej zmianie w płatnościach. Gałąź `feat/platnosci-direct-p24` już nie istnieje — pracuj na `main`.
 
 Zrobione i potwierdzone pomiarem:
 - **Migracja 47 jest na prodzie** (addytywna; `stripe_payment_intent` nietknięta, żywy kod Stripe działa).
@@ -189,29 +192,26 @@ Zrobione i potwierdzone pomiarem:
 - Klucz API to **„Klucz do raportów"** z panelu (nie „Klucz do zamówień"). Sandbox uruchamia się jednym klikiem: panel produkcyjny → Moje konto → **Konto w SANDBOX**. Panel sandboxa: `https://sandbox.przelewy24.pl/panel` (sam korzeń hosta zwraca 400 — jako `P24_BASE_URL` jest poprawny).
 - Narzędzia: **`npm run p24:smoke [-- <url-wdrożenia>]`** (klucze + podpis + czy `urlStatus` trafia w nasz handler) i **`npm run p24:methods`** (metody aktywne na koncie; Apple Pay w sandboxie = `id 252`, aktywne — na produkcji jeszcze NIESPRAWDZONE). Oba tylko do odczytu, nie ruszają pieniędzy.
 
-Co zostało, w tej kolejności:
-1. **Klucze produkcyjne `P24_*` w Vercelu w zakresie Production** + `P24_BASE_URL=https://secure.przelewy24.pl`. ⚠️ MUSI być PRZED merge'em — bez nich `/api/checkout` rzuca i płatności online przestają działać (za pobraniem dalej idzie). ⚠️ **Nigdy nie zostawiać kluczy sandboxowych w Production** — kod nie rozpozna, że są testowe, więc sklep „przyjmowałby" płatności, które nigdy nie wpłyną.
-2. **Sprawdzić w panelu P24, czy konto jest zweryfikowane/aktywne** („Weryfikacja konta"). Sandbox działa od razu, prawdziwe płatności wymagają zakończonej weryfikacji.
-3. Merge #48 → auto-deploy → `npm run p24:smoke -- https://mollien.pl` (potwierdza, że env dojechały i notyfikacja trafia w handler).
-4. **Jedna prawdziwa transakcja na 1 zł** na produkcji + zwrot w panelu P24.
-5. **Migracja 48** (`drop stripe_payment_intent`) — **bez czekania 30 dni**, bo w bazie NIE MA ani jednego zamówienia opłaconego Stripe'em (sprawdzone: 0 referencji, 0 w statusie `paid`). Potem usunąć `stripe_payment_intent` z `types.ts` i z fallbacku w panelu admina.
-6. Usunąć z Vercela `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`, wyłączyć webhook w panelu Stripe, zamknąć konto.
-7. **Podmienić logotypy** — `public/payments/*.svg` to placeholdery (własne SVG z tekstem, w tym Visa/Mastercard/BLIK — znaków zastrzeżonych nie wolno rysować samemu). Pobrać oficjalny zestaw z panelu P24.
+Plan cutoveru (wszystkie kroki 1-6 wykonane do 2026-07-31): klucze produkcyjne w zakresie Production → weryfikacja konta w panelu → merge #48 → `p24:smoke` na produkcji → prawdziwa transakcja kontrolna → migracja 48 + wycięcie `stripe_payment_intent` z `types.ts` i panelu admina → usunięcie `STRIPE_*` z Vercela.
+
+**Co z tej listy NIE jest zrobione:**
+- ⬜ **Wyłączyć webhook w panelu Stripe i zamknąć konto Stripe** (samo konto, nie kod — kod nie ma już ani jednej referencji).
+- ⬜ **Podmienić logotypy** — `public/payments/*.svg` to placeholdery (własne SVG z tekstem, w tym Visa/Mastercard/BLIK — znaków zastrzeżonych nie wolno rysować samemu). Pobrać oficjalny zestaw z panelu P24.
+- ⬜ **`urlStatus` przestawić na źródło serwerowe** — patrz gotcha niżej; do zrobienia było „po cutoverze", czyli teraz.
 
 Gotchy, które kosztowały czas i wrócą:
 - ⚠️ **Vercel Deployment Protection blokuje notyfikacje P24** — przy `vercel_auth_enabled` `/api/p24/status` oddaje **401**, więc rozliczenie nigdy nie dojdzie. Na czas testów na preview trzeba ją wyłączyć (Settings → Deployment Protection) i **włączyć z powrotem po testach** (preview jest publiczny i dzieli bazę z produkcją).
 - ⚠️ **POST na nieistniejącą ścieżkę pod `/api/` zwraca 200 z HTML-em** (udokumentowane zachowanie `not-found` dla odpowiedzi strumieniowanych). Literówka w `urlStatus` = cicha awaria: P24 uzna notyfikację za dostarczoną i nie ponowi. Dlatego `p24:smoke` sprawdza ten adres osobno.
-- **Zamówienia z preview lecą do produkcyjnej bazy** (wspólny Supabase) — testowe trzeba usuwać: najpierw `order_items`, potem `orders`.
+- **Zamówienia z preview lecą do produkcyjnej bazy** (wspólny Supabase) — testowe trzeba usuwać. Wystarczy `delete from orders where …`: `order_items.order_id` ma FK `ON DELETE CASCADE`, więc pozycje lecą same (⚠️ wcześniejsza wersja tej notatki kazała kasować `order_items` ręcznie — niepotrzebnie). ⚠️ **Produktu użytego w zamówieniu usunąć się nie da** — `order_items.product_id` ma `RESTRICT`; produkty testowe wyłączaj (`is_active=false`), nie usuwaj.
 - **`urlStatus` bierze się z nagłówka `Origin`** (fallback `NEXT_PUBLIC_APP_URL`), czyli z czegoś, co kontroluje klient. Świadomie zostawione, bo dzięki temu test na preview działa bez grzebania w env. Wpływ niski (atakujący płaci swoimi pieniędzmi, zamówienie zostaje `pending`), ale po cutoverze przestawić na źródło serwerowe.
 - Poprawka regulaminu o **„płatności za pobraniem"** (§ 4 ust. 3, commit `a33a8853`) siedzi w tej gałęzi i wejdzie na produkcję razem z merge'em — nie wymaga osobnego działania.
 
-**Na nowym komputerze:** `git pull` + `git checkout feat/platnosci-direct-p24` + `npm install`, a potem odtworzyć **`.env.local`** (gitignored, NIE przychodzi z klonem): Supabase (URL, anon, service_role), `NEXT_PUBLIC_APP_URL` oraz `P24_MERCHANT_ID`/`P24_POS_ID`/`P24_API_KEY`/`P24_CRC` + `P24_BASE_URL=https://sandbox.przelewy24.pl`. Wartości P24 sandbox: panel sandboxa → **MOJE DANE → Ustawienia** („Klucz do CRC" i „Klucz do raportów"), ID konta widać w nagłówku panelu.
+**Na nowym komputerze:** `git pull` na `main` + `npm install`, a potem odtworzyć **`.env.local`** (gitignored, NIE przychodzi z klonem) — lista zmiennych w `docs/uruchomienie-dev.md`. Do zabawy lokalnie bierz klucze **sandboxowe** i `P24_BASE_URL=https://sandbox.przelewy24.pl`, inaczej każdy klik w checkoucie to prawdziwa płatność. Wartości sandbox: panel sandboxa → **MOJE DANE → Ustawienia** („Klucz do CRC" i „Klucz do raportów"), ID konta w nagłówku panelu.
 
 ## Następny krok
-1. **Cutover P24** — kolejność wyżej, w sekcji „Gdzie stanęliśmy".
-2. **EUR/Niemcy poza zakresem** (decyzja 2026-07-29: „na razie płatności tylko na Polskę"). Kod rejestruje transakcję w EUR dla `/de`, więc dopóki PayPro nie ma rozliczeń EUR, niemiecki checkout online pokaże błąd po niemiecku (zamówienie zostaje `pending`, bez 500). Dostawa i tak jest tylko po Polsce (regulamin § 5), a za pobraniem na `/de` działa.
-4. **Podprojekt 3 (faktury KSeF)** — czeka na odpowiedź: z jakiego programu fakturowego korzysta księgowa (przesądza drogę); potem spec → plan → wdrożenie.
-5. **Reszta podprojektu 4 (wysyłka)** — termin dostawy, dane transportu, model kosztu.
+1. **Ukryć `/de`** — decyzja właściciela 2026-07-31: sklep startuje ze sprzedażą **tylko w Polsce**, bo do Niemiec brakuje niemieckiego numeru podatkowego (USt-IdNr / VAT-OSS — do potwierdzenia z księgową). Przełącznik języka poza UI, redirect `/de/*` → `/`, wpisy DE wycięte ze `sitemap.xml`, całość **za jedną flagą**, żeby odmrożenie było zmianą jednej wartości, a nie rewertem. ⚠️ **Kodu EUR nie usuwać** (`money.ts`, `getEurRate`, `RateProvider`, `ProductCard` z propem `rate`, `orders.currency`/`fx_rate`) — jest sprawny i ma wrócić. Kurs w `/admin/ustawienia` to nadal seed `0.23`; realny ustawić przy odmrożeniu.
+2. **Podprojekt 3 (faktury KSeF)** — czeka na odpowiedź: z jakiego programu fakturowego korzysta księgowa (przesądza drogę); potem spec → plan → wdrożenie.
+3. **Reszta podprojektu 4 (wysyłka)** — termin dostawy, dane transportu, model kosztu.
 
 ## Drobne follow-upy (nieblokujące)
 - `schema.sql` jest niekompletnym baseline'em (pre-existing) — fresh-DB bootstrap z samego pliku byłby niepełny; źródłem prawdy są **migracje**.

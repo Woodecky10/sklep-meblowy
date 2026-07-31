@@ -182,16 +182,14 @@ export default async function AdminOrderDetailPage({
                 przy dostawie.
               </p>
             </Card>
-          ) : (order.payment_ref || order.stripe_payment_intent) ? (
+          ) : order.payment_ref ? (
             <Card>
               <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-3">Płatność</h3>
               <p className="text-xs text-[var(--muted)]">
-                {order.payment_provider === "stripe"
-                  ? "Stripe payment_intent (zwroty w panelu Stripe):"
-                  : "Referencja P24 (zwroty w panelu Przelewy24):"}
+                Referencja P24 (zwroty w panelu Przelewy24):
               </p>
               <p className="font-mono text-sm text-[var(--fg)] break-all">
-                {order.payment_ref ?? order.stripe_payment_intent}
+                {order.payment_ref}
               </p>
             </Card>
           ) : null}

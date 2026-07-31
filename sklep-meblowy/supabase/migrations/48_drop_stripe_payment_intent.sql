@@ -1,10 +1,13 @@
--- Migracja 48: usunięcie legacy kolumny Stripe. ODPALIĆ DOPIERO po oknie
--- zwrotów/reklamacji ostatniego zamówienia opłaconego Stripe (~30 days after cutover).
+-- Migracja 48: usunięcie legacy kolumny Stripe.
 -- (Przenumerowana z 41 — main zdążył zająć 40-46: fabric, warianty, COD.)
--- Do tego czasu kolumna jest źródłem referencji do zwrotów w panelu Stripe.
 --
--- Po odpaleniu migracji 48: usunąć stripe_payment_intent z types.ts
--- (Order i OrderInsert) oraz z fallbacku w panelu admina — osobny, późniejszy commit.
+-- Pierwotny nagłówek kazał czekać ~30 dni od przełączenia na Przelewy24, żeby
+-- zachować referencje do zwrotów w panelu Stripe. Ten powód NIE ISTNIEJE:
+-- sprawdzone na produkcji 2026-07-31 — ZERO zamówień z niepustym
+-- stripe_payment_intent i ZERO z payment_provider='stripe' (Stripe nigdy nie
+-- przyjął tu prawdziwej płatności, cały ruch szedł za pobraniem).
 --
--- NIE ODPALAĆ TERAZ — poczekaj ~30 dni od daty przełączenia na Przelewy24.
+-- Kolejność wdrożenia: najpierw kod przestaje o kolumnie wiedzieć (ten sam PR
+-- usuwa ją z types.ts i z panelu admina), potem ta migracja. Odwrotna kolejność
+-- też jest bezpieczna, bo zapytania robią select("*"), a nie po nazwie kolumny.
 alter table public.orders drop column if exists stripe_payment_intent;
