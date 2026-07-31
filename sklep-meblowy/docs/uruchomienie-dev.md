@@ -18,11 +18,19 @@
    NEXT_PUBLIC_SUPABASE_URL=
    NEXT_PUBLIC_SUPABASE_ANON_KEY=
    SUPABASE_SERVICE_ROLE_KEY=
-   STRIPE_SECRET_KEY=
-   STRIPE_WEBHOOK_SECRET=
    NEXT_PUBLIC_APP_URL=http://localhost:3000
+   P24_MERCHANT_ID=406297
+   P24_POS_ID=406297
+   P24_API_KEY=
+   P24_CRC=
+   P24_BASE_URL=https://secure.przelewy24.pl
    ```
-   (Jeśli po migracji na Przelewy24 dojdą zmienne P24 — patrz PR #48.)
+   `P24_MERCHANT_ID` / `P24_POS_ID` to jawne ID sklepu (klient widzi je na
+   bramce). `P24_API_KEY` i `P24_CRC` są sekretami — bierz je z panelu P24
+   (Moje konto → Konfiguracja API), **„Klucz API", nie „Klucz do zamówień"**.
+   Do zabawy lokalnie lepiej wziąć klucze **sandboxowe** i wtedy
+   `P24_BASE_URL=https://sandbox.przelewy24.pl` — inaczej każdy klik w checkoucie
+   to prawdziwa płatność.
 
 3. **Start**
    ```bash

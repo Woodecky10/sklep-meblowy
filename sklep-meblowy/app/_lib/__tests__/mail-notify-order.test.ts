@@ -49,7 +49,6 @@ const MINIMAL_ORDER = {
     country: "Polska",
     phone: "500600700",
   },
-  stripe_payment_intent: null,
   payment_method: "online",
   promo_code_id: null,
   promo_discount: 0,
