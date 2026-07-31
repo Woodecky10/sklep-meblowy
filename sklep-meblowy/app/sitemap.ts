@@ -4,6 +4,7 @@ import { COMPANY } from "@/app/_lib/company";
 import { getCategories } from "@/app/_lib/categories";
 import { getAllCollections } from "@/app/_lib/collections";
 import { sitemapAlternates } from "@/app/_lib/sitemap-i18n";
+import { DE_ENABLED } from "@/app/_lib/i18n";
 import { getPagesForSitemap } from "@/app/_lib/pages-server";
 import { getActiveBundleSlugs } from "@/app/_lib/bundles-server";
 
@@ -19,22 +20,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
   // Strony zakupowe (home, /sklep) są w PEŁNI przetłumaczone przez słownik UI
-  // (nie zależą od `needs_translation` per produkt) — zawsze publikujemy DE.
+  // (nie zależą od `needs_translation` per produkt) — publikujemy DE, o ile
+  // wersja niemiecka nie jest zamrożona (DE_ENABLED w i18n.ts).
   // Dodajemy osobne wpisy /de i /de/sklep + wzajemne alternates na obu wpisach.
   const homeAlts = sitemapAlternates("/", { hasDe: true }, BASE).languages;
   const sklepAlts = sitemapAlternates("/sklep", { hasDe: true }, BASE).languages;
   const tkaninyAlts = sitemapAlternates("/tkaniny", { hasDe: true }, BASE).languages;
+
+  // ⏸ Przy zamrożonym DE żaden URL '/de/...' nie może wyjść w sitemapie —
+  // zgłaszalibyśmy Google'owi adresy, które odpowiadają redirectem.
+  const deEntry = (entry: MetadataRoute.Sitemap[number]): MetadataRoute.Sitemap =>
+    DE_ENABLED ? [entry] : [];
 
   // Statyczne strony publiczne — kolejność = priorytet wizualny.
   // Info/legal (o-nas, kontakt, dostawa, zwroty, regulamin, prywatnosc) NIE
   // dostają DE na tym etapie (brak tłumaczeń) — zostają PL-only.
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: `${BASE}/`,            lastModified: now, changeFrequency: "daily",   priority: 1.0, alternates: { languages: homeAlts } },
-    { url: `${BASE}/de`,          lastModified: now, changeFrequency: "daily",   priority: 1.0, alternates: { languages: homeAlts } },
+    ...deEntry({ url: `${BASE}/de`,         lastModified: now, changeFrequency: "daily",  priority: 1.0, alternates: { languages: homeAlts } }),
     { url: `${BASE}/sklep`,       lastModified: now, changeFrequency: "daily",   priority: 0.9, alternates: { languages: sklepAlts } },
-    { url: `${BASE}/de/sklep`,    lastModified: now, changeFrequency: "daily",   priority: 0.9, alternates: { languages: sklepAlts } },
+    ...deEntry({ url: `${BASE}/de/sklep`,   lastModified: now, changeFrequency: "daily",  priority: 0.9, alternates: { languages: sklepAlts } }),
     { url: `${BASE}/tkaniny`,     lastModified: now, changeFrequency: "weekly",  priority: 0.7, alternates: { languages: tkaninyAlts } },
-    { url: `${BASE}/de/tkaniny`,  lastModified: now, changeFrequency: "weekly",  priority: 0.7, alternates: { languages: tkaninyAlts } },
+    ...deEntry({ url: `${BASE}/de/tkaniny`, lastModified: now, changeFrequency: "weekly", priority: 0.7, alternates: { languages: tkaninyAlts } }),
     { url: `${BASE}/o-nas`,       lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${BASE}/kontakt`,     lastModified: now, changeFrequency: "monthly", priority: 0.6 },
     { url: `${BASE}/dostawa`,     lastModified: now, changeFrequency: "monthly", priority: 0.5 },
@@ -100,7 +107,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           alternates,
         },
       ];
-      if (hasDe) {
+      if (DE_ENABLED && hasDe) {
         entries.push({
           url: `${BASE}/de${plPath}`,
           lastModified,
@@ -129,7 +136,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           alternates,
         },
       ];
-      if (hasDe) {
+      if (DE_ENABLED && hasDe) {
         entries.push({
           url: `${BASE}/de${plPath}`,
           lastModified,
@@ -159,13 +166,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           priority: 0.7,
           alternates,
         },
-        {
+        ...deEntry({
           url: `${BASE}/de${plPath}`,
           lastModified: now,
           changeFrequency: "weekly" as const,
           priority: 0.7,
           alternates,
-        },
+        }),
       ];
     });
 
@@ -183,7 +190,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const entries: MetadataRoute.Sitemap = [
         { url: `${BASE}${plPath}`, lastModified, changeFrequency: "monthly", priority: 0.5, alternates },
       ];
-      if (hasDe) {
+      if (DE_ENABLED && hasDe) {
         entries.push({ url: `${BASE}/de${plPath}`, lastModified, changeFrequency: "monthly", priority: 0.5, alternates });
       }
       return entries;

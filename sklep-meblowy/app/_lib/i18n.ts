@@ -2,6 +2,26 @@ export const LOCALES = ["pl", "de"] as const;
 export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = "pl";
 
+// ⏸ ZAMROŻENIE WERSJI NIEMIECKIEJ — decyzja właściciela 2026-07-31.
+//
+// Sklep startuje ze sprzedażą TYLKO w Polsce: do wystawiania faktur i
+// rozliczania VAT dla niemieckiego klienta brakuje niemieckiego numeru
+// podatkowego (USt-IdNr / VAT-OSS — do potwierdzenia z księgową). Kod EUR i
+// tłumaczenia DE są sprawne i mają wrócić, więc NIE są usuwane — tylko
+// odcięte od świata tą jedną flagą.
+//
+// `false` powoduje, że:
+//   - `/de/*` odpowiada redirectem 307 na odpowiednik PL (proxy.ts → updateSession),
+//   - przełącznik języka PL|DE nie renderuje się wcale (LanguageSwitcher),
+//   - hreflang `de` nie wychodzi z żadnej strony ani ze sitemapy (sitemap-i18n.ts),
+//   - sitemapa nie zawiera URL-i `/de/...`,
+//   - `getLocale()` nie zwróci "de", nawet gdyby ktoś podrobił nagłówek x-locale.
+//
+// ODMROŻENIE = zmiana tej wartości na `true` i nic więcej w kodzie. Poza kodem
+// zostaje: ustawić realny kurs EUR w /admin/ustawienia (jest tam seed 0.23),
+// zgłosić `/de` w Search Console i sprawdzić, czy PayPro rozlicza EUR.
+export const DE_ENABLED = false;
+
 export function isLocale(v: string): v is Locale {
   return (LOCALES as readonly string[]).includes(v);
 }
@@ -12,6 +32,15 @@ export function stripLocale(pathname: string): { locale: Locale; pathname: strin
   if (pathname === "/de") return { locale: "de", pathname: "/" };
   if (pathname.startsWith("/de/")) return { locale: "de", pathname: pathname.slice(3) };
   return { locale: DEFAULT_LOCALE, pathname };
+}
+
+// Przy zamrożonym DE zwraca ścieżkę PL, na którą trzeba przekierować żądanie,
+// albo `null` gdy żądanie nie wymaga redirectu (locale PL albo DE odmrożone).
+// Wydzielone z proxy, żeby dało się przetestować bez NextRequest.
+export function frozenDeRedirectPath(pathname: string): string | null {
+  if (DE_ENABLED) return null;
+  const { locale, pathname: stripped } = stripLocale(pathname);
+  return locale === "de" ? stripped : null;
 }
 
 // Dokleja prefiks locale do ścieżki (PL bez prefiksu).

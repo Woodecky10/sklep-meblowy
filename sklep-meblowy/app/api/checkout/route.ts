@@ -13,6 +13,7 @@ import {
 import type { Address, Product } from "@/app/_lib/types";
 import { getEurRate } from "@/app/_lib/store-settings";
 import { convertToEur } from "@/app/_lib/money";
+import { DE_ENABLED } from "@/app/_lib/i18n";
 import { effectivePrice } from "@/app/_lib/pricing";
 import {
   groupBundleUnits,
@@ -53,7 +54,12 @@ export async function POST(request: NextRequest) {
   const tr = (pl: string, de: string) => (locale === "de" ? de : pl);
   try {
     const body = (await request.json()) as CheckoutBody;
-    locale = body.locale === "de" ? "de" : "pl";
+    // ⏸ Zamrożenie DE (DE_ENABLED w i18n.ts) klamruje locale TUTAJ, a nie tylko
+    // w UI. `body.locale` przychodzi od klienta, więc bez tego warunku dowolny
+    // POST z `locale:"de"` dalej tworzyłby zamówienie w EUR — czyli dokładnie
+    // to, czego zamrożenie ma nie dopuścić (brak niemieckiego numeru VAT).
+    // Ukrycie `/de` w UI samo z siebie tego nie blokuje.
+    locale = DE_ENABLED && body.locale === "de" ? "de" : "pl";
 
     const isDe = locale === "de";
     // Brak pola = "online" — kompatybilnie ze starszym klientem (cache SW itp.).

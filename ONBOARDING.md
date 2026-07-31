@@ -3,12 +3,12 @@
 Przewodnik do podjęcia pracy nad projektem na nowym komputerze / w nowej sesji.
 
 ## Co to jest
-Sklep meblowy **Mollien** (meble na zamówienie). **Next.js 16** (App Router, Server Actions, Turbopack) + **Supabase** (Postgres + Auth + Storage) + **Przelewy24** (PayPro, direct REST API v1). Aplikacja jest w podfolderze `sklep-meblowy/`. Repo: `Woodecky10/sklep-meblowy`, główny branch `main`. Produkcja: Vercel (auto-deploy z `origin/main`), domena www.mollien.pl. Dwujęzyczny: **PL** (korzeń) + **DE** (`/de`, ceny w EUR).
+Sklep meblowy **Mollien** (meble na zamówienie). **Next.js 16** (App Router, Server Actions, Turbopack) + **Supabase** (Postgres + Auth + Storage) + **Przelewy24** (PayPro, direct REST API v1). Aplikacja jest w podfolderze `sklep-meblowy/`. Repo: `Woodecky10/sklep-meblowy`, główny branch `main`. Produkcja: Vercel (auto-deploy z `origin/main`), domena www.mollien.pl. Dwujęzyczny w kodzie: **PL** (korzeń) + **DE** (`/de`, ceny w EUR) — ale **DE jest od 2026-07-31 ZAMROŻONE** (patrz sekcja niżej), więc publicznie sklep jest jednojęzyczny.
 
 > ⚠️ To NIE jest Next.js z treningu — wersja 16 ma breaking changes. Przed kodem Server Component/Action sprawdź `node_modules/next/dist/docs/`. `params`/`searchParams` to Promise. (Patrz `sklep-meblowy/AGENTS.md`.)
 
-## Stan repo (2026-07-29)
-`origin/main` = `18bba5af`, **na produkcji** (Vercel auto-deployuje z `main`). Bramki na `main`: `tsc` 0 · `lint` 0 błędów (4 znane warningi) · **856 testów** (vitest, 70 plików) · `build` przechodzi (Turbopack).
+## Stan repo (2026-07-31)
+`origin/main` = `11ebcc0`, **na produkcji** (Vercel auto-deployuje z `main`). Bramki na `main`: `tsc` 0 · `lint` 0 błędów (4 znane warningi) · **877 testów** (vitest, 74 pliki) · `build` przechodzi (Turbopack).
 
 Wieczorem 2026-07-29 domknięta cała kolejka PR-ów: **#110** (pakiet techniczny SEO — `/og`, `/feed.xml`, JSON-LD Organization + breadcrumby), **#78** (BackToTop w adminie + wyszukiwanie odporne na spacje i kolejność słów), **#100** (licznik nowych zamówień w panelu), **#92** (filtry z parametrów produktu zamiast koloru/tkaniny), **#111** (sprzątanie migracji po BL). Zamknięte bez merge jako zdublowane dzisiejszą pracą: **#99** (ONBOARDING, zastąpiony przez #109) i **#62** (skrypt rehost, usunięty w #105/#106). **#48 (Przelewy24) — SCALONY 2026-07-31** (`0c4085f`), po testach w sandboxie i weryfikacji kluczy produkcyjnych. Szczegóły w sekcji „Płatności" niżej. **Kolejka PR-ów jest pusta.**
 
@@ -69,7 +69,23 @@ Pytania do właścicielki (faktury KSeF + wysyłka): `sklep-meblowy/docs/2026-06
 
 ## Ceny EUR na /de (2026-06-24, PR #42)
 Klient na `/de` widzi i **płaci w EUR**; PL (`/`) bez zmian (PLN). Stały kurs PLN→EUR w tabeli `store_settings`, edytowalny w **`/admin/ustawienia`** (bez deploya). Konwersja `eur = ceil(pln × kurs)` tylko przy wyświetlaniu (`formatMoney`) i w checkoutcie; ceny w DB/koszyku zostają w PLN. Każde zamówienie zapisuje `orders.currency` + `fx_rate`; kwoty zamówień (konto/admin/sukces) formatowane wg **waluty zamówienia**, nie locale. Checkout DE: P24 `currency:"EUR"` (karta PL/DE), BLIK = PLN-only → wykluczony z DE. Klucz: `app/_lib/money.ts`, `getEurRate` (`store-settings.ts`, cache+fallback), `RateProvider`/`useEurRate` (seed w root layoucie), `ProductCard` z **wymaganym** propem `rate`.
-> ⚠️ **EUR/`/de` ZAMROŻONE — decyzja właściciela 2026-07-31.** Sprzedaż startuje **tylko w Polsce**; do sprzedaży na Niemcy brakuje niemieckiego numeru VAT (USt-IdNr / VAT-OSS — doprecyzować z księgową). Do tego czasu `/de` ma zostać **ukryte** (przełącznik języka, redirect `/de/*` → `/`, wpisy DE poza sitemapą) — za flagą, żeby dało się przywrócić jedną zmianą. Kod EUR pozostaje w repo i działa; nie usuwać. Kurs w `/admin/ustawienia` wciąż jest seedem `0.23` — ustawić realny dopiero przy odmrożeniu.
+> ⏸ **Ta funkcjonalność jest ZAMROŻONA od 2026-07-31** — cała mechanika i sposób odmrożenia w sekcji „Wersja niemiecka ZAMROŻONA" zaraz niżej. Kod EUR pozostaje w repo i działa; **nie usuwać**.
+
+## ⏸ Wersja niemiecka ZAMROŻONA (2026-07-31)
+Decyzja właściciela: sklep startuje ze sprzedażą **tylko w Polsce**, bo do Niemiec brakuje niemieckiego numeru podatkowego (USt-IdNr / VAT-OSS — **do potwierdzenia z księgową**). Bez niego wystawianie faktur i rozliczenie VAT dla niemieckiego klienta jest nielegalne.
+
+**Wszystko wisi na jednej fladze: `DE_ENABLED` w `app/_lib/i18n.ts`.** `false` powoduje, że:
+- `/de/*` odpowiada **redirectem 307 na odpowiednik PL z zachowaną ścieżką** (`/de/sklep` → `/sklep`), obsługa w `app/_lib/supabase/middleware.ts` przez czystą funkcję `frozenDeRedirectPath` (wydzieloną, żeby dała się przetestować bez `NextRequest`). **307, nie 301** — 301 zostałby w cache przeglądarek i w indeksie Google długo po odmrożeniu.
+- przełącznik języka nie renderuje się wcale (`LanguageSwitcher` zwraca `null`, użycia w `TopBar`/`MobileMenu` zostają),
+- hreflang `de` nie wychodzi z żadnej strony ani ze sitemapy — blokada siedzi **wewnątrz** `alternatesFor` (`sitemap-i18n.ts`), a nie po wywołaniach, żeby nowa strona dodana w przyszłości nie ogłosiła DE mimo zamrożenia; czysty kształt mapy został jako `buildAlternates` (kontrakt na odmrożenie, pokryty testami),
+- `sitemap.xml` nie zawiera URL-i `/de/...`,
+- `getLocale()` i `useClientLocale()` nie zwrócą `"de"`.
+
+⚠️ **Najważniejsze i najmniej oczywiste:** `/api/checkout` bierze locale z **body żądania** (`body.locale`), nie z URL-a — bo `fetch` do API nie ma prefiksu `/de`. Samo ukrycie `/de` w UI **nie blokowało** więc zamówień w EUR: wystarczył POST z `locale:"de"`. Dlatego locale jest klamrowane serwerowo w route (`DE_ENABLED && body.locale === "de"`). Gdyby ktoś kiedyś dodał drugie wejście przyjmujące locale od klienta — musi przejść tę samą klamrę.
+
+⚠️ **Kodu EUR NIE usuwać** (`money.ts`, `getEurRate`, `RateProvider`, `ProductCard` z propem `rate`, `orders.currency`/`fx_rate`, `buildProductFeedXml` z `locale:"de"`) — jest sprawny, przetestowany i ma wrócić.
+
+**ODMROŻENIE:** `DE_ENABLED = true` i nic więcej w kodzie. Poza kodem: ustawić realny kurs EUR w `/admin/ustawienia` (jest tam seed `0.23`), zgłosić `/de` w Search Console, potwierdzić z PayPro rozliczanie EUR. Testy w `__tests__/i18n.test.ts` i `__tests__/sitemap-i18n.test.ts` asertują `DE_ENABLED === false` — po przełączeniu **wywalą się celowo**, żeby wymusić przegląd oczekiwań zamiast cichego przepuszczenia starego stanu.
 
 ## Płatności — Przelewy24 / PayPro (2026-06-29, direct REST API v1)
 Operator płatności: **Przelewy24** (PayPro SA), direct REST API v1. Stripe został usunięty.
@@ -164,7 +180,7 @@ curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $SUPABASE_ACCES
 **Jak agent może dziś sięgnąć do bazy** (gdy MCP `supabase` nie działa): tokenem z `.mcp.json` (plik jest gitignorowany, patrz `sklep-meblowy/.gitignore`) przez Management API — `POST https://api.supabase.com/v1/projects/tlvgsddpiikolgdwuwmc/database/query` z ciałem `{"query":"..."}` i nagłówkiem `Authorization: Bearer <token>`. Tą drogą da się wykonać dowolny SQL, w tym DDL migracji, bez czekania na restart narzędzia. Uwaga: zmiana `.mcp.json` wymaga **pełnego restartu** Claude Code — `/mcp → Reconnect` podnosi serwer ze konfiguracją wczytaną przy starcie, więc nowego tokena nie zobaczy.
 
 ## Bramki jakości (uruchamiać z `sklep-meblowy/`)
-`npx tsc --noEmit` (0 błędów) · `npm run lint` (0) · `npm test` (vitest — 268 zielonych) · `npm run build` (Turbopack przechodzi).
+`npx tsc --noEmit` (0 błędów) · `npm run lint` (0) · `npm test` (vitest — **877 zielonych w 74 plikach**, stan 2026-07-31) · `npm run build` (Turbopack przechodzi).
 > Po przełączeniu gałęzi build/tsc potrafi pokazać „phantom" błędy ze stale cache `.next` (referencje do nieistniejących już tras). Jeśli tak — `rm -rf .next` i ponów.
 
 ## Push do origin
@@ -209,8 +225,7 @@ Gotchy, które kosztowały czas i wrócą:
 **Na nowym komputerze:** `git pull` na `main` + `npm install`, a potem odtworzyć **`.env.local`** (gitignored, NIE przychodzi z klonem) — lista zmiennych w `docs/uruchomienie-dev.md`. Do zabawy lokalnie bierz klucze **sandboxowe** i `P24_BASE_URL=https://sandbox.przelewy24.pl`, inaczej każdy klik w checkoucie to prawdziwa płatność. Wartości sandbox: panel sandboxa → **MOJE DANE → Ustawienia** („Klucz do CRC" i „Klucz do raportów"), ID konta w nagłówku panelu.
 
 ## Następny krok
-1. **Ukryć `/de`** — decyzja właściciela 2026-07-31: sklep startuje ze sprzedażą **tylko w Polsce**, bo do Niemiec brakuje niemieckiego numeru podatkowego (USt-IdNr / VAT-OSS — do potwierdzenia z księgową). Przełącznik języka poza UI, redirect `/de/*` → `/`, wpisy DE wycięte ze `sitemap.xml`, całość **za jedną flagą**, żeby odmrożenie było zmianą jednej wartości, a nie rewertem. ⚠️ **Kodu EUR nie usuwać** (`money.ts`, `getEurRate`, `RateProvider`, `ProductCard` z propem `rate`, `orders.currency`/`fx_rate`) — jest sprawny i ma wrócić. Kurs w `/admin/ustawienia` to nadal seed `0.23`; realny ustawić przy odmrożeniu.
-2. **Podprojekt 3 (faktury KSeF)** — czeka na odpowiedź: z jakiego programu fakturowego korzysta księgowa (przesądza drogę); potem spec → plan → wdrożenie.
+1. **Podprojekt 3 (faktury KSeF)** — czeka na odpowiedź: z jakiego programu fakturowego korzysta księgowa (przesądza drogę); potem spec → plan → wdrożenie.
 3. **Reszta podprojektu 4 (wysyłka)** — termin dostawy, dane transportu, model kosztu.
 
 ## Drobne follow-upy (nieblokujące)
