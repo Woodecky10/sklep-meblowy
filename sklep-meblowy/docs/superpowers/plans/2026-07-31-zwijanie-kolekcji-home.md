@@ -8,6 +8,65 @@
 
 **Tech Stack:** Next.js 16 (App Router, Server Actions), Supabase (Postgres, service-role client), Tailwind, `@dnd-kit` (już w projekcie), vitest (node, testy czystych funkcji), Playwright (e2e).
 
+---
+
+## ⏸ STAN WYKONANIA — przerwane 2026-07-31, wznawiane na innym komputerze
+
+> Ta sekcja jest w repo **celowo**: ledger wykonania (`.superpowers/sdd/…`) jest gitignorowany, więc nie jedzie z klonem. To jedyne miejsce, z którego da się podnieść pracę na innej maszynie. Aktualizuj ją przy każdym przerwaniu.
+
+**Gałąź:** `feat/kolekcje-zwijanie-home`, wypchnięta na origin. Ostatni commit: `e62063c`.
+
+### Zrobione i zamknięte
+
+**Task 1 — migracja 66. GOTOWE, recenzja czysta** (`248c57f`, poprawka `929ec1e`).
+Migracja **jest już zaaplikowana na produkcyjnej bazie** (11 kolekcji, każda z innym `sort_order`, kolejność alfabetyczna, `reorder_collections` istnieje). ⚠️ **NIE aplikuj jej ponownie.** Recenzja wymusiła guard idempotentności backfillu (właściciel zatwierdził) — bez niego powtórne odpalenie pliku skasowałoby kolejność ustawioną w panelu.
+
+### Zrobione, ale NIEZWERYFIKOWANE — tu wznów
+
+**Taski 2+3 — warstwa danych i front. Kod gotowy, wszystkie bramki zielone** (`edcbb38`, runda poprawek `e62063c`): `tsc` 0 błędów, cała suita **895 testów** zielona (18 w `collection-tiles.test.ts`), `npm run build` przechodzi. Na dev potwierdzone wizualnie: 6 kafelków, „Pokaż wszystkie kolekcje (+5)", po rozwinięciu 11 i „Zwiń", realne liczniki produktów.
+
+⬜ **Brakuje jednego kroku: zawężonej ponownej recenzji rundy poprawek `edcbb38..e62063c`.** Recenzja Tasków 2+3 znalazła 6 rzeczy wagi Ważne i wszystkie zostały zaadresowane w `e62063c`, ale **nikt tego nie sprawdził**. Zacznij od tego.
+
+Co naprawiała runda poprawek (to trzeba zweryfikować):
+1. `foldAfterIndex` przy dokładnie 6 widocznych kolekcjach zwracał 5, łamiąc własny kontrakt („null gdy ≤6") — a test przechodził trywialnie, bo używał 5 kolekcji.
+2. + 3. Granica klient/serwer narysowana w połowie: czyste funkcje zostały w `collections.ts`, który ciągnie `next/cache` i `next/headers`. Naprawione zgodnie z konwencją repo (`blocks.ts`/`blocks-server.ts`, `i18n.ts`/`i18n-server.ts`): czysty **`app/_lib/collection-tiles.ts`**, `collections.ts` z `import "server-only"`, bez re-eksportu (re-eksport maskował problem). Plik `collection-tiles-shared.ts` z pierwszej wersji został usunięty.
+4. + 5. Definicja „aktywnego produktu" przeniesiona z SQL do czystego kodu, bo była zduplikowana (SQL na home, JS w panelu) i **usunięcie filtru `is_active` zostawiało wszystkie testy zielone** — najdroższy z trzech naprawianych błędów był jedyny bez guardu. Filtr w SQL został jako oszczędność pasma; źródłem prawdy jest czysty kod.
+6. `key={src}` w mozaice dawał zduplikowane klucze React, gdy dwa produkty dzielą pierwsze zdjęcie. Naprawione deduplikacją miniatur **przed** obcięciem do 4.
+
+### ⚠️ POPRAWKA DO TASKA 4 — przeczytaj przed jego implementacją
+
+Recenzja wyłapała defekt w treści Taska 4, którego nie widać z jego kodu: **`getAllCollections()` sortuje po `label`**, a Task 4 wpuszcza tę tablicę wprost do przeciągania i nadaje `sort_order = index`. Skutek: po pierwszym przeciągnięciu i odświeżeniu panel wróciłby do porządku alfabetycznego, a kolejne przeciągnięcie przenumerowałoby względem alfabetu i **cicho skasowało poprzedni układ**. Kreska „poniżej dopiero po rozwinięciu" liczyłaby się względem porządku, który nie jest porządkiem strony głównej.
+
+Strona główna jest bezpieczna, bo `buildCollectionTiles` sortuje sama. Migracja 66 backfilluje alfabetycznie, więc rozjazd ujawni się **dopiero po pierwszym przeciągnięciu** — czyli w testach ręcznych łatwo go przegapić.
+
+**Poprawka:** panel musi posortować listę **tym samym komparatorem** co strona główna (`sort_order` rosnąco, `label` jako tie-break). Komparator jest już wyeksportowany z `app/_lib/collection-tiles.ts` właśnie po to. Sortuj kopię, nie wynik `getAllCollections()` — ta funkcja jest cache'owana i używana w innych miejscach.
+
+Drugie: Task 4 ma podawać do helpera **wszystkie** wiersze produktów bez filtrowania w JS (`.filter((p) => p.is_active)` z treści zadania jest już nieaktualne) — filtrowanie robi czysty kod.
+
+### Odłożone drobiazgi (do triażu w końcowej recenzji gałęzi, nie blokują)
+
+- Test „lokalizuje etykietę dla DE z fallbackiem do PL" nie testuje fallbacku — ustawia `label_de` i sprawdza `label_de`.
+- Gałąź `images: null` w `CollectionProductRow` bez pokrycia (fabryka testowa produkuje `[]`, nigdy `null`, a w bazie NULL jest możliwy).
+- Komentarz w `HomeCollections.tsx` odsyła do `e2e/home-collections.spec.ts`, który powstanie dopiero w Tasku 5.
+- Raport implementera myli się co do `pluralForm` (usunięcie importu było poprawne, opis w raporcie nie).
+- Tie-break po polskiej etykiecie działa też na `/de` — bez wpływu, `/de` jest zamrożone flagą `DE_ENABLED`.
+- Brak indeksu na `collections(sort_order)` — wszystkie inne tabele z `sort_order` w repo mają wspierający indeks. Przy 11 wierszach bez znaczenia, czysty rozjazd z konwencją.
+- W planie Task 1 Step 6 `git add` miał ścieżkę bez prefiksu `sklep-meblowy/` (poprawione w rundzie 1).
+
+### Świadome ograniczenie, nie do naprawiania
+
+Test e2e sprawdza, że ukryty kontener ma `display: none` — **nie** sprawdza, że przeglądarka faktycznie nie pobiera zdjęć. Weryfikacja braku żądań wymagałaby panelu sieci. Właściwość wydajnościowa opiera się więc na `display: none` jako proxy; e2e chroni przed zamianą na `opacity-0`, co jest realnym ryzykiem regresji (wizualnie nierozpoznawalne).
+
+### Kolejność wznowienia
+
+1. Zawężona re-recenzja `edcbb38..e62063c` (6 znalezisk → ADDRESSED / NOT ADDRESSED).
+2. Task 4 **z poprawką wyżej**.
+3. Task 5 (e2e).
+4. Końcowa recenzja całej gałęzi + triaż odłożonych drobiazgów.
+5. PR na `main`. ⚠️ Push wymaga konta **Woodecky10** (`mwlo1403` dostaje 403).
+
+---
+
 ## Global Constraints
 
 - **To NIE jest Next.js z treningu** — wersja 16 ma breaking changes. Przed kodem Server Component/Action sprawdź `node_modules/next/dist/docs/`. `params`/`searchParams` to Promise. (`sklep-meblowy/AGENTS.md`)
