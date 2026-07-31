@@ -10,7 +10,7 @@ Sklep meblowy **Mollien** (meble na zamówienie). **Next.js 16** (App Router, Se
 ## Stan repo (2026-07-29)
 `origin/main` = `18bba5af`, **na produkcji** (Vercel auto-deployuje z `main`). Bramki na `main`: `tsc` 0 · `lint` 0 błędów (4 znane warningi) · **856 testów** (vitest, 70 plików) · `build` przechodzi (Turbopack).
 
-Wieczorem 2026-07-29 domknięta cała kolejka PR-ów: **#110** (pakiet techniczny SEO — `/og`, `/feed.xml`, JSON-LD Organization + breadcrumby), **#78** (BackToTop w adminie + wyszukiwanie odporne na spacje i kolejność słów), **#100** (licznik nowych zamówień w panelu), **#92** (filtry z parametrów produktu zamiast koloru/tkaniny), **#111** (sprzątanie migracji po BL). Zamknięte bez merge jako zdublowane dzisiejszą pracą: **#99** (ONBOARDING, zastąpiony przez #109) i **#62** (skrypt rehost, usunięty w #105/#106). Otwarty zostaje tylko **#48** (Przelewy24). **Stan na 2026-07-30:** konflikty zniknęły — gałąź scaliła `main` (`origin` = `d99fe36`), PR jest `MERGEABLE`/`CLEAN` (55 plików, +2987/−513), a **migracja 47 jest już wgrana na prodzie** (`orders.payment_provider`, `orders.payment_ref` istnieją). Do merge brakuje: transakcji w sandboxie P24 i zmiennych `P24_MERCHANT_ID/POS_ID/API_KEY/CRC/P24_BASE_URL` w Vercelu (po dodaniu — Redeploy). ⚠️ Migrację `48_drop_stripe_payment_intent` z tej gałęzi wgrywaj **po** deployu, nie przed — dropuje kolumnę, którą obecny prod jeszcze czyta.
+Wieczorem 2026-07-29 domknięta cała kolejka PR-ów: **#110** (pakiet techniczny SEO — `/og`, `/feed.xml`, JSON-LD Organization + breadcrumby), **#78** (BackToTop w adminie + wyszukiwanie odporne na spacje i kolejność słów), **#100** (licznik nowych zamówień w panelu), **#92** (filtry z parametrów produktu zamiast koloru/tkaniny), **#111** (sprzątanie migracji po BL). Zamknięte bez merge jako zdublowane dzisiejszą pracą: **#99** (ONBOARDING, zastąpiony przez #109) i **#62** (skrypt rehost, usunięty w #105/#106). **#48 (Przelewy24) — SCALONY 2026-07-31** (`0c4085f`), po testach w sandboxie i weryfikacji kluczy produkcyjnych. Szczegóły w sekcji „Płatności" niżej. **Kolejka PR-ów jest pusta.**
 
 ### Maile transakcyjne — UZBROJONE i przetestowane na produkcji (2026-07-29)
 Kod był gotowy od 2026-07-28, brakowało konfiguracji — zrobione i sprawdzone realnym zamówieniem na mollien.pl. Działa: potwierdzenie zamówienia, „Nowe zamówienie" do właścicielki, „w drodze" (z przewoźnikiem i trackingiem), „anulowane". Maile wychodzą TYLKO przy statusach `shipped` i `cancelled` (`NOTIFY_STATUSES` w `app/_lib/mail/status-notify.ts`) — „Dostarczone"/„W realizacji"/„Opłacone" świadomie nie mailują.
@@ -69,7 +69,7 @@ Pytania do właścicielki (faktury KSeF + wysyłka): `sklep-meblowy/docs/2026-06
 
 ## Ceny EUR na /de (2026-06-24, PR #42)
 Klient na `/de` widzi i **płaci w EUR**; PL (`/`) bez zmian (PLN). Stały kurs PLN→EUR w tabeli `store_settings`, edytowalny w **`/admin/ustawienia`** (bez deploya). Konwersja `eur = ceil(pln × kurs)` tylko przy wyświetlaniu (`formatMoney`) i w checkoutcie; ceny w DB/koszyku zostają w PLN. Każde zamówienie zapisuje `orders.currency` + `fx_rate`; kwoty zamówień (konto/admin/sukces) formatowane wg **waluty zamówienia**, nie locale. Checkout DE: P24 `currency:"EUR"` (karta PL/DE), BLIK = PLN-only → wykluczony z DE. Klucz: `app/_lib/money.ts`, `getEurRate` (`store-settings.ts`, cache+fallback), `RateProvider`/`useEurRate` (seed w root layoucie), `ProductCard` z **wymaganym** propem `rate`.
-> ⚠️ **GO-LIVE EUR (po stronie człowieka):** ustaw realny kurs w `/admin/ustawienia` (seed startowy `0.23`); zrób testową sesję EUR (card) na `/de` w sandboxie P24.
+> ⚠️ **EUR/`/de` ZAMROŻONE — decyzja właściciela 2026-07-31.** Sprzedaż startuje **tylko w Polsce**; do sprzedaży na Niemcy brakuje niemieckiego numeru VAT (USt-IdNr / VAT-OSS — doprecyzować z księgową). Do tego czasu `/de` ma zostać **ukryte** (przełącznik języka, redirect `/de/*` → `/`, wpisy DE poza sitemapą) — za flagą, żeby dało się przywrócić jedną zmianą. Kod EUR pozostaje w repo i działa; nie usuwać. Kurs w `/admin/ustawienia` wciąż jest seedem `0.23` — ustawić realny dopiero przy odmrożeniu.
 
 ## Płatności — Przelewy24 / PayPro (2026-06-29, direct REST API v1)
 Operator płatności: **Przelewy24** (PayPro SA), direct REST API v1. Stripe został usunięty.
@@ -86,15 +86,29 @@ Operator płatności: **Przelewy24** (PayPro SA), direct REST API v1. Stripe zos
 - `P24_CRC` — klucz do podpisów CRC (SHA384)
 - `P24_BASE_URL` — `https://sandbox.przelewy24.pl` (dev) / `https://secure.przelewy24.pl` (prod)
 
-**Migracje DB (expand-contract):**
-- **Migracja 40** (`40_p24_payment_ref.sql`) — dodaje kolumny `payment_ref` + `payment_provider` do `orders`. **NIE odpalona jeszcze** — uruchomić w Supabase SQL Editorze przy cutoverze P24 na produkcję.
-- **Migracja 41** (`41_drop_stripe_payment_intent.sql`) — usuwa legacy kolumnę `stripe_payment_intent`. **NIE odpalać teraz** — poczekaj ~30 dni po cutoverze (okno zwrotów Stripe). Po odpaleniu: usunąć `stripe_payment_intent` z `types.ts` i panelu admina (osobny commit).
+**Migracje DB (expand-contract):** numery w planie (40/41) NIE zgadzają się z repo — `main` zdążył zająć 40–46, więc realne pliki to **47** i **48**.
+- **Migracja 47** (`47_p24_payment_ref.sql`) — dodaje `payment_ref` + `payment_provider` do `orders`. ✅ **ODPALONA na prodzie** (2026-07-29).
+- **Migracja 48** (`48_drop_stripe_payment_intent.sql`) — usuwa legacy kolumnę `stripe_payment_intent`. ⬜ **NIE odpalona.** Komentarz w pliku mówi „poczekaj ~30 dni na okno zwrotów Stripe", ale ten powód **nie istnieje**: sprawdzone 2026-07-31, w bazie jest **zero** zamówień z `stripe_payment_intent` i zero z `payment_provider='stripe'` — Stripe nigdy nie rozliczył ani jednego zamówienia, więc nie ma referencji do zwrotów. Można wgrać, kiedy tylko chcemy. Zostawione świadomie na **jeden commit razem z czyszczeniem kodu**, bo drop bez tego robi niespójność: `types.ts:269,331` deklaruje pole, którego nie ma w bazie, a `app/admin/zamowienia/[id]/page.tsx:185,194` czyta je jako fallback. Runtime to zniesie (`select("*")` → `undefined` → falsy → panel pokaże „brak"), ale to dług, nie stan docelowy.
 
 **Pliki kluczowe:** `app/_lib/p24.ts` (konfiguracja, podpisy CRC, funkcje klienckie: `registerTransaction` / `verifyTransaction` / `refundTransaction`), `app/_lib/p24-events.ts` (walidacja podpisu notyfikacji), `app/api/checkout/route.ts` (rejestruje transakcję P24 w ramach tworzenia zamówienia), `app/api/p24/status/route.ts` (notyfikacja → weryfikacja → settle + idempotencja). Funkcja `refundTransaction` istnieje w `p24.ts`, ale nie jest jeszcze wpięta w żaden endpoint ani panel.
 
-**Sandbox:** panel + dane testowe → `https://sandbox.przelewy24.pl`. Ustaw `P24_BASE_URL=https://sandbox.przelewy24.pl` w `.env.local`.
+**Konto P24 (namiary, 2026-07-31):** panel produkcyjny `panel.przelewy24.pl`, **ID sprzedawcy = ID sklepu = `406297`** (jeden sklep: `MOLLIEN.PL`; widoczne w panelu → „Na skróty"). **Ten sam numer obowiązuje w sandboxie** — różnią się tylko klucze i `P24_BASE_URL`. ID nie jest sekretem: klient widzi je na bramce płatności.
+- Klucze: panel → **Moje konto → Konfiguracja API → „(pokaż)"**. ⚠️ Bierz **„Klucz API"**, NIE „Klucz do zamówień" — to drugie jest do starego API `trnRegister`, a nasz kod używa REST v1 z Basic Auth (`posId` : `Klucz API`). Pomyłka objawia się dopiero błędem uwierzytelnienia przy płatności.
+- **Adresy IP w Konfiguracji API zostawić na „wszyscy (%)"** — Vercel nie ma stałych adresów wyjściowych, whitelisting zablokowałby nasze wywołania.
+- Aktywne metody (sprawdzone `npm run p24:methods` na produkcji): **BLIK, karta, Google Pay, Apple Pay** (26 metod na koncie).
 
-> ⚠️ **GO-LIVE P24 (po stronie człowieka):** wpisz realne klucze sandbox w `.env.local`; odpal migrację 40 na prod (jeśli jeszcze nie); wykonaj E2E checklist (karta PL/DE, BLIK, przelew, porzucona płatność, duplikat notyfikacji, podrobiony sign). Po ~30 dniach od cutoveru odpal migrację 41 i zrób cleanup commit.
+**Dwa środowiska w Vercelu — zakresy MUSZĄ być rozdzielne:** klucze sandbox w zakresie **Preview**, produkcyjne w **Production**. Ta sama nazwa zmiennej może mieć różne wartości per zakres. ⚠️ Nigdy „All Environments" — jedna wartość `P24_BASE_URL` na oba środowiska oznacza albo produkcję strzelającą w sandbox (nikt nie zapłaci), albo testy obciążające prawdziwe karty.
+
+**Narzędzia do diagnozy (bez klikania przez checkout):**
+- `npm run p24:smoke` — `testAccess` (Basic Auth) + `register` na 1 zł (**podpis SHA-384** — najczęstsze miejsce błędu). Czyta `.env.local`, nie tworzy zamówienia.
+- `npm run p24:methods` — lista metod aktywnych na koncie.
+
+> ✅ **P24 JEST NA PRODUKCJI od 2026-07-31** (PR #48, merge `0c4085f`). Zweryfikowane:
+> - **sandbox E2E na preview:** udana płatność przelewem → `status=paid`, `payment_provider=p24`, `payment_ref` zapisany; nieudana (BLIK→błąd) → zostaje `pending` bez `payment_ref`; podrobiona notyfikacja → `400 Bad signature`; powrót z bramki pokazuje „Płatność w toku" (strona **nie ufa** `urlReturn`, czeka na notyfikację).
+> - **produkcja:** `p24:smoke` zielony na `secure.przelewy24.pl`, a `POST /api/checkout` zwraca URL bramki produkcyjnej → zmienne dojechały.
+> - Duplikat notyfikacji sprawdzony **inspekcją kodu, nie E2E** (brak dostępu do ponowienia w panelu): wczesne wyjście przy `status != pending` + atomowy CAS `UPDATE ... WHERE status='pending'` w `markOrderPaid` → drugie wywołanie zwraca 0 wierszy, więc promo nie rośnie i drugi mail nie wychodzi.
+>
+> ⬜ **ZOSTAŁO:** jedna prawdziwa transakcja kontrolna na produkcji (najtaniej: materac 139 zł) + zwrot w panelu P24 — sandbox nie potwierdzi realnego rozliczenia i wypłaty. Oraz usunięcie `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` z Vercela (nic ich już nie czyta).
 
 ## Edytor WYSIWYG opisów produktu (2026-06-22)
 Opisy produktu edytuje się w panelu pełnym edytorem WYSIWYG (**TipTap**) — bez ręcznego HTML. Komponent `app/admin/produkty/[id]/RichTextEditor.tsx` (TipTap, client-only, `immediatelyRender:false`), wpięty w sekcje opisu (PL custom, override, DE) oraz pojedyncze pole „Opis produktu"/„Opis (DE)". Pasek: cofnij/ponów, B/I/U/S, listy, cytat, H2–H4, wyrównanie, kolor, marker, link, obraz (upload przez `uploadProductImage` + `compressIfNeeded`).
