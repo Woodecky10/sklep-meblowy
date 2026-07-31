@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { getStripe } from "@/app/_lib/stripe";
 import { getOrderById } from "@/app/_lib/orders";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { localizeHref } from "@/app/_lib/i18n";
@@ -9,9 +8,11 @@ import ClearCart from "./ClearCart";
 export default async function SuccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ session_id?: string; order_id?: string }>;
+  // ?order= — powrót z P24 (urlReturn); ?order_id= — redirect pobrania (COD).
+  searchParams: Promise<{ order?: string; order_id?: string }>;
 }) {
-  const { session_id, order_id } = await searchParams;
+  const { order: orderQ, order_id } = await searchParams;
+  const orderParam = orderQ ?? order_id;
   const locale = await getLocale();
   const de = locale === "de";
 
@@ -19,8 +20,11 @@ export default async function SuccessPage({
     ? {
         eyebrow: "Vielen Dank",
         heading: "Bestellung erhalten",
+        headingPending: "Zahlung wird verarbeitet",
         intro:
           "Die Zahlung wurde erfolgreich abgewickelt. An die angegebene E-Mail-Adresse haben wir eine Bestellbestätigung mit allen Details geschickt.",
+        introPending:
+          "Die Zahlung wird vom Anbieter bestätigt. Sobald der Betrag eingegangen ist, senden wir eine Bestätigung an Ihre E-Mail. Sie können diese Seite schließen.",
         introCod:
           "Ihre Bestellung wurde angenommen. Sie zahlen bequem bei Lieferung an den Kurier (Nachnahme).",
         details: "Details",
@@ -32,8 +36,11 @@ export default async function SuccessPage({
     : {
         eyebrow: "Dziękujemy",
         heading: "Zamówienie przyjęte",
+        headingPending: "Płatność w toku",
         intro:
           "Płatność zrealizowana pomyślnie. Na podany adres email wysłaliśmy potwierdzenie zamówienia wraz ze szczegółami.",
+        introPending:
+          "Trwa potwierdzanie płatności przez operatora. Gdy środki wpłyną, wyślemy potwierdzenie na podany adres email. Tę stronę można zamknąć.",
         introCod:
           "Zamówienie zostało przyjęte do realizacji. Zapłacisz wygodnie kurierowi przy odbiorze (za pobraniem).",
         details: "Szczegóły",
@@ -47,40 +54,27 @@ export default async function SuccessPage({
   let total: number | null = null;
   let email: string | null = null;
   let orderCurrency: "pln" | "eur" = "pln";
+  let isPaid = false;
   let isCod = false;
 
-  if (session_id) {
+  if (orderParam) {
     try {
-      const session = await getStripe().checkout.sessions.retrieve(session_id);
-      orderId = session.metadata?.order_id ?? null;
-      email = session.customer_details?.email ?? session.customer_email ?? null;
-      if (orderId) {
-        const order = await getOrderById(orderId);
-        total = Number(order.total);
-        orderCurrency = order.currency;
-      }
+      const order = await getOrderById(orderParam);
+      orderId = order.id;
+      total = Number(order.total);
+      orderCurrency = order.currency;
+      email = order.guest_email; // null dla zalogowanych — wiersz się nie wyrenderuje
+      isCod = order.payment_method === "cod";
+      isPaid = order.status !== "pending";
     } catch {
-      // sesja mogła wygasnąć — pokaż ogólny komunikat
+      // brak zamówienia — pokaż ogólny komunikat bez szczegółów
     }
   }
 
-  if (!session_id && order_id) {
-    try {
-      const order = await getOrderById(order_id);
-      // Szczegóły tylko dla zamówień pobraniowych — strona nie może być
-      // wyrocznią do podglądania CUDZYCH zamówień online po id (UUID jest
-      // niezgadywalny, ale zawężenie nic nie kosztuje).
-      if (order.payment_method === "cod") {
-        isCod = true;
-        orderId = order.id;
-        total = Number(order.total);
-        orderCurrency = order.currency;
-        email = order.guest_email; // null dla zalogowanych — wiersz się nie wyrenderuje
-      }
-    } catch {
-      // nieistniejące id — pokaż ogólny komunikat bez szczegółów
-    }
-  }
+  // COD: przyjęte, płatność u kuriera. Online (P24): nagłówek/intro zależą od
+  // tego, czy notyfikacja zdążyła oznaczyć zamówienie jako opłacone.
+  const heading = isCod || isPaid ? c.heading : c.headingPending;
+  const intro = isCod ? c.introCod : isPaid ? c.intro : c.introPending;
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-24 text-center">
@@ -103,9 +97,9 @@ export default async function SuccessPage({
         {c.eyebrow}
       </p>
       <h1 className="font-display text-4xl md:text-5xl font-bold text-[var(--fg)] mb-6">
-        {c.heading}
+        {heading}
       </h1>
-      <p className="text-[var(--muted)] mb-10 leading-relaxed">{isCod ? c.introCod : c.intro}</p>
+      <p className="text-[var(--muted)] mb-10 leading-relaxed">{intro}</p>
 
       {(orderId || total !== null || email) && (
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8 mb-10 text-left">

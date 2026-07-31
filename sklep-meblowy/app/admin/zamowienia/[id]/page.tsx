@@ -168,9 +168,9 @@ export default async function AdminOrderDetailPage({
             </Card>
           )}
 
-          {/* Karty "Płatność" wzajemnie wykluczone: COD nigdy nie ma
-              stripe_payment_intent, ale gdyby dane kiedyś się rozjechały,
-              admin ma zobaczyć JEDNĄ kartę właściwą dla metody płatności. */}
+          {/* Karty "Płatność" wzajemnie wykluczone: COD nie ma referencji
+              płatności online, ale gdyby dane kiedyś się rozjechały, admin
+              ma zobaczyć JEDNĄ kartę właściwą dla metody płatności. */}
           {order.payment_method === "cod" ? (
             <Card>
               <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-3">Płatność</h3>
@@ -182,14 +182,16 @@ export default async function AdminOrderDetailPage({
                 przy dostawie.
               </p>
             </Card>
-          ) : order.stripe_payment_intent ? (
+          ) : (order.payment_ref || order.stripe_payment_intent) ? (
             <Card>
               <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-3">Płatność</h3>
               <p className="text-xs text-[var(--muted)]">
-                Stripe payment_intent (referencja do zwrotów):
+                {order.payment_provider === "stripe"
+                  ? "Stripe payment_intent (zwroty w panelu Stripe):"
+                  : "Referencja P24 (zwroty w panelu Przelewy24):"}
               </p>
               <p className="font-mono text-sm text-[var(--fg)] break-all">
-                {order.stripe_payment_intent}
+                {order.payment_ref ?? order.stripe_payment_intent}
               </p>
             </Card>
           ) : null}

@@ -3,7 +3,7 @@
 Przewodnik do podjęcia pracy nad projektem na nowym komputerze / w nowej sesji.
 
 ## Co to jest
-Sklep meblowy **Mollien** (meble na zamówienie). **Next.js 16** (App Router, Server Actions, Turbopack) + **Supabase** (Postgres + Auth + Storage) + **Stripe**. Aplikacja jest w podfolderze `sklep-meblowy/`. Repo: `Woodecky10/sklep-meblowy`, główny branch `main`. Produkcja: Vercel (auto-deploy z `origin/main`), domena www.mollien.pl. Dwujęzyczny: **PL** (korzeń) + **DE** (`/de`, ceny w EUR).
+Sklep meblowy **Mollien** (meble na zamówienie). **Next.js 16** (App Router, Server Actions, Turbopack) + **Supabase** (Postgres + Auth + Storage) + **Przelewy24** (PayPro, direct REST API v1). Aplikacja jest w podfolderze `sklep-meblowy/`. Repo: `Woodecky10/sklep-meblowy`, główny branch `main`. Produkcja: Vercel (auto-deploy z `origin/main`), domena www.mollien.pl. Dwujęzyczny: **PL** (korzeń) + **DE** (`/de`, ceny w EUR).
 
 > ⚠️ To NIE jest Next.js z treningu — wersja 16 ma breaking changes. Przed kodem Server Component/Action sprawdź `node_modules/next/dist/docs/`. `params`/`searchParams` to Promise. (Patrz `sklep-meblowy/AGENTS.md`.)
 
@@ -68,8 +68,33 @@ Decyzja właścicielki (2026-06-17): sklep prowadzi produkty, kategorie i zamów
 Pytania do właścicielki (faktury KSeF + wysyłka): `sklep-meblowy/docs/2026-06-18-rozpoznanie-faktury-wysylka.md`.
 
 ## Ceny EUR na /de (2026-06-24, PR #42)
-Klient na `/de` widzi i **płaci w EUR**; PL (`/`) bez zmian (PLN). Stały kurs PLN→EUR w tabeli `store_settings`, edytowalny w **`/admin/ustawienia`** (bez deploya). Konwersja `eur = ceil(pln × kurs)` tylko przy wyświetlaniu (`formatMoney`) i w checkoutcie; ceny w DB/koszyku zostają w PLN. Każde zamówienie zapisuje `orders.currency` + `fx_rate`; kwoty zamówień (konto/admin/sukces) formatowane wg **waluty zamówienia**, nie locale. Checkout DE: Stripe `currency:"eur"`, `locale:"de"`, `payment_method_types:["card","p24"]` (BLIK = PLN-only → wykluczony z DE; p24 wspiera EUR — potwierdzone w docs Stripe). Klucz: `app/_lib/money.ts`, `getEurRate` (`store-settings.ts`, cache+fallback), `RateProvider`/`useEurRate` (seed w root layoucie), `ProductCard` z **wymaganym** propem `rate`.
-> ⚠️ **GO-LIVE EUR (po stronie człowieka):** ustaw realny kurs w `/admin/ustawienia` (seed startowy `0.23`); zrób testową sesję EUR (card+p24) na `/de` — fix BLIK nie był weryfikowany na żywym Stripe.
+Klient na `/de` widzi i **płaci w EUR**; PL (`/`) bez zmian (PLN). Stały kurs PLN→EUR w tabeli `store_settings`, edytowalny w **`/admin/ustawienia`** (bez deploya). Konwersja `eur = ceil(pln × kurs)` tylko przy wyświetlaniu (`formatMoney`) i w checkoutcie; ceny w DB/koszyku zostają w PLN. Każde zamówienie zapisuje `orders.currency` + `fx_rate`; kwoty zamówień (konto/admin/sukces) formatowane wg **waluty zamówienia**, nie locale. Checkout DE: P24 `currency:"EUR"` (karta PL/DE), BLIK = PLN-only → wykluczony z DE. Klucz: `app/_lib/money.ts`, `getEurRate` (`store-settings.ts`, cache+fallback), `RateProvider`/`useEurRate` (seed w root layoucie), `ProductCard` z **wymaganym** propem `rate`.
+> ⚠️ **GO-LIVE EUR (po stronie człowieka):** ustaw realny kurs w `/admin/ustawienia` (seed startowy `0.23`); zrób testową sesję EUR (card) na `/de` w sandboxie P24.
+
+## Płatności — Przelewy24 / PayPro (2026-06-29, direct REST API v1)
+Operator płatności: **Przelewy24** (PayPro SA), direct REST API v1. Stripe został usunięty.
+
+**Przepływ:**
+1. Checkout (`POST /api/checkout`) rejestruje transakcję — wywołuje `registerTransaction()` z `app/_lib/p24.ts`, otrzymuje `token` i zwraca `{ url: trnRequestUrl(token) }` do klienta. Nie istnieje osobna trasa `/api/p24/register` ani Server Action `registerP24Transaction`.
+2. Klient przekierowany na `https://secure.przelewy24.pl/trnRequest/{token}` (lub sandbox) — wybiera metodę, płaci.
+3. P24 wysyła notyfikację `POST /api/p24/status` z `sign` CRC (podpis z `P24_CRC`). Endpoint weryfikuje kwotę przez `POST /api/v1/transaction/verify` i oznacza zamówienie `paid` + `payment_ref`.
+4. Klient wraca na `/checkout/success?order=<orderId>` (dla EUR: `/de/checkout/success?order=<orderId>`) — strona sukcesu jest agnostyczna (nie ufa returnowi, czyta status zamówienia z DB; pokazuje widok „opłacone" lub „w toku" zależnie od statusu).
+
+**Env (P24):**
+- `P24_MERCHANT_ID` / `P24_POS_ID` — z panelu PayPro
+- `P24_API_KEY` — klucz REST API
+- `P24_CRC` — klucz do podpisów CRC (SHA384)
+- `P24_BASE_URL` — `https://sandbox.przelewy24.pl` (dev) / `https://secure.przelewy24.pl` (prod)
+
+**Migracje DB (expand-contract):**
+- **Migracja 40** (`40_p24_payment_ref.sql`) — dodaje kolumny `payment_ref` + `payment_provider` do `orders`. **NIE odpalona jeszcze** — uruchomić w Supabase SQL Editorze przy cutoverze P24 na produkcję.
+- **Migracja 41** (`41_drop_stripe_payment_intent.sql`) — usuwa legacy kolumnę `stripe_payment_intent`. **NIE odpalać teraz** — poczekaj ~30 dni po cutoverze (okno zwrotów Stripe). Po odpaleniu: usunąć `stripe_payment_intent` z `types.ts` i panelu admina (osobny commit).
+
+**Pliki kluczowe:** `app/_lib/p24.ts` (konfiguracja, podpisy CRC, funkcje klienckie: `registerTransaction` / `verifyTransaction` / `refundTransaction`), `app/_lib/p24-events.ts` (walidacja podpisu notyfikacji), `app/api/checkout/route.ts` (rejestruje transakcję P24 w ramach tworzenia zamówienia), `app/api/p24/status/route.ts` (notyfikacja → weryfikacja → settle + idempotencja). Funkcja `refundTransaction` istnieje w `p24.ts`, ale nie jest jeszcze wpięta w żaden endpoint ani panel.
+
+**Sandbox:** panel + dane testowe → `https://sandbox.przelewy24.pl`. Ustaw `P24_BASE_URL=https://sandbox.przelewy24.pl` w `.env.local`.
+
+> ⚠️ **GO-LIVE P24 (po stronie człowieka):** wpisz realne klucze sandbox w `.env.local`; odpal migrację 40 na prod (jeśli jeszcze nie); wykonaj E2E checklist (karta PL/DE, BLIK, przelew, porzucona płatność, duplikat notyfikacji, podrobiony sign). Po ~30 dniach od cutoveru odpal migrację 41 i zrób cleanup commit.
 
 ## Edytor WYSIWYG opisów produktu (2026-06-22)
 Opisy produktu edytuje się w panelu pełnym edytorem WYSIWYG (**TipTap**) — bez ręcznego HTML. Komponent `app/admin/produkty/[id]/RichTextEditor.tsx` (TipTap, client-only, `immediatelyRender:false`), wpięty w sekcje opisu (PL custom, override, DE) oraz pojedyncze pole „Opis produktu"/„Opis (DE)". Pasek: cofnij/ponów, B/I/U/S, listy, cytat, H2–H4, wyrównanie, kolor, marker, link, obraz (upload przez `uploadProductImage` + `compressIfNeeded`).
@@ -85,9 +110,10 @@ npm install                           # node_modules NIE są w repo
 npm run dev
 ```
 Niezbędne env do dev (nazwy — wartości z Vercel/starego `.env.local`):
-`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_APP_URL`. Pełny szablon: `sklep-meblowy/.env.example`.
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `P24_MERCHANT_ID`, `P24_POS_ID`, `P24_API_KEY`, `P24_CRC`, `P24_BASE_URL`, `NEXT_PUBLIC_APP_URL`. Pełny szablon: `sklep-meblowy/.env.example`.
+> ⚠️ **Ta gałąź zamienia Stripe'a na bezpośredni Przelewy24.** Po merge `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` przestają być czytane przez cokolwiek, a `P24_*` stają się **wymagane** — bez nich `/api/checkout` nie zarejestruje transakcji. `BASELINKER_*`/`BL_STATUS_*`/`CRON_SECRET` usunięte dawno.
 > Maile: `RESEND_API_KEY`, `MAIL_FROM`, `MAIL_REPLY_TO`, `MAIL_ADMIN_TO` są ustawione **w Vercelu (Production)**. Lokalnie NIE są potrzebne — bez `RESEND_API_KEY` kod działa w trybie no-op (loguje `[mail] brak RESEND_API_KEY` i nic nie wysyła), więc dev nie zaśmieca skrzynek. Dodaj je do `.env.local` tylko gdy chcesz testować maile z lokalnego builda.
-> **Baza i storage są ZDALNE/współdzielone (Supabase).** Migracje (29–34) już wgrane, obrazy w storage. Nowy komp **nie robi setupu bazy** — wystarczy `.env.local` wskazujący na ten sam projekt Supabase. `.env.local` i `node_modules` są gitignored, więc nie przychodzą z klonem.
+> **Baza i storage są ZDALNE/współdzielone (Supabase).** Migracje już wgrane, obrazy w storage. Nowy komp **nie robi setupu bazy** — wystarczy `.env.local` wskazujący na ten sam projekt Supabase. `.env.local` i `node_modules` są gitignored, więc nie przychodzą z klonem.
 
 ### Dostęp agenta do bazy (MCP Supabase)
 Agent czyta i zmienia bazę przez serwer MCP Supabase, a ten wymaga **osobistego tokenu dostępowego** — to NIE jest żaden z kluczy z `.env.local`. Token generujesz w `https://supabase.com/dashboard/account/tokens` (pokazywany raz).
@@ -111,7 +137,9 @@ curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $SUPABASE_ACCES
 `200` = token dobry, `401` = do wymiany. Straciliśmy na tym pół godziny 2026-07-30.
 
 ## Baza — migracje
-**WSZYSTKIE migracje z `main` są ODPALONE** na produkcyjnym Supabase — sprawdzone 2026-07-30 przez `list_migrations`. Uwaga na dwa mylące wpisy: migracja `65_products_search_key` figuruje w bazie pod starą nazwą `61_products_search_key` (plik przenumerowano w repo z powodu kolizji z `61_variant_info`; jest w całości wgrana — `search_key` i `search_key_de` + dwa indeksy GIN), a `47_p24_payment_ref` jest wgrana na prodzie, choć pliku nie ma na `main` (leży na gałęzi PR #48). Wspólna baza → świeży klon nic nie re-uruchamia. Przyszłe migracje: kolejny numer w `sklep-meblowy/supabase/migrations/`.
+**WSZYSTKIE migracje z `main` są ODPALONE** na produkcyjnym Supabase — sprawdzone 2026-07-30 przez `list_migrations`. Z repo została **tylko `48` (P24)**. Uwaga na dwa mylące wpisy: migracja `65_products_search_key` figuruje w bazie pod starą nazwą `61_products_search_key` (plik przenumerowano w repo z powodu kolizji z `61_variant_info`; jest w całości wgrana — `search_key` i `search_key_de` + dwa indeksy GIN), a `47_p24_payment_ref` jest wgrana na prodzie, choć pliku nie ma na `main` (leży na tej gałęzi, PR #48). Wspólna baza → świeży klon nic nie re-uruchamia. Przyszłe migracje: kolejny numer w `sklep-meblowy/supabase/migrations/` (kanoniczny katalog); odpala człowiek w Supabase SQL Editorze albo agent przez Supabase MCP (model: pokaż SQL → potwierdź → wykonaj).
+> Migracja **47** (`47_p24_payment_ref.sql`) jest **addytywna (expand)** — dodaje `payment_ref` + `payment_provider` i backfilluje istniejące zamówienia jako `stripe`, **nie rusza `stripe_payment_intent`**. Dlatego była bezpieczna przy żywym kodzie Stripe i odpalono ją **PRZED** merge'em tej gałęzi (2026-07-29; preview dzieli bazę z produkcją).
+> Migracja **48** (`48_drop_stripe_payment_intent.sql`) — odpalać **po cutoverze**, bez 30-dniowego okna zwrotów (patrz punkt 5 w „Gdzie stanęliśmy": w bazie nie ma ani jednego zamówienia opłaconego Stripe'em). Po niej: usunąć `stripe_payment_intent` z `types.ts` i z fallbacku w panelu admina.
 
 ⚠️ **Rejestr migracji w bazie jest NIEPEŁNY i nie nadaje się do oceny stanu schematu.** Sprawdzone 2026-07-30: `supabase_migrations.schema_migrations` ma **23 wpisy**, a w repo jest **58 plików**. To NIE znaczy, że 35 brakuje — migracje `01`–`46` oraz `49`–`58` wgrywano ręcznie w SQL Editorze, a ten nie zapisuje się do rejestru. Dodatkowo nazwy w rejestrze nie zgadzają się z plikami: `62_fabric_short_info` figuruje jako `fabric_short_info`, a `65_products_search_key` jako `61_products_search_key`. Najnowsze wpisy: `47_p24_payment_ref` (2026-07-29) i grupa `fabric_*` (24–27.07).
 **Wniosek: stan bazy sprawdzaj po OBIEKTACH, nie po rejestrze** — czy kolumna/indeks/RPC istnieje (`information_schema`, `pg_indexes`), a nie czy plik widnieje na liście migracji. Inaczej wyjdzie fałszywy alarm „brakuje 35 migracji".
@@ -119,7 +147,7 @@ curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $SUPABASE_ACCES
 **Jak agent może dziś sięgnąć do bazy** (gdy MCP `supabase` nie działa): tokenem z `.mcp.json` (plik jest gitignorowany, patrz `sklep-meblowy/.gitignore`) przez Management API — `POST https://api.supabase.com/v1/projects/tlvgsddpiikolgdwuwmc/database/query` z ciałem `{"query":"..."}` i nagłówkiem `Authorization: Bearer <token>`. Tą drogą da się wykonać dowolny SQL, w tym DDL migracji, bez czekania na restart narzędzia. Uwaga: zmiana `.mcp.json` wymaga **pełnego restartu** Claude Code — `/mcp → Reconnect` podnosi serwer ze konfiguracją wczytaną przy starcie, więc nowego tokena nie zobaczy.
 
 ## Bramki jakości (uruchamiać z `sklep-meblowy/`)
-`npx tsc --noEmit` (0 błędów) · `npm run lint` (0) · `npm test` (vitest — ~208 zielonych) · `npm run build` (Turbopack przechodzi).
+`npx tsc --noEmit` (0 błędów) · `npm run lint` (0) · `npm test` (vitest — 268 zielonych) · `npm run build` (Turbopack przechodzi).
 > Po przełączeniu gałęzi build/tsc potrafi pokazać „phantom" błędy ze stale cache `.next` (referencje do nieistniejących już tras). Jeśli tak — `rm -rf .next` i ponów.
 
 ## Push do origin
@@ -136,10 +164,40 @@ Origin wymaga konta **Woodecky10** — `mwlo1403` NIE ma write (push → 403). K
 ## Metoda pracy (tak prowadzone są podprojekty)
 brainstorming → spec (`docs/superpowers/specs/`) → plan TDD (`docs/superpowers/plans/`) → implementacja subagent-driven (świeży subagent na task + recenzja po każdym + final whole-branch review) → merge. Panel admina jest **PL-only** (bez i18n). Server actions: `"use server"` + `requireAdmin()` + `createAdminClient()` + `revalidatePath`, zwracają `ActionResult` (typ w `app/_lib/types.ts`), updaty castowane `as never`. Komponenty klienckie używają `app/admin/_shared` + `useTransition`.
 
+## ⏸ Gdzie stanęliśmy — P24, 2026-07-29 wieczór (czytaj to pierwsze po przesiadce na inny komputer)
+
+**Ta gałąź (`feat/platnosci-direct-p24`, PR #48) jest przetestowana w sandboxie i gotowa do cutoveru. Na produkcji NADAL płaci Stripe** — dopóki nie ma merge'a, nic się nie zmieniło dla klientów.
+
+Zrobione i potwierdzone pomiarem:
+- **Migracja 47 jest na prodzie** (addytywna; `stripe_payment_intent` nietknięta, żywy kod Stripe działa).
+- **Pełny przepływ w sandboxie przeszedł na preview:** zamówienie → `trnRequest` → symulator „Mój bank" → Zapłać → notyfikacja → `status=paid`, `payment_ref`, `payment_provider=p24`. Mail potwierdzenia **doszedł**. Duplikat notyfikacji idempotentny; nieudana płatność zostaje `pending`; podrobiony podpis → 400; zaniżona kwota → `pending` + `admin_note`. Zamówienia testowe (#38, #39) usunięte z bazy.
+- **Podpisy `register` i `verify` potwierdzone na żywym API**, podpis notyfikacji potwierdzony realną płatnością.
+- Klucz API to **„Klucz do raportów"** z panelu (nie „Klucz do zamówień"). Sandbox uruchamia się jednym klikiem: panel produkcyjny → Moje konto → **Konto w SANDBOX**. Panel sandboxa: `https://sandbox.przelewy24.pl/panel` (sam korzeń hosta zwraca 400 — jako `P24_BASE_URL` jest poprawny).
+- Narzędzia: **`npm run p24:smoke [-- <url-wdrożenia>]`** (klucze + podpis + czy `urlStatus` trafia w nasz handler) i **`npm run p24:methods`** (metody aktywne na koncie; Apple Pay w sandboxie = `id 252`, aktywne — na produkcji jeszcze NIESPRAWDZONE). Oba tylko do odczytu, nie ruszają pieniędzy.
+
+Co zostało, w tej kolejności:
+1. **Klucze produkcyjne `P24_*` w Vercelu w zakresie Production** + `P24_BASE_URL=https://secure.przelewy24.pl`. ⚠️ MUSI być PRZED merge'em — bez nich `/api/checkout` rzuca i płatności online przestają działać (za pobraniem dalej idzie). ⚠️ **Nigdy nie zostawiać kluczy sandboxowych w Production** — kod nie rozpozna, że są testowe, więc sklep „przyjmowałby" płatności, które nigdy nie wpłyną.
+2. **Sprawdzić w panelu P24, czy konto jest zweryfikowane/aktywne** („Weryfikacja konta"). Sandbox działa od razu, prawdziwe płatności wymagają zakończonej weryfikacji.
+3. Merge #48 → auto-deploy → `npm run p24:smoke -- https://mollien.pl` (potwierdza, że env dojechały i notyfikacja trafia w handler).
+4. **Jedna prawdziwa transakcja na 1 zł** na produkcji + zwrot w panelu P24.
+5. **Migracja 48** (`drop stripe_payment_intent`) — **bez czekania 30 dni**, bo w bazie NIE MA ani jednego zamówienia opłaconego Stripe'em (sprawdzone: 0 referencji, 0 w statusie `paid`). Potem usunąć `stripe_payment_intent` z `types.ts` i z fallbacku w panelu admina.
+6. Usunąć z Vercela `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`, wyłączyć webhook w panelu Stripe, zamknąć konto.
+7. **Podmienić logotypy** — `public/payments/*.svg` to placeholdery (własne SVG z tekstem, w tym Visa/Mastercard/BLIK — znaków zastrzeżonych nie wolno rysować samemu). Pobrać oficjalny zestaw z panelu P24.
+
+Gotchy, które kosztowały czas i wrócą:
+- ⚠️ **Vercel Deployment Protection blokuje notyfikacje P24** — przy `vercel_auth_enabled` `/api/p24/status` oddaje **401**, więc rozliczenie nigdy nie dojdzie. Na czas testów na preview trzeba ją wyłączyć (Settings → Deployment Protection) i **włączyć z powrotem po testach** (preview jest publiczny i dzieli bazę z produkcją).
+- ⚠️ **POST na nieistniejącą ścieżkę pod `/api/` zwraca 200 z HTML-em** (udokumentowane zachowanie `not-found` dla odpowiedzi strumieniowanych). Literówka w `urlStatus` = cicha awaria: P24 uzna notyfikację za dostarczoną i nie ponowi. Dlatego `p24:smoke` sprawdza ten adres osobno.
+- **Zamówienia z preview lecą do produkcyjnej bazy** (wspólny Supabase) — testowe trzeba usuwać: najpierw `order_items`, potem `orders`.
+- **`urlStatus` bierze się z nagłówka `Origin`** (fallback `NEXT_PUBLIC_APP_URL`), czyli z czegoś, co kontroluje klient. Świadomie zostawione, bo dzięki temu test na preview działa bez grzebania w env. Wpływ niski (atakujący płaci swoimi pieniędzmi, zamówienie zostaje `pending`), ale po cutoverze przestawić na źródło serwerowe.
+- Poprawka regulaminu o **„płatności za pobraniem"** (§ 4 ust. 3, commit `a33a8853`) siedzi w tej gałęzi i wejdzie na produkcję razem z merge'em — nie wymaga osobnego działania.
+
+**Na nowym komputerze:** `git pull` + `git checkout feat/platnosci-direct-p24` + `npm install`, a potem odtworzyć **`.env.local`** (gitignored, NIE przychodzi z klonem): Supabase (URL, anon, service_role), `NEXT_PUBLIC_APP_URL` oraz `P24_MERCHANT_ID`/`P24_POS_ID`/`P24_API_KEY`/`P24_CRC` + `P24_BASE_URL=https://sandbox.przelewy24.pl`. Wartości P24 sandbox: panel sandboxa → **MOJE DANE → Ustawienia** („Klucz do CRC" i „Klucz do raportów"), ID konta widać w nagłówku panelu.
+
 ## Następny krok
-1. **EUR go-live:** ustaw realny kurs w `/admin/ustawienia`; testowa sesja EUR (card+p24) na `/de`.
-2. **Podprojekt 3 (faktury KSeF)** — czeka na odpowiedź: z jakiego programu fakturowego korzysta księgowa (przesądza drogę); potem spec → plan → wdrożenie.
-3. **Reszta podprojektu 4 (wysyłka)** — termin dostawy, dane transportu, model kosztu.
+1. **Cutover P24** — kolejność wyżej, w sekcji „Gdzie stanęliśmy".
+2. **EUR/Niemcy poza zakresem** (decyzja 2026-07-29: „na razie płatności tylko na Polskę"). Kod rejestruje transakcję w EUR dla `/de`, więc dopóki PayPro nie ma rozliczeń EUR, niemiecki checkout online pokaże błąd po niemiecku (zamówienie zostaje `pending`, bez 500). Dostawa i tak jest tylko po Polsce (regulamin § 5), a za pobraniem na `/de` działa.
+4. **Podprojekt 3 (faktury KSeF)** — czeka na odpowiedź: z jakiego programu fakturowego korzysta księgowa (przesądza drogę); potem spec → plan → wdrożenie.
+5. **Reszta podprojektu 4 (wysyłka)** — termin dostawy, dane transportu, model kosztu.
 
 ## Drobne follow-upy (nieblokujące)
 - `schema.sql` jest niekompletnym baseline'em (pre-existing) — fresh-DB bootstrap z samego pliku byłby niepełny; źródłem prawdy są **migracje**.

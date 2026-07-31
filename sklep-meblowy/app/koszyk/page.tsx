@@ -52,7 +52,7 @@ export default function KoszykPage() {
   );
 
   // Koszt dostawy ustalany indywidualnie per zamówienie po kontakcie z klientem
-  // — meble różnią się wagą i gabarytami. Stripe pobiera tylko cenę produktów.
+  // — meble różnią się wagą i gabarytami. Płatność online pobiera tylko cenę produktów.
   const discount = appliedPromo?.discount ?? 0;
   const grandTotal = Math.max(0, total - bundleDiscount - discount);
 

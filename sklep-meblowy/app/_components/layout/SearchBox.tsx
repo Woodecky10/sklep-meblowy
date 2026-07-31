@@ -204,7 +204,6 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
               onClick={() => {
                 setValue("");
                 setSuggestions([]);
-                inputRef.current?.focus();
               }}
               aria-label={t.filter.clear}
               className="text-[var(--muted)] hover:text-[var(--fg)] text-xs shrink-0"

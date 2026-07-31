@@ -1,13 +1,11 @@
 import { NextResponse, after, type NextRequest } from "next/server";
-import type Stripe from "stripe";
-import { getStripe } from "@/app/_lib/stripe";
+import { registerTransaction, trnRequestUrl, type P24RegisterParams } from "@/app/_lib/p24";
 import { createClient, createAdminClient } from "@/app/_lib/supabase/server";
 import { createOrder } from "@/app/_lib/orders";
 import { notifyOrderPlaced } from "@/app/_lib/mail/notify-order";
 import { validatePromoCode, incrementPromoUsage } from "@/app/_lib/promo";
 import { isValidCodPhone } from "@/app/_lib/cod";
 import {
-  formatVariantLabel,
   hasVariants,
   isVariantSelectionComplete,
   sumValueSurcharges,
@@ -16,7 +14,6 @@ import type { Address, Product } from "@/app/_lib/types";
 import { getEurRate } from "@/app/_lib/store-settings";
 import { convertToEur } from "@/app/_lib/money";
 import { effectivePrice } from "@/app/_lib/pricing";
-import { getFabricDeMap } from "@/app/_lib/fabrics";
 import {
   groupBundleUnits,
   verifyBundleGroup,
@@ -28,12 +25,6 @@ import {
 // wysylka maila nie moze wisiec bez limitu. 30s jest w limicie Node
 // kazdego planu Vercela.
 export const maxDuration = 30;
-
-// stripe v22 re-eksportuje SessionCreateParams jako alias typu (bez
-// wewnętrznego namespace), więc .LineItem nie istnieje — indeksujemy typ.
-type LineItem = NonNullable<
-  Stripe.Checkout.SessionCreateParams["line_items"]
->[number];
 
 type CheckoutBody = {
   items: {
@@ -61,7 +52,6 @@ export async function POST(request: NextRequest) {
   let locale: "pl" | "de" = "pl";
   const tr = (pl: string, de: string) => (locale === "de" ? de : pl);
   try {
-    const stripe = getStripe();
     const body = (await request.json()) as CheckoutBody;
     locale = body.locale === "de" ? "de" : "pl";
 
@@ -71,7 +61,6 @@ export async function POST(request: NextRequest) {
     const rate = isDe ? await getEurRate() : 1;
     const currency: "pln" | "eur" = isDe ? "eur" : "pln";
     const toCharge = (pln: number) => (isDe ? convertToEur(pln, rate) : pln);
-    const fabricMap = isDe ? await getFabricDeMap() : {};
 
     if (!body.items?.length) {
       return NextResponse.json(
@@ -155,7 +144,6 @@ export async function POST(request: NextRequest) {
       bundle_id?: string | null;
       bundle_label?: string | null;
     }[] = [];
-    const stripeLineItems: LineItem[] = [];
     let total = 0;
 
     for (const item of body.items) {
@@ -174,7 +162,7 @@ export async function POST(request: NextRequest) {
 
       // Ilość z klienta — twarda walidacja (int 1..99). Bez tego ujemne /
       // ułamkowe / absurdalne ilości tworzyły zamówienia-śmieci w DB
-      // (service role) zanim Stripe cokolwiek zwalidował.
+      // (service role) zanim cokolwiek zostało zwalidowane.
       if (
         !Number.isInteger(item.quantity) ||
         item.quantity < 1 ||
@@ -229,20 +217,6 @@ export async function POST(request: NextRequest) {
         price: unitPrice,
         variant_values: variantValues,
         notes: item.notes?.trim() ? item.notes.trim().slice(0, 500) : null,
-      });
-
-      stripeLineItems.push({
-        quantity: item.quantity,
-        price_data: {
-          currency,
-          unit_amount: Math.round(toCharge(unitPrice) * 100),
-          product_data: {
-            name:
-              product.name +
-              (variantValues ? ` — ${formatVariantLabel(variantValues, locale, fabricMap)}` : ""),
-            images: product.images?.length ? [product.images[0]] : undefined,
-          },
-        },
       });
     }
 
@@ -331,11 +305,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Walidacja kodu rabatowego (autorytatywna — klient mógł zmienić cokolwiek).
-    // Discount stosujemy do total produktów (przed dostawą). Stripe dostaje
-    // dynamicznie utworzony Coupon zamiast modyfikacji line_items.
+    // Discount stosujemy do total produktów (przed dostawą). Rabat jest już
+    // zawarty w finalTotal — P24 dostaje tylko sumę końcową.
     let promoCodeId: string | null = null;
     let promoDiscount = 0;
-    let stripeCouponId: string | null = null;
 
     if (body.promoCode) {
       // Kod NIE obejmuje pozycji z zestawów — podstawą jest suma subtotali
@@ -357,42 +330,25 @@ export async function POST(request: NextRequest) {
       if (!promoResult.ok) {
         return NextResponse.json({ error: promoResult.error }, { status: 400 });
       }
-      promoCodeId = promoResult.promo.id;
-      promoDiscount = promoResult.discount;
-
-      // Reguła zerowania promo: gdy NASZA kwota rabatu zaokrągla się do 0 gr
-      // (np. 1% z 0,49 zł), nie tworzymy kuponu Stripe ANI nie wiążemy
-      // zamówienia z kodem — inaczej webhook spaliłby użycie kodu (used_count++)
-      // za rabat, którego klient nie dostał. Dotyczy tylko płatności online
-      // (amount_off=0 jest błędem Stripe); przy COD rabat z validatePromoCode
-      // zostaje bez zmian. Kupon Stripe (wspólny dla zestawów i kodu) składamy
-      // niżej, PO tej regule.
-      if (!isCod && Math.round(toCharge(promoDiscount) * 100) === 0) {
-        promoDiscount = 0;
-        promoCodeId = null;
-      }
-    }
-
-    // Wysyłka darmowa na terenie całej Polski — do Stripe idzie tylko cena
-    // produktów (minus rabaty), bez kosztu dostawy. Pole delivery_cost w panelu
-    // admina zostaje do rozliczeń wewnętrznych, ale klientowi nic nie doliczamy.
-    const finalTotal = toCharge(Math.max(0, total - bundleDiscount - promoDiscount));
-
-    // Jeden kupon Stripe na łączny rabat (zestawy + kod) — line_items idą w
-    // pełnych cenach, a amount_off jest NASZĄ kwotą (bez własnych zaokrągleń
-    // Stripe; ta sama kwota siedzi w orders.bundle_discount/promo_discount).
-    if (!isCod && bundleDiscount + promoDiscount > 0) {
-      const amountOffGr = Math.round(toCharge(bundleDiscount + promoDiscount) * 100);
+      // Rabat wiąże się z zamówieniem tylko gdy realnie obniża kwotę w groszach.
+      // Rabat zaokrąglony do 0 gr (np. 1% z 0,49 zł) nie wiąże kodu — inaczej
+      // used_count++ za rabat, którego klient nie dostał. Ta sama reguła dla
+      // P24 i pobrania (spójność: COD też nie pali użycia kodu za 0,00 zł).
+      const amountOffGr = Math.round(toCharge(promoResult.discount) * 100);
       if (amountOffGr > 0) {
-        const coupon = await stripe.coupons.create({
-          amount_off: amountOffGr,
-          currency,
-          duration: "once",
-          name: promoCodeId ? `Rabat (${body.promoCode})` : "Zestaw",
-        });
-        stripeCouponId = coupon.id;
+        promoCodeId = promoResult.promo.id;
+        promoDiscount = promoResult.discount;
       }
     }
+
+    // Wysyłka darmowa na terenie całej Polski — nie doliczamy kosztu dostawy.
+    // Do P24 idzie tylko cena produktów (minus rabaty: zestawy + kod). Pola
+    // delivery_cost / delivery_price w panelu admina zostają do rozliczeń
+    // wewnętrznych. Bez kuponów — P24 dostaje jedną kwotę końcową, a rozbicie
+    // rabatów siedzi w orders.bundle_discount / promo_discount.
+    const finalTotal = toCharge(
+      Math.max(0, total - bundleDiscount - promoDiscount)
+    );
 
     // Użytkownik zalogowany?
     const {
@@ -414,22 +370,17 @@ export async function POST(request: NextRequest) {
       paymentMethod: isCod ? "cod" : "online",
     });
 
-    // Stripe Checkout Session
     const origin =
       request.headers.get("origin") ??
       process.env.NEXT_PUBLIC_APP_URL ??
       "http://localhost:3000";
 
-    // Prefiks języka dla URL-i powrotnych — strony /checkout/* żyją pod /de/*
-    // dla locale "de" (proxy przepisuje /de/* na /*). Dla "pl" zostaje pusty,
-    // więc URL pozostaje oryginalny.
-    const localePrefix = locale === "de" ? "/de" : "";
-
-    // ── Pobranie: bez Stripe. Zamówienie już utworzone (status "processing"),
-    // klient płaci kurierowi. Promo inkrementujemy TERAZ (nie ma webhooka,
-    // który by to zrobił po płatności) — best-effort jak w webhooku,
-    // used_count to miękka statystyka.
+    // ── Pobranie: bez płatności online. Zamówienie już utworzone (status
+    // "processing"), klient płaci kurierowi. Promo inkrementujemy TERAZ —
+    // notyfikacja P24 (/api/p24/status) nigdy nie przyjdzie dla COD.
+    // Best-effort: used_count to miękka statystyka.
     if (isCod) {
+      const localePrefix = isDe ? "/de" : "";
       if (promoCodeId) {
         try {
           await incrementPromoUsage(promoCodeId);
@@ -449,24 +400,21 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      payment_method_types: isDe ? ["card", "p24"] : ["card", "blik", "p24"],
-      line_items: stripeLineItems,
-      customer_email: body.email,
-      success_url: `${origin}${localePrefix}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}${localePrefix}/checkout/cancel`,
-      metadata: { order_id: order.id },
-      locale: isDe ? "de" : "pl",
-      ...(stripeCouponId
-        ? { discounts: [{ coupon: stripeCouponId }] }
-        : {}),
-    });
+    // Rejestracja transakcji P24
+    const token = await registerTransaction(
+      buildP24RegisterParams({
+        orderId: order.id,
+        finalTotal,
+        isDe,
+        email: body.email,
+        origin,
+      })
+    );
 
-    return NextResponse.json({ url: session.url });
+    return NextResponse.json({ url: trnRequestUrl(token) });
   } catch (err) {
     // Szczegóły tylko do logów serwera — surowe err.message wyciekało
-    // wewnętrzne detale (Stripe/Supabase) do klienta.
+    // wewnętrzne detale (Supabase/P24) do klienta.
     console.error("Checkout error:", err);
     return NextResponse.json(
       {
@@ -478,4 +426,25 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export function buildP24RegisterParams(args: {
+  orderId: string;
+  finalTotal: number;
+  isDe: boolean;
+  email: string;
+  origin: string;
+}): P24RegisterParams {
+  const localePrefix = args.isDe ? "/de" : "";
+  return {
+    sessionId: args.orderId,
+    amount: Math.round(args.finalTotal * 100),
+    currency: args.isDe ? "EUR" : "PLN",
+    description: `Zamówienie ${args.orderId.slice(0, 8).toUpperCase()}`,
+    email: args.email,
+    country: args.isDe ? "DE" : "PL",
+    language: args.isDe ? "de" : "pl",
+    urlReturn: `${args.origin}${localePrefix}/checkout/success?order=${args.orderId}`,
+    urlStatus: `${args.origin}/api/p24/status`,
+  };
 }

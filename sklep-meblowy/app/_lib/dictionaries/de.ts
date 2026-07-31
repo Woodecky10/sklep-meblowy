@@ -147,7 +147,7 @@ export const de: DeepPartial<PlShape> = {
     deliveryNotice:
       "Der Versand innerhalb Polens ist kostenlos — wir berechnen keine Versandkosten.",
     deliveryNoticeLink: "Versanddetails",
-    trustPayment: "Sichere Zahlung mit Stripe",
+    trustPayment: "Sichere Zahlung mit Przelewy24",
     trustReturns: "Rückgabe innerhalb von 14 Tagen",
     trustWarranty: "2 Jahre Garantie",
     crossSellEyebrow: "Passend zum Warenkorb",
@@ -359,5 +359,6 @@ export const de: DeepPartial<PlShape> = {
     tagline:
       "Wir schaffen Räume, in denen man leben möchte. Möbel von höchster Qualität, mit Liebe zum Detail.",
     rightsReserved: "Alle Rechte vorbehalten.",
+    securePayments: "Sichere Zahlungen",
   },
 };

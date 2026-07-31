@@ -34,6 +34,8 @@ export default function UserMenuDropdown({
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label={t.nav.myAccount}
+        aria-haspopup="menu"
+        aria-expanded={open}
         className="hidden sm:inline-flex w-9 h-9 items-center justify-center rounded-full bg-[var(--color-navy)] text-white text-sm font-semibold hover:bg-[var(--color-gold)] transition-colors"
       >
         {initial}

@@ -266,8 +266,11 @@ export type Order = {
   currency: "pln" | "eur";
   fx_rate: number | null;
   shipping_address: Address;
-  stripe_payment_intent: string | null;
-  // Metoda płatności (migracja 45): online = Stripe, cod = za pobraniem.
+  stripe_payment_intent: string | null; // legacy (Stripe) — usuwane w migracji drop_stripe_payment_intent
+  payment_ref: string | null;
+  payment_provider: "stripe" | "p24" | null;
+  // Metoda płatności (migracja 45): online = płatność elektroniczna (P24),
+  // cod = za pobraniem u kuriera.
   payment_method: PaymentMethod;
   promo_code_id: string | null;
   promo_discount: number;
@@ -326,6 +329,8 @@ type OrderInsert = {
   shipping_address: Address;
   status?: OrderStatus;
   stripe_payment_intent?: string | null;
+  payment_ref?: string | null;
+  payment_provider?: "stripe" | "p24" | null;
 };
 
 type OrderItemInsert = {

@@ -17,7 +17,7 @@ export type CancelOrderResult =
 //
 // Stock i promo_codes.used_count nie są dotykane:
 // - Stock nie jest dekrementowany przy tworzeniu zamówienia w tym sklepie.
-// - used_count jest inkrementowany dopiero w Stripe webhook po opłaceniu —
+// - used_count jest inkrementowany dopiero w notyfikacji P24 po opłaceniu —
 //   więc dla pending order kupon NIE jest jeszcze policzony jako użyty.
 export async function cancelOrder(orderId: string): Promise<CancelOrderResult> {
   const de = (await getLocale()) === "de";

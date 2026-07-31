@@ -8,6 +8,7 @@ import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
 
 const VISIBLE_MS = 3500;
+const FADE_MS = 300;
 
 export default function CartToast() {
   const { notification, dismissNotification } = useCart();
@@ -28,7 +29,7 @@ export default function CartToast() {
     // i zdjęcie notyfikacji 300ms po zakończeniu fade-out.
     const showTimer = setTimeout(() => setVisible(true), 20);
     const hideTimer = setTimeout(() => setVisible(false), VISIBLE_MS);
-    const removeTimer = setTimeout(() => dismissNotification(), VISIBLE_MS + 300);
+    const removeTimer = setTimeout(() => dismissNotification(), VISIBLE_MS + FADE_MS);
     return () => {
       clearTimeout(showTimer);
       clearTimeout(hideTimer);
@@ -78,7 +79,7 @@ export default function CartToast() {
         <button
           onClick={() => {
             setVisible(false);
-            setTimeout(() => dismissNotification(), 300);
+            setTimeout(() => dismissNotification(), FADE_MS);
           }}
           aria-label={t.common.close}
           className="shrink-0 -mr-1 -mt-1 w-6 h-6 flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] transition-colors"

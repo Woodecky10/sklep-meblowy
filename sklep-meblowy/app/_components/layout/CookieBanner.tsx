@@ -21,6 +21,10 @@ export type CookieConsent = {
 const STORAGE_KEY = "mollien.cookie-consent";
 const CONSENT_VERSION = 1;
 
+// Wspólny styl przycisków wtórnych (Dostosuj/Zapisz/tylko niezbędne).
+const secondaryBtnClass =
+  "px-5 py-2.5 text-sm font-sans font-semibold uppercase tracking-wider rounded-full border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--fg)] transition-colors";
+
 export function getConsent(): CookieConsent | null {
   if (typeof window === "undefined") return null;
   try {
@@ -137,15 +141,12 @@ export default function CookieBanner() {
           <div className="flex flex-wrap gap-2 justify-end">
             {/* Jeden przycisk: przed rozwinięciem otwiera szczegóły, po
                 rozwinięciu zapisuje wybór niestandardowy (ten sam styl). */}
-            <button
-              onClick={onCustomizeOrSave}
-              className="px-5 py-2.5 text-sm font-sans font-semibold uppercase tracking-wider rounded-full border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--fg)] transition-colors"
-            >
+            <button onClick={onCustomizeOrSave} className={secondaryBtnClass}>
               {showDetails ? t.cookies.save : t.cookies.customize}
             </button>
             <button
               onClick={rejectAll}
-              className="px-5 py-2.5 text-sm font-sans font-semibold uppercase tracking-wider rounded-full border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--fg)] transition-colors"
+              className={secondaryBtnClass}
             >
               {t.cookies.onlyNecessary}
             </button>

@@ -54,7 +54,7 @@ export async function createOrder({
       payment_method: paymentMethod,
       // COD nie ma etapu płatności — od razu "processing" (przyjęte do
       // realizacji). Dzięki temu nie miesza się z porzuconymi "pending"
-      // (nieopłacone checkouty Stripe) i webhook Stripe go nie dotyczy.
+      // (nieopłacone checkouty online) i notyfikacja P24 go nie dotyczy.
       // Reguła TYLKO tu — caller nie przekazuje statusu.
       ...(paymentMethod === "cod" ? { status: "processing" } : {}),
     } as never)
@@ -94,16 +94,19 @@ export async function getUserOrders(userId: string) {
 
 export async function markOrderPaid(
   orderId: string,
-  paymentIntentId: string
+  paymentRef: string
 ): Promise<boolean> {
   const supabase = await createAdminClient();
   // CAS: aktualizuj TYLKO przy przejściu pending→paid. Zwraca true, jeśli TO
-  // wywołanie faktycznie przestawiło status — czyli wygrało wyścig równoległych
-  // duplikatów webhooka Stripe. Caller używa tego do JEDNOKROTNEGO incrementu
-  // used_count (bez tego dwa duplikaty liczyłyby ten sam kod podwójnie).
+  // wywołanie faktycznie przestawiło status — zwycięzca wyścigu duplikatów
+  // notyfikacji P24. Caller używa tego do JEDNOKROTNEGO incrementu used_count.
   const { data, error } = await supabase
     .from("orders")
-    .update({ stripe_payment_intent: paymentIntentId, status: "paid" } as never)
+    .update({
+      payment_ref: paymentRef,
+      payment_provider: "p24",
+      status: "paid",
+    } as never)
     .eq("id", orderId)
     .eq("status", "pending")
     .select("id");

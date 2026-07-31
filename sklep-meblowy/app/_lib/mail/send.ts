@@ -17,8 +17,8 @@ function redactEmail(address: string): string {
   return `${address[0]}***@${address.slice(at + 1)}`;
 }
 
-// Jedyne wyjście na świat. NIGDY nie rzuca — wywoływane z webhooka Stripe
-// (500 = ponowienie eventu) i z akcji admina (wyjątek = błąd w panelu).
+// Jedyne wyjście na świat. NIGDY nie rzuca — wywoływane z notyfikacji P24
+// (500 = ponowienie notyfikacji) i z akcji admina (wyjątek = błąd w panelu).
 // Zwraca true tylko gdy Resend przyjął wiadomość.
 export async function sendMail(payload: MailPayload): Promise<boolean> {
   const resend = getResend();

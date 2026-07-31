@@ -348,6 +348,7 @@ export type PlShape = {
     privacy: string;
     tagline: string;
     rightsReserved: string;
+    securePayments: string;
   };
 };
 
@@ -496,7 +497,7 @@ export const pl = {
     deliveryNotice:
       "Wysyłka jest darmowa na terenie całej Polski — nie doliczamy żadnych kosztów dostawy.",
     deliveryNoticeLink: "Szczegóły dostawy",
-    trustPayment: "Bezpieczna płatność Stripe",
+    trustPayment: "Bezpieczna płatność Przelewy24",
     trustReturns: "Zwrot do 14 dni",
     trustWarranty: "Gwarancja 2 lata",
     crossSellEyebrow: "Polecane do koszyka",
@@ -709,5 +710,6 @@ export const pl = {
     tagline:
       "Tworzymy przestrzenie, w których chce się żyć. Meble najwyższej jakości, z pasją do detalu.",
     rightsReserved: "Wszelkie prawa zastrzeżone.",
+    securePayments: "Bezpieczne płatności",
   },
 } as const;

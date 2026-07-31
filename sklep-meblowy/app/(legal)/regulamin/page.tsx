@@ -91,9 +91,12 @@ export default async function RegulaminPage() {
           "Der Kunde kann eine der im Shop verfügbaren Zahlungsmethoden wählen:",
         s4_3a: "Online-Zahlung mit Zahlungskarte,",
         s4_3b: "BLIK,",
-        s4_3c: "Sofortüberweisung (Przelewy24).",
+        s4_3c: "Sofortüberweisung (Przelewy24),",
+        s4_3d: "Nachnahme – Barzahlung beim Kurier bei der Lieferung.",
         s4_4:
           "Der Verkäufer stellt einen Kassenbon oder – auf in der Bestellung gemeldeten Wunsch des Kunden – eine Mehrwertsteuerrechnung aus.",
+        s4_5:
+          "Zahlungsdienstleister im Shop ist Przelewy24 (PayPro SA). Betreiber der Kartenzahlungen ist PayPro SA Agent Rozliczeniowy, ul. Pastelowa 8, 60-198 Poznań, eingetragen im Unternehmerregister des Landesgerichtsregisters (KRS) unter der Nummer KRS 0000347935, NIP 7792369887, REGON 301345068.",
 
         s5: "§ 5. Bestellabwicklung und Lieferung",
         s5_1:
@@ -217,9 +220,12 @@ export default async function RegulaminPage() {
         s4_3Intro: "Klient może wybrać jedną z dostępnych w Sklepie form płatności:",
         s4_3a: "płatność online kartą płatniczą,",
         s4_3b: "BLIK,",
-        s4_3c: "szybki przelew (Przelewy24).",
+        s4_3c: "szybki przelew (Przelewy24),",
+        s4_3d: "płatność za pobraniem — gotówką kurierowi przy odbiorze.",
         s4_4:
           "Sprzedawca wystawia paragon fiskalny lub – na życzenie Klienta zgłoszone w zamówieniu – fakturę VAT.",
+        s4_5:
+          "Operatorem płatności w Sklepie jest Przelewy24 (PayPro SA). Operatorem kart płatniczych jest PayPro SA Agent Rozliczeniowy, ul. Pastelowa 8, 60-198 Poznań, wpisany do Rejestru Przedsiębiorców Krajowego Rejestru Sądowego prowadzonego przez Sąd Rejonowy Poznań – Nowe Miasto i Wilda w Poznaniu, VIII Wydział Gospodarczy Krajowego Rejestru Sądowego pod numerem KRS 0000347935, NIP 7792369887, REGON 301345068.",
 
         s5: "§ 5. Realizacja zamówienia i dostawa",
         s5_1:
@@ -376,9 +382,11 @@ export default async function RegulaminPage() {
             <li>{c.s4_3a}</li>
             <li>{c.s4_3b}</li>
             <li>{c.s4_3c}</li>
+            <li>{c.s4_3d}</li>
           </ul>
         </li>
         <li>{c.s4_4}</li>
+        <li>{c.s4_5}</li>
       </ol>
 
       <h2>{c.s5}</h2>
