@@ -65,11 +65,25 @@ alter table public.collections
 -- i kolejność na stronie robi się przypadkowa (zależna od tego, co baza
 -- zwróci pierwsze). Numerujemy alfabetycznie, czyli zachowujemy kolejność
 -- obowiązującą przed migracją — wdrożenie nie zmienia nic, co widzi klient.
+--
+-- GUARD dopisany 2026-07-31 PO zaaplikowaniu tej migracji na produkcji
+-- (backfill już wykonany i zweryfikowany: 11 kolekcji, 11 różnych numerów).
+-- Projekt aplikuje migracje ręcznie i ma niepełny rejestr — plik może
+-- zostać odpalony ponownie. Bez guarda kolejne odpalenie bezwarunkowo
+-- nadpisze sort_order z powrotem na alfabetyczny, kasując bez ostrzeżenia
+-- ustawienia admina zrobione przeciąganiem w /admin/kolekcje (Task 3/4,
+-- funkcja reorder_collections). Guard: backfill działa tylko, gdy żadna
+-- kolekcja nie ma jeszcze niezerowego sort_order, czyli tylko przy
+-- pierwszym uruchomieniu na świeżej bazie.
 update public.collections c
 set sort_order = t.rn
 from (select id, (row_number() over (order by label)) - 1 as rn
       from public.collections) t
-where c.id = t.id;
+where c.id = t.id
+  -- GUARD: tylko gdy kolejność nie jest jeszcze ustawiona
+  and not exists (
+    select 1 from public.collections where sort_order <> 0
+  );
 
 -- Atomowy reorder jedną instrukcją — jak reorder_home_tiles z migracji 28.
 -- Pętla UPDATE po jednym wierszu przy padzie w połowie zostawia kolekcje
@@ -139,7 +153,7 @@ Expected: 0 błędów. `getAllCollections` robi `select("*")`, więc nowe pola d
 - [ ] **Step 6: Commit**
 
 ```bash
-git add supabase/migrations/66_collections_order_and_home_flag.sql sklep-meblowy/app/_lib/types.ts
+git add sklep-meblowy/supabase/migrations/66_collections_order_and_home_flag.sql sklep-meblowy/app/_lib/types.ts
 git commit -m "feat(kolekcje): sort_order i show_on_home + atomowy reorder (migracja 66)"
 ```
 

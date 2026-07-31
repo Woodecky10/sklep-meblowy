@@ -41,11 +41,19 @@ alter table public.collections
   add column if not exists show_on_home boolean not null default true;
 
 -- Backfill kolejnością alfabetyczną, czyli tą, która obowiązuje dziś.
+-- GUARD (dopisany po zaaplikowaniu na produkcji 2026-07-31): backfill
+-- działa tylko, gdy żadna kolekcja nie ma jeszcze niezerowego sort_order.
+-- Bez tego powtórne odpalenie pliku (projekt aplikuje migracje ręcznie,
+-- rejestr bywa niepełny) nadpisałoby kolejność ustawioną przeciąganiem
+-- w /admin/kolekcje z powrotem na alfabetyczną.
 update public.collections c
 set sort_order = t.rn
 from (select id, (row_number() over (order by label)) - 1 as rn
       from public.collections) t
-where c.id = t.id;
+where c.id = t.id
+  and not exists (
+    select 1 from public.collections where sort_order <> 0
+  );
 
 -- Atomowy reorder — jak reorder_home_tiles z migracji 28.
 create or replace function public.reorder_collections(p_ids uuid[])
