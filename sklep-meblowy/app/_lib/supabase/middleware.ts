@@ -1,12 +1,32 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { localizePath, stripLocale } from "../i18n";
+import { frozenDeRedirectPath, localizePath, stripLocale } from "../i18n";
 import { buildCsp } from "../csp";
 
 export async function updateSession(request: NextRequest) {
   // Rozbij ścieżkę na locale + ścieżkę bez prefiksu '/de'.
   // localePath = realna trasa appki (np. '/de/konto' → '/konto').
   const { locale, pathname: localePath } = stripLocale(request.nextUrl.pathname);
+
+  // ⏸ DE zamrożone (DE_ENABLED w i18n.ts) — każde '/de/...' wraca na odpowiednik
+  // PL, z zachowaniem ścieżki i query. Ścieżkę zachowujemy, bo '/de/sklep' →
+  // '/sklep' zostawia użytkownika tam, gdzie chciał być; '/de/sklep' → '/'
+  // wyrzucałoby go na home bez powodu. Prefiks '/de' zawsze jest przepisaniem
+  // istniejącej trasy PL, więc cel redirectu zawsze istnieje.
+  //
+  // 307, NIE 301: to zamrożenie, nie usunięcie. 301 zostaje w cache przeglądarki
+  // i w indeksie Google na długo po odmrożeniu, więc niemieckie URL-e byłyby
+  // martwe jeszcze długo po przywróceniu flagi.
+  //
+  // Świadomie PRZED obsługą sesji Supabase: getUser() to zbędny round-trip dla
+  // odpowiedzi, która i tak nic nie renderuje. Sesja odświeży się na docelowym
+  // żądaniu PL.
+  const frozenDeTarget = frozenDeRedirectPath(request.nextUrl.pathname);
+  if (frozenDeTarget) {
+    const url = request.nextUrl.clone();
+    url.pathname = frozenDeTarget;
+    return NextResponse.redirect(url, 307);
+  }
 
   // Nagłówek x-locale ląduje na requeście do server components (getLocale() go czyta).
   // Musi być w KAŻDYM NextResponse.next, który niesie request — i w initial, i w rebuildzie z setAll.

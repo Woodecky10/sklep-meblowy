@@ -1,4 +1,4 @@
-import { localizePath } from "./i18n";
+import { DE_ENABLED, localizePath } from "./i18n";
 
 // Czyste helpery hreflang/alternates dla SEO i18n PL/DE.
 //
@@ -16,6 +16,19 @@ export type HreflangMap = { languages: Record<string, string> };
 //   alternatesFor("/produkt/abc", { hasDe: false })
 //     → { languages: { pl: "/produkt/abc", "x-default": "/produkt/abc" } }  (brak de)
 export function alternatesFor(
+  plPath: string,
+  opts: { hasDe: boolean }
+): HreflangMap {
+  // ⏸ Zamrożenie DE przechodzi TĘDY, a nie po wywołaniach. Sześć stron i
+  // sitemapa wołają `alternatesFor` — gdyby flagę sprawdzać u nich, nowa strona
+  // dodana w przyszłości ogłosiłaby `de` mimo zamrożenia.
+  return buildAlternates(plPath, { hasDe: DE_ENABLED && opts.hasDe });
+}
+
+// Czysta postać mapy, bez oglądania się na `DE_ENABLED` — trzymana osobno,
+// żeby testy „jak hreflang ma wyglądać po odmrożeniu" nie zniknęły razem
+// z zamrożeniem. Do wołania z produkcyjnego kodu jest `alternatesFor`.
+export function buildAlternates(
   plPath: string,
   opts: { hasDe: boolean }
 ): HreflangMap {

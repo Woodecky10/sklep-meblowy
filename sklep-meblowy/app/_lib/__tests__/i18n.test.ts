@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { stripLocale, localizePath, pickLocalized, isLocale, localizeHref } from "@/app/_lib/i18n";
+import {
+  stripLocale,
+  localizePath,
+  pickLocalized,
+  isLocale,
+  localizeHref,
+  frozenDeRedirectPath,
+  DE_ENABLED,
+} from "@/app/_lib/i18n";
 
 describe("i18n helpery", () => {
   it("isLocale", () => {
@@ -42,5 +50,35 @@ describe("i18n helpery", () => {
     expect(localizeHref("https://x.com", "de")).toBe("https://x.com");
     expect(localizeHref("#sekcja", "de")).toBe("#sekcja");
     expect(localizeHref("mailto:a@b.pl", "de")).toBe("mailto:a@b.pl");
+  });
+});
+
+// Zamrożenie wersji niemieckiej (DE_ENABLED w i18n.ts). Testy są napisane pod
+// AKTUALNĄ wartość flagi, żeby po odmrożeniu wywaliły się i wymusiły przegląd
+// tych oczekiwań, zamiast cicho przepuścić stary stan.
+describe("frozenDeRedirectPath — zamrożenie DE", () => {
+  it("flaga jest wyłączona (sprzedaż tylko PL, brak niemieckiego NIP)", () => {
+    expect(DE_ENABLED).toBe(false);
+  });
+
+  it("/de/... → odpowiednik PL z zachowaną ścieżką", () => {
+    expect(frozenDeRedirectPath("/de/sklep")).toBe("/sklep");
+    expect(frozenDeRedirectPath("/de/produkt/abc")).toBe("/produkt/abc");
+    expect(frozenDeRedirectPath("/de/tkaniny/nova")).toBe("/tkaniny/nova");
+  });
+
+  it("samo /de → korzeń", () => {
+    expect(frozenDeRedirectPath("/de")).toBe("/");
+  });
+
+  it("ścieżki PL nie są przekierowywane", () => {
+    expect(frozenDeRedirectPath("/sklep")).toBeNull();
+    expect(frozenDeRedirectPath("/")).toBeNull();
+  });
+
+  it("NIE łapie ścieżek zaczynających się na 'de' bez granicy segmentu", () => {
+    // Regresja: naiwne startsWith('/de') przekierowałoby '/depilacja' → '/pilacja'.
+    expect(frozenDeRedirectPath("/depilacja")).toBeNull();
+    expect(frozenDeRedirectPath("/dekoracje")).toBeNull();
   });
 });

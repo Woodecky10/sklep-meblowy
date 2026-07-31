@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { LOCALES, stripLocale, localizePath, type Locale } from "@/app/_lib/i18n";
+import { DE_ENABLED, LOCALES, stripLocale, localizePath, type Locale } from "@/app/_lib/i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 
 const LABELS: Record<Locale, string> = { pl: "PL", de: "DE" };
@@ -19,6 +19,12 @@ export default function LanguageSwitcher({ className = "" }: { className?: strin
 
   const query = searchParams?.toString() ?? "";
   const suffix = query ? `?${query}` : "";
+
+  // ⏸ DE zamrożone (DE_ENABLED w i18n.ts) → jeden język, nie ma czego
+  // przełączać. Ukrywamy tutaj, a nie usuwamy użycia z TopBar/MobileMenu,
+  // żeby odmrożenie było zmianą jednej wartości, a nie przywracaniem kodu.
+  // Warunek PO hookach — wcześniejszy return łamałby Rules of Hooks.
+  if (!DE_ENABLED) return null;
 
   return (
     <div className={`flex items-center gap-1 text-xs font-sans ${className}`} aria-label={t.a11y.language}>
