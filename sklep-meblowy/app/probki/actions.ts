@@ -5,7 +5,12 @@
 // reference_turbopack_use_server_export_type). Funkcje pomocnicze bez `export`
 // są w porządku.
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { createClient } from "@/app/_lib/supabase/server";
+import {
+  notifyAdminNewSampleOrder,
+  notifyCustomerSampleOrder,
+} from "@/app/_lib/mail/sample-notify";
 import { createSampleOrder } from "@/app/_lib/samples";
 import { buildSampleP24Params } from "@/app/_lib/sample-p24";
 import { registerTransaction, trnRequestUrl } from "@/app/_lib/p24";
@@ -93,6 +98,16 @@ export async function submitSampleOrder(formData: FormData): Promise<ActionResul
 
   // Zamówienie darmowe kończy się tutaj — bramka płatności się nie pojawia.
   if (created.amountTotal <= 0) {
+    // Maile TYLKO na tej gałęzi. Zamówienie płatne dostaje potwierdzenie
+    // dopiero po rozliczeniu notyfikacji P24 (app/api/p24/probki-status) —
+    // nie dziękujemy za zamówienie, które klient może porzucić przed bramką.
+    // after(): wysyłka jest POST-response, żeby zawieszony Resend nie trzymał
+    // klienta na spinnerze. Obie funkcje nigdy nie rzucają, więc `await`
+    // w środku jest bezpieczny i druga zawsze dojdzie do skutku.
+    after(async () => {
+      await notifyCustomerSampleOrder(created.orderId);
+      await notifyAdminNewSampleOrder(created.orderId);
+    });
     return { ok: true, data: { orderId: created.orderId, redirectUrl: null } };
   }
 

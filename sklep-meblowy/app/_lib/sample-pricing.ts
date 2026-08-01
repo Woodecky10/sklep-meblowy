@@ -55,6 +55,16 @@ export function sampleOrderTotal(paidCount: number): number {
   return Math.max(0, paidCount) * SAMPLE_UNIT_PRICE;
 }
 
+// Skrócony identyfikator zamówienia — to, co klient i właścicielka podają sobie
+// w rozmowie („zamówienie A1B2C3D4"). `sample_orders` nie ma czytelnego numeru
+// jak `orders.order_number` (migracja 67), więc jedynym identyfikatorem jest
+// uuid, a cały uuid w mailu jest nie do przeczytania i nie do podyktowania.
+// Kształt musi być IDENTYCZNY z tym, co pokazuje /probki/sukces — inaczej klient
+// dostałby w mailu inny numer niż na ekranie po zapłacie.
+export function shortSampleOrderRef(id: string): string {
+  return id.slice(0, 8).toUpperCase();
+}
+
 // Ten sam kolor tej samej tkaniny to jedna próbka; dwa kolory tej samej
 // tkaniny to dwie osobne próbki (każda liczy się do puli i do ceny).
 export function dedupeSelections(items: SampleSelection[]): SampleSelection[] {

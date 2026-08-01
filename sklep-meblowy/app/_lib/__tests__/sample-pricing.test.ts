@@ -6,6 +6,7 @@ import {
   splitFreePaid,
   sampleOrderTotal,
   dedupeSelections,
+  shortSampleOrderRef,
 } from "../sample-pricing";
 
 describe("normalizeEmailKey", () => {
@@ -39,6 +40,20 @@ describe("normalizeEmailKey", () => {
   it("nie wysypuje się na tekście bez @", () => {
     expect(normalizeEmailKey("  JanKowalski ")).toBe("jankowalski");
     expect(normalizeEmailKey("")).toBe("");
+  });
+});
+
+describe("shortSampleOrderRef", () => {
+  it("daje pierwsze 8 znaków uuid wersalikami — tak samo jak /probki/sukces", () => {
+    // ⚠️ Kształt MUSI się zgadzać ze stroną powrotu (order.id.slice(0, 8)
+    // .toUpperCase()), inaczej klient dostałby w mailu inny numer niż na
+    // ekranie po zapłacie i nie miałby czego podać przy reklamacji.
+    expect(shortSampleOrderRef("a1b2c3d4-1111-2222-3333-444455556666")).toBe("A1B2C3D4");
+  });
+
+  it("nie wywraca się na krótszym identyfikatorze", () => {
+    expect(shortSampleOrderRef("abc")).toBe("ABC");
+    expect(shortSampleOrderRef("")).toBe("");
   });
 });
 

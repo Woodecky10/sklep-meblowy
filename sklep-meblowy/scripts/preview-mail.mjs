@@ -12,6 +12,9 @@ import { OrderCancelled } from "../app/_lib/mail/templates/OrderCancelled.tsx";
 import { AdminNewOrder } from "../app/_lib/mail/templates/AdminNewOrder.tsx";
 import { AuthConfirm } from "../app/_lib/mail/templates/AuthConfirm.tsx";
 import { PasswordReset } from "../app/_lib/mail/templates/PasswordReset.tsx";
+import { AdminNewSampleOrder } from "../app/_lib/mail/templates/AdminNewSampleOrder.tsx";
+import { SampleOrderConfirmation } from "../app/_lib/mail/templates/SampleOrderConfirmation.tsx";
+import { SampleOrderSent } from "../app/_lib/mail/templates/SampleOrderSent.tsx";
 import { wasOrderPaid } from "../app/_lib/mail/status-notify.ts";
 
 const OUT = "mail-preview";
@@ -91,6 +94,50 @@ const orderDe = {
 // tego z prawdziwym namierzeniem klienta.
 const FAKE_CUSTOMER_EMAIL = "jan.kowalski@example.com";
 const ADMIN_URL = "http://localhost:3000/admin/zamowienia/" + order.id;
+
+// ── Próbki tkanin ────────────────────────────────────────────────────────
+// Trzy gratisy w oknie 12 miesięcy, każda kolejna 15 zł, dostawa zawsze 0 zł.
+// Fikstura celowo MIESZANA (3 gratis + 1 płatna): tylko taka pokazuje naraz
+// wiersz „gratis" i wiersz z ceną, więc kwota 15 zł musi się zgadzać z listą.
+const sampleOrder = {
+  id: "a1b2c3d4-1111-2222-3333-444455556666",
+  customer_name: "Anna Kowalska",
+  customer_email: FAKE_CUSTOMER_EMAIL,
+  customer_phone: "+48 600 700 800",
+  shipping_address: {
+    fullname: "Anna Kowalska",
+    street: "Kwiatowa 12/3",
+    postal_code: "61-001",
+    city: "Poznań",
+  },
+  status: "new",
+  payment_status: "paid",
+  amount_total: 15,
+  free_count: 3,
+  paid_count: 1,
+  tracking: null,
+};
+
+const sampleItems = [
+  { id: "s1", fabric_name: "Riviera", color: "16", is_free: true, unit_price: 0 },
+  { id: "s2", fabric_name: "Astoria", color: "05", is_free: true, unit_price: 0 },
+  { id: "s3", fabric_name: "Montes", color: "12", is_free: true, unit_price: 0 },
+  { id: "s4", fabric_name: "Velvet", color: "21", is_free: false, unit_price: 15 },
+];
+
+// Wariant w całości z darmowej puli: payment_status "none" i zero złotych —
+// zamówienie, które NIGDY nie widziało bramki płatności.
+const sampleOrderFree = {
+  ...sampleOrder,
+  payment_status: "none",
+  amount_total: 0,
+  free_count: 3,
+  paid_count: 0,
+};
+const sampleItemsFree = sampleItems.slice(0, 3);
+
+const SAMPLE_ORDER_URL = "https://www.mollien.pl/probki/sukces?zamowienie=" + sampleOrder.id;
+const SAMPLE_SHOP_URL = "https://www.mollien.pl/sklep";
 
 const cases = [
   {
@@ -203,6 +250,63 @@ const cases = [
       // recovery; bez niej /reset-hasla nie ma czym zapisać nowego hasła.
       resetUrl:
         "{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/reset-hasla",
+    }),
+  },
+  {
+    name: "sample-admin-new",
+    el: AdminNewSampleOrder({
+      order: sampleOrder,
+      items: sampleItems,
+      branding,
+      adminUrl: "http://localhost:3000/admin/probki",
+    }),
+  },
+  {
+    // Ten sam mail dla zamówienia bez ani jednej złotówki — inna linia kwoty.
+    name: "sample-admin-new-free",
+    el: AdminNewSampleOrder({
+      order: sampleOrderFree,
+      items: sampleItemsFree,
+      branding,
+      adminUrl: "http://localhost:3000/admin/probki",
+    }),
+  },
+  {
+    name: "sample-confirmation-paid",
+    el: SampleOrderConfirmation({
+      order: sampleOrder,
+      items: sampleItems,
+      branding,
+      orderUrl: SAMPLE_ORDER_URL,
+    }),
+  },
+  {
+    name: "sample-confirmation-free",
+    el: SampleOrderConfirmation({
+      order: sampleOrderFree,
+      items: sampleItemsFree,
+      branding,
+      orderUrl: SAMPLE_ORDER_URL,
+    }),
+  },
+  {
+    name: "sample-sent-tracking",
+    el: SampleOrderSent({
+      order: { ...sampleOrder, status: "sent", tracking: "00259007730000123456" },
+      items: sampleItems,
+      branding,
+      shopUrl: SAMPLE_SHOP_URL,
+    }),
+  },
+  {
+    // ⚠️ Wariant BEZ numeru nadania jest tym częstszym: próbki jadą zwykłą
+    // kopertą listową. Musi się renderować bez pustej etykiety „Numer nadania".
+    name: "sample-sent-no-tracking",
+    el: SampleOrderSent({
+      order: { ...sampleOrder, status: "sent", tracking: "" },
+      items: sampleItems,
+      branding,
+      shopUrl: SAMPLE_SHOP_URL,
     }),
   },
 ];

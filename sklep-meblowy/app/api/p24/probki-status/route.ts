@@ -1,4 +1,8 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
+import {
+  notifyAdminNewSampleOrder,
+  notifyCustomerSampleOrder,
+} from "@/app/_lib/mail/sample-notify";
 import { getP24Config, verifyTransaction } from "@/app/_lib/p24";
 import { isValidNotification, type P24Notification } from "@/app/_lib/p24-events";
 import { markSampleOrderPaid } from "@/app/_lib/samples";
@@ -157,6 +161,10 @@ export async function POST(request: NextRequest) {
     // otwarte, a P24 ponawia, dopóki nie dostanie 200 — wolny mail wyglądałby
     // jak nieudana notyfikacja mimo rozliczonego zamówienia. Funkcja wysyłająca
     // nie może rzucać, żeby nieudany mail nie zamienił się w 500.
+    after(async () => {
+      await notifyCustomerSampleOrder(orderId);
+      await notifyAdminNewSampleOrder(orderId);
+    });
   }
 
   return NextResponse.json({ received: true });

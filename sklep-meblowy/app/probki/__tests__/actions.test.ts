@@ -9,6 +9,31 @@ let sessionUser: { id: string; email?: string } | null = null;
 
 const createSampleOrderMock = vi.fn();
 const registerTransactionMock = vi.fn();
+const notifyCustomerMock = vi.fn();
+const notifyAdminMock = vi.fn();
+
+// `after` poza kontekstem żądania RZUCA (next/dist/server/after/after.js).
+// Kolejkujemy zadania zamiast je gubić — dzięki temu widać, czy akcja w ogóle
+// zaplanowała maile, a nie tylko czy się nie wywaliła.
+const afterTasks: (() => unknown)[] = [];
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return {
+    ...actual,
+    after: (task: () => unknown) => {
+      afterTasks.push(task);
+    },
+  };
+});
+
+async function runAfterTasks() {
+  for (const task of afterTasks) await task();
+}
+
+vi.mock("@/app/_lib/mail/sample-notify", () => ({
+  notifyCustomerSampleOrder: (...args: unknown[]) => notifyCustomerMock(...args),
+  notifyAdminNewSampleOrder: (...args: unknown[]) => notifyAdminMock(...args),
+}));
 
 vi.mock("@/app/_lib/supabase/server", () => ({
   createClient: async () => ({
@@ -44,6 +69,7 @@ function formData(overrides: Record<string, string> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  afterTasks.length = 0;
   vi.spyOn(console, "error").mockImplementation(() => {});
   sessionUser = { id: "user-1", email: "klient@example.com" };
   createSampleOrderMock.mockResolvedValue({
@@ -186,5 +212,59 @@ describe("submitSampleOrder — rozwidlenie na kwocie", () => {
 
     expect(res.ok).toBe(false);
     expect((res as { data?: unknown }).data).toBeUndefined();
+  });
+});
+
+describe("submitSampleOrder — maile", () => {
+  it("zamówienie darmowe mailuje od razu (nie ma płatności, na którą można czekać)", async () => {
+    await submitSampleOrder(formData());
+    await runAfterTasks();
+
+    expect(notifyCustomerMock).toHaveBeenCalledWith("ord-1");
+    expect(notifyAdminMock).toHaveBeenCalledWith("ord-1");
+  });
+
+  it("⚠️ zamówienie PŁATNE nie dostaje potwierdzenia przy składaniu", async () => {
+    // Potwierdzenie wychodzi dopiero z /api/p24/probki-status, po rozliczeniu.
+    // Inaczej klient, który porzucił bramkę, dostałby „dziękujemy za zamówienie"
+    // za coś, czego nigdy nie opłacił i czego nie wyślemy.
+    createSampleOrderMock.mockResolvedValue({
+      orderId: "ord-2",
+      amountTotal: 30,
+      freeCount: 3,
+      paidCount: 2,
+    });
+
+    await submitSampleOrder(formData());
+    await runAfterTasks();
+
+    expect(afterTasks).toHaveLength(0);
+    expect(notifyCustomerMock).not.toHaveBeenCalled();
+    expect(notifyAdminMock).not.toHaveBeenCalled();
+  });
+
+  it("padnięta rejestracja P24 też nie mailuje (zamówienie czeka nieopłacone)", async () => {
+    createSampleOrderMock.mockResolvedValue({
+      orderId: "ord-3",
+      amountTotal: 15,
+      freeCount: 0,
+      paidCount: 1,
+    });
+    registerTransactionMock.mockRejectedValue(new Error("P24 register nieudany (500)"));
+
+    await submitSampleOrder(formData());
+    await runAfterTasks();
+
+    expect(notifyCustomerMock).not.toHaveBeenCalled();
+  });
+
+  it("nieudane zamówienie nie mailuje w ogóle", async () => {
+    createSampleOrderMock.mockRejectedValue(new Error("Nie udało się sprawdzić puli: boom"));
+
+    await submitSampleOrder(formData());
+    await runAfterTasks();
+
+    expect(notifyCustomerMock).not.toHaveBeenCalled();
+    expect(notifyAdminMock).not.toHaveBeenCalled();
   });
 });

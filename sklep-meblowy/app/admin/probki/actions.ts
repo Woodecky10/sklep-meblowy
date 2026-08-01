@@ -9,7 +9,9 @@
 // wysypują się pod Turbopackiem na ReferenceError).
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { requireAdmin } from "@/app/_lib/admin";
+import { notifyCustomerSampleSent } from "@/app/_lib/mail/sample-notify";
 import {
   cancelSampleOrder,
   getSampleOrderById,
@@ -86,7 +88,15 @@ export async function markSampleSent(formData: FormData): Promise<ActionResult> 
   const tracking = String(formData.get("tracking") ?? "").trim();
   if (!id) return { ok: false, error: "Brak identyfikatora zamówienia" };
 
-  const blocked = await guardStatusChange(id, "wysłać");
+  // ⚠️ „Wysłane" BLOKUJE ponowne wysłanie. Bez tego przejście sent → sent
+  // przechodzi, a druga, nieodświeżona karta panelu wciąż pokazuje formularz
+  // „Wysłane" z PUSTYM polem numeru nadania: kliknięcie przestawiłoby `sent_at`
+  // na „teraz" i nadpisało numer nadania pustym stringiem — czyli skasowało
+  // dokładnie tę informację, którą karta ma pokazywać. Przy okazji klient
+  // dostałby DRUGI raz maila „próbki wysłane", tym razem bez numeru.
+  // Nic legalnego to nie ubija: korekty numeru nadania panel świadomie nie
+  // oferuje (osobny follow-up), a markSamplePacked ma już taką samą blokadę.
+  const blocked = await guardStatusChange(id, "wysłać", ["sent"]);
   if (blocked) {
     revalidatePath(PANEL_PATH);
     return blocked;
@@ -109,7 +119,16 @@ export async function markSampleSent(formData: FormData): Promise<ActionResult> 
   // snapshotu zamówienia — `getSampleOrderById(id)` — a nie z sesji.
   // ⚠️ Funkcja powiadamiająca NIE MOŻE rzucać: padnięty Resend nie może
   // cofnąć właścicielce oznaczenia paczki jako wysłanej.
+  //
+  // after(): wysyłka jest POST-response i nie może opóźnić ani zepsuć tej
+  // akcji — zawieszony Resend blokowałby panel, aż platforma przerwałaby
+  // żądanie, a właścicielka zobaczyłaby „błąd" dla wysyłki, która jest już
+  // zapisana. Ten plik ma "use server" na poziomie modułu, więc to Server
+  // Function — jedno z miejsc, w których `after` wolno użyć (Next 16, after.md).
+  // Numer nadania i adres klienta funkcja bierze ze świeżego snapshotu
+  // zamówienia, nie z tego formularza.
   // ────────────────────────────────────────────────────────────────────────
+  after(() => notifyCustomerSampleSent(id));
 
   revalidatePath(PANEL_PATH);
   return { ok: true, message: "Oznaczono jako wysłane" };

@@ -18,6 +18,33 @@ vi.stubEnv("P24_BASE_URL", "https://sandbox.przelewy24.pl");
 const maybeSingleMock = vi.fn();
 const markSampleOrderPaidMock = vi.fn();
 const verifyTransactionMock = vi.fn();
+const notifyCustomerMock = vi.fn();
+const notifyAdminMock = vi.fn();
+
+// `after` poza kontekstem żądania RZUCA (next/dist/server/after/after.js), więc
+// bez tej atrapy każdy test wołający POST wywracałby się na wysyłce maila.
+// Zadania kolejkujemy zamiast je gubić: to jedyny sposób, żeby sprawdzić, CO
+// handler zaplanował po odpowiedzi — a to właśnie tam siedzi reguła „mail tylko
+// przy pierwszym rozliczeniu".
+const afterTasks: (() => unknown)[] = [];
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return {
+    ...actual,
+    after: (task: () => unknown) => {
+      afterTasks.push(task);
+    },
+  };
+});
+
+async function runAfterTasks() {
+  for (const task of afterTasks) await task();
+}
+
+vi.mock("@/app/_lib/mail/sample-notify", () => ({
+  notifyCustomerSampleOrder: (...args: unknown[]) => notifyCustomerMock(...args),
+  notifyAdminNewSampleOrder: (...args: unknown[]) => notifyAdminMock(...args),
+}));
 // Co i skąd handler czyta — sprawdzamy wprost, bo rozliczenie NIE MOŻE
 // przechodzić przez getSampleOrderById (helper połyka błąd odczytu).
 const queries: { table: string; columns: string; id: unknown }[] = [];
@@ -90,6 +117,7 @@ function row(over: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   queries.length = 0;
+  afterTasks.length = 0;
   vi.spyOn(console, "error").mockImplementation(() => {});
   maybeSingleMock.mockResolvedValue(row());
   markSampleOrderPaidMock.mockResolvedValue(true);
@@ -252,5 +280,58 @@ describe("POST /api/p24/probki-status — verify i zapis", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ received: true });
+  });
+});
+
+// Potwierdzenie zamówienia PŁATNEGO wychodzi wyłącznie stąd — akcja składająca
+// zamówienie mailuje tylko darmowe (nie dziękujemy za porzuconą bramkę).
+describe("POST /api/p24/probki-status — maile", () => {
+  it("pierwsze rozliczenie planuje potwierdzenie dla klienta i powiadomienie właścicielki", async () => {
+    await post(notification());
+    await runAfterTasks();
+
+    expect(notifyCustomerMock).toHaveBeenCalledWith("ord-1");
+    expect(notifyAdminMock).toHaveBeenCalledWith("ord-1");
+  });
+
+  it("PONOWIONA notyfikacja nie wysyła potwierdzenia drugi raz", async () => {
+    // ⚠️ Sedno: P24 ponawia notyfikację, dopóki nie dostanie 200. Gdyby mail
+    // szedł poza zwycięzcą CAS-a, klient dostałby „dziękujemy" kilka razy.
+    markSampleOrderPaidMock.mockResolvedValue(false);
+
+    await post(notification());
+    await runAfterTasks();
+
+    expect(afterTasks).toHaveLength(0);
+    expect(notifyCustomerMock).not.toHaveBeenCalled();
+    expect(notifyAdminMock).not.toHaveBeenCalled();
+  });
+
+  it("ponowienie odbite na dedupie (payment_status już 'paid') też nie mailuje", async () => {
+    maybeSingleMock.mockResolvedValue(row({ payment_status: "paid" }));
+
+    await post(notification());
+    await runAfterTasks();
+
+    expect(notifyCustomerMock).not.toHaveBeenCalled();
+  });
+
+  it("za ANULOWANE zamówienie nie dziękujemy — payment_ref tak, mail nie", async () => {
+    maybeSingleMock.mockResolvedValue(row({ status: "cancelled" }));
+
+    await post(notification());
+    await runAfterTasks();
+
+    expect(markSampleOrderPaidMock).toHaveBeenCalledWith("ord-1", "987654");
+    expect(notifyCustomerMock).not.toHaveBeenCalled();
+    expect(notifyAdminMock).not.toHaveBeenCalled();
+  });
+
+  it("niezgodna kwota nie planuje żadnego maila", async () => {
+    const res = await post(notification({ amount: 15 }));
+    await runAfterTasks();
+
+    expect(res.status).toBe(200);
+    expect(notifyCustomerMock).not.toHaveBeenCalled();
   });
 });
