@@ -185,3 +185,59 @@ export async function saveCollection(
   revalidatePath("/sklep");
   return { ok: true, message: "Kolekcja zapisana" };
 }
+
+// ============================================================
+// Kolejność na stronie głównej (spec 2026-07-31)
+// ============================================================
+// Atomowy reorder przez RPC — pętla UPDATE po jednym wierszu przy padzie
+// w połowie zostawia kolekcje z pomieszanymi numerami (jak reorderTiles).
+export async function reorderCollections(
+  order: { id: string; sort_order: number }[]
+): Promise<ActionResult> {
+  await requireAdmin();
+
+  if (!Array.isArray(order) || order.length === 0) {
+    return { ok: false, error: "Pusta lista kolejności" };
+  }
+
+  const supabase = await createAdminClient();
+  const { error } = await supabase.rpc("reorder_collections", {
+    p_ids: order.map((o) => o.id).filter(Boolean),
+  });
+  if (error) return { ok: false, error: `Reorder zawiódł: ${error.message}` };
+
+  invalidateCollectionsCache();
+  revalidatePath("/admin/kolekcje");
+  revalidatePath("/");
+  return { ok: true, message: "Kolejność zapisana" };
+}
+
+// Ptaszek "pokazuj na stronie głównej" — zapis od razu, osobno od formularza
+// edycji. Metadane kolekcji idą przez save_collection(uuid,text,text,uuid[])
+// o ustalonej sygnaturze; dopisanie tam pola wymagałoby zmiany funkcji
+// używanej też przez inną ścieżkę.
+export async function toggleCollectionOnHome(
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+
+  const id = sanitize(formData.get("id"));
+  if (!id) return { ok: false, error: "Brak id" };
+
+  const show = formData.get("show") === "1";
+
+  const supabase = await createAdminClient();
+  const { error } = await supabase
+    .from("collections")
+    .update({ show_on_home: show } as never)
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  invalidateCollectionsCache();
+  revalidatePath("/admin/kolekcje");
+  revalidatePath("/");
+  return {
+    ok: true,
+    message: show ? "Kolekcja wróciła na stronę główną" : "Kolekcja ukryta ze strony głównej",
+  };
+}
