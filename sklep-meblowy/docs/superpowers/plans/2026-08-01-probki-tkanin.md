@@ -666,7 +666,7 @@ export async function createSampleOrder(input: CreateSampleOrderInput) {
   return { orderId, amountTotal, freeCount: free, paidCount: paid };
 }
 
-async function fetchOrdersWithItems(filter?: (q: never) => never): Promise<SampleOrderWithItems[]> {
+export async function getSampleOrders(): Promise<SampleOrderWithItems[]> {
   const supabase = await createAdminClient();
   const { data, error } = await supabase
     .from("sample_orders")
@@ -674,15 +674,12 @@ async function fetchOrdersWithItems(filter?: (q: never) => never): Promise<Sampl
     .order("created_at", { ascending: false });
 
   if (error) {
+    // Nie połykamy po cichu: pusta lista w panelu wygląda jak "brak zamówień",
+    // czyli kłamie dokładnie wtedy, gdy coś jest zepsute.
     console.error("[probki] odczyt zamowien nieudany:", error.message);
     return [];
   }
-  void filter;
   return (data ?? []) as SampleOrderWithItems[];
-}
-
-export async function getSampleOrders(): Promise<SampleOrderWithItems[]> {
-  return fetchOrdersWithItems();
 }
 
 export async function getSampleOrderById(id: string): Promise<SampleOrderWithItems | null> {
@@ -699,6 +696,9 @@ export async function getSampleOrderById(id: string): Promise<SampleOrderWithIte
   return (data as SampleOrderWithItems) ?? null;
 }
 
+// Licznik przy pozycji w nawigacji = "ile czeka na spakowanie". Nieopłacone
+// świadomie NIE liczą się: właścicielka nie ma się nimi zajmować, dopóki
+// klient nie zapłaci, a badge ma znaczyć pracę do zrobienia.
 export async function getNewSampleOrdersCount(): Promise<number> {
   const supabase = await createAdminClient();
   const { count, error } = await supabase
