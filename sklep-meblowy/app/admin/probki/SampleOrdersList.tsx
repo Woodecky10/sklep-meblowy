@@ -257,6 +257,16 @@ function OrderCard({
             Zamówienie jest anulowane, ale klient zapłacił. Zwrot zrób ręcznie
             w panelu Przelewy24 — wyszukaj tam transakcję:
           </p>
+          {/* ⚠️ ANULOWANE ZAMÓWIENIE MOŻE BYĆ JUŻ WYSŁANE. Bez tego zdania karta
+              mówi wyłącznie „zrób zwrot", a wycinki fizycznie pojechały pocztą
+              — właścicielka oddałaby pieniądze za dostarczony towar. */}
+          {order.sent_at && (
+            <p className="text-sm font-semibold text-[var(--fg)] leading-relaxed">
+              Uwaga: próbki zostały wysłane {dateLabel(order.sent_at)}
+              {order.tracking ? ` (numer nadania ${order.tracking})` : ""} — zdecyduj,
+              czy zwrot się należy.
+            </p>
+          )}
           {order.payment_ref ? (
             <div className="flex flex-wrap items-center gap-2">
               <code className="font-mono text-sm px-2 py-1 rounded-lg bg-[var(--card-bg)] border border-[var(--border)] text-[var(--fg)] break-all">
@@ -394,10 +404,12 @@ function OrderCard({
         </div>
       )}
 
-      {/* Numer nadania — po wysyłce zostaje na karcie */}
-      {order.status === "sent" && (
+      {/* Ślad wysyłki zostaje na karcie NA ZAWSZE — warunek po `sent_at`, a nie
+          po statusie. Po anulowaniu wysłanego zamówienia status to „cancelled",
+          więc warunek na statusie ukryłby fakt, że paczka już poszła. */}
+      {order.sent_at && (
         <p className="text-sm text-[var(--muted)]">
-          Wysłano {order.sent_at ? dateLabel(order.sent_at) : "—"}
+          Wysłano {dateLabel(order.sent_at)}
           {order.tracking ? (
             <>
               {" · "}numer nadania:{" "}

@@ -15,31 +15,34 @@ import {
   getSampleOrderById,
   setSampleOrderStatus,
 } from "@/app/_lib/samples";
-import type { ActionResult } from "@/app/_lib/types";
+import type { ActionResult, SampleOrderStatus } from "@/app/_lib/types";
+import { SAMPLE_STATUS_LABELS } from "./sample-groups";
 
 const PANEL_PATH = "/admin/probki";
 
 // Wspólna bramka zmiany statusu.
 //
-// ⚠️ ANULOWANE ZAMÓWIENIE JEST NIETYKALNE. `setSampleOrderStatus` jest
-// bezwarunkowe — przestawi „cancelled" z powrotem na „new"/„packed", a kolejne
-// „Anuluj" zwolni darmową pulę DRUGI raz (sześć gratisów zamiast trzech).
-// Lista przycisków tego nie oferuje, ale sam brak przycisku nie wystarcza:
-// wystarczy druga otwarta karta panelu (anulowane w jednej, klik w drugiej),
-// żeby trafić dokładnie w ten scenariusz. Dlatego stan sprawdzamy tuż przed
-// zapisem, na świeżym odczycie.
+// ⚠️ `setSampleOrderStatus` jest BEZWARUNKOWE — przestawi każdy status na każdy
+// inny. Panel takich przejść nie oferuje, ale sam brak przycisku nie wystarcza:
+// druga, nieodświeżona karta panelu pokazuje przyciski sprzed zmiany. Dlatego
+// stan sprawdzamy tuż przed zapisem, na świeżym odczycie.
+//
+// Blokujemy zawsze „cancelled" (wskrzeszenie + kolejne „Anuluj" zwolniłoby
+// darmową pulę DRUGI raz, sześć gratisów zamiast trzech), a `alsoBlock` dokłada
+// stany zabronione dla konkretnej akcji.
 async function guardStatusChange(
   id: string,
-  what: string
+  what: string,
+  alsoBlock: SampleOrderStatus[] = []
 ): Promise<{ ok: false; error: string } | null> {
   const order = await getSampleOrderById(id);
   if (!order) {
     return { ok: false, error: "Nie znaleziono tego zamówienia — odśwież stronę." };
   }
-  if (order.status === "cancelled") {
+  if (order.status === "cancelled" || alsoBlock.includes(order.status)) {
     return {
       ok: false,
-      error: `To zamówienie jest już anulowane — nie da się go ${what}. Odśwież stronę.`,
+      error: `To zamówienie ma już status „${SAMPLE_STATUS_LABELS[order.status]}” — nie da się go ${what}. Odśwież stronę.`,
     };
   }
   return null;
@@ -50,7 +53,12 @@ export async function markSamplePacked(formData: FormData): Promise<ActionResult
   const id = String(formData.get("id") ?? "").trim();
   if (!id) return { ok: false, error: "Brak identyfikatora zamówienia" };
 
-  const blocked = await guardStatusChange(id, "spakować");
+  // ⚠️ „Wysłane" TEŻ blokuje pakowanie. Bez tego wystarczy druga otwarta karta
+  // panelu: w pierwszej oznaczasz wysyłkę, w drugiej (sprzed zmiany) klikasz
+  // „Spakowane" — status wraca na „packed", `sent_at`/`tracking` zostają, a
+  // zamówienie ląduje z powrotem w sekcji „do wysłania". Paczka idzie DRUGI raz.
+  // Cofania wysyłki panel świadomie nie oferuje, więc nic legalnego to nie ubija.
+  const blocked = await guardStatusChange(id, "spakować", ["sent"]);
   if (blocked) {
     // Strona i tak jest nieaktualna — odświeżamy ją, żeby właścicielka zobaczyła
     // prawdziwy stan zamiast klikać drugi raz w to samo.

@@ -6,7 +6,10 @@ import { describe, it, expect } from "vitest";
 // wkleić na kopertę.
 
 import { buildFabricImageMap } from "@/app/_lib/variants";
+import type { SampleOrderStatus, SamplePaymentStatus } from "@/app/_lib/types";
 import {
+  SAMPLE_GROUPS,
+  SAMPLE_GROUP_ORDER,
   cancelSampleConfirmMessage,
   cancelSampleWarnings,
   formatSampleAddress,
@@ -93,6 +96,33 @@ describe("sampleGroupOf", () => {
     expect(sampleGroupOf(order({ status: "new", payment_status: "paid" }))).toBe("toPack");
     // Bez tej grupy zamówienie po kliknięciu „Spakowane" zniknęłoby z ekranu.
     expect(sampleGroupOf(order({ status: "packed", payment_status: "paid" }))).toBe("packed");
+  });
+});
+
+describe("nic nie wypada z ekranu", () => {
+  // ⚠️ Render iteruje po SAMPLE_GROUP_ORDER, a groupSampleOrders zwraca rekord
+  // po SampleGroupKey. Dopisanie siódmej grupy bez dopisania jej do tablicy
+  // dałoby CICHĄ utratę zamówień z ekranu — bez błędu, bez pustej sekcji,
+  // po prostu bez zamówień. Czyli dokładnie ta awaria, przed którą broni cały
+  // ten ekran, tyle że wprowadzona przez następną osobę.
+  it("SAMPLE_GROUP_ORDER wymienia każdą grupę dokładnie raz", () => {
+    expect([...SAMPLE_GROUP_ORDER].sort()).toEqual(Object.keys(SAMPLE_GROUPS).sort());
+    expect(new Set(SAMPLE_GROUP_ORDER).size).toBe(SAMPLE_GROUP_ORDER.length);
+  });
+
+  it("każda z 12 kombinacji status × payment_status trafia w renderowaną sekcję", () => {
+    const statuses: SampleOrderStatus[] = ["new", "packed", "sent", "cancelled"];
+    const payments: SamplePaymentStatus[] = ["none", "pending", "paid"];
+
+    for (const status of statuses) {
+      for (const payment_status of payments) {
+        const key = sampleGroupOf(order({ status, payment_status }));
+        expect(
+          SAMPLE_GROUP_ORDER.includes(key),
+          `${status} + ${payment_status} → „${key}" nie jest renderowane`
+        ).toBe(true);
+      }
+    }
   });
 });
 
