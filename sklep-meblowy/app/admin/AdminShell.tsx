@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { href: "/admin/tkaniny", label: "Tkaniny", icon: FabricsIcon },
   { href: "/admin/kody-rabatowe", label: "Kody rabatowe", icon: TicketIcon },
   { href: "/admin/zapytania", label: "Zapytania", icon: InboxIcon },
+  { href: "/admin/probki", label: "Próbki", icon: SwatchIcon },
   { href: "/admin/reklamacje", label: "Reklamacje", icon: ComplaintsIcon },
 ];
 
@@ -29,13 +30,19 @@ const NAV_ITEMS = [
 // `label` idzie w aria-label, bo sama cyfra nic czytnikowi ekranu nie mówi.
 function navBadge(
   href: string,
-  counts: { newIssues: number; newOrders: number }
+  counts: { newIssues: number; newOrders: number; newSamples: number }
 ): { count: number; label: string } | null {
   if (href === "/admin/reklamacje" && counts.newIssues > 0) {
     return { count: counts.newIssues, label: "nowe zgłoszenia" };
   }
   if (href === "/admin/zamowienia" && counts.newOrders > 0) {
     return { count: counts.newOrders, label: "nowe zamówienia" };
+  }
+  // Licznik próbek liczy TYLKO zamówienia gotowe do spakowania — nieopłacone
+  // świadomie nie wchodzą (getNewSampleOrdersCount), bo badge ma znaczyć pracę
+  // do zrobienia, a zamówieniem bez wpłaty właścicielka się nie zajmuje.
+  if (href === "/admin/probki" && counts.newSamples > 0) {
+    return { count: counts.newSamples, label: "nowe zamówienia próbek" };
   }
   return null;
 }
@@ -44,11 +51,13 @@ export default function AdminShell({
   userEmail,
   newIssues,
   newOrders,
+  newSamples,
   children,
 }: {
   userEmail: string | null;
   newIssues: number;
   newOrders: number;
+  newSamples: number;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -125,7 +134,7 @@ export default function AdminShell({
 
         <nav className="flex-1 py-4 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
-            const badge = navBadge(item.href, { newIssues, newOrders });
+            const badge = navBadge(item.href, { newIssues, newOrders, newSamples });
             return (
               <Link
                 key={item.href}
@@ -283,6 +292,18 @@ function FabricsIcon() {
       <path d="M3 6c3 2 6 2 9 0s6-2 9 0" />
       <path d="M3 12c3 2 6 2 9 0s6-2 9 0" />
       <path d="M3 18c3 2 6 2 9 0s6-2 9 0" />
+    </svg>
+  );
+}
+
+// Próbki tkanin — wachlarz wycinków (odróżnialny od falowanego FabricsIcon,
+// który prowadzi do katalogu tkanin).
+function SwatchIcon() {
+  return (
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="4" width="10" height="14" rx="1.5" />
+      <path d="M15.5 5.5l3.8 1.4a1.5 1.5 0 0 1 .9 1.9l-4 11" />
+      <circle cx="8" cy="15" r="1" fill="currentColor" />
     </svg>
   );
 }
