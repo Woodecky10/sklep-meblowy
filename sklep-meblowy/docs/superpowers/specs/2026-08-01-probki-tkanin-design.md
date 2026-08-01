@@ -41,9 +41,11 @@ Powód: meble i próbki to dwa różne światy. Meble wozi firma transportowa, p
 ⚠️ **Dwie niezależne osie stanu, celowo rozdzielone.** „Czy zapłacone" i „czy spakowane" nie mogą siedzieć w jednym polu — sklejenie ich jest dokładnie tym błędem, przez który dziś `orders.processing` przy płatności za pobraniem nie znaczy „opłacone".
 
 **`sample_order_items`** — pozycje zamówienia:
-- `sample_order_id` (kaskada), `fabric_id` (`on delete set null`)
-- **snapshot nazwy tkaniny** — żeby zamówienie sprzed roku dało się przeczytać po zmianie katalogu (wzorzec `product_inquiries.product_name`)
+- `sample_order_id` (kaskada), `fabric_id` (`on delete set null`), **`color`** (numer koloru, np. `"16"`)
+- **snapshot nazwy tkaniny i koloru** — żeby zamówienie sprzed roku dało się przeczytać po zmianie katalogu (wzorzec `product_inquiries.product_name`)
 - `is_free`, `unit_price`
+
+⚠️ **Jednostką jest kolor tkaniny, nie tkanina.** `fabrics` trzyma `colors: string[]` (numery kolekcji) i `color_images` (zdjęcie wzornika per numer), a cały sklep operuje wartościami w formacie `„Nazwa Numer"` (np. `„Riviera 16"`). Klient wybierający próbki wybiera **konkretne kolory** — dokładnie tak, jak to sformułowałeś na początku („3 wybranych próbek/kolorów tkanin"). Gdyby pozycją była sama tkanina, zamówienie nie powiedziałoby, który wycinek wysłać.
 
 **`sample_quota`** — licznik darmowej puli: `email_key` (klucz), `used_count`, `window_start`, `user_id` informacyjnie, unikalny indeks na `email_key`.
 
@@ -77,7 +79,7 @@ Karta produktu zostaje bez zmian: przy wyborze tkaniny do kanapy klient jest w i
 
 Strona zamawiania stoi pod adresem **`/probki`**; strona powrotu z płatności pod `/probki/sukces`.
 
-**Jedna sztuka na tkaninę w zamówieniu** — wybór jest checkboxem, więc nie da się zamówić dwóch próbek tej samej tkaniny. Klient, który chce więcej, składa kolejne zamówienie.
+**Jedna sztuka na kolor w zamówieniu** — wybór jest zaznaczeniem próbki we wzorniku, więc nie da się zamówić dwóch takich samych wycinków. Klient może za to wziąć kilka kolorów tej samej tkaniny (każdy liczy się osobno do puli i do ceny).
 
 ### Bramka logowania
 
@@ -98,6 +100,10 @@ Imię, nazwisko i adres wypełnione z `profiles.address`, a przy pustym profilu 
 Finał rozwidla się na kwocie:
 - **≤ 3 sztuki (0 zł)** — zamówienie zapisuje się od razu, klient widzi podziękowanie, bramka płatności się nie pojawia.
 - **4+ sztuki** — Przelewy24 jak przy meblach. Strona powrotu **nie ufa powrotowi z bramki**, tylko czyta status z bazy (wzorzec `/checkout/success`) — P24 potrafi odesłać klienta zanim dojdzie notyfikacja.
+
+⚠️ **Notyfikacja P24 dla próbek potrzebuje własnego endpointu.** Istniejący `/api/p24/status` zakłada wprost `sessionId == orders.id` (komentarz w kodzie: „sessionId == order.id (ustawiane w checkoucie)") i przy nieznanym identyfikatorze loguje „zamówienie nie istnieje" — czyli płatność za próbki zostałaby po cichu zgubiona. Próbki dostają `/api/p24/probki-status`, a wspólna część (walidacja podpisu, `verify`, idempotencja) idzie do współdzielonego helpera, żeby nie kopiować logiki pieniędzy.
+
+⚠️ Adres tego endpointu trzeba sprawdzić osobno: POST na nieistniejącą ścieżkę pod `/api/` zwraca w tym frameworku **200 z HTML-em**, więc literówka w `urlStatus` daje cichą awarię — P24 uzna notyfikację za dostarczoną i nie ponowi. Skrypt `npm run p24:smoke` już to sprawdza dla mebli; trzeba dołożyć drugi adres.
 
 ## Panel właścicielki
 
