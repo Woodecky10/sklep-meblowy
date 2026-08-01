@@ -31,11 +31,24 @@ test("pierwsze 6 kolekcji widoczne, reszta ukryta i rozwijana", async ({ page })
 
   const rest = page.locator("#home-collections-rest");
   const button = page.locator('button[aria-controls="home-collections-rest"]');
+  // Liczymy kafelki TYLKO w sekcji "Nasze kolekcje". Linki z `?kolekcja=` moga
+  // byc tez w navbarze, stopce i innych blokach home - te sa edytowalne z
+  // panelu (edytor bloku podpowiada wprost "np. /sklep?kolekcja=lisbon"), wiec
+  // liczenie po calej stronie psulaby test przy samej zmianie tresci w DB.
+  const section = page.locator("section:has(#home-collections-rest)");
 
-  // Sekcja moze nie miec nadwyzki (<= 6 kolekcji) - wtedy nie ma czego testowac.
-  if ((await button.count()) === 0) {
-    test.skip(true, "mniej niz 7 kolekcji na home - brak przycisku");
-  }
+  // Skip TYLKO gdy nadwyzki nie da sie miec - decyzja na danych, nie na
+  // obecnosci przycisku. Liczba page-level jest celowo zawyzona (lapie tez
+  // linki spoza sekcji), wiec `total <= VISIBLE` znaczy "nadwyzka niemozliwa".
+  const total = await page.locator('a[href*="kolekcja="]').count();
+  test.skip(
+    total <= VISIBLE,
+    "mniej niz 7 kolekcji z pokazywaniem na home i aktywnymi produktami - brak nadwyzki"
+  );
+
+  // 7+ kolekcji, a przycisku nie ma = REGRESJA (usuniety przycisk, zerwane
+  // aria-controls, wylaczony blok "collections"), a nie powod do skipa.
+  await expect(button).toHaveCount(1);
 
   // Kluczowa asercja: ukrycie musi byc display:none, bo tylko wtedy
   // przegladarka nie pobiera leniwych zdjec ze schowanego kontenera.
@@ -45,11 +58,12 @@ test("pierwsze 6 kolekcji widoczne, reszta ukryta i rozwijana", async ({ page })
 
   const hiddenCount = await rest.locator('a[href*="kolekcja="]').count();
   await expect(button).toHaveAttribute("aria-expanded", "false");
-  await expect(button).toContainText(`+${hiddenCount}`);
+  // Z nawiasami: samo `+5` zlapaloby tez "(+55)".
+  await expect(button).toContainText(`(+${hiddenCount})`);
 
-  // Widocznych dokladnie VISIBLE - liczymy linki spoza ukrytego kontenera.
-  const allLinks = page.locator('a[href*="kolekcja="]');
-  expect((await allLinks.count()) - hiddenCount).toBe(VISIBLE);
+  // Widocznych dokladnie VISIBLE - linki sekcji minus te z ukrytego kontenera.
+  const sectionLinks = section.locator('a[href*="kolekcja="]');
+  expect((await sectionLinks.count()) - hiddenCount).toBe(VISIBLE);
 
   await button.click();
 
@@ -57,7 +71,10 @@ test("pierwsze 6 kolekcji widoczne, reszta ukryta i rozwijana", async ({ page })
   await expect(button).toHaveAttribute("aria-expanded", "true");
   await expect(button).toHaveText("Zwiń");
 
-  // Zwijanie z powrotem
+  // Zwijanie z powrotem - pelny powrot do stanu wyjsciowego. Samo toBeHidden()
+  // przeszloby tez dla elementu odpietego z DOM, stad znowu display:none.
   await button.click();
   await expect(rest).toBeHidden();
+  await expect(rest).toHaveCSS("display", "none");
+  await expect(button).toHaveAttribute("aria-expanded", "false");
 });
