@@ -15,12 +15,29 @@ vi.stubEnv("P24_API_KEY", "key");
 vi.stubEnv("P24_CRC", CRC);
 vi.stubEnv("P24_BASE_URL", "https://sandbox.przelewy24.pl");
 
-const getSampleOrderByIdMock = vi.fn();
+const maybeSingleMock = vi.fn();
 const markSampleOrderPaidMock = vi.fn();
 const verifyTransactionMock = vi.fn();
+// Co i skąd handler czyta — sprawdzamy wprost, bo rozliczenie NIE MOŻE
+// przechodzić przez getSampleOrderById (helper połyka błąd odczytu).
+const queries: { table: string; columns: string; id: unknown }[] = [];
+
+vi.mock("@/app/_lib/supabase/server", () => ({
+  createAdminClient: async () => ({
+    from: (table: string) => ({
+      select: (columns: string) => ({
+        eq: (_col: string, id: unknown) => ({
+          maybeSingle: () => {
+            queries.push({ table, columns, id });
+            return maybeSingleMock();
+          },
+        }),
+      }),
+    }),
+  }),
+}));
 
 vi.mock("@/app/_lib/samples", () => ({
-  getSampleOrderById: (...args: unknown[]) => getSampleOrderByIdMock(...args),
   markSampleOrderPaid: (...args: unknown[]) => markSampleOrderPaidMock(...args),
 }));
 
@@ -65,22 +82,16 @@ function post(body: unknown) {
   );
 }
 
-function order(over: Record<string, unknown> = {}) {
-  return {
-    id: "ord-1",
-    user_id: "user-1",
-    status: "new",
-    payment_status: "pending",
-    amount_total: 15,
-    items: [],
-    ...over,
-  };
+// Wiersz taki, jaki oddaje `select("status, payment_status, amount_total")`.
+function row(over: Record<string, unknown> = {}) {
+  return { data: { status: "new", payment_status: "pending", amount_total: 15, ...over }, error: null };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  queries.length = 0;
   vi.spyOn(console, "error").mockImplementation(() => {});
-  getSampleOrderByIdMock.mockResolvedValue(order());
+  maybeSingleMock.mockResolvedValue(row());
   markSampleOrderPaidMock.mockResolvedValue(true);
   verifyTransactionMock.mockResolvedValue(true);
 });
@@ -99,14 +110,14 @@ describe("POST /api/p24/probki-status — bramka podpisu", () => {
     const res = await post(notification({ sign: "podrobka" }));
 
     expect(res.status).toBe(400);
-    expect(getSampleOrderByIdMock).not.toHaveBeenCalled();
+    expect(queries).toHaveLength(0);
     expect(markSampleOrderPaidMock).not.toHaveBeenCalled();
   });
 
   it("niepoprawny JSON → 400", async () => {
     const res = await post("{nie-json");
     expect(res.status).toBe(400);
-    expect(getSampleOrderByIdMock).not.toHaveBeenCalled();
+    expect(queries).toHaveLength(0);
   });
 
   it("poprawny JSON, który nie jest obiektem, nie wywraca handlera", async () => {
@@ -116,8 +127,29 @@ describe("POST /api/p24/probki-status — bramka podpisu", () => {
 });
 
 describe("POST /api/p24/probki-status — zamówienie", () => {
+  it("czyta wiersz zamówienia próbek po sessionId, bez joinu pozycji", async () => {
+    await post(notification());
+
+    expect(queries).toEqual([
+      { table: "sample_orders", columns: "status, payment_status, amount_total", id: "ord-1" },
+    ]);
+  });
+
+  it("BŁĄD ODCZYTU bazy → 500, żeby P24 PONOWIŁO (inaczej wpłata przepada)", async () => {
+    // ⚠️ Sedno: „nie ma wiersza" i „baza nie odpowiedziała" MUSZĄ dać różne
+    // odpowiedzi. Gdyby oba dawały 200, chwilowa awaria Supabase kasowałaby
+    // ponowienie, a zamówienie zostawało `pending` mimo pobranych pieniędzy.
+    maybeSingleMock.mockResolvedValue({ data: null, error: { message: "timeout" } });
+
+    const res = await post(notification());
+
+    expect(res.status).toBe(500);
+    expect(verifyTransactionMock).not.toHaveBeenCalled();
+    expect(markSampleOrderPaidMock).not.toHaveBeenCalled();
+  });
+
   it("nieznane zamówienie → 200 (P24 nie ma czego ponawiać), bez rozliczenia", async () => {
-    getSampleOrderByIdMock.mockResolvedValue(null);
+    maybeSingleMock.mockResolvedValue({ data: null, error: null });
 
     const res = await post(notification());
 
@@ -127,7 +159,7 @@ describe("POST /api/p24/probki-status — zamówienie", () => {
   });
 
   it("ponowiona notyfikacja dla opłaconego zamówienia nie płaci drugi raz", async () => {
-    getSampleOrderByIdMock.mockResolvedValue(order({ payment_status: "paid" }));
+    maybeSingleMock.mockResolvedValue(row({ payment_status: "paid" }));
 
     const res = await post(notification());
 
@@ -137,7 +169,7 @@ describe("POST /api/p24/probki-status — zamówienie", () => {
   });
 
   it("anulowane zamówienie i tak dostaje payment_ref (bez niego nie ma z czego zrobić zwrotu)", async () => {
-    getSampleOrderByIdMock.mockResolvedValue(order({ status: "cancelled" }));
+    maybeSingleMock.mockResolvedValue(row({ status: "cancelled" }));
 
     const res = await post(notification());
 
@@ -170,7 +202,7 @@ describe("POST /api/p24/probki-status — kwota i waluta", () => {
   });
 
   it("zaniżona kwota nie rozlicza zamówienia", async () => {
-    getSampleOrderByIdMock.mockResolvedValue(order({ amount_total: 45 }));
+    maybeSingleMock.mockResolvedValue(row({ amount_total: 45 }));
 
     const res = await post(notification({ amount: 1500 }));
 
@@ -186,9 +218,7 @@ describe("POST /api/p24/probki-status — kwota i waluta", () => {
   });
 
   it("zamowienia w calosci darmowego (amount_total 0) nie da sie oplacic notyfikacja", async () => {
-    getSampleOrderByIdMock.mockResolvedValue(
-      order({ amount_total: 0, payment_status: "none" })
-    );
+    maybeSingleMock.mockResolvedValue(row({ amount_total: 0, payment_status: "none" }));
 
     const res = await post(notification({ amount: 1500 }));
 

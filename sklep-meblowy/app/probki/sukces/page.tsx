@@ -34,11 +34,43 @@ export default async function SampleSuccessPage({
     data: { user },
   } = await supabase.auth.getUser();
 
+  // ⚠️ POWRÓT Z BRAMKI BEZ SESJI TO NORMALNA SYTUACJA, nie próba podglądania
+  // cudzego zamówienia: BLIK i aplikacje bankowe potrafią otworzyć `urlReturn`
+  // we WŁASNEJ przeglądarce (in-app browser banku), w której nie ma ciasteczek
+  // Supabase. Klient, który przed sekundą zapłacił, nie może tam zobaczyć
+  // „nie znaleźliśmy tego zamówienia". Nie czytamy zamówienia (nie ma czym
+  // potwierdzić własności), więc nie pokazujemy ŻADNYCH szczegółów — tylko
+  // potwierdzenie przyjęcia i logowanie po resztę. Ten sam wzorzec `next=`
+  // co bramka logowania na /probki.
+  if (orderId && !user) {
+    const back = `/probki/sukces?zamowienie=${encodeURIComponent(orderId)}`;
+    return (
+      <div className="max-w-2xl mx-auto px-6 py-24 text-center">
+        <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-3">
+          Dziękujemy
+        </p>
+        <h1 className="font-display text-3xl md:text-4xl font-bold text-[var(--fg)] mb-6">
+          Zamówienie przyjęte
+        </h1>
+        <p className="text-[var(--muted)] mb-10 leading-relaxed">
+          Zaloguj się, żeby zobaczyć szczegóły zamówienia i status płatności. Jeśli
+          wróciłeś tu z aplikacji banku, ta przeglądarka może nie znać Twojej sesji —
+          zamówienia to nie dotyczy, jest zapisane.
+        </p>
+        <Link
+          href={`/logowanie?next=${encodeURIComponent(back)}`}
+          className="inline-flex px-8 py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
+        >
+          Zaloguj się
+        </Link>
+      </div>
+    );
+  }
+
   // ⚠️ WŁASNOŚĆ SPRAWDZAMY SAMI. getSampleOrderById czyta service_rolem (RLS na
   // sample_orders go nie dotyczy), więc bez tego porównania wystarczyłoby zgadnąć
-  // uuid, żeby zobaczyć czyjeś imię, adres i telefon. Brak sesji traktujemy tak
-  // samo jak cudze zamówienie — jeden komunikat, zero szczegółów, bez zdradzania,
-  // czy takie zamówienie w ogóle istnieje.
+  // uuid, żeby zobaczyć czyjeś imię, adres i telefon. Cudze zamówienie i brak
+  // parametru dają ten sam komunikat — bez zdradzania, czy takie zamówienie istnieje.
   const fetched = orderId && user ? await getSampleOrderById(orderId) : null;
   const order = fetched && user && fetched.user_id === user.id ? fetched : null;
 

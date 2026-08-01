@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { submitSampleOrder } from "./actions";
 import {
@@ -176,7 +177,7 @@ export default function SampleForm({
         setNeedsConfirm(true);
         setError(
           "Nie udało się potwierdzić wysyłki zamówienia — sprawdź połączenie. " +
-            "Jeśli zamówienie mimo to się zapisało, drugie nie dostanie już darmowych próbek."
+            "Nie wiemy, czy zdążyło się zapisać, a drugie zamówienie nie dostanie już darmowych próbek."
         );
       }
     });
@@ -418,18 +419,33 @@ export default function SampleForm({
             >
               {error}
               {/* Świadome ponowienie po rzucie: jedno dodatkowe kliknięcie
-                  zamiast automatycznego odblokowania przycisku (patrz catch). */}
+                  zamiast automatycznego odblokowania przycisku (patrz catch).
+                  ⚠️ Klient MUSI dostać tu podpowiedź, co zrobić ZAMIAST klikania
+                  — sam nie ma jak sprawdzić, czy zamówienie powstało (lista
+                  zamówień próbek jest tylko w panelu właścicielki). Bez tego
+                  dodana blokada jest kosmetyczna: i tak kliknie „ponów". */}
               {needsConfirm && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNeedsConfirm(false);
-                    setError(null);
-                  }}
-                  className="block mt-3 px-4 py-2 rounded-full border border-current font-sans text-xs uppercase tracking-widest hover:opacity-80 transition-opacity"
-                >
-                  Odblokuj i spróbuj ponownie
-                </button>
+                <>
+                  <p className="mt-2">
+                    Nie masz jak sprawdzić tego samodzielnie — napisz do nas przez{" "}
+                    <Link href="/kontakt" className="underline font-semibold">
+                      stronę kontaktu
+                    </Link>{" "}
+                    (podaj tkaniny i kolory, które wybrałeś). Sprawdzimy, czy
+                    zamówienie się zapisało, i dokończymy je bez utraty darmowych
+                    próbek. Jeśli wolisz spróbować sam — odblokuj przycisk:
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNeedsConfirm(false);
+                      setError(null);
+                    }}
+                    className="block mt-3 px-4 py-2 rounded-full border border-current font-sans text-xs uppercase tracking-widest hover:opacity-80 transition-opacity"
+                  >
+                    Odblokuj i spróbuj ponownie
+                  </button>
+                </>
               )}
             </div>
           )}

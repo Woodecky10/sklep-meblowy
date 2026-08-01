@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getP24Config, verifyTransaction } from "@/app/_lib/p24";
 import { isValidNotification, type P24Notification } from "@/app/_lib/p24-events";
-import { getSampleOrderById, markSampleOrderPaid } from "@/app/_lib/samples";
+import { markSampleOrderPaid } from "@/app/_lib/samples";
+import { createAdminClient } from "@/app/_lib/supabase/server";
+import type { SampleOrderStatus, SamplePaymentStatus } from "@/app/_lib/types";
 
 // ⚠️ OSOBNA TRASA, a nie gałąź w /api/p24/status. Tamten handler ma wprost
 // zaszyte założenie „sessionId == orders.id" i szuka wiersza w `orders` —
@@ -49,20 +51,40 @@ export async function POST(request: NextRequest) {
 
   // sessionId == sample_orders.id (ustawiane w buildSampleP24Params).
   const orderId = n.sessionId;
-  const order = await getSampleOrderById(orderId);
-  if (!order) {
-    // 200, bo P24 nie ma czego ponawiać — takiego zamówienia po prostu nie ma.
-    // ⚠️ ZNANE OGRANICZENIE: getSampleOrderById połyka błąd odczytu i też zwraca
-    // null, więc chwilowa awaria bazy jest tu NIE DO ODRÓŻNIENIA od nieistnieją-
-    // cego zamówienia — a wtedy 200 kasuje ponowienie. Warstwa danych jest
-    // zamknięta w tym tasku; ślad zostaje w logu razem z numerem transakcji P24,
-    // po którym da się rozliczyć ręcznie. Docelowo: getSampleOrderById powinno
-    // rozróżniać „brak wiersza" od „błąd" (wtedy tu 500).
+
+  // ⚠️ WIERSZ CZYTAMY WPROST, tak jak /api/p24/status czyta `orders` — a NIE
+  // przez getSampleOrderById. Helper połyka błąd odczytu i zwraca `null`
+  // identycznie jak przy nieistniejącym zamówieniu, a te dwie sytuacje muszą dać
+  // RÓŻNE odpowiedzi: awaria bazy → 500 (P24 ponowi), brak wiersza → 200 (nie ma
+  // czego ponawiać). Sklejenie ich znaczyłoby, że chwilowy błąd Supabase kasuje
+  // ponowienie i wpłata przepada bez rozliczenia. Przy okazji nie ciągniemy
+  // joinu z pozycjami, którego rozliczenie nie używa.
+  const supabase = await createAdminClient();
+  const { data: orderRow, error: orderErr } = await supabase
+    .from("sample_orders")
+    .select("status, payment_status, amount_total")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (orderErr) {
+    console.error(
+      `P24 probki: błąd odczytu zamówienia ${orderId} (transakcja P24 orderId=${n.orderId}):`,
+      orderErr.message
+    );
+    return NextResponse.json({ error: "DB error" }, { status: 500 }); // P24 ponowi
+  }
+  if (!orderRow) {
     console.error(
       `P24 probki: zamówienie ${orderId} nie istnieje (transakcja P24 orderId=${n.orderId})`
     );
     return NextResponse.json({ received: true });
   }
+
+  const order = orderRow as unknown as {
+    status: SampleOrderStatus;
+    payment_status: SamplePaymentStatus;
+    amount_total: number;
+  };
 
   // Płatność za ANULOWANE zamówienie — pieniądze przyszły za coś, czego nie
   // wyślemy. `sample_orders` nie ma admin_note (migracja 67), więc JEDYNYM
@@ -72,7 +94,7 @@ export async function POST(request: NextRequest) {
   const cancelled = order.status === "cancelled";
   if (cancelled) {
     console.error(
-      `P24 probki: płatność za ANULOWANE zamówienie ${orderId} — ręczna obsługa (zwrot)`
+      `P24 probki: płatność za ANULOWANE zamówienie ${orderId} (transakcja P24 orderId=${n.orderId}) — ręczna obsługa (zwrot)`
     );
   }
 
@@ -90,7 +112,7 @@ export async function POST(request: NextRequest) {
   const expectedAmount = expectedSampleAmount(Number(order.amount_total));
   if (n.amount !== expectedAmount || n.currency !== "PLN") {
     console.error(
-      `P24 probki: NIEZGODNA kwota/waluta dla ${orderId} (notif ${n.amount}/${n.currency} vs oczek. ${expectedAmount}/PLN) — NIE rozliczam`
+      `P24 probki: NIEZGODNA kwota/waluta dla ${orderId} (transakcja P24 orderId=${n.orderId}, notif ${n.amount}/${n.currency} vs oczek. ${expectedAmount}/PLN) — NIE rozliczam`
     );
     return NextResponse.json({ received: true });
   }
@@ -102,7 +124,9 @@ export async function POST(request: NextRequest) {
     currency: "PLN",
   });
   if (!verified) {
-    console.error(`P24 probki: verify nieudany dla ${orderId} — zostaje pending`);
+    console.error(
+      `P24 probki: verify nieudany dla ${orderId} (transakcja P24 orderId=${n.orderId}) — zostaje pending`
+    );
     return NextResponse.json({ received: true });
   }
 
@@ -112,7 +136,10 @@ export async function POST(request: NextRequest) {
   try {
     claimedFirst = await markSampleOrderPaid(orderId, String(n.orderId));
   } catch (err) {
-    console.error("P24 probki: błąd markSampleOrderPaid:", err);
+    console.error(
+      `P24 probki: błąd markSampleOrderPaid dla ${orderId} (transakcja P24 orderId=${n.orderId}):`,
+      err
+    );
     return NextResponse.json({ error: "DB error" }, { status: 500 }); // P24 ponowi
   }
 
