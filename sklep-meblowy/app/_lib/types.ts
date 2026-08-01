@@ -378,3 +378,46 @@ export type Database = {
     };
   };
 };
+
+// ============================================================
+// Próbki tkanin (migracja 67)
+// ============================================================
+// UWAGA na kolizję nazw: "próbka" w istniejącym kodzie oznacza ZDJĘCIE wzornika
+// (FabricSwatchGrid, fabric-swatch-images.ts). Byty z tej funkcji nazywamy
+// konsekwentnie `Sample*` / `sample_*`.
+
+export type SampleOrderStatus = "new" | "packed" | "sent" | "cancelled";
+export type SamplePaymentStatus = "none" | "pending" | "paid";
+
+export type SampleOrderItem = {
+  id: string;
+  sample_order_id: string;
+  fabric_id: string | null;
+  color: string;
+  // Snapshot nazwy tkaniny z chwili zamówienia — katalog może się zmienić.
+  fabric_name: string;
+  is_free: boolean;
+  unit_price: number;
+  created_at: string;
+};
+
+export type SampleOrder = {
+  id: string;
+  user_id: string;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string | null;
+  shipping_address: Record<string, string>;
+  status: SampleOrderStatus;
+  // Osobna oś od `status`: "czy zapłacone" nie jest etapem realizacji.
+  payment_status: SamplePaymentStatus;
+  amount_total: number;
+  payment_ref: string | null;
+  free_count: number;
+  paid_count: number;
+  email_key: string;
+  tracking: string | null;
+  sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
