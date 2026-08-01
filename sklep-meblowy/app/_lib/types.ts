@@ -407,7 +407,11 @@ export type SampleOrder = {
   customer_name: string;
   customer_email: string;
   customer_phone: string | null;
-  shipping_address: Record<string, string>;
+  // Partial<Address>, a nie Record<string, string>: Address ma opcjonalne
+  // fullname/phone (string | undefined), więc do Record<string, string> się nie
+  // przypisze — a adres bierzemy wprost z profiles.address / orders.shipping_address.
+  // Partial, bo profil bywa pusty i formularz startuje z niekompletnym adresem.
+  shipping_address: Partial<Address>;
   status: SampleOrderStatus;
   // Osobna oś od `status`: "czy zapłacone" nie jest etapem realizacji.
   payment_status: SamplePaymentStatus;
