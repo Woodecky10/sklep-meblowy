@@ -142,10 +142,19 @@ if (ok) {
 // urlStatus miał literówkę, P24 dostałoby 200, uznało notyfikację za
 // dostarczoną i NIE ponowiło jej — zamówienie zostałoby pending bez śladu.
 // Dlatego sprawdzamy, że pod adresem odpowiada nasz handler, a nie strona HTML.
-const target = process.argv[2]?.replace(/\/+$/, "");
-if (target) {
-  const url = `${target}/api/p24/status`;
-  console.log(`Sprawdzam urlStatus: ${url}`);
+//
+// ⚠️ KAŻDY urlStatus, jaki wysyłamy do P24, musi być tu wymieniony. Meble
+// (app/api/checkout/route.ts) i próbki (app/_lib/sample-p24.ts) mają OSOBNE
+// trasy notyfikacji, bo sessionId znaczy w nich co innego (orders.id vs
+// sample_orders.id) — i osobno da się je zepsuć.
+const NOTIFICATION_PATHS = [
+  ["/api/p24/status", "meble (app/api/checkout/route.ts)"],
+  ["/api/p24/probki-status", "próbki (app/_lib/sample-p24.ts)"],
+];
+
+async function checkNotificationUrl(target, path, who) {
+  const url = `${target}${path}`;
+  console.log(`Sprawdzam urlStatus [${who}]: ${url}`);
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -161,12 +170,19 @@ if (target) {
     } else if (ct.includes("html")) {
       console.error(`✖ urlStatus: HTTP ${res.status} i HTML zamiast JSON-a — pod tym adresem NIE MA naszej trasy.`);
       console.error("  ⚠ To jest cicha awaria: P24 zobaczy 200, uzna notyfikację za dostarczoną i jej NIE ponowi.");
-      console.error("  → sprawdź, czy gałąź z /api/p24/status jest wdrożona pod tym adresem i czy ścieżka nie ma literówki");
+      console.error(`  → sprawdź, czy gałąź z ${path} jest wdrożona pod tym adresem i czy ścieżka nie ma literówki`);
     } else {
       console.error(`✖ urlStatus: nieoczekiwane HTTP ${res.status} (${ct}) ${body}`);
     }
   } catch (err) {
     console.error(`✖ urlStatus: brak połączenia — ${err.message}`);
+  }
+}
+
+const target = process.argv[2]?.replace(/\/+$/, "");
+if (target) {
+  for (const [path, who] of NOTIFICATION_PATHS) {
+    await checkNotificationUrl(target, path, who);
   }
 } else {
   console.log("Pominięto sprawdzenie urlStatus (podaj adres: npm run p24:smoke -- https://twoj-deploy)");

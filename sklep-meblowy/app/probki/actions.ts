@@ -120,7 +120,16 @@ export async function submitSampleOrder(formData: FormData): Promise<ActionResul
     console.error("[probki] rejestracja P24 nieudana:", err);
     return {
       ok: false,
-      error: "Zamówienie zapisane, ale nie udało się otworzyć płatności. Skontaktuj się z nami.",
+      error:
+        "Zamówienie zapisane, ale nie udało się otworzyć płatności. Za chwilę pokażemy jego status.",
+      // ⚠️ KONTRAKT, NIE OZDOBNIK: `data.orderId` przy `ok: false` znaczy
+      // „zamówienie JUŻ POWSTAŁO w bazie i zabrało darmową pulę". Formularz na
+      // tej podstawie NIE odblokowuje przycisku, tylko przechodzi na
+      // /probki/sukces (SampleForm.tsx). Bez tego kanału klient widziałby zwykły
+      // błąd, kliknął „Zamawiam" jeszcze raz i dostał DRUGIE zamówienie — tym
+      // razem w całości płatne, 45 zł za te same trzy próbki. Rozpoznawanie tej
+      // sytuacji po TREŚCI komunikatu byłoby dopasowaniem stringa, nie kontraktem.
+      data: { orderId: created.orderId },
     };
   }
 }

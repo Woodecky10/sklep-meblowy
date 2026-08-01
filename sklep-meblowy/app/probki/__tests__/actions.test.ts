@@ -160,4 +160,31 @@ describe("submitSampleOrder — rozwidlenie na kwocie", () => {
 
     expect(res.ok).toBe(false);
   });
+
+  it("padnięta rejestracja P24 NIESIE orderId — zamówienie już istnieje", async () => {
+    // ⚠️ To jest bramka na pieniądze klienta. Bez orderId formularz pokazałby
+    // zwykły błąd, odblokował przycisk i drugie kliknięcie złożyłoby DRUGIE
+    // zamówienie — tym razem bez darmowej puli, bo pierwsze już ją zabrało.
+    createSampleOrderMock.mockResolvedValue({
+      orderId: "ord-4",
+      amountTotal: 45,
+      freeCount: 0,
+      paidCount: 3,
+    });
+    registerTransactionMock.mockRejectedValue(new Error("P24 register nieudany (500)"));
+
+    const res = await submitSampleOrder(formData());
+
+    expect(res.ok).toBe(false);
+    expect(res).toMatchObject({ data: { orderId: "ord-4" } });
+  });
+
+  it("błąd PRZED utworzeniem zamówienia nie niesie orderId (nie ma czego pokazywać)", async () => {
+    createSampleOrderMock.mockRejectedValue(new Error("Nie udało się sprawdzić puli: boom"));
+
+    const res = await submitSampleOrder(formData());
+
+    expect(res.ok).toBe(false);
+    expect((res as { data?: unknown }).data).toBeUndefined();
+  });
 });

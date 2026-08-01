@@ -66,18 +66,22 @@ export default function SampleForm({
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  // ⚠️ OCHRONA PIENIĘDZY KLIENTA. Po sukcesie NIE wracamy do stanu „można
-  // klikać": przeglądarka jest już w drodze do bramki albo na stronę
-  // podziękowania, a każde kolejne wysłanie to OSOBNE zamówienie — pierwsze
-  // zabiera całą darmową pulę, drugie jest w całości płatne (45 zł za te same
-  // trzy próbki). Warstwa danych tego nie wyłapie: dla niej to dwa poprawne
-  // zamówienia.
-  const [leaving, setLeaving] = useState(false);
+  // ⚠️ OCHRONA PIENIĘDZY KLIENTA. Gdy zamówienie POWSTAŁO, NIE wracamy do stanu
+  // „można klikać": przeglądarka jest już w drodze do bramki, na stronę
+  // podziękowania albo na status, a każde kolejne wysłanie to OSOBNE zamówienie
+  // — pierwsze zabiera całą darmową pulę, drugie jest w całości płatne (45 zł za
+  // te same trzy próbki). Warstwa danych tego nie wyłapie: dla niej to dwa
+  // poprawne zamówienia. Wartość mówi też, co robimy — inaczej przycisk
+  // obiecywałby płatność w chwili, gdy właśnie ona padła.
+  const [leaving, setLeaving] = useState<"payment" | "order" | "status" | null>(null);
+  // Wysyłka rzuciła wyjątkiem, więc NIE WIEMY, czy zamówienie powstało. Przycisk
+  // zostaje zablokowany do świadomego potwierdzenia (patrz catch niżej).
+  const [needsConfirm, setNeedsConfirm] = useState(false);
   // Ref, bo `isPending` staje się widoczne dopiero po re-renderze — dwa szybkie
   // kliknięcia (albo Enter + klik) mieszczą się przed nim.
   const busyRef = useRef(false);
 
-  const busy = isPending || leaving;
+  const busy = isPending || leaving !== null || needsConfirm;
   const sections = useMemo(
     () => buildSampleCatalog(fabrics, groups, query),
     [fabrics, groups, query]
@@ -129,17 +133,30 @@ export default function SampleForm({
       // zostaje na zawsze podniesiony (formularz zablokowany do F5).
       try {
         const res = await submitSampleOrder(formData);
+        // `data.orderId` jest po OBU stronach kontraktu akcji (app/probki/actions.ts):
+        // przy `ok: false` znaczy „zamówienie mimo wszystko powstało".
+        const data = (res.data ?? {}) as { orderId?: string; redirectUrl?: string | null };
 
         if (res.ok) {
-          const data = (res.data ?? {}) as { orderId?: string; redirectUrl?: string | null };
           // Przycisk zostaje zablokowany na zawsze — nawigacja trwa, a klient
           // widzący znów aktywny przycisk kliknąłby ponownie.
-          setLeaving(true);
+          setLeaving(data.redirectUrl ? "payment" : "order");
           if (data.redirectUrl) {
             window.location.href = data.redirectUrl;
             return;
           }
           router.push(`/probki/sukces?zamowienie=${encodeURIComponent(data.orderId ?? "")}`);
+          return;
+        }
+
+        // ⚠️ BŁĄD Z IDENTYFIKATOREM ZAMÓWIENIA (padła rejestracja płatności, ale
+        // wiersz w bazie i rezerwacja darmowej puli JUŻ SĄ) to nie jest błąd do
+        // powtórzenia — powtórzenie daje drugie zamówienie, tym razem bez
+        // gratisów. Nie odblokowujemy przycisku, tylko pokazujemy prawdziwy stan
+        // rzeczy: zamówienie przyjęte, płatność niepotwierdzona.
+        if (data.orderId) {
+          setLeaving("status");
+          router.push(`/probki/sukces?zamowienie=${encodeURIComponent(data.orderId)}`);
           return;
         }
 
@@ -149,26 +166,32 @@ export default function SampleForm({
         setError(res.error);
       } catch (err) {
         console.error("[probki] wysylka zamowienia nieudana:", err);
-        // Odblokowujemy — tak samo jak checkout mebli (CheckoutForm) — bo
-        // najczęstsza przyczyna to zerwana sieć PRZED dotarciem do serwera.
-        // Ostrzeżenie o możliwym duplikacie jest w treści: gdyby zamówienie
-        // jednak przeszło, drugie nie dostanie już gratisów.
+        // ⚠️ TA SAMA KLASA BŁĘDU, CO WYŻEJ, tylko bez odpowiedzi: rzut po
+        // dotarciu żądania (timeout, zerwana odpowiedź) mógł zostawić w bazie
+        // gotowe zamówienie, a my się o tym nie dowiemy. Automatyczne
+        // odblokowanie przycisku zamieniałoby to w duplikat na jedno kliknięcie,
+        // więc ponowienie musi być ŚWIADOME: przycisk zostaje zablokowany do
+        // czasu, aż klient potwierdzi je osobnym przyciskiem w komunikacie.
         busyRef.current = false;
+        setNeedsConfirm(true);
         setError(
-          "Nie udało się wysłać zamówienia — sprawdź połączenie i spróbuj ponownie. " +
-            "Jeśli błąd się powtarza, odśwież stronę zamiast klikać kolejny raz."
+          "Nie udało się potwierdzić wysyłki zamówienia — sprawdź połączenie. " +
+            "Jeśli zamówienie mimo to się zapisało, drugie nie dostanie już darmowych próbek."
         );
       }
     });
   }
 
-  const buttonLabel = leaving
-    ? total > 0
+  const buttonLabel =
+    leaving === "payment"
       ? "Przekierowuję do płatności…"
-      : "Zapisuję zamówienie…"
-    : isPending
-      ? "Wysyłam…"
-      : "Zamawiam";
+      : leaving === "order"
+        ? "Zapisuję zamówienie…"
+        : leaving === "status"
+          ? "Otwieram status zamówienia…"
+          : isPending
+            ? "Wysyłam…"
+            : "Zamawiam";
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-16">
@@ -394,6 +417,20 @@ export default function SampleForm({
               className="mb-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 rounded-xl px-4 py-3 text-sm"
             >
               {error}
+              {/* Świadome ponowienie po rzucie: jedno dodatkowe kliknięcie
+                  zamiast automatycznego odblokowania przycisku (patrz catch). */}
+              {needsConfirm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNeedsConfirm(false);
+                    setError(null);
+                  }}
+                  className="block mt-3 px-4 py-2 rounded-full border border-current font-sans text-xs uppercase tracking-widest hover:opacity-80 transition-opacity"
+                >
+                  Odblokuj i spróbuj ponownie
+                </button>
+              )}
             </div>
           )}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">

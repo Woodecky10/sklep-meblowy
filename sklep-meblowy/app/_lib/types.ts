@@ -3,9 +3,16 @@
 // po stronie DB przez FK products.category → categories.slug.
 export type Category = string;
 
+// `data` jest po OBU stronach świadomie. Bywają błędy, po których na serwerze
+// coś już POWSTAŁO i klient musi się o tym dowiedzieć — np. zamówienie próbek
+// jest zapisane w bazie, a padła dopiero rejestracja płatności. Bez tego kanału
+// formularz widzi „błąd", odblokowuje przycisk, klient klika drugi raz i składa
+// DRUGIE zamówienie (patrz app/probki/actions.ts + SampleForm.tsx). Kształt
+// ładunku ustala konkretna akcja i opisuje go przy `return` — tu zostaje
+// `unknown`, bo to typ współdzielony przez cały panel.
 export type ActionResult =
   | { ok: true; message?: string; data?: unknown }
-  | { ok: false; error: string };
+  | { ok: false; error: string; data?: unknown };
 
 export type ProductDimensions = {
   width: number;
