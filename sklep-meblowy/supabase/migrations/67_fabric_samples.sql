@@ -111,6 +111,15 @@ create table if not exists public.sample_quota (
 -- Sygnatura jest domknięta TERAZ celowo: dołożenie parametru po aplikacji na prod
 -- zostawiłoby wiszący overload (text,int) obok (text,int,uuid), z osobnym kompletem
 -- grantów — repo przejechało się już na tym w migracji 32.
+-- NIE USUWAĆ tego drop-a jako "zbędnego przy create or replace" — on NIE jest
+-- zbędny. `create or replace` nie podmienia funkcji o INNEJ liczbie argumentów,
+-- tylko stawia drugą obok. Gdyby na bazie wylądowała kiedyś dwuargumentowa
+-- wersja (ten plik jest idempotentny i bywa odpalany ponownie), wywołanie
+-- dwuargumentowe pasowałoby do obu i PostgREST oddałby 300 Multiple Choices
+-- zamiast wybrać — zamawianie próbek przestaje działać, a przyczyna jest
+-- nieoczywista. Precedens: 32_collections_de.sql:15.
+drop function if exists public.claim_free_samples(text, int);
+
 create or replace function public.claim_free_samples(
   p_email_key text,
   p_qty       int,
