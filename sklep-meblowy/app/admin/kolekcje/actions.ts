@@ -46,6 +46,20 @@ export async function createCollection(formData: FormData): Promise<ActionResult
   const descriptionDe = emptyToNull(sanitize(formData.get("description_de"), 1000));
 
   const supabase = await createAdminClient();
+
+  // Nowa kolekcja ląduje na KOŃCU listy (jak createTile w /admin/kafelki).
+  // Bez tego insert bierze default 0 z migracji 66 i kolekcja wskakuje na
+  // szczyt panelu, a gdy dostanie aktywne produkty — na pierwszą pozycję
+  // strony głównej, spychając ręcznie ustawioną szóstą kolekcję pod kreskę
+  // "poniżej dopiero po rozwinięciu".
+  const { data: maxRow } = await supabase
+    .from("collections")
+    .select("sort_order")
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const nextOrder = ((maxRow as { sort_order?: number } | null)?.sort_order ?? -1) + 1;
+
   const { error, data } = await supabase
     .from("collections")
     .insert({
@@ -54,6 +68,7 @@ export async function createCollection(formData: FormData): Promise<ActionResult
       label_de: labelDe,
       description,
       description_de: descriptionDe,
+      sort_order: nextOrder,
     } as never)
     .select()
     .single();
@@ -184,4 +199,68 @@ export async function saveCollection(
   revalidatePath("/admin/kolekcje");
   revalidatePath("/sklep");
   return { ok: true, message: "Kolekcja zapisana" };
+}
+
+// ============================================================
+// Kolejność na stronie głównej (spec 2026-07-31)
+// ============================================================
+// Atomowy reorder przez RPC — pętla UPDATE po jednym wierszu przy padzie
+// w połowie zostawia kolekcje z pomieszanymi numerami (jak reorderTiles).
+export async function reorderCollections(
+  order: { id: string; sort_order: number }[]
+): Promise<ActionResult> {
+  await requireAdmin();
+
+  if (!Array.isArray(order) || order.length === 0) {
+    return { ok: false, error: "Pusta lista kolejności" };
+  }
+
+  // Odrzucamy całe żądanie, gdy którekolwiek id jest puste. reorder_collections
+  // przenumerowuje DOKŁADNIE to, co dostanie, więc samo `.filter(Boolean)`
+  // przestawiłoby podzbiór kolekcji (reszta zostaje ze starymi numerami), a
+  // akcja i tak zwróciłaby ok:true z "Kolejność zapisana" — cicha, częściowa
+  // zmiana kolejności zameldowana jako sukces.
+  const ids = order.map((o) => o.id).filter(Boolean);
+  if (ids.length !== order.length) {
+    return { ok: false, error: "Lista kolejności zawiera puste id — nic nie zapisano" };
+  }
+
+  const supabase = await createAdminClient();
+  const { error } = await supabase.rpc("reorder_collections", { p_ids: ids });
+  if (error) return { ok: false, error: `Reorder zawiódł: ${error.message}` };
+
+  invalidateCollectionsCache();
+  revalidatePath("/admin/kolekcje");
+  revalidatePath("/");
+  return { ok: true, message: "Kolejność zapisana" };
+}
+
+// Ptaszek "pokazuj na stronie głównej" — zapis od razu, osobno od formularza
+// edycji. Metadane kolekcji idą przez save_collection(uuid,text,text,uuid[])
+// o ustalonej sygnaturze; dopisanie tam pola wymagałoby zmiany funkcji
+// używanej też przez inną ścieżkę.
+export async function toggleCollectionOnHome(
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+
+  const id = sanitize(formData.get("id"));
+  if (!id) return { ok: false, error: "Brak id" };
+
+  const show = formData.get("show") === "1";
+
+  const supabase = await createAdminClient();
+  const { error } = await supabase
+    .from("collections")
+    .update({ show_on_home: show } as never)
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  invalidateCollectionsCache();
+  revalidatePath("/admin/kolekcje");
+  revalidatePath("/");
+  return {
+    ok: true,
+    message: show ? "Kolekcja wróciła na stronę główną" : "Kolekcja ukryta ze strony głównej",
+  };
 }

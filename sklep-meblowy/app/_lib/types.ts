@@ -141,6 +141,12 @@ export type Collection = {
   label_de: string | null;
   description: string | null;
   description_de: string | null;
+  // Kolejność na stronie głównej (migracja 66). Mniejsze = wyżej; przy równych
+  // rozstrzyga label. Ustawiana przeciąganiem w /admin/kolekcje.
+  sort_order: number;
+  // Czy kolekcja pokazuje się w sekcji kolekcji na stronie głównej (migracja 66).
+  // Nie wpływa na /sklep?kolekcja=... ani na kartę produktu.
+  show_on_home: boolean;
   created_at: string;
   updated_at: string;
 };

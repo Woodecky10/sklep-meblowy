@@ -1,18 +1,41 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card, EmptyState, Field, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
 import Image from "next/image";
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   createCollection,
   saveCollection,
   deleteCollection,
   setCollectionProducts,
+  reorderCollections,
+  toggleCollectionOnHome,
   type ActionResult,
 } from "./actions";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import { searchMatches } from "@/app/_lib/search-normalize";
+// Czyste helpery — z collection-tiles, NIE z collections.ts: ten drugi ma
+// `import "server-only"` i ciągnie next/cache, więc import stąd ("use client")
+// wysypałby build.
+import { foldAfterIndex, HOME_COLLECTIONS_VISIBLE } from "@/app/_lib/collection-tiles";
 import type { Collection, Product } from "@/app/_lib/types";
 
 export default function CollectionsEditor({
@@ -34,6 +57,7 @@ export default function CollectionsEditor({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
+  const [, startTransition] = useTransition();
   const router = useRouter();
 
   function showToast(t: Toast) {
@@ -50,6 +74,50 @@ export default function CollectionsEditor({
     }
   }
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  function onDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = collections.findIndex((c) => c.id === active.id);
+    const newIndex = collections.findIndex((c) => c.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(collections, oldIndex, newIndex).map((c, i) => ({
+      ...c,
+      sort_order: i,
+    }));
+
+    // Cofnięcie wraca do OSTATNIEGO DOBREGO stanu, nie do initialCollections —
+    // inaczej nieudany zapis wymazuje wcześniejsze udane przestawienia
+    // (wniosek z audytu, ten sam komentarz jest w TilesEditor).
+    const prev = collections;
+    setCollections(reordered);
+    startTransition(async () => {
+      const res = await reorderCollections(
+        reordered.map((c) => ({ id: c.id, sort_order: c.sort_order }))
+      );
+      if (!res.ok) {
+        setCollections(prev);
+        showToast({ type: "error", message: res.error });
+      }
+    });
+  }
+
+  // Kreska liczy tylko kolekcje, które realnie trafią na home (widoczne
+  // i mające aktywne produkty) — inaczej pokazywałaby granicę w złym miejscu.
+  // foldAfterIndex iteruje podaną tablicę w podanej kolejności, więc dostaje
+  // DOKŁADNIE tę, którą renderujemy (posortowaną byHomeOrder w page.tsx
+  // i aktualizowaną przeciąganiem). null = nie ma czego zwijać.
+  const foldIndex = foldAfterIndex(
+    collections,
+    new Map(Object.entries(productCounts))
+  );
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex items-start justify-between gap-4">
@@ -61,7 +129,9 @@ export default function CollectionsEditor({
           <p className="text-sm text-[var(--muted)] mt-2 max-w-2xl">
             Grupuj produkty które pasują wizualnie do siebie (np. seria mebli &bdquo;Lisbon&rdquo;
             zawierająca narożnik + fotel + pufę). Na karcie produktu klienta zobaczy
-            sekcję &bdquo;Pełna kolekcja&rdquo; z resztą serii.
+            sekcję &bdquo;Pełna kolekcja&rdquo; z resztą serii. Przeciągnij żeby zmienić
+            kolejność — na stronie głównej widać pierwsze {HOME_COLLECTIONS_VISIBLE}{" "}
+            kolekcji, reszta dopiero po kliknięciu przycisku.
           </p>
         </div>
         <button
@@ -109,37 +179,75 @@ export default function CollectionsEditor({
       {collections.length === 0 && !creating ? (
         <EmptyState message="Brak kolekcji. Dodaj pierwszą żeby zacząć." />
       ) : (
-        <div className="flex flex-col gap-3">
-          {collections.map((c) => (
-            <Row
-              key={c.id}
-              collection={c}
-              productCount={productCounts[c.id] ?? 0}
-              allProducts={allProducts}
-              expanded={editingId === c.id}
-              onToggleExpand={() => setEditingId(editingId === c.id ? null : c.id)}
-              onUpdate={async (fd, productIds) => {
-                // Metadane + przypisania w jednej atomowej akcji (audyt LOW #14).
-                const res = await saveCollection(fd, productIds);
-                if (!res.ok) {
-                  showToast({ type: "error", message: res.error });
-                  return;
-                }
-                showToast({ type: "success", message: "Kolekcja zapisana" });
-                setEditingId(null);
-                router.refresh();
-              }}
-              onDelete={async () => {
-                const fd = new FormData();
-                fd.set("id", c.id);
-                const res = await deleteCollection(fd);
-                handleResult(res, () => {
-                  setCollections(collections.filter((x) => x.id !== c.id));
-                });
-              }}
-            />
-          ))}
-        </div>
+        <DndContext
+          id="collections-dnd"
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={onDragEnd}
+        >
+          <SortableContext
+            items={collections.map((c) => c.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="flex flex-col gap-3">
+              {collections.map((c, index) => (
+                <Fragment key={c.id}>
+                  <Row
+                    collection={c}
+                    productCount={productCounts[c.id] ?? 0}
+                    allProducts={allProducts}
+                    expanded={editingId === c.id}
+                    onToggleExpand={() => setEditingId(editingId === c.id ? null : c.id)}
+                    onUpdate={async (fd, productIds) => {
+                      // Metadane + przypisania w jednej atomowej akcji (audyt LOW #14).
+                      const res = await saveCollection(fd, productIds);
+                      if (!res.ok) {
+                        showToast({ type: "error", message: res.error });
+                        return;
+                      }
+                      showToast({ type: "success", message: "Kolekcja zapisana" });
+                      setEditingId(null);
+                      router.refresh();
+                    }}
+                    onDelete={async () => {
+                      const fd = new FormData();
+                      fd.set("id", c.id);
+                      const res = await deleteCollection(fd);
+                      handleResult(res, () => {
+                        setCollections(collections.filter((x) => x.id !== c.id));
+                      });
+                    }}
+                    onToggleHome={async () => {
+                      const prev = collections;
+                      setCollections(
+                        collections.map((x) =>
+                          x.id === c.id ? { ...x, show_on_home: !x.show_on_home } : x
+                        )
+                      );
+                      const fd = new FormData();
+                      fd.set("id", c.id);
+                      fd.set("show", c.show_on_home ? "0" : "1");
+                      const res = await toggleCollectionOnHome(fd);
+                      if (!res.ok) {
+                        setCollections(prev);
+                        showToast({ type: "error", message: res.error });
+                      }
+                    }}
+                  />
+                  {foldIndex === index && (
+                    <div className="flex items-center gap-3 py-1" aria-hidden="true">
+                      <div className="h-px flex-1 bg-[var(--border)]" />
+                      <span className="text-[11px] font-sans uppercase tracking-widest text-[var(--muted)]">
+                        poniżej dopiero po rozwinięciu
+                      </span>
+                      <div className="h-px flex-1 bg-[var(--border)]" />
+                    </div>
+                  )}
+                </Fragment>
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
     </div>
   );
@@ -157,6 +265,7 @@ function Row({
   onToggleExpand,
   onUpdate,
   onDelete,
+  onToggleHome,
 }: {
   collection: Collection;
   productCount: number;
@@ -165,12 +274,45 @@ function Row({
   onToggleExpand: () => void;
   onUpdate: (fd: FormData, productIds: string[]) => Promise<void>;
   onDelete: () => Promise<void>;
+  onToggleHome: () => Promise<void>;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: collection.id });
   const [pendingDelete, startDeleteTransition] = useTransition();
+  const [pendingHome, startHomeTransition] = useTransition();
   const confirm = useConfirm();
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+
   return (
-    <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl overflow-hidden">
+    <div
+      ref={setNodeRef}
+      style={style}
+      // Wyszarzenie = ta kolekcja nie trafi na stronę główną (ukryta ptaszkiem
+      // albo bez ani jednego aktywnego produktu) — ten sam warunek co
+      // appearsOnHome, tyle że po stronie widoku.
+      className={`bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl overflow-hidden ${!collection.show_on_home || productCount === 0 ? "opacity-60" : ""}`}
+    >
       <div className="flex items-center gap-3 p-4 flex-wrap">
+        <button
+          {...attributes}
+          {...listeners}
+          aria-label="Przeciągnij żeby zmienić kolejność"
+          className="shrink-0 w-8 h-8 flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] cursor-grab active:cursor-grabbing"
+        >
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <circle cx="9" cy="6" r="1" fill="currentColor" />
+            <circle cx="9" cy="12" r="1" fill="currentColor" />
+            <circle cx="9" cy="18" r="1" fill="currentColor" />
+            <circle cx="15" cy="6" r="1" fill="currentColor" />
+            <circle cx="15" cy="12" r="1" fill="currentColor" />
+            <circle cx="15" cy="18" r="1" fill="currentColor" />
+          </svg>
+        </button>
         <div className="flex-1 min-w-0">
           <p className="font-display text-base font-semibold text-[var(--fg)]">
             {collection.label}
@@ -180,6 +322,30 @@ function Row({
             {productCount === 1 ? "produkt" : productCount < 5 ? "produkty" : "produktów"}
           </p>
         </div>
+        <label className="flex items-center gap-2 text-xs text-[var(--fg)] cursor-pointer shrink-0">
+          <input
+            type="checkbox"
+            // Sam napis "na stronie głównej" powtarza się w każdym wierszu, więc
+            // czytnik ekranu nie odróżniłby kolekcji — stąd aria-label z nazwą.
+            aria-label={`Pokaż kolekcję ${collection.label} na stronie głównej`}
+            checked={collection.show_on_home}
+            disabled={pendingHome}
+            // BEZ `void` — startTransition musi dostać obietnicę zwróconą przez
+            // onToggleHome. Z `void` callback kończy się na części synchronicznej,
+            // transition zamyka się natychmiast i `disabled={pendingHome}` wyżej
+            // nie blokuje niczego: seria szybkich kliknięć wysyła konkurencyjne
+            // UPDATE-y bez wskaźnika zapisu. Wzorzec jak startDeleteTransition
+            // niżej i TilesEditor.tsx — nie dopisuj tu `void` z powrotem.
+            onChange={() => startHomeTransition(() => onToggleHome())}
+            className="h-4 w-4 accent-[var(--color-gold)]"
+          />
+          na stronie głównej
+        </label>
+        {productCount === 0 && (
+          <span className="shrink-0 text-[11px] text-[var(--muted)]">
+            brak aktywnych produktów — nie pokaże się
+          </span>
+        )}
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={onToggleExpand}

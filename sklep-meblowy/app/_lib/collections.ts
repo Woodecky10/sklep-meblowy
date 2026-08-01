@@ -1,5 +1,13 @@
 // Helpery do tabeli collections — grupowanie produktów (np. "Kolekcja Lisbon").
 // Edytowane przez admin panel /admin/kolekcje.
+//
+// Ten moduł ma server-only importy (next/cache, supabase/server → next/headers)
+// — `import "server-only"` niżej zamienia ciche wysypanie builda Turbopacka na
+// jawny błąd, gdyby ktoś zaimportował ten plik z komponentu klienckiego.
+// Czysta logika kafelków (bez I/O) żyje w collection-tiles.ts — importuj
+// stamtąd, NIE re-eksportu tutaj (patrz historia w commitach: re-eksport
+// maskował, że collections.ts jest "zatruty" server-only importami).
+import "server-only";
 
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
@@ -7,6 +15,12 @@ import { createAdminClient } from "./supabase/server";
 import { localizeProduct, localizeCollection } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Collection, Product } from "./types";
+import {
+  buildCollectionTiles,
+  COLLECTION_TILE_COLUMNS,
+  type CollectionProductRow,
+  type CollectionTile,
+} from "./collection-tiles";
 
 export const COLLECTIONS_CACHE_TAG = "collections";
 
@@ -63,39 +77,44 @@ export async function getCollectionSiblings(
 }
 
 // ============================================================
-// Kolekcje + sample produkty dla home page (auto-display)
+// Kafelki kolekcji na stronę główną
 // ============================================================
-// Zwraca tylko kolekcje które mają co najmniej jeden produkt — puste kolekcje
-// nie pokazują się klientom. Dla każdej dodaje do 4 sample produktów żeby
-// front mógł zrobić mozaikę miniaturek.
-export async function getCollectionsForHome(
+// Cienka skorupa nad buildCollectionTiles (collection-tiles.ts): dwa
+// zapytania i nic więcej — cała logika filtrowania/sortowania/liczenia jest
+// w czystym module, testowana bez bazy.
+export async function getCollectionTilesForHome(
   locale: Locale = DEFAULT_LOCALE
-): Promise<Array<{ collection: Collection; sampleProducts: Product[] }>> {
-  const supabase = await createAdminClient();
+): Promise<CollectionTile[]> {
   const collections = await getAllCollections();
   if (collections.length === 0) return [];
 
-  // Pobierz wszystkie produkty należące do dowolnej kolekcji jednym query
-  const { data } = await supabase
+  const supabase = await createAdminClient();
+  const { data, error } = await supabase
     .from("products")
-    .select("*")
+    // Lista kolumn z collection-tiles.ts (COLLECTION_TILE_COLUMNS) — musi
+    // odpowiadać CollectionProductRow, patrz komentarz przy stałej.
+    .select(COLLECTION_TILE_COLUMNS)
+    // Optymalizacja pasma (nie ściągamy nieaktywnych produktów) — NIE jest
+    // źródłem prawdy o aktywności. Źródło prawdy: isActiveProductRow w
+    // collection-tiles.ts, którego Task 4 (panel, bez tego filtra SQL) też
+    // używa. Nie usuwaj tego `.eq` myśląc, że jest zbędny — to tylko wydajność.
+    .eq("is_active", true)
     .not("collection_id", "is", null)
     .order("name", { ascending: true });
 
-  const byCollection = new Map<string, Product[]>();
-  for (const p of (data ?? []) as Product[]) {
-    if (!p.collection_id) continue;
-    const arr = byCollection.get(p.collection_id) ?? [];
-    if (arr.length < 4) arr.push(localizeProduct(p, locale));
-    byCollection.set(p.collection_id, arr);
+  // Dotąd błąd był ignorowany bez śladu: awaria bazy = sekcja znika ze strony
+  // głównej i nikt nie wie dlaczego. Znikanie zostaje (jedenaście kafelków
+  // z szarymi prostokątami wygląda na zepsute bardziej), ale z logiem.
+  if (error) {
+    console.error("[collections] produkty do kafelków niedostępne:", error);
+    return [];
   }
 
-  return collections
-    .map((collection) => ({
-      collection: localizeCollection(collection, locale),
-      sampleProducts: byCollection.get(collection.id) ?? [],
-    }))
-    .filter((row) => row.sampleProducts.length > 0);
+  return buildCollectionTiles(
+    collections,
+    (data ?? []) as CollectionProductRow[],
+    locale
+  );
 }
 
 // ============================================================

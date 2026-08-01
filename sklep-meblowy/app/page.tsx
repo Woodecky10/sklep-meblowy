@@ -7,11 +7,10 @@ import { getActiveSlides, DEFAULT_FALLBACK_SLIDE, localizeSlide } from "./_lib/s
 import { getActiveTiles, DEFAULT_FALLBACK_TILES, localizeTile } from "./_lib/home-tiles";
 import { getFeaturedOrFallback } from "./_lib/featured";
 import { getCategories } from "./_lib/categories";
-import { getCollectionsForHome } from "./_lib/collections";
+import { getCollectionTilesForHome } from "./_lib/collections";
 import { getUserWishlistIds } from "./_lib/wishlist";
 import { getLocale } from "./_lib/i18n-server";
 import { getEurRate } from "./_lib/store-settings";
-import { pluralForm } from "./_lib/plural";
 import { localizePath } from "./_lib/i18n";
 import { alternatesFor } from "./_lib/sitemap-i18n";
 import { baseOpenGraph } from "./_lib/seo-og";
@@ -21,6 +20,7 @@ import TrustBar from "./_components/ui/TrustBar";
 import { localizeBlock, type LocalizedBlock } from "./_lib/blocks";
 import { getHomeBlocks } from "./_lib/blocks-server";
 import ContentBlock from "./_components/blocks/ContentBlock";
+import HomeCollections from "./_components/blocks/HomeCollections";
 
 // Home jest w pełni przetłumaczone przez słownik UI → DE zawsze (hasDe: true).
 // generateMetadata na poziomie strony nadpisuje statyczne metadata z layoutu
@@ -47,26 +47,16 @@ function protectOrphans(text: string): string {
   return text.replace(/ ([A-ZĄĆĘŁŃÓŚŹŻa-ząćęłńóśźż])$/, " $1");
 }
 
-// Klasa grid dla i-tego zdjęcia w mozaice kolekcji (do 4 zdjęć). Pojedyncze
-// zdjęcie wypełnia całość, dwa dzielą się na pół wysokości, przy trzech
-// pierwsze zajmuje cały górny wiersz, przy czterech siatka 2×2.
-function mosaicTileClass(total: number, index: number): string {
-  if (total === 1) return "col-span-2 row-span-2";
-  if (total === 2) return "col-span-1 row-span-2";
-  if (total === 3 && index === 0) return "col-span-2";
-  return "";
-}
-
 export default async function HomePage() {
   const locale = await getLocale();
   const t = getDictionary(locale);
-  const [dbSlides, dbTiles, featured, allCategories, collectionsForHome, wishlistIds, rate, dbBlocks] =
+  const [dbSlides, dbTiles, featured, allCategories, collectionTiles, wishlistIds, rate, dbBlocks] =
     await Promise.all([
       getActiveSlides(),
       getActiveTiles(),
       getFeaturedOrFallback(locale),
       getCategories(locale),
-      getCollectionsForHome(locale),
+      getCollectionTilesForHome(locale),
       getUserWishlistIds(),
       getEurRate(),
       getHomeBlocks(),
@@ -212,64 +202,13 @@ export default async function HomePage() {
         );
 
       case "collections":
-        // Nasze kolekcje — auto-render kolekcji z DB które mają produkty
-        if (collectionsForHome.length === 0) return null;
+        // Nasze kolekcje — auto-render kolekcji z DB które mają aktywne produkty.
+        // Zwijanie i markup kafelka: _components/blocks/HomeCollections.tsx
+        if (collectionTiles.length === 0) return null;
         return (
           <section className="max-w-7xl mx-auto px-6 py-24">
             {sectionHeader(b)}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {collectionsForHome.map(({ collection, sampleProducts }) => (
-                <LocalizedLink
-                  key={collection.id}
-                  href={`/sklep?kolekcja=${collection.slug}`}
-                  className="group flex flex-col bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl overflow-hidden hover:border-[var(--color-gold)] transition-colors"
-                >
-                  {/* Mozaika do 4 zdjęć produktów z kolekcji */}
-                  <div className="relative aspect-[4/3] grid grid-cols-2 gap-1 p-1 bg-stone-100 dark:bg-stone-900">
-                    {sampleProducts.slice(0, 4).map((p, i) => (
-                      <div
-                        key={p.id}
-                        className={`relative bg-stone-200 dark:bg-stone-800 rounded-lg overflow-hidden ${mosaicTileClass(
-                          sampleProducts.length,
-                          i
-                        )}`}
-                      >
-                        {p.images?.[0] && (
-                          <Image
-                            src={p.images[0]}
-                            alt=""
-                            fill
-                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                            className="object-cover transition-transform group-hover:scale-105"
-                          />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="p-6 flex flex-col gap-2">
-                    <h3 className="font-display text-2xl font-bold text-[var(--fg)] group-hover:text-[var(--color-gold)] transition-colors">
-                      {collection.label}
-                    </h3>
-                    {collection.description && (
-                      <p className="text-sm text-[var(--muted)] leading-snug line-clamp-2">
-                        {collection.description}
-                      </p>
-                    )}
-                    <span className="mt-2 text-xs font-sans uppercase tracking-widest text-[var(--color-gold)] flex items-center gap-1">
-                      {t.home.seeCollection} ({sampleProducts.length}{" "}
-                      {pluralForm(sampleProducts.length, {
-                        one: t.home.productOne,
-                        few: t.home.productFew,
-                        many: t.home.productMany,
-                      })})
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M5 12h14M12 5l7 7-7 7" />
-                      </svg>
-                    </span>
-                  </div>
-                </LocalizedLink>
-              ))}
-            </div>
+            <HomeCollections tiles={collectionTiles} locale={locale} />
           </section>
         );
     }

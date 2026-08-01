@@ -30,6 +30,8 @@ export type PlShape = {
     seriesEyebrow: string;
     seriesHeading: string;
     seeCollection: string;
+    collectionsShowAll: string;
+    collectionsCollapse: string;
     productOne: string;
     productFew: string;
     productMany: string;
@@ -385,6 +387,8 @@ export const pl = {
     seriesEyebrow: "Serie mebli",
     seriesHeading: "Nasze kolekcje",
     seeCollection: "Zobacz kolekcję",
+    collectionsShowAll: "Pokaż wszystkie kolekcje",
+    collectionsCollapse: "Zwiń",
     productOne: "produkt",
     productFew: "produkty",
     productMany: "produktów",
