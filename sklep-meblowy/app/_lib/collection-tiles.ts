@@ -29,6 +29,18 @@ export type CollectionProductRow = {
   is_active: boolean;
 };
 
+// Lista kolumn dla zapytania, które karmi CollectionProductRow — stoi TU,
+// obok typu i ostrzeżenia wyżej, a nie jako literał w collections.ts.
+// Powód: skrócenie tej listy (np. wywalenie `is_active` jako "przecież SQL
+// już filtruje") nie wywala niczego — `as CollectionProductRow[]` przepuszcza
+// to przez tsc, testy jednostkowe podają is_active jawnie, a na produkcji
+// isActiveProductRow zwraca undefined dla KAŻDEGO wiersza → wszystkie
+// liczniki 0 → sekcja kolekcji cicho znika ze strony głównej. Trzymając
+// stałą tutaj wymuszamy, żeby taka zmiana wymagała dotknięcia pliku
+// z ostrzeżeniem, zamiast edycji stringa kilkadziesiąt linii dalej.
+// Musi odpowiadać DOKŁADNIE polom CollectionProductRow.
+export const COLLECTION_TILE_COLUMNS = "collection_id, images, is_active";
+
 export type CollectionTile = {
   collection: Collection; // zlokalizowana (label/description)
   thumbnails: string[]; // do 4 UNIKALNYCH adresów zdjęć na mozaikę

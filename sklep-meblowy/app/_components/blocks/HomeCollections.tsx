@@ -25,6 +25,12 @@ function mosaicTileClass(total: number, index: number): string {
 
 const GRID = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6";
 const REST_ID = "home-collections-rest";
+// Uchwyt dla e2e (home-collections.spec.ts). Bez niego test liczyłby linki
+// `?kolekcja=` po całej stronie i łapał navbar, stopkę oraz bloki home
+// edytowalne z panelu (edytor podpowiada wprost "np. /sklep?kolekcja=lisbon")
+// — zawyżony wynik wywracał test przy samej zmianie treści w DB, a zerowy
+// (czyli ZNIKNIĘCIE sekcji — regresja) uciszał go skipem.
+const VISIBLE_ID = "home-collections-visible";
 
 // Sekcja "Nasze kolekcje". Pierwsze HOME_COLLECTIONS_VISIBLE kafelków widać od
 // razu, nadwyżka siedzi w drugim kontenerze do kliknięcia.
@@ -95,7 +101,9 @@ export default function HomeCollections({
 
   return (
     <>
-      <div className={GRID}>{visible.map(card)}</div>
+      <div id={VISIBLE_ID} className={GRID}>
+        {visible.map(card)}
+      </div>
 
       {rest.length > 0 && (
         <>

@@ -15,7 +15,12 @@ import { createAdminClient } from "./supabase/server";
 import { localizeProduct, localizeCollection } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Collection, Product } from "./types";
-import { buildCollectionTiles, type CollectionProductRow, type CollectionTile } from "./collection-tiles";
+import {
+  buildCollectionTiles,
+  COLLECTION_TILE_COLUMNS,
+  type CollectionProductRow,
+  type CollectionTile,
+} from "./collection-tiles";
 
 export const COLLECTIONS_CACHE_TAG = "collections";
 
@@ -86,7 +91,9 @@ export async function getCollectionTilesForHome(
   const supabase = await createAdminClient();
   const { data, error } = await supabase
     .from("products")
-    .select("collection_id, images, is_active")
+    // Lista kolumn z collection-tiles.ts (COLLECTION_TILE_COLUMNS) — musi
+    // odpowiadać CollectionProductRow, patrz komentarz przy stałej.
+    .select(COLLECTION_TILE_COLUMNS)
     // Optymalizacja pasma (nie ściągamy nieaktywnych produktów) — NIE jest
     // źródłem prawdy o aktywności. Źródło prawdy: isActiveProductRow w
     // collection-tiles.ts, którego Task 4 (panel, bez tego filtra SQL) też

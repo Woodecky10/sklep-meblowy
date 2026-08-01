@@ -46,6 +46,20 @@ export async function createCollection(formData: FormData): Promise<ActionResult
   const descriptionDe = emptyToNull(sanitize(formData.get("description_de"), 1000));
 
   const supabase = await createAdminClient();
+
+  // Nowa kolekcja ląduje na KOŃCU listy (jak createTile w /admin/kafelki).
+  // Bez tego insert bierze default 0 z migracji 66 i kolekcja wskakuje na
+  // szczyt panelu, a gdy dostanie aktywne produkty — na pierwszą pozycję
+  // strony głównej, spychając ręcznie ustawioną szóstą kolekcję pod kreskę
+  // "poniżej dopiero po rozwinięciu".
+  const { data: maxRow } = await supabase
+    .from("collections")
+    .select("sort_order")
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const nextOrder = ((maxRow as { sort_order?: number } | null)?.sort_order ?? -1) + 1;
+
   const { error, data } = await supabase
     .from("collections")
     .insert({
@@ -54,6 +68,7 @@ export async function createCollection(formData: FormData): Promise<ActionResult
       label_de: labelDe,
       description,
       description_de: descriptionDe,
+      sort_order: nextOrder,
     } as never)
     .select()
     .single();
