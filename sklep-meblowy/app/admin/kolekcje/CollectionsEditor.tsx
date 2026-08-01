@@ -325,9 +325,18 @@ function Row({
         <label className="flex items-center gap-2 text-xs text-[var(--fg)] cursor-pointer shrink-0">
           <input
             type="checkbox"
+            // Sam napis "na stronie głównej" powtarza się w każdym wierszu, więc
+            // czytnik ekranu nie odróżniłby kolekcji — stąd aria-label z nazwą.
+            aria-label={`Pokaż kolekcję ${collection.label} na stronie głównej`}
             checked={collection.show_on_home}
             disabled={pendingHome}
-            onChange={() => startHomeTransition(() => void onToggleHome())}
+            // BEZ `void` — startTransition musi dostać obietnicę zwróconą przez
+            // onToggleHome. Z `void` callback kończy się na części synchronicznej,
+            // transition zamyka się natychmiast i `disabled={pendingHome}` wyżej
+            // nie blokuje niczego: seria szybkich kliknięć wysyła konkurencyjne
+            // UPDATE-y bez wskaźnika zapisu. Wzorzec jak startDeleteTransition
+            // niżej i TilesEditor.tsx — nie dopisuj tu `void` z powrotem.
+            onChange={() => startHomeTransition(() => onToggleHome())}
             className="h-4 w-4 accent-[var(--color-gold)]"
           />
           na stronie głównej

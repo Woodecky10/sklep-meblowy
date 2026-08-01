@@ -15,7 +15,7 @@ export default async function AdminCollectionsPage() {
   await requireAdmin();
 
   const supabase = await createAdminClient();
-  const [collections, { data: productsRaw }] = await Promise.all([
+  const [collections, { data: productsRaw, error: productsError }] = await Promise.all([
     getAllCollections(),
     // Picker produktów potrzebuje tylko nazwy, miniatury, kategorii i ceny —
     // NIE opisów HTML ani sekcji opisu, które przy select("*") ciągnęły cały
@@ -26,6 +26,23 @@ export default async function AdminCollectionsPage() {
       .select("id, name, images, collection_id, is_active, category, price")
       .order("name", { ascending: true }),
   ]);
+
+  // Błąd zapytania NIE może zniknąć po cichu. Bez produktów licznik każdej
+  // kolekcji wynosi 0, więc panel wyszarzyłby wszystkie wiersze, zgasił kreskę
+  // i przy każdej kolekcji napisał "brak aktywnych produktów — nie pokaże się",
+  // czyli skłamałby, że na stronę główną nie trafia nic. Gorzej: picker w
+  // edytorze wystartowałby z pustym zaznaczeniem, a zapis kolekcji odpiąłby od
+  // niej WSZYSTKIE produkty. Dlatego zamiast fałszywego stanu pokazujemy błąd
+  // i w ogóle nie renderujemy edytora (banner jak w /admin/produkty).
+  if (productsError) {
+    return (
+      <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-800 dark:text-red-300 text-sm">
+        Nie udało się wczytać produktów, więc lista kolekcji nie została pokazana
+        — liczniki i przypisania byłyby nieprawdziwe. Odśwież stronę za chwilę.
+        Szczegóły techniczne: {productsError.message}
+      </div>
+    );
+  }
 
   const products = (productsRaw ?? []) as Product[];
 

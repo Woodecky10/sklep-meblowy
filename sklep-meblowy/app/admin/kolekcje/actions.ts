@@ -200,10 +200,18 @@ export async function reorderCollections(
     return { ok: false, error: "Pusta lista kolejności" };
   }
 
+  // Odrzucamy całe żądanie, gdy którekolwiek id jest puste. reorder_collections
+  // przenumerowuje DOKŁADNIE to, co dostanie, więc samo `.filter(Boolean)`
+  // przestawiłoby podzbiór kolekcji (reszta zostaje ze starymi numerami), a
+  // akcja i tak zwróciłaby ok:true z "Kolejność zapisana" — cicha, częściowa
+  // zmiana kolejności zameldowana jako sukces.
+  const ids = order.map((o) => o.id).filter(Boolean);
+  if (ids.length !== order.length) {
+    return { ok: false, error: "Lista kolejności zawiera puste id — nic nie zapisano" };
+  }
+
   const supabase = await createAdminClient();
-  const { error } = await supabase.rpc("reorder_collections", {
-    p_ids: order.map((o) => o.id).filter(Boolean),
-  });
+  const { error } = await supabase.rpc("reorder_collections", { p_ids: ids });
   if (error) return { ok: false, error: `Reorder zawiódł: ${error.message}` };
 
   invalidateCollectionsCache();
