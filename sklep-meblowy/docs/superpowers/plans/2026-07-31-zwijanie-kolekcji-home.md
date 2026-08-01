@@ -10,60 +10,46 @@
 
 ---
 
-## ⏸ STAN WYKONANIA — przerwane 2026-07-31, wznawiane na innym komputerze
+## ✅ STAN WYKONANIA — ZAKOŃCZONE 2026-08-01
 
-> Ta sekcja jest w repo **celowo**: ledger wykonania (`.superpowers/sdd/…`) jest gitignorowany, więc nie jedzie z klonem. To jedyne miejsce, z którego da się podnieść pracę na innej maszynie. Aktualizuj ją przy każdym przerwaniu.
+> Ta sekcja była w repo **celowo**: ledger wykonania (`.superpowers/sdd/…`) jest gitignorowany, więc nie jedzie z klonem, a praca przechodziła między dwoma komputerami. Zostaje jako zapis tego, co i dlaczego odbiega od treści planu.
 
-**Gałąź:** `feat/kolekcje-zwijanie-home`, wypchnięta na origin. Ostatni commit: `e62063c`.
+**Gałąź:** `feat/kolekcje-zwijanie-home`, ostatni commit `5c8478aa`. Wszystkie taski zrobione, każdy zrecenzowany, końcowa recenzja całej gałęzi + fala naprawcza zamknięte.
 
-### Zrobione i zamknięte
+**Bramki na koniec:** `tsc --noEmit` 0 błędów · `npm test` **895 testów w 75 plikach** · `npm run build` przechodzi · `npx playwright test home-collections --no-deps` na localhoście `1 passed` (z weryfikacją negatywną: celowo zepsute id → `1 failed`).
 
-**Task 1 — migracja 66. GOTOWE, recenzja czysta** (`248c57f`, poprawka `929ec1e`).
-Migracja **jest już zaaplikowana na produkcyjnej bazie** (11 kolekcji, każda z innym `sort_order`, kolejność alfabetyczna, `reorder_collections` istnieje). ⚠️ **NIE aplikuj jej ponownie.** Recenzja wymusiła guard idempotentności backfillu (właściciel zatwierdził) — bez niego powtórne odpalenie pliku skasowałoby kolejność ustawioną w panelu.
+**Migracja 66 jest zaaplikowana na produkcyjnej bazie** (11 kolekcji, `sort_order` 0-10, RPC `reorder_collections` istnieje, `prosecdef = false` → zapis chroniony przez RLS). ⚠️ **NIE aplikuj jej ponownie** — a gdyby ktoś odpalił plik drugi raz, guard idempotentności backfillu i tak nie nadpisze kolejności ustawionej w panelu (zweryfikowane na żywej bazie: 10 wierszy z niezerowym `sort_order`).
 
-### Zrobione, ale NIEZWERYFIKOWANE — tu wznów
+### Gdzie plan był BŁĘDNY — rozstrzygnięcia obowiązujące ponad jego treścią
 
-**Taski 2+3 — warstwa danych i front. Kod gotowy, wszystkie bramki zielone** (`edcbb38`, runda poprawek `e62063c`): `tsc` 0 błędów, cała suita **895 testów** zielona (18 w `collection-tiles.test.ts`), `npm run build` przechodzi. Na dev potwierdzone wizualnie: 6 kafelków, „Pokaż wszystkie kolekcje (+5)", po rozwinięciu 11 i „Zwiń", realne liczniki produktów.
+Nie „poprawiaj" kodu z powrotem do tego, co pisze plan w tych sześciu miejscach:
 
-⬜ **Brakuje jednego kroku: zawężonej ponownej recenzji rundy poprawek `edcbb38..e62063c`.** Recenzja Tasków 2+3 znalazła 6 rzeczy wagi Ważne i wszystkie zostały zaadresowane w `e62063c`, ale **nikt tego nie sprawdził**. Zacznij od tego.
+1. **Czyste funkcje żyją w `app/_lib/collection-tiles.ts`**, nie w `collections.ts` (ten dostał `import "server-only"`). Plan pokazywał importy z `collections.ts` — komponent kliencki wciągnąłby przez to `next/cache`. Bez re-eksportu, świadomie: re-eksport maskował problem.
+2. **Panel sortuje KOPIĘ listy komparatorem `byHomeOrder`.** Plan wpuszczał wynik `getAllCollections()` (sortowany po `label`) wprost do przeciągania — drugie przeciągnięcie cicho kasowałoby układ, a błąd ujawniłby się dopiero na produkcji. Kopia jest obowiązkowa, bo `getAllCollections` jest cache'owane, a `sort()` mutuje.
+3. **`select` w `app/admin/kolekcje/page.tsx` ma `category` i `price`** ponad listę z planu — bez nich picker produktów rzuca `undefined.toLocaleString`, a rzutowanie `as Product[]` ukrywa to przed `tsc`.
+4. **Brak `void` w `startHomeTransition(() => onToggleHome())`.** Plan miał `void`; z nim `disabled={pendingHome}` nie blokował niczego, bo transition kończył się po części synchronicznej.
+5. **Guard e2e: `test.skip` opiera się na liczbie kafelków w widocznej siatce (`#home-collections-visible`), nie na braku przycisku**, a liczenie jest zawężone do tej siatki. Wersja z planu zamieniała zniknięcie sekcji w cichy zielony skip i pękała od treści edytowalnej z panelu (`?kolekcja=` w navbarze/stopce/blokach home).
+6. **Przy błędzie zapytania o produkty panel renderuje banner błędu ZAMIAST edytora.** Picker nad pustą listą + RPC `save_collection` (`not (id = any(p_product_ids))`) odpiąłby wszystkie produkty od kolekcji jednym „Zapisz".
 
-Co naprawiała runda poprawek (to trzeba zweryfikować):
-1. `foldAfterIndex` przy dokładnie 6 widocznych kolekcjach zwracał 5, łamiąc własny kontrakt („null gdy ≤6") — a test przechodził trywialnie, bo używał 5 kolekcji.
-2. + 3. Granica klient/serwer narysowana w połowie: czyste funkcje zostały w `collections.ts`, który ciągnie `next/cache` i `next/headers`. Naprawione zgodnie z konwencją repo (`blocks.ts`/`blocks-server.ts`, `i18n.ts`/`i18n-server.ts`): czysty **`app/_lib/collection-tiles.ts`**, `collections.ts` z `import "server-only"`, bez re-eksportu (re-eksport maskował problem). Plik `collection-tiles-shared.ts` z pierwszej wersji został usunięty.
-4. + 5. Definicja „aktywnego produktu" przeniesiona z SQL do czystego kodu, bo była zduplikowana (SQL na home, JS w panelu) i **usunięcie filtru `is_active` zostawiało wszystkie testy zielone** — najdroższy z trzech naprawianych błędów był jedyny bez guardu. Filtr w SQL został jako oszczędność pasma; źródłem prawdy jest czysty kod.
-6. `key={src}` w mozaice dawał zduplikowane klucze React, gdy dwa produkty dzielą pierwsze zdjęcie. Naprawione deduplikacją miniatur **przed** obcięciem do 4.
+Do tego dwie rzeczy dołożone poza planem, obie z powodu znalezisk recenzji: `createCollection` wstawia `max(sort_order) + 1` (plan zostawiał default `0`, więc nowa kolekcja lądowała na pierwszej pozycji strony głównej), a lista kolumn zapytania o produkty jest wspólną stałą `COLLECTION_TILE_COLUMNS`.
 
-### ⚠️ POPRAWKA DO TASKA 4 — przeczytaj przed jego implementacją
+### Follow-upy (nieblokujące, świadomie odłożone)
 
-Recenzja wyłapała defekt w treści Taska 4, którego nie widać z jego kodu: **`getAllCollections()` sortuje po `label`**, a Task 4 wpuszcza tę tablicę wprost do przeciągania i nadaje `sort_order = index`. Skutek: po pierwszym przeciągnięciu i odświeżeniu panel wróciłby do porządku alfabetycznego, a kolejne przeciągnięcie przenumerowałoby względem alfabetu i **cicho skasowało poprzedni układ**. Kreska „poniżej dopiero po rozwinięciu" liczyłaby się względem porządku, który nie jest porządkiem strony głównej.
+- **e2e da fałszywą CZERWIEŃ przy dokładnie sześciu kolekcjach na home** (przycisk się nie renderuje, więc `toHaveCount(1)` pada mimo zdrowego kodu). Fix ~4 linijki: `data-collections-total={tiles.length}` na siatce i skip na `total <= VISIBLE`. Fałszywy alarm, nigdy fałszywa zieleń.
+- `app/admin/kolekcje/page.tsx` pobiera te same wiersze **własnym literałem kolumn** — wycięcie stamtąd `is_active` nadal przechodzi `tsc` i gasi wszystkie liczniki w panelu. Domknięcie: `` .select(`id, name, category, price, ${COLLECTION_TILE_COLUMNS}`) ``.
+- `COLLECTION_TILE_COLUMNS` jest guardem społecznym, nie mechanicznym — utwardzenie: `Record<keyof CollectionProductRow, true>` + `Object.keys().join(", ")`.
+- `onToggleHome` czyta `collections` z domknięcia zamiast przez updater funkcyjny — klikanie ptaszków w dwóch wierszach pod rząd potrafi wizualnie cofnąć pierwszą zmianę (baza dostaje oba UPDATE-y poprawnie).
+- Kreska „poniżej dopiero po rozwinięciu" nie jest sortowalna, więc wiersze przejeżdżają po niej w trakcie przeciągania; `aria-hidden` ukrywa ją przed czytnikiem ekranu.
+- Komunikaty sukcesu obu nowych akcji nigdy nie docierają do UI (klient reaguje tylko na `!ok`).
+- Guard reordera łapie tylko puste id (duplikaty i id spoza tabeli dają `ok: true`); `update().eq("id")` na nieistniejącym id też zwraca `ok: true`.
+- `fetchAllCollections` połyka błąd zapytania i zwraca `[]` → przy awarii Supabase panel pokaże „Brak kolekcji. Dodaj pierwszą" (pre-existing, ale teraz obok stoi banner dla produktów).
+- Test „lokalizuje etykietę dla DE z fallbackiem do PL" nie testuje fallbacku; gałąź `images: null` bez pokrycia (na produkcji 0 takich wierszy); brak pokrycia `/de` (zamrożone flagą `DE_ENABLED`).
 
-Strona główna jest bezpieczna, bo `buildCollectionTiles` sortuje sama. Migracja 66 backfilluje alfabetycznie, więc rozjazd ujawni się **dopiero po pierwszym przeciągnięciu** — czyli w testach ręcznych łatwo go przegapić.
+Odrzucone świadomie: indeks na `collections(sort_order)` (nic nie sortuje po nim w SQL — sortowanie dzieje się w JS), sygnatura `reorderCollections` z nieużywanym `sort_order` (1:1 z `reorderTiles`), zmiana dedupe miniatur (jedno duże zdjęcie zamiast czterech kopii tego samego to poprawa).
 
-**Poprawka:** panel musi posortować listę **tym samym komparatorem** co strona główna (`sort_order` rosnąco, `label` jako tie-break). Komparator jest już wyeksportowany z `app/_lib/collection-tiles.ts` właśnie po to. Sortuj kopię, nie wynik `getAllCollections()` — ta funkcja jest cache'owana i używana w innych miejscach.
+### Czego NIE zweryfikowała automatyka — klik-testy właścicielki
 
-Drugie: Task 4 ma podawać do helpera **wszystkie** wiersze produktów bez filtrowania w JS (`.filter((p) => p.is_active)` z treści zadania jest już nieaktualne) — filtrowanie robi czysty kod.
-
-### Odłożone drobiazgi (do triażu w końcowej recenzji gałęzi, nie blokują)
-
-- Test „lokalizuje etykietę dla DE z fallbackiem do PL" nie testuje fallbacku — ustawia `label_de` i sprawdza `label_de`.
-- Gałąź `images: null` w `CollectionProductRow` bez pokrycia (fabryka testowa produkuje `[]`, nigdy `null`, a w bazie NULL jest możliwy).
-- Komentarz w `HomeCollections.tsx` odsyła do `e2e/home-collections.spec.ts`, który powstanie dopiero w Tasku 5.
-- Raport implementera myli się co do `pluralForm` (usunięcie importu było poprawne, opis w raporcie nie).
-- Tie-break po polskiej etykiecie działa też na `/de` — bez wpływu, `/de` jest zamrożone flagą `DE_ENABLED`.
-- Brak indeksu na `collections(sort_order)` — wszystkie inne tabele z `sort_order` w repo mają wspierający indeks. Przy 11 wierszach bez znaczenia, czysty rozjazd z konwencją.
-- W planie Task 1 Step 6 `git add` miał ścieżkę bez prefiksu `sklep-meblowy/` (poprawione w rundzie 1).
-
-### Świadome ograniczenie, nie do naprawiania
-
-Test e2e sprawdza, że ukryty kontener ma `display: none` — **nie** sprawdza, że przeglądarka faktycznie nie pobiera zdjęć. Weryfikacja braku żądań wymagałaby panelu sieci. Właściwość wydajnościowa opiera się więc na `display: none` jako proxy; e2e chroni przed zamianą na `opacity-0`, co jest realnym ryzykiem regresji (wizualnie nierozpoznawalne).
-
-### Kolejność wznowienia
-
-1. Zawężona re-recenzja `edcbb38..e62063c` (6 znalezisk → ADDRESSED / NOT ADDRESSED).
-2. Task 4 **z poprawką wyżej**.
-3. Task 5 (e2e).
-4. Końcowa recenzja całej gałęzi + triaż odłożonych drobiazgów.
-5. PR na `main`. ⚠️ Push wymaga konta **Woodecky10** (`mwlo1403` dostaje 403).
+Panel operuje na produkcyjnej bazie, więc przeciąganie i ptaszek nie zostały ani razu wykonane; panel admina nie ma ani jednego testu. Lista scenariuszy do wyklikania jest w opisie PR.
 
 ---
 
