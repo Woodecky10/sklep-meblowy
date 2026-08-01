@@ -7,6 +7,7 @@
 import { headers } from "next/headers";
 import { createClient } from "@/app/_lib/supabase/server";
 import { createSampleOrder } from "@/app/_lib/samples";
+import { buildSampleP24Params } from "@/app/_lib/sample-p24";
 import { registerTransaction, trnRequestUrl } from "@/app/_lib/p24";
 import type { SampleSelection } from "@/app/_lib/sample-pricing";
 import type { ActionResult } from "@/app/_lib/types";
@@ -99,25 +100,19 @@ export async function submitSampleOrder(formData: FormData): Promise<ActionResul
     (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://www.mollien.pl";
 
   try {
-    const token = await registerTransaction({
-      sessionId: created.orderId,
-      // ⚠️ GROSZE. sampleOrderTotal zwraca ZŁOTE — bez tego mnożenia klient
-      // zapłaciłby 15 groszy zamiast 15 złotych.
-      amount: Math.round(created.amountTotal * 100),
-      // Próbki są PLN-only (/de zamrożone flagą DE_ENABLED).
-      currency: "PLN",
-      description: `Próbki tkanin (${created.paidCount} szt.)`,
-      email: user.email,
-      country: "PL",
-      language: "pl",
-      urlReturn: `${origin}/probki/sukces?zamowienie=${created.orderId}`,
-      // ⚠️ OSOBNY endpoint (powstaje w Tasku 5). /api/p24/status zakłada
-      // sessionId == orders.id i zgubiłby tę płatność, logując „zamówienie
-      // nie istnieje". Literówka w tym adresie daje CICHĄ awarię: POST na
-      // nieistniejącą ścieżkę pod /api/ zwraca w tym frameworku 200 z HTML-em,
-      // więc P24 uzna notyfikację za dostarczoną i nie ponowi.
-      urlStatus: `${origin}/api/p24/probki-status`,
-    });
+    // Kwota w groszach, waluta, adresy powrotu i notyfikacji — w czystej,
+    // otestowanej funkcji (app/_lib/sample-p24.ts), nie inline: z pliku
+    // "use server" nie da się wyeksportować niczego do testu.
+    const token = await registerTransaction(
+      buildSampleP24Params({
+        orderId: created.orderId,
+        amountTotal: created.amountTotal,
+        paidCount: created.paidCount,
+        // ⚠️ Znowu e-mail SESJI, nie z formularza.
+        sessionEmail: user.email,
+        origin,
+      })
+    );
     return { ok: true, data: { orderId: created.orderId, redirectUrl: trnRequestUrl(token) } };
   } catch (err) {
     // Zamówienie ISTNIEJE (payment_status = "pending") i widać je w panelu

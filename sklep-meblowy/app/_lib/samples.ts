@@ -46,15 +46,25 @@ export type CreateSampleOrderInput = {
   selections: SampleSelection[];
 };
 
-// Zwrot miejsc do darmowej puli. Nigdy nie rzuca: wołamy to na ścieżkach
-// kompensacji, gdzie mamy już inny (ważniejszy) błąd do przekazania wyżej,
-// a przykrycie go błędem kompensacji zgubiłoby przyczynę.
+// Zwrot miejsc do darmowej puli.
+//
+// Domyślnie NIE rzuca — to wariant dla kompensacji w createSampleOrder, gdzie
+// mamy już inny (ważniejszy) błąd do przekazania wyżej, a przykrycie go błędem
+// kompensacji zgubiłoby przyczynę.
+//
+// `throwOnError` jest dla anulowania: tam nie ma konkurencyjnego błędu, status
+// przeleciał już na "cancelled", a nieudany zwrot jest NIEODWRACALNY — ponowne
+// „Anuluj" złapie 0 wierszy przy warunkowym flipie i wyjdzie po cichu. Cisza
+// oznaczałaby, że właścicielka widzi sukces, a klient bezpowrotnie traci gratisy.
 async function releaseFreeQuota(
   supabase: AdminClient,
   emailKey: string,
-  qty: number
+  qty: number,
+  opts: { throwOnError?: boolean } = {}
 ): Promise<void> {
   if (qty <= 0) return;
+
+  let failure: unknown = null;
   try {
     // normalizeEmailKey przed KAŻDYM wywołaniem RPC — funkcja jest idempotentna,
     // więc powtórzenie na już znormalizowanym kluczu nic nie psuje, a chroni
@@ -63,14 +73,18 @@ async function releaseFreeQuota(
       p_email_key: normalizeEmailKey(emailKey),
       p_qty: qty,
     });
-    if (error) {
-      console.error(
-        `[probki] zwrot ${qty} darmowych sztuk do puli nieudany (${emailKey}):`,
-        error.message
-      );
-    }
+    if (error) failure = new Error(error.message);
   } catch (err) {
-    console.error(`[probki] zwrot darmowych sztuk rzucil wyjatkiem (${emailKey}):`, err);
+    failure = err;
+  }
+  if (!failure) return;
+
+  const detail = failure instanceof Error ? failure.message : String(failure);
+  console.error(`[probki] zwrot ${qty} darmowych sztuk do puli nieudany (${emailKey}):`, detail);
+  if (opts.throwOnError) {
+    throw new Error(
+      `Zamówienie anulowane, ale zwrot ${qty} darmowych próbek do puli nie zadziałał (${detail}). Zgłoś to — pulę trzeba poprawić ręcznie.`
+    );
   }
 }
 
@@ -135,6 +149,12 @@ export async function createSampleOrder(input: CreateSampleOrderInput) {
   // padnie (błąd bazy, wyjątek, timeout), zabiera klientowi gratisy bez
   // zamówienia, które właścicielka mogłaby anulować. Dlatego każda ścieżka
   // wyjścia przez błąd kompensuje przez release_free_samples.
+  //
+  // Jedyny wyjątek: gdy w bazie ZOSTAJE zamówienie z free_count > 0, zwrot
+  // należy do „Anuluj" w panelu i tutaj musi zostać pominięty (inaczej pula
+  // wróciłaby dwa razy). Sygnalizuje to ta zmienna.
+  let compensateQty = free;
+
   try {
     const { data: order, error: orderError } = await supabase
       .from("sample_orders")
@@ -181,7 +201,20 @@ export async function createSampleOrder(input: CreateSampleOrderInput) {
     if (itemsError) {
       // Zamówienie bez pozycji jest bezużyteczne (właścicielka nie wie, co
       // wysłać) — kasujemy je, żeby nie zostało w panelu jako puste.
-      await supabase.from("sample_orders").delete().eq("id", orderId);
+      const { error: deleteError } = await supabase
+        .from("sample_orders")
+        .delete()
+        .eq("id", orderId);
+      if (deleteError) {
+        // Kasowanie zawiodło: zamówienie ZOSTAJE w bazie z free_count > 0.
+        // Nie wolno teraz zwolnić puli — późniejsze „Anuluj" w panelu zrobi to
+        // po raz drugi i klient dostanie sześć gratisów zamiast trzech.
+        compensateQty = 0;
+        console.error(
+          `[probki] nie udalo sie skasowac zamowienia bez pozycji (${orderId}) — pula zostaje zajeta do anulowania w panelu:`,
+          deleteError.message
+        );
+      }
       throw new Error(`Nie udało się zapisać pozycji: ${itemsError.message}`);
     }
 
@@ -189,7 +222,7 @@ export async function createSampleOrder(input: CreateSampleOrderInput) {
   } catch (err) {
     // Kompensacja: tyle sztuk, ile FAKTYCZNIE przyznała baza (`free`), i ten sam
     // znormalizowany klucz. Po niej przekazujemy oryginalny błąd dalej.
-    await releaseFreeQuota(supabase, emailKey, free);
+    await releaseFreeQuota(supabase, emailKey, compensateQty);
     throw err;
   }
 }
@@ -260,33 +293,55 @@ export async function setSampleOrderStatus(
 export async function cancelSampleOrder(id: string): Promise<void> {
   const supabase = await createAdminClient();
 
+  // KROK 1 — anulowanie ze zwrotem puli, dozwolone TYLKO dla zamówień jeszcze
+  // niewysłanych.
+  //
   // WARUNKOWY FLIP, nie „przeczytaj → zaktualizuj → zwolnij". release_free_samples
   // NIE jest idempotentne: dwa kliknięcia „Anuluj" (albo dwa otwarte panele)
   // oddałyby klientowi sześć gratisów zamiast trzech. Pulę zwalniamy TYLKO
   // wtedy, gdy to wywołanie faktycznie przestawiło status.
+  //
+  // Status filtrujemy w WHERE, a nie sprawdzamy w RETURNING, bo RETURNING po
+  // UPDATE oddaje wiersz PO zmianie — czyli zawsze "cancelled".
   const { data, error } = await supabase
     .from("sample_orders")
     .update({ status: "cancelled" } as never)
     .eq("id", id)
-    .neq("status", "cancelled")
+    .in("status", ["new", "packed"])
     .select("email_key, free_count");
   if (error) throw new Error(error.message);
 
   const rows = (data ?? []) as { email_key: string; free_count: number }[];
-  if (rows.length === 0) {
-    // Zero wierszy ma dwie przyczyny — trzeba je rozróżnić, bo „już anulowane"
-    // to sukces, a „nie ma takiego zamówienia" to błąd wart pokazania.
-    const { data: existing } = await supabase
-      .from("sample_orders")
-      .select("id")
-      .eq("id", id)
-      .maybeSingle();
-    if (!existing) throw new Error("Zamówienie nie istnieje");
+  if (rows.length > 0) {
+    // Zwrot darmowych miejsc — bez tego porzucone zamówienie blokuje pulę na rok.
+    // throwOnError: nieudany zwrot ma dojść do panelu, bo nic go później nie naprawi.
+    await releaseFreeQuota(supabase, rows[0].email_key, rows[0].free_count, {
+      throwOnError: true,
+    });
     return;
   }
 
-  // Zwrot darmowych miejsc — bez tego porzucone zamówienie blokuje pulę na rok.
-  await releaseFreeQuota(supabase, rows[0].email_key, rows[0].free_count);
+  // KROK 2 — zamówienie już WYSŁANE. Anulowanie działa (właścicielka może chcieć
+  // zamknąć sprawę), ale puli NIE zwracamy: próbki fizycznie poszły pocztą, więc
+  // oddanie gratisów oznaczałoby podwójny koszt — towar plus przesyłka, plus
+  // kolejne trzy darmowe. Decyzja właściciela.
+  const { data: sentData, error: sentError } = await supabase
+    .from("sample_orders")
+    .update({ status: "cancelled" } as never)
+    .eq("id", id)
+    .eq("status", "sent")
+    .select("id");
+  if (sentError) throw new Error(sentError.message);
+  if (((sentData ?? []) as { id: string }[]).length > 0) return;
+
+  // KROK 3 — nic nie przeleciało. Dwie przyczyny, trzeba je rozróżnić: „już
+  // anulowane" to sukces, a „nie ma takiego zamówienia" to błąd wart pokazania.
+  const { data: existing } = await supabase
+    .from("sample_orders")
+    .select("id")
+    .eq("id", id)
+    .maybeSingle();
+  if (!existing) throw new Error("Zamówienie nie istnieje");
 }
 
 // Idempotentne rozliczenie: powtórzona notyfikacja P24 nie może zapłacić dwa razy.

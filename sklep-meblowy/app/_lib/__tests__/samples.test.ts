@@ -53,6 +53,7 @@ function makeClient(cfg: {
         "delete",
         "eq",
         "neq",
+        "in",
         "order",
         "single",
         "maybeSingle",
@@ -251,6 +252,7 @@ describe("createSampleOrder — kompensacja puli po udanym claim", () => {
     current = makeClient({
       rpc: { claim_free_samples: [{ data: 2 }] },
       tables: {
+        // drugi wpis = wynik DELETE (bez błędu)
         sample_orders: [{ data: { id: "ord-3" } }, {}],
         sample_order_items: [{ error: { message: "fk violation" } }],
       },
@@ -272,6 +274,31 @@ describe("createSampleOrder — kompensacja puli po udanym claim", () => {
       name: "release_free_samples",
       params: { p_email_key: "a@example.com", p_qty: 2 },
     });
+  });
+
+  it("nieudane kasowanie osieroconego zamówienia WSTRZYMUJE zwrot puli", async () => {
+    // Zamówienie zostaje w bazie z free_count > 0. Gdybyśmy teraz zwolnili pulę,
+    // późniejsze „Anuluj" w panelu zwolniłoby ją drugi raz = sześć gratisów.
+    current = makeClient({
+      rpc: { claim_free_samples: [{ data: 2 }] },
+      tables: {
+        sample_orders: [{ data: { id: "ord-4" } }, { error: { message: "delete padl" } }],
+        sample_order_items: [{ error: { message: "fk violation" } }],
+      },
+    });
+
+    await expect(
+      createSampleOrder({
+        userId: "user-1",
+        email: "a@example.com",
+        name: "A",
+        phone: null,
+        address: {},
+        selections: [1, 2].map(SELECTION),
+      })
+    ).rejects.toThrow(/Nie udało się zapisać pozycji/);
+
+    expect(current.rpcCalls.map((c) => c.name)).toEqual(["claim_free_samples"]);
   });
 
   it("RZUCONY wyjątek po claim też kompensuje (claim commituje osobną transakcją)", async () => {
@@ -368,6 +395,8 @@ describe("getSampleQuotaLeft", () => {
 });
 
 describe("cancelSampleOrder", () => {
+  // Kolejka `sample_orders` odpowiada trzem krokom akcji:
+  //   [0] warunkowy flip dla new/packed, [1] flip dla sent, [2] sprawdzenie istnienia.
   it("zwraca pulę, gdy to wywołanie faktycznie anulowało zamówienie", async () => {
     current = makeClient({
       tables: { sample_orders: [{ data: [{ email_key: "a@example.com", free_count: 2 }] }] },
@@ -378,14 +407,30 @@ describe("cancelSampleOrder", () => {
     expect(current.rpcCalls).toEqual([
       { name: "release_free_samples", params: { p_email_key: "a@example.com", p_qty: 2 } },
     ]);
+    // Zwrot dotyczy wyłącznie zamówień jeszcze niewysłanych — filtr jest w WHERE,
+    // bo RETURNING po UPDATE oddałby już status "cancelled".
+    const inOp = current.ops.find((o) => o.op === "in");
+    expect(inOp?.args).toEqual(["status", ["new", "packed"]]);
+  });
+
+  it("anulowanie zamówienia JUŻ WYSŁANEGO nie oddaje gratisów", async () => {
+    // Próbki fizycznie poszły pocztą — zwrot puli oznaczałby podwójny koszt.
+    // Samo anulowanie ma działać (właścicielka zamyka sprawę).
+    current = makeClient({
+      tables: { sample_orders: [{ data: [] }, { data: [{ id: "ord-1" }] }] },
+    });
+
+    await cancelSampleOrder("ord-1");
+
+    expect(current.rpcCalls).toEqual([]);
   });
 
   it("drugie anulowanie tego samego zamówienia NIE zwraca puli drugi raz", async () => {
-    // Warunkowy update nie łapie wiersza (status już 'cancelled'), ale
+    // Warunkowe update'y nie łapią wiersza (status już 'cancelled'), ale
     // zamówienie istnieje — release_free_samples nie jest idempotentne, więc
     // powtórka dałaby klientowi sześć gratisów zamiast trzech.
     current = makeClient({
-      tables: { sample_orders: [{ data: [] }, { data: { id: "ord-1" } }] },
+      tables: { sample_orders: [{ data: [] }, { data: [] }, { data: { id: "ord-1" } }] },
     });
 
     await cancelSampleOrder("ord-1");
@@ -394,7 +439,9 @@ describe("cancelSampleOrder", () => {
   });
 
   it("nieistniejące zamówienie = błąd, nie cichy sukces", async () => {
-    current = makeClient({ tables: { sample_orders: [{ data: [] }, { data: null }] } });
+    current = makeClient({
+      tables: { sample_orders: [{ data: [] }, { data: [] }, { data: null }] },
+    });
     await expect(cancelSampleOrder("ord-x")).rejects.toThrow(/nie istnieje/);
   });
 
@@ -404,6 +451,17 @@ describe("cancelSampleOrder", () => {
     });
     await cancelSampleOrder("ord-1");
     expect(current.rpcCalls).toEqual([]);
+  });
+
+  it("nieudany zwrot puli DOCHODZI do panelu (nic go później nie naprawi)", async () => {
+    // Status jest już 'cancelled', więc ponowne „Anuluj" złapie 0 wierszy
+    // i wyjdzie po cichu — cisza tutaj znaczyłaby bezpowrotną utratę gratisów.
+    current = makeClient({
+      tables: { sample_orders: [{ data: [{ email_key: "a@example.com", free_count: 3 }] }] },
+      rpc: { release_free_samples: [{ error: { message: "timeout" } }] },
+    });
+
+    await expect(cancelSampleOrder("ord-1")).rejects.toThrow(/zwrot 3 darmowych próbek/);
   });
 });
 
