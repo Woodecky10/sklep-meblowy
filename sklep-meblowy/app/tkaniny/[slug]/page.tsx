@@ -8,6 +8,7 @@ import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import { getEurRate } from "@/app/_lib/store-settings";
 import { formatMoney } from "@/app/_lib/money";
 import { sanitizeRichHtml, extractShortDescription } from "@/app/_lib/product-html";
+import Link from "next/link";
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import FabricSwatchGrid from "@/app/_components/ui/FabricSwatchGrid";
 import FabricFeaturedProducts from "@/app/_components/ui/FabricFeaturedProducts";
@@ -156,9 +157,20 @@ export default async function TkaninaPage({ params }: Props) {
 
       {colors.length > 0 && (
         <section className="mb-12">
-          <h2 className="font-display text-2xl font-bold text-[var(--fg)] mb-6">
-            {t.fabrics.swatchHeading}
-          </h2>
+          <div className="flex items-baseline justify-between gap-4 flex-wrap mb-6">
+            <h2 className="font-display text-2xl font-bold text-[var(--fg)]">
+              {t.fabrics.swatchHeading}
+            </h2>
+            {/* Wejście do zamawiania próbek z preselekcją TEJ tkaniny (spec
+                2026-08-01). Zwykły Link, nie LocalizedLink: /probki jest PL-only
+                (DE zamrożone flagą DE_ENABLED). */}
+            <Link
+              href={`/probki?tkanina=${encodeURIComponent(fabric.slug)}`}
+              className="px-6 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-xs uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
+            >
+              Zamów próbkę tej tkaniny →
+            </Link>
+          </div>
           <FabricSwatchGrid
             colors={colors}
             images={fabric.color_images ?? {}}

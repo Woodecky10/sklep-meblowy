@@ -3,9 +3,16 @@
 // po stronie DB przez FK products.category → categories.slug.
 export type Category = string;
 
+// `data` jest po OBU stronach świadomie. Bywają błędy, po których na serwerze
+// coś już POWSTAŁO i klient musi się o tym dowiedzieć — np. zamówienie próbek
+// jest zapisane w bazie, a padła dopiero rejestracja płatności. Bez tego kanału
+// formularz widzi „błąd", odblokowuje przycisk, klient klika drugi raz i składa
+// DRUGIE zamówienie (patrz app/probki/actions.ts + SampleForm.tsx). Kształt
+// ładunku ustala konkretna akcja i opisuje go przy `return` — tu zostaje
+// `unknown`, bo to typ współdzielony przez cały panel.
 export type ActionResult =
   | { ok: true; message?: string; data?: unknown }
-  | { ok: false; error: string };
+  | { ok: false; error: string; data?: unknown };
 
 export type ProductDimensions = {
   width: number;
@@ -377,4 +384,51 @@ export type Database = {
       };
     };
   };
+};
+
+// ============================================================
+// Próbki tkanin (migracja 67)
+// ============================================================
+// UWAGA na kolizję nazw: "próbka" w istniejącym kodzie oznacza ZDJĘCIE wzornika
+// (FabricSwatchGrid, fabric-swatch-images.ts). Byty z tej funkcji nazywamy
+// konsekwentnie `Sample*` / `sample_*`.
+
+export type SampleOrderStatus = "new" | "packed" | "sent" | "cancelled";
+export type SamplePaymentStatus = "none" | "pending" | "paid";
+
+export type SampleOrderItem = {
+  id: string;
+  sample_order_id: string;
+  fabric_id: string | null;
+  color: string;
+  // Snapshot nazwy tkaniny z chwili zamówienia — katalog może się zmienić.
+  fabric_name: string;
+  is_free: boolean;
+  unit_price: number;
+  created_at: string;
+};
+
+export type SampleOrder = {
+  id: string;
+  user_id: string;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string | null;
+  // Partial<Address>, a nie Record<string, string>: Address ma opcjonalne
+  // fullname/phone (string | undefined), więc do Record<string, string> się nie
+  // przypisze — a adres bierzemy wprost z profiles.address / orders.shipping_address.
+  // Partial, bo profil bywa pusty i formularz startuje z niekompletnym adresem.
+  shipping_address: Partial<Address>;
+  status: SampleOrderStatus;
+  // Osobna oś od `status`: "czy zapłacone" nie jest etapem realizacji.
+  payment_status: SamplePaymentStatus;
+  amount_total: number;
+  payment_ref: string | null;
+  free_count: number;
+  paid_count: number;
+  email_key: string;
+  tracking: string | null;
+  sent_at: string | null;
+  created_at: string;
+  updated_at: string;
 };

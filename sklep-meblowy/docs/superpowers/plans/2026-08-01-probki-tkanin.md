@@ -8,6 +8,55 @@
 
 **Tech Stack:** Next.js 16 (App Router, Server Actions), Supabase (Postgres + RLS + RPC), Przelewy24 REST v1, Resend, Tailwind, vitest, Playwright.
 
+---
+
+## ✅ STAN WYKONANIA — ZAKOŃCZONE 2026-08-02
+
+Wszystkie 8 tasków zrobionych, każdy po recenzji i co najmniej jednej rundzie poprawek. Końcowa recenzja całej gałęzi: **zero Criticali**, po jednej fali naprawczej — **gotowe do merge'a**.
+
+**Bramki:** `tsc` 0 · `npm test` **1060 testów w 85 plikach** · `build` przechodzi · `lint` 0 błędów · `playwright test samples` 3 passed.
+
+**Migracja 67 jest już na produkcji** (model expand-first, zaaplikowana za zgodą właściciela przed mergem). Smoke na żywej bazie potwierdził twardość limitu: `claim(5)` z pustej puli → 3, `claim(2)` po wyczerpaniu → 0, `release(3)` + `claim(1)` → 1.
+
+### ⚠️ Czego NIGDY nie sprawdzono na żywo
+
+Tabela `sample_orders` jest **pusta** — nikt nie złożył ani jednego zamówienia. W konsekwencji **nikt nie widział**: żywej karty w panelu, żadnego z trzech maili, prawdziwej notyfikacji P24 dla próbek, ani wyglądu wzornika dla zalogowanego klienta. Panel nie został ani razu otwarty w przeglądarce (żaden agent nie miał zalogowanego admina). Klik-testy nie są formalnością — to pierwsze uruchomienie tej funkcji.
+
+### Rzeczy, które wyłapały recenzje, a których nie było w planie ani specu
+
+Nie „poprawiaj" ich z powrotem:
+
+1. **`on delete cascade` na `user_id`** kasowałby opłacone zamówienia razem z kontem klienta → `on delete restrict`, jak `orders`.
+2. **Enter w polu wyszukiwania składał zamówienie** (implicit submission) i prowadził wprost na bramkę płatności → guard na Enterze.
+3. **Awaria odczytu bazy w chwili notyfikacji** dawała 200, więc P24 nigdy nie ponawiał → zgubiona wpłata. Handler czyta wiersz wprost, `error` → 500.
+4. **Trzy grupy w panelu gubiły status `packed`** — paczka znikała z ekranu. Jest sześć grup, rozłącznych i zupełnych.
+5. **Anulowanie wysłanego zamówienia ukrywało fakt wysyłki** → ryzyko zwrotu pieniędzy za dostarczony towar. Warunek na `sent_at`, nie na statusie.
+6. **Panel nie pokazywał numeru zamówienia**, który wszystkie maile i strona sukcesu każą klientowi podawać.
+7. **Klucz darmowej puli to znormalizowany e-mail**, nie `user_id` — inaczej `imie+1@gmail.com` daje kolejne trzy gratisy w pół minuty.
+8. **Rezerwacja puli przy składaniu, nie po zapłacie**, z kompensacją na każdej ścieżce błędu.
+9. **Anulowanie `sent` nie zwraca puli** (decyzja właściciela: próbki fizycznie poszły pocztą).
+
+### Follow-upy (nieblokujące, w kolejności wagi)
+
+1. **Ciężar wzornika**: 477 kolorów × 90–149 kB oryginałów (`images.unoptimized: true`) — przewinięcie całości to dziesiątki MB. Najtaniej: zwijanie sekcji grup od wejścia (wzorzec PR #117) albo `content-visibility: auto`. Klienci trafią tam od pierwszego dnia.
+2. **Nieaktualna pula wysyła na bramkę bez potwierdzenia**: karta otwarta od godziny pokazuje „3 gratis = 0 zł", a system nalicza 45 zł i od razu przekierowuje. Fix: przesłać `expectedPaid` i przy rozjeździe nie rejestrować transakcji (formularz ma już gałąź na taki kształt odpowiedzi). ⚠️ Naprawiając przy okazji „martwy przycisk po powrocie wstecz", trzeba zacząć od tego — dziś ta wada przypadkiem przed tym chroni.
+3. **`/rejestracja` gubi `next`** — nowy klient, najcenniejszy lead, po rejestracji wraca na `/konto` bez wybranej tkaniny. Ścieżka logowania jest chroniona na trzech poziomach, rejestracji na żadnym.
+4. **Brak akcji „Oznacz jako opłacone"** w panelu — po zgubionej notyfikacji to jedyna droga ratunku poza edycją bazy.
+5. **CAS w `setSampleOrderStatus` jest słabszy niż precedens** (`.neq("status", target)` zamiast `.eq("status", from)`) — nie zamyka cofnięcia `sent → packed` ze starej karty panelu.
+6. **Etykieta licznika a to, co liczy**: badge mówi „do obsłużenia", ale nie liczy grupy `packed` (spakowane, nienadane) — koperta może leżeć bez sygnału.
+7. **Próg 200 próbek daje komunikat „Nieprawidłowy wybór"** — wygląda jak awaria. Własny komunikat albo próg ponad rozmiar katalogu.
+8. **„Do zwrotu" nie da się zamknąć** (brak kolumny `refunded_at`) — czerwona sekcja zostaje na zawsze i uczy ignorować kolor alarmowy.
+9. Numeru nadania nie da się poprawić bez przestawienia `sent_at`; `getSampleOrderById` połyka błąd odczytu (na stronie sukcesu i w panelu awaria bazy wygląda jak brak zamówienia); dwa różne fallbacki hosta (apex vs www); brak strażnika „nie wysyłaj nieopłaconego"; `getSampleOrders` bez limitu i wyszukiwarki; `docs/maile-konfiguracja.md` nie zna trzech nowych maili.
+
+### Do zrobienia PRZED pierwszym zamówieniem (poza kodem)
+
+1. Otworzyć `/admin/probki` na produkcji po deployu — pierwsze uruchomienie zapytania z embedem `sample_order_items` przeciw żywej bazie.
+2. `npm run p24:smoke -- https://www.mollien.pl` — sprawdza obie trasy notyfikacji i schodzi z kodem 1 przy błędzie. Jedyna obrona przed cichą awarią `urlStatus`.
+3. Potwierdzić `MAIL_ADMIN_TO` w Vercelu (ten sam env obsługuje działające maile mebli, więc praktycznie pewny).
+4. Ola przepina przycisk banera „TKANINY / Zamów darmowe próbki" na `/probki` i poprawia treść na „Pierwsze 3 próbki gratis".
+
+---
+
 ## Global Constraints
 
 - **To NIE jest Next.js z treningu** — wersja 16 ma breaking changes. Przed kodem Server Component/Action sprawdź `node_modules/next/dist/docs/`. `params`/`searchParams` to Promise. (`sklep-meblowy/AGENTS.md`)
@@ -666,7 +715,7 @@ export async function createSampleOrder(input: CreateSampleOrderInput) {
   return { orderId, amountTotal, freeCount: free, paidCount: paid };
 }
 
-async function fetchOrdersWithItems(filter?: (q: never) => never): Promise<SampleOrderWithItems[]> {
+export async function getSampleOrders(): Promise<SampleOrderWithItems[]> {
   const supabase = await createAdminClient();
   const { data, error } = await supabase
     .from("sample_orders")
@@ -674,15 +723,12 @@ async function fetchOrdersWithItems(filter?: (q: never) => never): Promise<Sampl
     .order("created_at", { ascending: false });
 
   if (error) {
+    // Nie połykamy po cichu: pusta lista w panelu wygląda jak "brak zamówień",
+    // czyli kłamie dokładnie wtedy, gdy coś jest zepsute.
     console.error("[probki] odczyt zamowien nieudany:", error.message);
     return [];
   }
-  void filter;
   return (data ?? []) as SampleOrderWithItems[];
-}
-
-export async function getSampleOrders(): Promise<SampleOrderWithItems[]> {
-  return fetchOrdersWithItems();
 }
 
 export async function getSampleOrderById(id: string): Promise<SampleOrderWithItems | null> {
@@ -699,6 +745,9 @@ export async function getSampleOrderById(id: string): Promise<SampleOrderWithIte
   return (data as SampleOrderWithItems) ?? null;
 }
 
+// Licznik przy pozycji w nawigacji = "ile czeka na spakowanie". Nieopłacone
+// świadomie NIE liczą się: właścicielka nie ma się nimi zajmować, dopóki
+// klient nie zapłaci, a badge ma znaczyć pracę do zrobienia.
 export async function getNewSampleOrdersCount(): Promise<number> {
   const supabase = await createAdminClient();
   const { count, error } = await supabase

@@ -35,6 +35,16 @@ function loadEnvLocal() {
   return out;
 }
 
+// Każde ✖ MUSI zejść niezerowym kodem wyjścia. Ten skrypt jest jedynym
+// strażnikiem cichej awarii notyfikacji (POST na nieistniejącą ścieżkę pod /api/
+// oddaje HTML zamiast błędu), więc dopóki kończył się zerem, nie dało się go
+// wpiąć w nic automatycznego — „✖" przewijało się w logu i wyglądało jak sukces.
+// process.exitCode (a nie process.exit) pozwala dokończyć pozostałe sprawdzenia.
+function fail(...args) {
+  process.exitCode = 1;
+  console.error(...args);
+}
+
 const env = { ...loadEnvLocal(), ...process.env };
 const merchantId = Number(env.P24_MERCHANT_ID);
 const posId = Number(env.P24_POS_ID);
@@ -51,7 +61,7 @@ const missing = [
 ].filter(([, v]) => !v).map(([k]) => k);
 
 if (missing.length > 0) {
-  console.error(`\n✖ Brak w .env.local (albo w env): ${missing.join(", ")}`);
+  fail(`\n✖ Brak w .env.local (albo w env): ${missing.join(", ")}`);
   console.error(`
 Skąd wziąć wartości — panel sandboxa: https://sandbox.przelewy24.pl/panel
 (⚠ sam korzeń https://sandbox.przelewy24.pl zwraca HTTP 400 — jako P24_BASE_URL
@@ -81,12 +91,12 @@ try {
     console.log(`✔ testAccess: HTTP ${res.status} — posId + klucz API działają`);
   } else {
     ok = false;
-    console.error(`✖ testAccess: HTTP ${res.status} — ${body.slice(0, 300)}`);
+    fail(`✖ testAccess: HTTP ${res.status} — ${body.slice(0, 300)}`);
     console.error("  → sprawdź P24_POS_ID i P24_API_KEY (Basic Auth: posId jako login, klucz API jako hasło)");
   }
 } catch (err) {
   ok = false;
-  console.error(`✖ testAccess: brak połączenia — ${err.message}`);
+  fail(`✖ testAccess: brak połączenia — ${err.message}`);
 }
 
 // ── 2. register (weryfikuje podpis) ───────────────────────────────────────
@@ -122,14 +132,14 @@ if (ok) {
       console.log(`  otwórz w przeglądarce: ${baseUrl}/trnRequest/${token}`);
       console.log("\n  (urlStatus wskazuje localhost, więc notyfikacja nie dojdzie — to tylko test podpisu.)");
     } else {
-      console.error(`✖ register: HTTP ${res.status} — ${body.slice(0, 500)}`);
+      fail(`✖ register: HTTP ${res.status} — ${body.slice(0, 500)}`);
       console.error("  → jeśli błąd dotyczy 'sign', kolejność pól podpisu nie zgadza się z dokumentacją:");
       console.error("    register  = { sessionId, merchantId, amount, currency, crc }   (app/_lib/p24.ts)");
       console.error("    verify    = { sessionId, orderId, amount, currency, crc }");
       console.error("    notyfikacja = { merchantId, posId, sessionId, amount, originAmount, currency, orderId, methodId, statement, crc }   (app/_lib/p24-events.ts)");
     }
   } catch (err) {
-    console.error(`✖ register: brak połączenia — ${err.message}`);
+    fail(`✖ register: brak połączenia — ${err.message}`);
   }
 }
 
@@ -142,10 +152,19 @@ if (ok) {
 // urlStatus miał literówkę, P24 dostałoby 200, uznało notyfikację za
 // dostarczoną i NIE ponowiło jej — zamówienie zostałoby pending bez śladu.
 // Dlatego sprawdzamy, że pod adresem odpowiada nasz handler, a nie strona HTML.
-const target = process.argv[2]?.replace(/\/+$/, "");
-if (target) {
-  const url = `${target}/api/p24/status`;
-  console.log(`Sprawdzam urlStatus: ${url}`);
+//
+// ⚠️ KAŻDY urlStatus, jaki wysyłamy do P24, musi być tu wymieniony. Meble
+// (app/api/checkout/route.ts) i próbki (app/_lib/sample-p24.ts) mają OSOBNE
+// trasy notyfikacji, bo sessionId znaczy w nich co innego (orders.id vs
+// sample_orders.id) — i osobno da się je zepsuć.
+const NOTIFICATION_PATHS = [
+  ["/api/p24/status", "meble (app/api/checkout/route.ts)"],
+  ["/api/p24/probki-status", "próbki (app/_lib/sample-p24.ts)"],
+];
+
+async function checkNotificationUrl(target, path, who) {
+  const url = `${target}${path}`;
+  console.log(`Sprawdzam urlStatus [${who}]: ${url}`);
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -157,16 +176,23 @@ if (target) {
     if (res.status === 400 && ct.includes("json")) {
       console.log(`✔ urlStatus: HTTP 400 ${body} — odpowiada NASZ handler, bramka podpisu działa`);
     } else if (res.status === 500) {
-      console.error(`✖ urlStatus: HTTP 500 — trasa istnieje, ale temu wdrożeniu brakuje zmiennych P24_* (getP24Config rzuca)`);
+      fail(`✖ urlStatus: HTTP 500 — trasa istnieje, ale temu wdrożeniu brakuje zmiennych P24_* (getP24Config rzuca)`);
     } else if (ct.includes("html")) {
-      console.error(`✖ urlStatus: HTTP ${res.status} i HTML zamiast JSON-a — pod tym adresem NIE MA naszej trasy.`);
+      fail(`✖ urlStatus: HTTP ${res.status} i HTML zamiast JSON-a — pod tym adresem NIE MA naszej trasy.`);
       console.error("  ⚠ To jest cicha awaria: P24 zobaczy 200, uzna notyfikację za dostarczoną i jej NIE ponowi.");
-      console.error("  → sprawdź, czy gałąź z /api/p24/status jest wdrożona pod tym adresem i czy ścieżka nie ma literówki");
+      console.error(`  → sprawdź, czy gałąź z ${path} jest wdrożona pod tym adresem i czy ścieżka nie ma literówki`);
     } else {
-      console.error(`✖ urlStatus: nieoczekiwane HTTP ${res.status} (${ct}) ${body}`);
+      fail(`✖ urlStatus: nieoczekiwane HTTP ${res.status} (${ct}) ${body}`);
     }
   } catch (err) {
-    console.error(`✖ urlStatus: brak połączenia — ${err.message}`);
+    fail(`✖ urlStatus: brak połączenia — ${err.message}`);
+  }
+}
+
+const target = process.argv[2]?.replace(/\/+$/, "");
+if (target) {
+  for (const [path, who] of NOTIFICATION_PATHS) {
+    await checkNotificationUrl(target, path, who);
   }
 } else {
   console.log("Pominięto sprawdzenie urlStatus (podaj adres: npm run p24:smoke -- https://twoj-deploy)");

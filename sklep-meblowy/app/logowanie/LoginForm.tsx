@@ -6,7 +6,10 @@ import { useActionState } from "react";
 import { signIn, signInWithGoogle, type AuthState } from "@/app/_lib/auth-actions";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 
-export default function LoginForm() {
+// `next` to zwalidowana serwerowo ścieżka lokalna (safeNextPath w page.tsx) —
+// przekazujemy ją OBIEMA drogami logowania. Bez tego klient, który przyszedł
+// z bramki próbek, wraca na /konto i traci wybraną tkaninę.
+export default function LoginForm({ next }: { next?: string | null }) {
   const de = useClientLocale() === "de";
   const [state, action, pending] = useActionState<AuthState, FormData>(
     signIn,
@@ -36,6 +39,7 @@ export default function LoginForm() {
   return (
     <div className="flex flex-col gap-6">
       <form action={signInWithGoogle}>
+        {next && <input type="hidden" name="next" value={next} />}
         <button
           type="submit"
           className="w-full py-3.5 border border-[var(--border)] rounded-full font-sans text-sm font-semibold text-[var(--fg)] hover:bg-[var(--card-bg)] transition-colors flex items-center justify-center gap-3"
@@ -54,6 +58,7 @@ export default function LoginForm() {
       </div>
 
       <form action={action} className="flex flex-col gap-4">
+        {next && <input type="hidden" name="next" value={next} />}
         <label className="flex flex-col gap-2">
           <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
             {c.email}

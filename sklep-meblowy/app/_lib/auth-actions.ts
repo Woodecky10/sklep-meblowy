@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { createClient } from "./supabase/server";
 import { linkGuestOrders } from "./link-guest-orders";
 import { isAdmin } from "./admin";
+import { safeNextPath } from "./safe-redirect";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { localizePath, localizeHref } from "./i18n";
 
@@ -22,6 +23,16 @@ function getOrigin(headerList: Headers) {
 
 function validateEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+// Cel powrotu po zalogowaniu, przekazany ukrytym polem formularza (LoginForm).
+// To DECYZJA TEJ AKCJI, dokąd odesłać klienta — strona logowania sama przekieruje
+// tylko kogoś, kto już ma sesję. Bez tego klient wchodzący z bramki próbek
+// (/probki?tkanina=...) lądował na /konto i tracił wybraną tkaninę.
+// safeNextPath odrzuca wszystko poza ścieżką lokalną (ochrona przed open redirect).
+function nextFromForm(formData: FormData | undefined): string | null {
+  if (!formData) return null;
+  return safeNextPath(String(formData.get("next") ?? "").trim() || null);
 }
 
 export async function signIn(_state: AuthState, formData: FormData): Promise<AuthState> {
@@ -52,7 +63,9 @@ export async function signIn(_state: AuthState, formData: FormData): Promise<Aut
   }
 
   revalidatePath("/", "layout");
-  redirect(isAdmin(user) ? "/admin" : localizePath("/konto", de ? "de" : "pl"));
+  redirect(
+    nextFromForm(formData) ?? (isAdmin(user) ? "/admin" : localizePath("/konto", de ? "de" : "pl"))
+  );
 }
 
 export async function signUp(_state: AuthState, formData: FormData): Promise<AuthState> {
@@ -90,16 +103,21 @@ export async function signUp(_state: AuthState, formData: FormData): Promise<Aut
   return { info: tr("Sprawdź skrzynkę — wysłaliśmy link potwierdzający rejestrację.", "Bitte prüfen Sie Ihr Postfach — wir haben Ihnen einen Bestätigungslink gesendet.") };
 }
 
-export async function signInWithGoogle() {
+// Wywoływane jako `<form action={signInWithGoogle}>` — React przekazuje FormData,
+// więc ukryte pole `next` dojeżdża tu tak samo jak przy logowaniu hasłem.
+export async function signInWithGoogle(formData?: FormData) {
   const locale = await getLocale();
   const headerList = await headers();
   const origin = getOrigin(headerList);
+  const next = nextFromForm(formData) ?? localizePath("/konto", locale);
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${origin}/auth/callback?next=${localizePath("/konto", locale)}`,
+      // encodeURIComponent, bo cel powrotu potrafi mieć własny query string
+      // (/probki?tkanina=riviera) — bez tego callback zgubiłby wszystko po „?".
+      redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
     },
   });
 

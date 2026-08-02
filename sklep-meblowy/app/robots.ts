@@ -16,6 +16,7 @@ export default function robots(): MetadataRoute.Robots {
           "/checkout/",    // payment flow
           "/koszyk",       // user-specific
           "/ulubione",     // loginwall
+          "/probki",       // zamawianie próbek (loginwall — bot dostaje 307 na /logowanie)
           "/logowanie",
           "/rejestracja",
           "/reset-hasla",

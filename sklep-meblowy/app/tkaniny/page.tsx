@@ -7,6 +7,7 @@ import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import { getEurRate } from "@/app/_lib/store-settings";
 import { formatMoney } from "@/app/_lib/money";
 import { colorsLabel } from "@/app/_lib/fabric-labels";
+import Link from "next/link";
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import type { Fabric } from "@/app/_lib/types";
 
@@ -55,6 +56,15 @@ export default async function TkaninyPage() {
         </p>
         <h1 className="font-display text-4xl font-bold text-[var(--fg)]">{t.fabrics.heading}</h1>
         <p className="text-sm text-[var(--muted)] mt-3 max-w-2xl">{t.fabrics.intro}</p>
+        {/* Wejście do zamawiania próbek (spec 2026-08-01). Zwykły Link, nie
+            LocalizedLink: /probki jest PL-only (DE zamrożone flagą DE_ENABLED),
+            więc prefiks /de prowadziłby donikąd. */}
+        <Link
+          href="/probki"
+          className="inline-block mt-6 px-8 py-3.5 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
+        >
+          Zamów próbki tkanin →
+        </Link>
       </div>
 
       {sections.map(({ group, items }) => (
