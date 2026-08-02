@@ -69,7 +69,8 @@ beforeEach(() => {
   afterTasks.length = 0;
   requireAdminMock.mockResolvedValue(undefined);
   getSampleOrderByIdMock.mockResolvedValue(order());
-  setSampleOrderStatusMock.mockResolvedValue(undefined);
+  // `true` = ten zapis TRAFIŁ w wiersz (CAS). Od tego zależy, czy wyjdzie mail.
+  setSampleOrderStatusMock.mockResolvedValue(true);
 });
 
 describe("markSampleSent", () => {
@@ -105,6 +106,20 @@ describe("markSampleSent", () => {
 
     expect(res.ok).toBe(false);
     expect(setSampleOrderStatusMock).not.toHaveBeenCalled();
+    expect(notifySentMock).not.toHaveBeenCalled();
+  });
+
+  it("⚠️ PRZEGRANY WYŚCIG: zapis nie trafił w wiersz → zero maila, zero sukcesu", async () => {
+    // Strażnik czyta świeży stan, ale między odczytem a zapisem mieści się
+    // druga karta panelu — obie potrafią go przejść. Zapis warunkowy przepuszcza
+    // jedną; przegrana nie może wysłać klientowi duplikatu maila (bez numeru
+    // nadania, bo w jej formularzu pole było puste).
+    setSampleOrderStatusMock.mockResolvedValue(false);
+
+    const res = await markSampleSent(formData({ id: "ord-1", tracking: "" }));
+    await runAfterTasks();
+
+    expect(res.ok).toBe(false);
     expect(notifySentMock).not.toHaveBeenCalled();
   });
 

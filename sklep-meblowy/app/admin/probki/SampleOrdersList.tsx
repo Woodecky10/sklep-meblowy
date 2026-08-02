@@ -6,6 +6,9 @@ import { useConfirm } from "@/app/_context/ConfirmContext";
 import { EmptyState, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
 import { formatPrice } from "@/app/_lib/format";
 import { pluralForm } from "@/app/_lib/plural";
+// Moduł czystej logiki, bez importów serwerowych — wolno go wciągnąć do
+// komponentu klienckiego (tak samo robi SampleForm.tsx).
+import { shortSampleOrderRef } from "@/app/_lib/sample-pricing";
 import type { ActionResult } from "@/app/_lib/types";
 import { cancelSample, markSamplePacked, markSampleSent } from "./actions";
 import {
@@ -228,6 +231,26 @@ function OrderCard({
     <li className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-4">
       {/* Nagłówek: co to za zamówienie i w jakim jest stanie */}
       <div className="flex flex-wrap items-center gap-2">
+        {/* ⚠️ NUMER ZAMÓWIENIA — dokładnie ten, który klient widzi na
+            /probki/sukces i dostaje we wszystkich trzech mailach (wszystkie
+            każą go podać przy kontakcie). Bez niego telefon „dzień dobry,
+            zamówienie A1B2C3D4" jest nie do dopasowania inaczej niż po imieniu
+            i dacie. Pierwszy w rzędzie i monospace'em, żeby dało się go
+            odnaleźć wzrokiem na liście kilkudziesięciu kart. */}
+        <span className="inline-flex items-center gap-1.5">
+          <code
+            title="Numer zamówienia — ten sam, który klient dostał w mailu"
+            className="font-mono text-sm font-bold px-2 py-0.5 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-[var(--fg)]"
+          >
+            {shortSampleOrderRef(order.id)}
+          </code>
+          <CopyButton
+            text={shortSampleOrderRef(order.id)}
+            label="Kopiuj"
+            title="Kopiuj numer zamówienia"
+            onToast={onToast}
+          />
+        </span>
         <span className="px-2 py-0.5 text-[10px] font-sans font-bold uppercase tracking-widest rounded-full bg-[var(--bg)] border border-[var(--border)] text-[var(--fg)]">
           {SAMPLE_STATUS_LABELS[order.status]}
         </span>

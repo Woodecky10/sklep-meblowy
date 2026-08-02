@@ -8,7 +8,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ⚠️ Wyścigu dwóch równoległych zamówień tu NIE testujemy — to wymagałoby
 // produkcyjnej bazy; został sprawdzony smoke'iem przy migracji 67.
 
-type Result = { data?: unknown; error?: unknown };
+// `throws` odwzorowuje ZERWANE POŁĄCZENIE: klient Supabase oddaje błędy bazy
+// w `error`, ale padnięty transport odrzuca promise — to zupełnie inna ścieżka
+// w kodzie i tylko tak da się ją sprawdzić.
+type Result = { data?: unknown; error?: unknown; count?: number; throws?: string };
 
 type FakeClient = {
   rpcCalls: { name: string; params: Record<string, unknown> }[];
@@ -38,7 +41,15 @@ function makeClient(cfg: {
     from(table: string) {
       if (cfg.throwOnFrom === table) throw new Error("boom: polaczenie padlo");
       const result = tableQueues[table]?.shift() ?? {};
-      const payload = { data: result.data ?? null, error: result.error ?? null };
+      // Rzut na KONKRETNYM wywołaniu (n-ty wpis w kolejce), a nie na całej
+      // tabeli — inaczej nie da się przetestować padnięcia dopiero przy DELETE,
+      // po udanym INSERCIE do tej samej tabeli.
+      if (result.throws) throw new Error(result.throws);
+      const payload = {
+        data: result.data ?? null,
+        error: result.error ?? null,
+        count: result.count ?? null,
+      };
       // Każda metoda buildera zwraca ten sam obiekt, a obiekt jest thenable —
       // dzięki temu działa zarówno `await from(x).insert(y)`, jak i dłuższe
       // łańcuchy zakończone .single()/.maybeSingle()/.select().
@@ -53,6 +64,7 @@ function makeClient(cfg: {
         "delete",
         "eq",
         "neq",
+        "or",
         "in",
         "order",
         "single",
@@ -78,8 +90,10 @@ vi.mock("../supabase/server", () => ({
 import {
   cancelSampleOrder,
   createSampleOrder,
+  getNewSampleOrdersCount,
   getSampleQuotaLeft,
   markSampleOrderPaid,
+  setSampleOrderStatus,
 } from "../samples";
 
 const SELECTION = (n: number) => ({
@@ -301,6 +315,35 @@ describe("createSampleOrder — kompensacja puli po udanym claim", () => {
     expect(current.rpcCalls.map((c) => c.name)).toEqual(["claim_free_samples"]);
   });
 
+  it("RZUCONE kasowanie osieroconego zamówienia TEŻ wstrzymuje zwrot puli", async () => {
+    // Ta sama sytuacja co wyżej, tylko delete nie oddaje błędu w `error`, lecz
+    // ODRZUCA promise (zerwane połączenie). Bez try/catch wokół samego delete
+    // wyjątek przeleciałby nad wyzerowaniem kompensacji: pula wróciłaby, mimo
+    // że zamówienie z free_count > 0 mogło zostać w bazie, a „Anuluj" w panelu
+    // zwolniłoby ją drugi raz.
+    current = makeClient({
+      rpc: { claim_free_samples: [{ data: 2 }] },
+      tables: {
+        sample_orders: [{ data: { id: "ord-5" } }, { throws: "delete: polaczenie padlo" }],
+        sample_order_items: [{ error: { message: "fk violation" } }],
+      },
+    });
+
+    await expect(
+      createSampleOrder({
+        userId: "user-1",
+        email: "a@example.com",
+        name: "A",
+        phone: null,
+        address: {},
+        selections: [1, 2].map(SELECTION),
+      })
+      // Wyjątek z delete NIE ZASTĘPUJE przyczyny — wyżej idzie błąd pozycji.
+    ).rejects.toThrow(/Nie udało się zapisać pozycji/);
+
+    expect(current.rpcCalls.map((c) => c.name)).toEqual(["claim_free_samples"]);
+  });
+
   it("RZUCONY wyjątek po claim też kompensuje (claim commituje osobną transakcją)", async () => {
     current = makeClient({
       rpc: { claim_free_samples: [{ data: 1 }] },
@@ -462,6 +505,64 @@ describe("cancelSampleOrder", () => {
     });
 
     await expect(cancelSampleOrder("ord-1")).rejects.toThrow(/zwrot 3 darmowych próbek/);
+  });
+});
+
+describe("getNewSampleOrdersCount", () => {
+  it("liczy też ANULOWANE OPŁACONE — pieniądze klienta czekają na zwrot", async () => {
+    // Bez tego jedynym sygnałem „oddaj pieniądze" jest czerwona sekcja widoczna
+    // dopiero po wejściu na /admin/probki; maila o anulowanym nie ma.
+    current = makeClient({ tables: { sample_orders: [{ count: 4 }] } });
+
+    expect(await getNewSampleOrdersCount()).toBe(4);
+
+    const or = current.ops.find((o) => o.table === "sample_orders" && o.op === "or");
+    const filter = String(or?.args[0] ?? "");
+    // Gałąź „do spakowania": nowe i NIE-czekające na wpłatę.
+    expect(filter).toContain("and(status.eq.new,payment_status.neq.pending)");
+    // Gałąź „do zwrotu pieniędzy".
+    expect(filter).toContain("and(status.eq.cancelled,payment_status.eq.paid)");
+  });
+
+  it("błąd odczytu nie wywala layoutu panelu (badge renderuje się wszędzie)", async () => {
+    current = makeClient({ tables: { sample_orders: [{ error: { message: "rls" } }] } });
+    expect(await getNewSampleOrdersCount()).toBe(0);
+  });
+});
+
+describe("setSampleOrderStatus — zapis warunkowy (CAS)", () => {
+  it("na 'sent' zapisuje z filtrem .neq(status,'sent') i zwraca true przy trafieniu", async () => {
+    current = makeClient({ tables: { sample_orders: [{ data: [{ id: "ord-1" }] }] } });
+
+    expect(await setSampleOrderStatus("ord-1", "sent", "PX1")).toBe(true);
+
+    const neq = current.ops.find((o) => o.table === "sample_orders" && o.op === "neq");
+    expect(neq?.args).toEqual(["status", "sent"]);
+    const update = current.ops.find((o) => o.table === "sample_orders" && o.op === "update");
+    expect(update?.args[0]).toMatchObject({ status: "sent", tracking: "PX1" });
+  });
+
+  it("⚠️ przegrany wyścig (0 wierszy) zwraca false — to on decyduje o mailu", async () => {
+    // Dwie karty panelu przechodzą strażnika w tym samym oknie. Bez CAS-a druga
+    // nadpisałaby numer nadania pustym stringiem, przestawiła `sent_at`
+    // i wysłała klientowi drugiego maila.
+    current = makeClient({ tables: { sample_orders: [{ data: [] }] } });
+
+    expect(await setSampleOrderStatus("ord-1", "sent", "")).toBe(false);
+  });
+
+  it("'packed' nie dotyka sent_at ani numeru nadania", async () => {
+    current = makeClient({ tables: { sample_orders: [{ data: [{ id: "ord-1" }] }] } });
+
+    expect(await setSampleOrderStatus("ord-1", "packed")).toBe(true);
+
+    const update = current.ops.find((o) => o.table === "sample_orders" && o.op === "update");
+    expect(update?.args[0]).toEqual({ status: "packed" });
+  });
+
+  it("błąd bazy rzuca (panel ma o nim powiedzieć, nie udawać sukcesu)", async () => {
+    current = makeClient({ tables: { sample_orders: [{ error: { message: "db down" } }] } });
+    await expect(setSampleOrderStatus("ord-1", "sent", "PX1")).rejects.toThrow(/db down/);
   });
 });
 

@@ -38,11 +38,14 @@ function navBadge(
   if (href === "/admin/zamowienia" && counts.newOrders > 0) {
     return { count: counts.newOrders, label: "nowe zamówienia" };
   }
-  // Licznik próbek liczy TYLKO zamówienia gotowe do spakowania — nieopłacone
-  // świadomie nie wchodzą (getNewSampleOrdersCount), bo badge ma znaczyć pracę
-  // do zrobienia, a zamówieniem bez wpłaty właścicielka się nie zajmuje.
+  // Licznik próbek to „ile czeka na moją reakcję": zamówienia gotowe do
+  // spakowania ORAZ anulowane, za które klient zapłacił (pieniądze do ręcznego
+  // zwrotu w P24). Nieopłacone świadomie nie wchodzą (getNewSampleOrdersCount),
+  // bo badge ma znaczyć pracę do zrobienia, a zamówieniem bez wpłaty
+  // właścicielka się nie zajmuje. Etykieta MUSI obejmować oba przypadki —
+  // „nowe zamówienia próbek" kłamałoby przy pozycji do zwrotu pieniędzy.
   if (href === "/admin/probki" && counts.newSamples > 0) {
-    return { count: counts.newSamples, label: "nowe zamówienia próbek" };
+    return { count: counts.newSamples, label: "zamówienia próbek do obsłużenia" };
   }
   return null;
 }

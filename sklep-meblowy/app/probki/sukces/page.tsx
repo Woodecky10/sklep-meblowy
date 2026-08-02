@@ -4,6 +4,7 @@ import { createClient } from "@/app/_lib/supabase/server";
 import { getSampleOrderById } from "@/app/_lib/samples";
 import { getContactInfo } from "@/app/_lib/contact-server";
 import { formatPrice } from "@/app/_lib/format";
+import { shortSampleOrderRef } from "@/app/_lib/sample-pricing";
 
 // Strona powrotu po zamówieniu próbek (urlReturn z app/_lib/sample-p24.ts).
 // PL-only jak całe /probki: /de jest zamrożone flagą DE_ENABLED.
@@ -101,7 +102,11 @@ export default async function SampleSuccessPage({
   // albo rejestracja płatności padła i zamówienie czeka bez transakcji.
   const pending = order.payment_status === "pending";
   const contact = pending ? await getContactInfo() : null;
-  const shortId = order.id.slice(0, 8).toUpperCase();
+  // Helper, nie `slice` na miejscu: ten sam numer wypisują trzy szablony maili
+  // i karta w panelu. Dwie kopie tej samej reguły to gwarancja, że kiedyś
+  // rozjadą się o jeden znak, a klient poda numer, którego właścicielka nie
+  // znajdzie.
+  const shortId = shortSampleOrderRef(order.id);
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-20">

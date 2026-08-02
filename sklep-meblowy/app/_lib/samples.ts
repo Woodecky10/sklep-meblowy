@@ -201,18 +201,33 @@ export async function createSampleOrder(input: CreateSampleOrderInput) {
     if (itemsError) {
       // Zamówienie bez pozycji jest bezużyteczne (właścicielka nie wie, co
       // wysłać) — kasujemy je, żeby nie zostało w panelu jako puste.
-      const { error: deleteError } = await supabase
-        .from("sample_orders")
-        .delete()
-        .eq("id", orderId);
-      if (deleteError) {
+      //
+      // ⚠️ try/catch WOKÓŁ SAMEGO delete, nie tylko sprawdzenie `error`. Klient
+      // Supabase oddaje błędy bazy w `error`, ale zerwane połączenie ODRZUCA
+      // promise — wyjątek przeleciałby nad `compensateQty = 0` prosto do catch-a
+      // niżej, pula wróciłaby do klienta, a zamówienie z free_count > 0 zostało
+      // w bazie. Późniejsze „Anuluj" w panelu zwolniłoby ją DRUGI raz.
+      let deleteFailure: string | null = null;
+      try {
+        const { error: deleteError } = await supabase
+          .from("sample_orders")
+          .delete()
+          .eq("id", orderId);
+        if (deleteError) deleteFailure = deleteError.message;
+      } catch (err) {
+        // Po zerwanym połączeniu nie wiemy, czy delete doszedł do bazy.
+        // Wybieramy stronę bezpieczną dla puli: podwójny zwrot jest gorszy niż
+        // zwrot, który i tak zrobi „Anuluj" w panelu, jeśli zamówienie zostało.
+        deleteFailure = err instanceof Error ? err.message : String(err);
+      }
+      if (deleteFailure) {
         // Kasowanie zawiodło: zamówienie ZOSTAJE w bazie z free_count > 0.
         // Nie wolno teraz zwolnić puli — późniejsze „Anuluj" w panelu zrobi to
         // po raz drugi i klient dostanie sześć gratisów zamiast trzech.
         compensateQty = 0;
         console.error(
           `[probki] nie udalo sie skasowac zamowienia bez pozycji (${orderId}) — pula zostaje zajeta do anulowania w panelu:`,
-          deleteError.message
+          deleteFailure
         );
       }
       throw new Error(`Nie udało się zapisać pozycji: ${itemsError.message}`);
@@ -257,16 +272,29 @@ export async function getSampleOrderById(id: string): Promise<SampleOrderWithIte
   return (data as SampleOrderWithItems | null) ?? null;
 }
 
-// Licznik przy pozycji w nawigacji = "ile czeka na spakowanie". Nieopłacone
-// świadomie NIE liczą się: właścicielka nie ma się nimi zajmować, dopóki
-// klient nie zapłaci, a badge ma znaczyć pracę do zrobienia.
+// Licznik przy pozycji w nawigacji = "ile czeka na moją reakcję". Wchodzą dwie
+// rzeczy, obie znaczące pracę do zrobienia:
+//
+//   1. status "new" i cokolwiek poza "pending" w płatności — zamówienie gotowe
+//      do spakowania. Nieopłacone świadomie NIE liczą się: właścicielka nie ma
+//      się nimi zajmować, dopóki klient nie zapłaci.
+//   2. status "cancelled" przy płatności "paid" — pieniądze klienta leżą u nas
+//      i czekają na ręczny zwrot w Przelewy24. Bez tego jedynym sygnałem byłaby
+//      czerwona sekcja widoczna DOPIERO po wejściu na /admin/probki, a scenariusz
+//      jest realny: klient porzuca bramkę, właścicielka po godzinie anuluje,
+//      klient kończy płatność w starej karcie. Maila o tym też nie ma (handler
+//      notyfikacji świadomie nie pisze o anulowanych).
 export async function getNewSampleOrdersCount(): Promise<number> {
   const supabase = await createAdminClient();
   const { count, error } = await supabase
     .from("sample_orders")
     .select("id", { count: "exact", head: true })
-    .eq("status", "new")
-    .neq("payment_status", "pending");
+    // Jedno zapytanie zamiast dwóch — filtr `or` PostgREST z dwoma `and`.
+    // Wszystkie wartości są stałymi z kodu, nie wejściem użytkownika, więc nie
+    // ma tu czego sanityzować (inaczej niż w wyszukiwarce zamówień).
+    .or(
+      "and(status.eq.new,payment_status.neq.pending),and(status.eq.cancelled,payment_status.eq.paid)"
+    );
   if (error) {
     // Badge nie może wywalić layoutu panelu (renderuje się na każdej podstronie).
     console.error("[probki] licznik nieudany:", error.message);
@@ -275,19 +303,41 @@ export async function getNewSampleOrdersCount(): Promise<number> {
   return count ?? 0;
 }
 
+// Zmiana statusu zamówienia próbek. Zwraca `true` TYLKO wtedy, gdy to wywołanie
+// faktycznie przestawiło wiersz — na tej podstawie panel decyduje, czy wysłać
+// maila „próbki wysłane".
+//
+// ⚠️ ZAPIS WARUNKOWY (CAS), nie „przeczytaj → zapisz". Strażnik w akcji panelu
+// czyta świeży stan, ale między odczytem a zapisem mieści się druga karta
+// panelu: obie przechodzą strażnika, obie zapisują "sent", a druga nadpisuje
+// numer nadania PUSTYM stringiem, przestawia `sent_at` na „teraz" i wysyła
+// klientowi drugiego maila — bez numeru. Filtr `.neq("status", status)`
+// przepuszcza wyłącznie pierwszą, a `.select("id")` jest KONIECZNE: bez niego
+// `error` jest null także wtedy, gdy update nie trafił w żaden wiersz.
+// Ten sam wzorzec co `updateOrderStatus` w app/admin/zamowienia/actions.ts.
+//
+// CAS NIE ZASTĘPUJE STRAŻNIKA: blokuje tylko powtórzenie TEGO SAMEGO statusu,
+// więc „cancelled" → „sent" nadal by przeszło. Legalność przejścia rozstrzyga
+// guardStatusChange, tutaj chodzi wyłącznie o wyścig.
 export async function setSampleOrderStatus(
   id: string,
   status: SampleOrderStatus,
   tracking?: string
-): Promise<void> {
+): Promise<boolean> {
   const supabase = await createAdminClient();
   const patch: Record<string, unknown> = { status };
   if (status === "sent") {
     patch.sent_at = new Date().toISOString();
     if (tracking !== undefined) patch.tracking = tracking;
   }
-  const { error } = await supabase.from("sample_orders").update(patch as never).eq("id", id);
+  const { data, error } = await supabase
+    .from("sample_orders")
+    .update(patch as never)
+    .eq("id", id)
+    .neq("status", status)
+    .select("id");
   if (error) throw new Error(error.message);
+  return ((data ?? []) as { id: string }[]).length > 0;
 }
 
 export async function cancelSampleOrder(id: string): Promise<void> {

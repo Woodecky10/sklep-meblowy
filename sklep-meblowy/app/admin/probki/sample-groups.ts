@@ -142,8 +142,9 @@ export type SampleActions = {
 
 export function sampleActionsFor(order: SampleOrderRow): SampleActions {
   // ⚠️ ANULOWANE TO KONIEC DROGI — żadnych przycisków zmiany statusu.
-  // `setSampleOrderStatus` jest bezwarunkowe: umie przestawić „cancelled"
-  // z powrotem na „new"/„packed", a kolejne „Anuluj" zwolniłoby darmową pulę
+  // `setSampleOrderStatus` pilnuje tylko powtórzenia tego samego statusu (CAS),
+  // więc umie przestawić „cancelled" z powrotem
+  // na „new"/„packed", a kolejne „Anuluj" zwolniłoby darmową pulę
   // DRUGI raz (klient dostałby sześć gratisów zamiast trzech). Panel nie może
   // takiego przejścia w ogóle oferować.
   if (order.status === "cancelled") {

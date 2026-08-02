@@ -24,10 +24,13 @@ const PANEL_PATH = "/admin/probki";
 
 // Wspólna bramka zmiany statusu.
 //
-// ⚠️ `setSampleOrderStatus` jest BEZWARUNKOWE — przestawi każdy status na każdy
-// inny. Panel takich przejść nie oferuje, ale sam brak przycisku nie wystarcza:
-// druga, nieodświeżona karta panelu pokazuje przyciski sprzed zmiany. Dlatego
-// stan sprawdzamy tuż przed zapisem, na świeżym odczycie.
+// ⚠️ `setSampleOrderStatus` blokuje wyłącznie powtórzenie TEGO SAMEGO statusu
+// (CAS na `status`) — przejście „cancelled" → „packed"/„sent" przeleciałoby
+// przez nie bez przeszkód. Panel takich przejść nie oferuje, ale sam brak
+// przycisku nie wystarcza: druga, nieodświeżona karta panelu pokazuje przyciski
+// sprzed zmiany. Dlatego legalność przejścia sprawdzamy tuż przed zapisem, na
+// świeżym odczycie — strażnik odpowiada za REGUŁY i czytelny komunikat, CAS
+// za WYŚCIG dwóch równoległych zapisów.
 //
 // Blokujemy zawsze „cancelled" (wskrzeszenie + kolejne „Anuluj" zwolniłoby
 // darmową pulę DRUGI raz, sześć gratisów zamiast trzech), a `alsoBlock` dokłada
@@ -69,6 +72,10 @@ export async function markSamplePacked(formData: FormData): Promise<ActionResult
   }
 
   try {
+    // Wynik CAS-a świadomie ignorujemy: „nie trafiono w wiersz" znaczy tu tylko
+    // tyle, że zamówienie JUŻ jest spakowane (pozostałe stany odrzucił strażnik),
+    // czyli stan końcowy zgadza się z tym, o co właścicielka prosiła. Nic się
+    // przy pakowaniu nie wysyła, więc nie ma zwycięzcy do wyłaniania.
     await setSampleOrderStatus(id, "packed");
   } catch (err) {
     return {
@@ -102,12 +109,27 @@ export async function markSampleSent(formData: FormData): Promise<ActionResult> 
     return blocked;
   }
 
+  let applied: boolean;
   try {
-    await setSampleOrderStatus(id, "sent", tracking);
+    applied = await setSampleOrderStatus(id, "sent", tracking);
   } catch (err) {
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Nie udało się zapisać",
+    };
+  }
+
+  // ⚠️ PRZEGRANY WYŚCIG. Strażnik wyżej czyta stan, ale między odczytem a
+  // zapisem mieści się druga karta panelu — obie potrafią go przejść. Zapis
+  // warunkowy przepuścił tylko jedną z nich; ta druga trafiła w 0 wierszy,
+  // więc numer nadania i `sent_at` zostały NIETKNIĘTE, a maila wysłał już
+  // zwycięzca. Drugi mail byłby duplikatem (i to bez numeru nadania).
+  if (!applied) {
+    revalidatePath(PANEL_PATH);
+    return {
+      ok: false,
+      error:
+        "To zamówienie zostało w międzyczasie oznaczone jako wysłane — odśwież stronę i sprawdź numer nadania.",
     };
   }
 

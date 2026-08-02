@@ -136,6 +136,57 @@ describe("submitSampleOrder — walidacja wejścia", () => {
   });
 });
 
+describe("submitSampleOrder — limity SANITY (nie biznesowe)", () => {
+  // ⚠️ Liczba próbek w zamówieniu jest biznesowo NIEOGRANICZONA i taka zostaje.
+  // Poniższe progi są techniczne: ciało akcji serwerowej to 10 MB, a
+  // `fabric_name` nie ma w bazie żadnego CHECK-u na długość.
+  const selection = (n: number) => ({
+    fabricId: `fab-${n}`,
+    fabricName: "Riviera",
+    // Różny kolor przy każdej pozycji — dedupe ich NIE sklei, więc do bazy
+    // poszłoby tyle wierszy, ile klient przysłał.
+    color: String(n),
+  });
+
+  it("200 pozycji wciąż przechodzi (limit nie łapie realnych zamówień)", async () => {
+    const many = Array.from({ length: 200 }, (_, i) => selection(i));
+
+    await submitSampleOrder(formData({ selections: JSON.stringify(many) }));
+
+    expect(createSampleOrderMock).toHaveBeenCalledTimes(1);
+    const arg = createSampleOrderMock.mock.calls[0][0] as { selections: unknown[] };
+    expect(arg.selections).toHaveLength(200);
+  });
+
+  it("⚠️ 100 000 pozycji nie dociera do produkcyjnej bazy", async () => {
+    const flood = Array.from({ length: 100_000 }, (_, i) => selection(i));
+
+    const res = await submitSampleOrder(formData({ selections: JSON.stringify(flood) }));
+
+    expect(res).toEqual({ ok: false, error: "Nieprawidłowy wybór próbek" });
+    expect(createSampleOrderMock).not.toHaveBeenCalled();
+  });
+
+  it("⚠️ gigantyczna nazwa tkaniny jest PRZYCINANA, nie wpisywana w bazę", async () => {
+    // `fabric_name` nie ma CHECK-u (`color` ma <= 40), więc bez przycięcia
+    // megabajtowy string wjechałby do wiersza jak stał.
+    await submitSampleOrder(
+      formData({
+        selections: JSON.stringify([
+          { fabricId: "fab-1", fabricName: "R".repeat(50_000), color: "16" },
+        ]),
+      })
+    );
+
+    const arg = createSampleOrderMock.mock.calls[0][0] as {
+      selections: { fabricId: string; fabricName: string }[];
+    };
+    expect(arg.selections[0].fabricName).toHaveLength(120);
+    // Zamówienie ma się złożyć — nazwa jest opisowa, nie jest kluczem.
+    expect(arg.selections[0].fabricId).toBe("fab-1");
+  });
+});
+
 describe("submitSampleOrder — rozwidlenie na kwocie", () => {
   it("zamówienie darmowe nie otwiera bramki płatności", async () => {
     const res = await submitSampleOrder(formData());

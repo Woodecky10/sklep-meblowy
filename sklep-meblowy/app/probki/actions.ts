@@ -17,12 +17,34 @@ import { registerTransaction, trnRequestUrl } from "@/app/_lib/p24";
 import type { SampleSelection } from "@/app/_lib/sample-pricing";
 import type { ActionResult } from "@/app/_lib/types";
 
+// ⚠️ LIMIT SANITY, NIE BIZNESOWY — to dwie różne rzeczy i mieszanie ich byłoby
+// zmianą reguły sprzedaży.
+// Biznesowo liczba próbek w zamówieniu jest NIEOGRANICZONA (spec: „limit sztuk
+// w zamówieniu: brak") — klient może zamówić ich tyle, ile chce, i zapłacić
+// 15 zł za każdą ponad darmową pulę. Tego nie ruszamy.
+// Technicznie ciało akcji serwerowej to 10 MB, a `sample_order_items.fabric_name`
+// nie ma w bazie ŻADNEGO CHECK-u na długość (`color` ma <= 40). Bez poniższych
+// progów jedno żądanie zalogowanego klienta wkłada do produkcyjnej bazy sto
+// tysięcy wierszy (dedupe ich nie sklei — wystarczą różne kolory) albo nazwę
+// tkaniny wielkości megabajta.
+// 200 pozycji = 2955 zł za próbki; żadne prawdziwe zamówienie tego nie dotknie,
+// a wzornik nie ma jak takiego wyboru wyprodukować — dlatego odrzucenie idzie
+// tym samym, ogólnym komunikatem co reszta niepoprawnego wejścia.
+const MAX_SELECTIONS = 200;
+// 120 znaków z zapasem mieści najdłuższą nazwę tkaniny z katalogu. Przycinamy,
+// a nie odrzucamy: nazwa jest opisowa (do maila i panelu), nie jest kluczem —
+// obcięta wciąż mówi właścicielce, co wyciąć, a odrzucone zamówienie nie.
+const MAX_FABRIC_NAME = 120;
+
 // Wybór przychodzi jako JSON z komponentu klienckiego, więc jego kształt jest
 // tak samo niezaufany jak każde inne pole formularza. Bez tej bramki byle co
 // wpadłoby do insertu pozycji: `fabric_id` jest kluczem obcym (uuid), a błąd
 // dopiero na poziomie bazy kosztowałby klienta rezerwację puli i kompensację.
 function parseSelections(raw: unknown): SampleSelection[] | null {
   if (!Array.isArray(raw)) return null;
+  // Sprawdzane PRZED pętlą i przed dedupe: chodzi o rozmiar ŻĄDANIA, a nie
+  // o liczbę pozycji, które ostatecznie zostaną zapisane.
+  if (raw.length > MAX_SELECTIONS) return null;
   const out: SampleSelection[] = [];
   for (const entry of raw) {
     if (!entry || typeof entry !== "object") return null;
@@ -37,7 +59,11 @@ function parseSelections(raw: unknown): SampleSelection[] | null {
     const fabricId = e.fabricId.trim();
     const color = e.color.trim();
     if (!fabricId || !color) return null;
-    out.push({ fabricId, fabricName: e.fabricName.trim(), color });
+    out.push({
+      fabricId,
+      fabricName: e.fabricName.trim().slice(0, MAX_FABRIC_NAME),
+      color,
+    });
   }
   return out;
 }
