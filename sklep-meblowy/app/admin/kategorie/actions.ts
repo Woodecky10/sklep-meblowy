@@ -211,7 +211,11 @@ export async function deleteCategory(formData: FormData): Promise<ActionResult> 
         one: "podkategorię",
         few: "podkategorie",
         many: "podkategorii",
-      })}. Najpierw przenieś je pod inną kategorię (pole „Rodzic") albo usuń.`,
+      })}. Najpierw przenieś ${pluralForm(children, {
+        one: "ją",
+        few: "je",
+        many: "je",
+      })} pod inną kategorię (pole „Rodzic") albo usuń.`,
     };
   }
 

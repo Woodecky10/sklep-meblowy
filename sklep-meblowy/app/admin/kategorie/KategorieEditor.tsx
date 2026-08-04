@@ -55,6 +55,17 @@ export default function KategorieEditor({
   }
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creatingUnder, setCreatingUnder] = useState<string | null | undefined>(undefined);
+  // Poziom, na którym TRWA przeciąganie — zmierzone transformy pokazały, że
+  // verticalListSortingStrategy przesuwa tylko karty, a poddrzewa (rodzeństwo
+  // karty, poza refem useSortable) zostają na miejscu; przy chwyceniu korzenia
+  // "Fotele" nad "Narożniki" karty dostały translate3d(…482px…), (…-156px…),
+  // (…-320px…), a ich nierozdzielone poddrzewa nie — więc na ekranie materace
+  // wyglądały jak podkategoria Narożników. Zwinięcie dzieci na TYM poziomie na
+  // czas przeciągania robi z kart ciągłą kolumnę, którą strategia faktycznie
+  // zakłada. `null` = nikt nie przeciąga; obiekt (nie goły `null`) trzeba użyć,
+  // bo `parentId` korzeni TEŻ jest `null` — inaczej nie dałoby się odróżnić
+  // "nie przeciągam" od "przeciągam najwyższy poziom".
+  const [draggingLevel, setDraggingLevel] = useState<{ parentId: string | null } | null>(null);
   const [toast, setToast] = useState<Toast>(null);
   const [, startTransition] = useTransition();
   const router = useRouter();
@@ -112,12 +123,25 @@ export default function KategorieEditor({
 
   function renderLevel(siblings: CategoryTreeNode[], parentId: string | null) {
     if (siblings.length === 0) return null;
+    // Ten poziom jest zwinięty, gdy przeciąganie trwa NA NIM (parentId się
+    // zgadza) — poziomy innych rodziców (w tym rodzic dziecka ciągnący korzeń,
+    // i odwrotnie) zostają nietknięte.
+    const collapseChildren = draggingLevel !== null && draggingLevel.parentId === parentId;
+    const handleDragEnd = onDragEnd(parentId);
     return (
       <DndContext
         id={`categories-dnd-${parentId ?? "root"}`}
         sensors={sensors}
         collisionDetection={closestCenter}
-        onDragEnd={onDragEnd(parentId)}
+        onDragStart={() => setDraggingLevel({ parentId })}
+        onDragEnd={(event) => {
+          setDraggingLevel(null);
+          handleDragEnd(event);
+        }}
+        // Escape (i odmontowanie węzła w trakcie ciągnięcia) idą przez
+        // onDragCancel, NIE onDragEnd — bez tego handlera dzieci po Escape
+        // zostałyby zwinięte na zawsze.
+        onDragCancel={() => setDraggingLevel(null)}
       >
         <SortableContext
           items={siblings.map((n) => n.id)}
@@ -150,7 +174,7 @@ export default function KategorieEditor({
                 allParents={allowedParents(items, node.id)}
                 allCategories={items}
               >
-                {renderLevel(node.children, node.id)}
+                {!collapseChildren && renderLevel(node.children, node.id)}
                 {creatingUnder === node.id && (
                   <Card>
                     <CategoryForm
