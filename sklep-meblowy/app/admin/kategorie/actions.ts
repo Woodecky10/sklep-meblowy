@@ -60,6 +60,12 @@ function parseParentId(input: unknown): string | null {
   return s === "" ? null : s;
 }
 
+// Wiadomość dla FK 23503 na parent_id — współdzielona z createCategory, gdzie
+// walidacja "czy rodzic istnieje" nie ma sensu robić z wyprzedzeniem (formularz
+// nie ma jeszcze id nowego węzła), więc jedyną linią obrony jest złapanie kodu
+// błędu Postgresa PO insercie.
+const PARENT_NOT_FOUND_ERROR = "Wybrana kategoria-rodzic już nie istnieje — odśwież stronę.";
+
 // Walidacja rodzica PRZED zapisem — trigger w bazie też to złapie, ale rzuci
 // surowym błędem Postgresa. Admin ma dostać zdanie po polsku.
 async function validateParent(
@@ -68,9 +74,16 @@ async function validateParent(
 ): Promise<string | null> {
   if (!parentId) return null;
   if (id && parentId === id) return "Kategoria nie może być swoim własnym rodzicem";
+
+  // Rozdzielone PRZED sprawdzeniem "czy to potomek": "rodzic w ogóle nie
+  // istnieje" (druga zakładka usunęła go w tle) i "rodzic istnieje, ale jest
+  // tobą/twoim potomkiem" to dwie różne sytuacje i dwa różne komunikaty —
+  // pomieszanie ich wysyła admina szukać cyklu, którego nie ma.
+  const nodes = await getAllCategories();
+  if (!nodes.some((n) => n.id === parentId)) return PARENT_NOT_FOUND_ERROR;
+
   if (!id) return null; // nowy węzeł nie ma jeszcze potomków
 
-  const nodes = await getAllCategories();
   const allowed = new Set(allowedParents(nodes, id).map((p) => p.id));
   if (!allowed.has(parentId)) {
     return "Nie można przenieść kategorii pod jej własną podkategorię — najpierw przenieś podkategorię";
@@ -108,6 +121,11 @@ export async function createCategory(formData: FormData): Promise<ActionResult> 
   if (error) {
     if (error.code === "23505")
       return { ok: false, error: `Kategoria o slug "${slug}" już istnieje` };
+    // FK parent_id: rodzic zniknął między wyrenderowaniem formularza a
+    // zapisem (np. druga zakładka panelu usunęła go w tle). Bez tego admin
+    // dostaje surowy błąd Postgresa ("insert or update on table categories
+    // violates foreign key constraint...").
+    if (error.code === "23503") return { ok: false, error: PARENT_NOT_FOUND_ERROR };
     return { ok: false, error: error.message };
   }
 
@@ -149,7 +167,13 @@ export async function updateCategory(formData: FormData): Promise<ActionResult> 
     } as never)
     .eq("id", id);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    // validateParent już sprawdził istnienie rodzica przed tym zapytaniem, ale
+    // między odczytem i update jest okno na wyścig (druga zakładka usuwa
+    // rodzica w tym samym momencie) — bez tego admin dostałby surowy błąd FK.
+    if (error.code === "23503") return { ok: false, error: PARENT_NOT_FOUND_ERROR };
+    return { ok: false, error: error.message };
+  }
 
   invalidateCategoriesCache();
   revalidatePath("/admin/kategorie");

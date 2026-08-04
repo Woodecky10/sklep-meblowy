@@ -67,6 +67,14 @@ function parsePositiveNumber(value: string | undefined) {
   return Number.isFinite(n) && n >= 0 ? n : undefined;
 }
 
+// Next oddaje string[] dla powtórzonego parametru (np. ?kategoria=a&kategoria=b),
+// mimo że SearchParams obiecuje string. Bez tej normalizacji `.trim()` na
+// tablicy rzuca TypeError → 500 na publicznej stronie (stary kod z `query.eq`
+// dostawał tablicę i po prostu nie znajdował wyników — bezpieczniej).
+function first(v: string | string[] | undefined): string | undefined {
+  return Array.isArray(v) ? v[0] : v;
+}
+
 export default async function SklepPage({
   searchParams,
 }: {
@@ -75,19 +83,19 @@ export default async function SklepPage({
   const sp = await searchParams;
   const locale = await getLocale();
   const t = getDictionary(locale);
-  const category = sp.kategoria || undefined;
+  const category = first(sp.kategoria) || undefined;
   // sekcja działa tylko jeśli kategoria nie jest ustawiona — kategoria
   // bardziej szczegółowa wygrywa (user kliknął sub-kategorię z dropdown).
-  const sectionSlug = !category && sp.sekcja ? sp.sekcja.trim() : undefined;
+  const sectionSlug = !category && sp.sekcja ? first(sp.sekcja)?.trim() : undefined;
   const sort =
     (sp.sortuj as "alphabetic" | "price_asc" | "price_desc" | "newest") ??
     "alphabetic";
   const page = Number(sp.strona ?? 1);
-  const search = sp.q?.trim() || undefined;
+  const search = first(sp.q)?.trim() || undefined;
   const priceMin = parsePositiveNumber(sp.cena_od);
   const priceMax = parsePositiveNumber(sp.cena_do);
   const inStockOnly = sp.dostepne === "1";
-  const collectionSlug = sp.kolekcja?.trim() || undefined;
+  const collectionSlug = first(sp.kolekcja)?.trim() || undefined;
   const optionFilters = parseOptionFilterParams(sp);
   const featureFilters = parseFeatureFilterParams(sp);
   const dimensionRanges = {

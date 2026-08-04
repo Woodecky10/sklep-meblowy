@@ -24,40 +24,30 @@ create index if not exists idx_categories_parent on public.categories (parent_id
 alter table public.categories alter column group_id drop not null;
 
 -- ============================================================
--- 2. Kolizje slugów — PRZED wstawieniem grup
+-- 2. Backfill: kolizje slugów + grupy → węzły najwyższego poziomu
 -- ============================================================
--- slug jest unikalny w całej tabeli, a trzy grupy mają dziś slug identyczny ze
--- slugiem istniejącej kategorii: materace, pufy, schodki-dla-pupila.
+-- CAŁY backfill (przemianowanie slugów, przepisanie cross-sellu i wstawienie
+-- grup jako korzeni) stoi pod JEDNYM guardem. GUARD wzorem migracji 66:
+-- projekt aplikuje migracje ręcznie i ma niepełny rejestr, więc plik może
+-- zostać odpalony ponownie.
 --
--- materace  → kategoria „Materace kieszeniowe" (slug rozjechany z etykietą)
--- pufy      → kategoria „Narożnik w kształcie U" (slug z migracji 09 to naroznik-u)
--- schodki-dla-pupila → grupa i kategoria mają tę SAMĄ nazwę (nagłówek-atrapa)
---                      → grupa nie tworzy węzła, patrz krok 3.
---
--- products.category jedzie samo: products_category_fk ma on update cascade.
--- Warunek `where slug = ...` jest sam z siebie idempotentny.
-update public.categories set slug = 'materace-kieszeniowe' where slug = 'materace';
-update public.categories set slug = 'naroznik-u'           where slug = 'pufy';
-
--- cross_sell_categories to TABLICA slugów (text[] not null default '{}',
--- migracja 16) i żaden FK jej nie pilnuje. Bez tego dobór materaca do łóżka
--- przestaje proponować kieszeniowe i NIE zgłasza błędu — sekcja „Polecane
--- materace" po prostu robi się pusta.
-update public.categories
-   set cross_sell_categories = array_replace(cross_sell_categories, 'materace', 'materace-kieszeniowe')
- where 'materace' = any(cross_sell_categories);
-
-update public.categories
-   set cross_sell_categories = array_replace(cross_sell_categories, 'pufy', 'naroznik-u')
- where 'pufy' = any(cross_sell_categories);
-
--- ============================================================
--- 3. Grupy → węzły najwyższego poziomu
--- ============================================================
--- GUARD wzorem migracji 66: projekt aplikuje migracje ręcznie i ma niepełny
--- rejestr, więc plik może zostać odpalony ponownie. Bez guarda drugie odpalenie
--- przestawiłoby układ zrobiony przeciąganiem w panelu z powrotem na ten sprzed
--- migracji.
+-- Guard MUSI obejmować też przemianowanie slugów, nie tylko insert grup:
+-- warunek `where slug = 'materace'` wygląda idempotentny, ale NIE JEST —
+-- backfill niżej w TYM SAMYM przebiegu tworzy nowy korzeń o slugu `materace`
+-- z category_groups, więc drugie odpalenie całej migracji ten warunek znowu
+-- znajduje. Bez wspólnego guarda drugie odpalenie:
+--   A) trafia w nowo wstawiony korzeń MATERACE i próbuje przestawić go na
+--      `materace-kieszeniowe`, które już istnieje → duplicate key, migracja
+--      przerwana surowym błędem Postgresa;
+--   B) (gorzej, gdyby liść `materace-kieszeniowe` kiedyś zniknął albo się
+--      przeniósł) — kolizji nie ma, więc korzeń `materace` PO CICHU dostaje
+--      slug `materace-kieszeniowe`, kaskada FK przestawia produkty, a
+--      zaindeksowany `?kategoria=materace` zaczyna zwracać pusty listing.
+--      Zero błędu, zero komunikatu.
+-- Guard „drzewo już zbudowane → wyjdź" (poniżej) jest jedynym warunkiem, który
+-- poprawnie oznacza „ta migracja już się wykonała" — w odróżnieniu od
+-- `and not exists (select 1 ... where slug = 'materace-kieszeniowe')`, które
+-- łata tylko skutek A, nie skutek B.
 do $$
 begin
   if exists (select 1 from public.categories where parent_id is not null) then
@@ -65,6 +55,34 @@ begin
     return;
   end if;
 
+  -- ---- 2a. Kolizje slugów — PRZED wstawieniem grup ----
+  -- slug jest unikalny w całej tabeli, a trzy grupy mają dziś slug identyczny
+  -- ze slugiem istniejącej kategorii: materace, pufy, schodki-dla-pupila.
+  --
+  -- materace  → kategoria „Materace kieszeniowe" (slug rozjechany z etykietą)
+  -- pufy      → kategoria „Narożnik w kształcie U" (slug z migracji 09 to naroznik-u)
+  -- schodki-dla-pupila → grupa i kategoria mają tę SAMĄ nazwę (nagłówek-atrapa)
+  --                      → grupa nie tworzy węzła, patrz 2b.
+  --
+  -- products.category jedzie samo: products_category_fk ma on update cascade.
+  update public.categories set slug = 'materace-kieszeniowe' where slug = 'materace';
+  update public.categories set slug = 'naroznik-u'           where slug = 'pufy';
+
+  -- cross_sell_categories to TABLICA slugów (text[] not null default '{}',
+  -- migracja 16) i żaden FK jej nie pilnuje. Bez tego dobór materaca do łóżka
+  -- przestaje proponować kieszeniowe i NIE zgłasza błędu — sekcja „Polecane
+  -- materace" po prostu robi się pusta. Ta sama pułapka co ze slugami: gdyby
+  -- ktoś kiedyś dodał do cross-sellu nowy korzeń `materace`, przemianowanie
+  -- bez wspólnego guarda przepisałoby go po cichu na `materace-kieszeniowe`.
+  update public.categories
+     set cross_sell_categories = array_replace(cross_sell_categories, 'materace', 'materace-kieszeniowe')
+   where 'materace' = any(cross_sell_categories);
+
+  update public.categories
+     set cross_sell_categories = array_replace(cross_sell_categories, 'pufy', 'naroznik-u')
+   where 'pufy' = any(cross_sell_categories);
+
+  -- ---- 2b. Grupy → węzły najwyższego poziomu ----
   -- Grupa, której slug pokrywa się ze slugiem istniejącej kategorii, NIE tworzy
   -- węzła (dziś: schodki-dla-pupila). Kategoria zostaje na najwyższym poziomie.
   -- needs_translation/translated_at jadą razem (obie tabele mają te kolumny od
@@ -86,7 +104,7 @@ begin
 end $$;
 
 -- ============================================================
--- 4. Brak cykli
+-- 3. Brak cykli
 -- ============================================================
 -- Bez tego pole „Rodzic" w panelu jednym zapisem odcina gałąź od drzewa,
 -- a każdy przebieg po ścieżce w górę (okruszki, efektywna widoczność) wisi.
@@ -124,7 +142,7 @@ create trigger trg_categories_no_cycle
   for each row execute function public.categories_no_cycle();
 
 -- ============================================================
--- 5. Atomowy reorder wśród rodzeństwa
+-- 4. Atomowy reorder wśród rodzeństwa
 -- ============================================================
 -- 1:1 wzorem reorder_collections (migracja 66). Pętla UPDATE po jednym wierszu
 -- przy padzie w połowie zostawia rodzeństwo z pomieszanymi numerami.

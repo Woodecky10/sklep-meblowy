@@ -24,12 +24,22 @@ decyduje to, **co jest czyim rodzicem**.
 
 ## Krok 2 — Dodaj kategorię
 
-1. Kliknij **„+ Nowa kategoria"**
+Są dwie drogi — wybierz tę, która pasuje do sytuacji:
+
+- **Nowa zakładka w menu** → przycisk **„+ Nowa pozycja menu"** na górze strony.
+- **Podkategoria pod istniejącą pozycją** → przycisk **„+ Podkategoria"** przy
+  tej pozycji, na jej wierszu. To najszybsza droga: pole „Rodzic" w formularzu
+  jest już ustawione na tę pozycję, więc nie musisz go wybierać ręcznie.
+
+Obie drogi otwierają ten sam formularz, tylko z inaczej ustawionym polem
+„Rodzic":
+
+1. Kliknij **„+ Nowa pozycja menu"** (albo **„+ Podkategoria"** przy wybranej pozycji)
 2. Wypełnij formularz:
    - **Nazwa wyświetlana** *(wymagane)* → tekst, który zobaczy klient, np. `Komody`
    - **Rodzic** → gdzie ta kategoria ma wisieć. Zostaw **„— najwyższy poziom —"**,
      jeśli ma być nową zakładką w menu; wybierz istniejącą kategorię, jeśli ma być
-     jej podkategorią
+     jej podkategorią. Po kliknięciu „+ Podkategoria" to pole jest już wypełnione
    - **Nazwa po niemiecku (DE)** → nazwa na `/de`. Puste = pokaże się polska
    - **Slug (link)** → zostaw puste, wygeneruje się z nazwy (`komody`)
    - **Kolejność** → mniejsze liczby idą pierwsze. Nie musisz tego ruszać —
@@ -202,9 +212,9 @@ ale wygląda niespójnie.
 ## Streszczenie
 
 ```
-/admin/kategorie → „+ Nowa kategoria"
+/admin/kategorie → „+ Nowa pozycja menu" (albo „+ Podkategoria" przy wierszu)
         ↓
-Nazwa (+ DE) + Rodzic (gdzie ma wisieć) → „Dodaj kategorię"
+Nazwa (+ DE) + Rodzic (gdzie ma wisieć, „+ Podkategoria" wypełnia to za Ciebie) → „Dodaj kategorię"
         ↓
 Kolejność → przeciąganie (tylko wśród rodzeństwa)
 Przeniesienie gdzie indziej → pole „Rodzic"
