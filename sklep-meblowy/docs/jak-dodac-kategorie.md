@@ -22,6 +22,11 @@ decyduje to, **co jest czyim rodzicem**.
 3. Przy każdej pozycji są dwie liczby: ile produktów ma **ona sama** i ile ma
    **razem z podkategoriami**
 
+> ℹ️ **Te liczby obejmują też produkty ukryte**, a sklep pokazuje klientowi
+> tylko widoczne. Dlatego panel może pisać „84 w poddrzewie", a listing w
+> sklepie policzy 83 — różnica to produkty, które sama schowałaś. Nic się nie
+> psuje, po prostu panel pokazuje pełny stan magazynu, a sklep ofertę.
+
 ## Krok 2 — Dodaj kategorię
 
 Są dwie drogi — wybierz tę, która pasuje do sytuacji:
@@ -65,6 +70,12 @@ albo w dół. Przeciąganie działa **tylko wśród rodzeństwa**, czyli w obrę
 jednego rodzica. Nie da się przeciągnięciem wrzucić kategorii pod inną —
 i to jest zamierzone, bo inaczej łatwo byłoby przenieść pół sklepu jednym
 nieuważnym ruchem.
+
+> ℹ️ **W momencie chwycenia karty podkategorie na tym poziomie się chowają**,
+> a lista skraca się do samych przenoszonych pozycji. Tak ma być: dzięki temu
+> widzisz dokładnie tę kolejność, która zostanie zapisana, i nie musisz się
+> domyślać, gdzie karta wyląduje. Po puszczeniu (albo po wciśnięciu `Esc`)
+> podkategorie wracają na swoje miejsce.
 
 **Przeniesienie — pole „Rodzic".** Żeby kategoria trafiła w inne miejsce
 drzewa, wejdź w **„Edytuj"** i zmień pole **Rodzic**. To wszystko. Wybór
@@ -115,6 +126,14 @@ pozycją „MEBLE", zrób to tak:
 Efekt: jedna zakładka „MEBLE", pod nią dawne zakładki, a pod nimi ich
 kategorie. Wtedy właśnie zaczynają działać wszystkie trzy poziomy menu.
 
+> ⚠️ **Uprzedzenie: zmieni się też stopka.** Kolumny w stopce to pozycje
+> najwyższego poziomu, a pod nimi ich podkategorie. Dziś jest tam osiem kolumn.
+> Jeśli wciągniesz wszystko pod „MEBLE", **stopka zwinie się do jednej kolumny**
+> „MEBLE" z listą dawnych zakładek. To nie awaria — stopka po prostu pokazuje
+> to samo drzewo co menu. Jeśli wolisz zachować szeroką stopkę, zostaw część
+> pozycji na najwyższym poziomie albo powiedz, zmienimy sposób, w jaki stopka
+> czyta drzewo.
+
 Nie musisz przenosić wszystkiego. Możesz zostawić część pozycji na najwyższym
 poziomie — na przykład „Nasze realizacje" obok „MEBLE", jeśli mają być
 równorzędne.
@@ -129,18 +148,23 @@ mają się proponować produkty pod danym produktem i w koszyku — dla łóżek
 kategorie materacy. Rozmiar dobiera się sam (łóżko 160×200 → materace 160×200),
 na podstawie etykiety rozmiaru produktu.
 
-> ⚠️ **Kolejność klikania NIE ma znaczenia.** Zaznaczone kategorie zapisują się
-> w tej kolejności, w jakiej są wypisane w panelu, czyli **alfabetycznie** —
-> niezależnie od tego, co kliknęłaś pierwsze. W takiej kolejności klient zobaczy
-> propozycje.
+> ℹ️ **Możesz zaznaczyć całą pozycję menu zamiast pojedynczych podkategorii.**
+> Zaznaczenie „MATERACE" znaczy „ten węzeł i wszystko pod nim" — tak samo jak
+> listing kategorii. Wtedy kolejność propozycji bierze się **z drzewa**, czyli
+> z tej, którą ustawiasz przeciąganiem w panelu.
 >
-> Ma to jeden praktyczny skutek, o którym trzeba wiedzieć: w bazie jest dziś
-> ustawiona kolejność **kieszeniowe → piankowe → nawierzchniowe** (żeby
-> pełnowartościowe materace szły przed cienkimi topperami), ale została wpisana
-> ręcznie. **Przy pierwszym zapisie kategorii łóżka przestawi się na
-> alfabetyczną** — czyli kieszeniowe, nawierzchniowe, piankowe — i toppery
-> awansują na drugie miejsce. Jeśli to problem, powiedz, poprawimy panel tak,
-> żeby respektował kolejność klikania.
+> ⚠️ Ale uwaga, bo to zmienia asortyment propozycji: dziś dla „Łóżek
+> tapicerowanych" zaznaczone są **tylko materace kieszeniowe i piankowe** —
+> nawierzchniowe (toppery) są **świadomie pominięte**. Gdybyś zaznaczyła całe
+> „MATERACE", toppery zaczęłyby się proponować razem z pełnowartościowymi
+> materacami. Jeśli mają być dalej pomijane, zostaw zaznaczone pojedyncze
+> podkategorie.
+>
+> ⚠️ **Przy zaznaczaniu pojedynczych podkategorii kolejność klikania NIE ma
+> znaczenia** — zapisują się w kolejności, w jakiej są wypisane w panelu, czyli
+> alfabetycznie. Dziś to nic nie psuje (alfabetycznie wypada kieszeniowe przed
+> piankowymi, czyli tak jak ma być), ale gdybyś chciała kolejność inną niż
+> alfabetyczna, samym klikaniem jej nie ustawisz — powiedz, poprawimy panel.
 
 ---
 

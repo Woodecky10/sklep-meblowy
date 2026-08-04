@@ -2,7 +2,7 @@ import { unstable_cache, revalidateTag } from "next/cache";
 import { createClient as createBareAnonClient } from "@supabase/supabase-js";
 import { createClient, createAdminClient } from "./supabase/server";
 import { getAllCategories } from "./categories";
-import { resolveCategoryFilter } from "./category-tree";
+import { resolveCategoryFilter, expandCrossSellTargets } from "./category-tree";
 import { searchTokens, rankByNameMatch, escapeIlike } from "./search-filter";
 import { sizeLabelOf } from "./size-groups";
 import { localizeProduct } from "./localize";
@@ -288,7 +288,14 @@ export async function getProduct(id: string, locale: Locale = DEFAULT_LOCALE) {
 // Slugi kategorii docelowych cross-sellu dla podanych kategorii źródłowych.
 // Kolejność z bazy (cross_sell_categories to text[]) jest znacząca — steruje
 // sortem karuzeli w getSizeMatchedCrossSell (realne materace przed topperami).
-// Pomija kategorie już obecne w źródle — to byłby same-sell, nie cross-sell.
+// Zaznaczenie węzła w panelu (np. korzenia „materace") ma znaczyć ten węzeł
+// I CAŁE jego poddrzewo — tak samo jak listing kategorii (resolveCategoryFilter).
+// Rozwinięcie i filtr same-sell (pomija sloty już obecne w źródle, także te,
+// które wracają jako potomek po rozwinięciu) żyją w expandCrossSellTargets.
+//
+// getAllCategories(), NIE getCategories(): cross-sell świadomie ignoruje
+// `active` — ukrycie kategorii nie wycofuje towaru ze sprzedaży (patrz
+// Global Constraints).
 async function resolveCrossSellTargets(
   sourceCategorySlugs: string[]
 ): Promise<string[]> {
@@ -298,17 +305,18 @@ async function resolveCrossSellTargets(
     .select("slug, cross_sell_categories")
     .in("slug", sourceCategorySlugs);
 
-  const targets: string[] = [];
+  const rawTargets: string[] = [];
   for (const c of (cats ?? []) as {
     slug: string;
     cross_sell_categories: string[] | null;
   }[]) {
     for (const s of c.cross_sell_categories ?? []) {
-      if (sourceCategorySlugs.includes(s)) continue;
-      if (!targets.includes(s)) targets.push(s);
+      if (!rawTargets.includes(s)) rawTargets.push(s);
     }
   }
-  return targets;
+
+  const nodes = await getAllCategories();
+  return expandCrossSellTargets(nodes, rawTargets, sourceCategorySlugs);
 }
 
 // Bierze unikalne slugi kategorii produktów w koszyku, dla każdej szuka

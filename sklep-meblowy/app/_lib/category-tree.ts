@@ -121,6 +121,51 @@ export function descendantSlugs(nodes: CategoryNode[], slug: string): string[] {
   return out;
 }
 
+// Cross-sell: zaznaczenie węzła w panelu ma znaczyć „ten węzeł i wszystko pod
+// nim" — dokładnie jak resolveCategoryFilter dla listingu. Bez tego zaznaczenie
+// korzenia z 0 własnymi produktami (wszystko wisi w podkategoriach — np.
+// „MATERACE" nad kieszeniowe/nawierzchniowe/piankowe) gasi całą sekcję
+// cross-sellu bez żadnego błędu w logach, bo `.in("category", ['materace'])`
+// nie znajduje nic.
+//
+// Nieznany slug (kategoria usunięta z tabeli — `cross_sell_categories` to
+// zwykła tablica tekstów, żaden FK jej nie pilnuje) zostaje wstawiony BEZ ZMIAN,
+// nie zgubiony po cichu — panel go zapisał, więc dalej ma prawo działać.
+//
+// `sourceSlugs` filtrujemy PO rozwinięciu każdego targetu, nie tylko na
+// surowych wpisach: gdy cross-sell źródłowej kategorii wskazuje na jej własny
+// korzeń (łóżko wisi pod „materace" wskazującym na „materace"), korzeń
+// rozwija się i źródło wraca jako potomek — bez tego dodatkowego filtra
+// dostajemy same-sell zamiast cross-sell.
+//
+// Kolejność wyniku = kolejność pierwszego wystąpienia po rozwinięciu (czyli
+// kolejność drzewa, ustawiana przeciąganiem w panelu), bez duplikatów. To ma
+// znaczenie: `getSizeMatchedCrossSell` przekazuje wynik jako trzeci argument
+// do `pickSizeMatched`, gdzie steruje priorytetem karuzeli (pełnowartościowe
+// materace mają iść przed cienkimi topperami).
+export function expandCrossSellTargets(
+  nodes: CategoryNode[],
+  rawTargets: string[],
+  sourceSlugs: string[]
+): string[] {
+  const sources = new Set(sourceSlugs);
+  const out: string[] = [];
+  const seen = new Set<string>();
+
+  for (const raw of rawTargets) {
+    const expanded = descendantSlugs(nodes, raw);
+    const slugs = expanded.length > 0 ? expanded : [raw];
+    for (const slug of slugs) {
+      if (sources.has(slug)) continue;
+      if (seen.has(slug)) continue;
+      seen.add(slug);
+      out.push(slug);
+    }
+  }
+
+  return out;
+}
+
 // Ścieżka od korzenia do węzła — nagłówek i okruszki. Pusta, gdy sluga nie ma.
 export function pathTo(nodes: CategoryNode[], slug: string): CategoryNode[] {
   const byId = new Map(nodes.map((n) => [n.id, n]));
