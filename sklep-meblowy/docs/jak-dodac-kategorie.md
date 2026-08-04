@@ -129,18 +129,23 @@ mają się proponować produkty pod danym produktem i w koszyku — dla łóżek
 kategorie materacy. Rozmiar dobiera się sam (łóżko 160×200 → materace 160×200),
 na podstawie etykiety rozmiaru produktu.
 
-> ⚠️ **Kolejność klikania NIE ma znaczenia.** Zaznaczone kategorie zapisują się
-> w tej kolejności, w jakiej są wypisane w panelu, czyli **alfabetycznie** —
-> niezależnie od tego, co kliknęłaś pierwsze. W takiej kolejności klient zobaczy
-> propozycje.
+> ℹ️ **Możesz zaznaczyć całą pozycję menu zamiast pojedynczych podkategorii.**
+> Zaznaczenie „MATERACE" znaczy „ten węzeł i wszystko pod nim" — tak samo jak
+> listing kategorii. Wtedy kolejność propozycji bierze się **z drzewa**, czyli
+> z tej, którą ustawiasz przeciąganiem w panelu.
 >
-> Ma to jeden praktyczny skutek, o którym trzeba wiedzieć: w bazie jest dziś
-> ustawiona kolejność **kieszeniowe → piankowe → nawierzchniowe** (żeby
-> pełnowartościowe materace szły przed cienkimi topperami), ale została wpisana
-> ręcznie. **Przy pierwszym zapisie kategorii łóżka przestawi się na
-> alfabetyczną** — czyli kieszeniowe, nawierzchniowe, piankowe — i toppery
-> awansują na drugie miejsce. Jeśli to problem, powiedz, poprawimy panel tak,
-> żeby respektował kolejność klikania.
+> ⚠️ Ale uwaga, bo to zmienia asortyment propozycji: dziś dla „Łóżek
+> tapicerowanych" zaznaczone są **tylko materace kieszeniowe i piankowe** —
+> nawierzchniowe (toppery) są **świadomie pominięte**. Gdybyś zaznaczyła całe
+> „MATERACE", toppery zaczęłyby się proponować razem z pełnowartościowymi
+> materacami. Jeśli mają być dalej pomijane, zostaw zaznaczone pojedyncze
+> podkategorie.
+>
+> ⚠️ **Przy zaznaczaniu pojedynczych podkategorii kolejność klikania NIE ma
+> znaczenia** — zapisują się w kolejności, w jakiej są wypisane w panelu, czyli
+> alfabetycznie. Dziś to nic nie psuje (alfabetycznie wypada kieszeniowe przed
+> piankowymi, czyli tak jak ma być), ale gdybyś chciała kolejność inną niż
+> alfabetyczna, samym klikaniem jej nie ustawisz — powiedz, poprawimy panel.
 
 ---
 

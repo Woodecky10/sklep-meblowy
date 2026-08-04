@@ -210,7 +210,30 @@ węzła.
 
 ### Follow-upy DOPISANE przez recenzję gałęzi (ważniejsze od listy poniżej)
 
-**A. Cross-sell nie rozwija poddrzewa — zrobić PRZED pierwszą samodzielną sesją
+**A. ZROBIONE** (gałąź `fix/cross-sell-poddrzewo`, commit `3bc7b7f`): wydzielona
+czysta `expandCrossSellTargets(nodes, rawTargets, sourceSlugs)` w
+`category-tree.ts` (+6 testów), `resolveCrossSellTargets` przepuszcza przez nią
+surowe wpisy. Filtr same-sell działa **po** rozwinięciu, nieznany slug zostaje
+zachowany, kolejność = kolejność pierwszego wystąpienia (czyli kolejność drzewa).
+Zweryfikowane na żywo z przywróceniem stanu: „Łóżka tapicerowane" z
+`["materace-kieszeniowe","materace-piankowe"]` → 14 materacy na stronie łóżka;
+przestawione na sam korzeń `["materace"]` → **20** (przed poprawką byłoby 0 i
+sekcja by zgasła); po przywróceniu znów 14 i konfiguracja identyczna.
+
+SPROSTOWANIE do follow-upu 3 poniżej (kolejność alfabetyczna): stan bazy jest
+inny, niż zapisałem. Dla „Łóżek tapicerowanych" zaznaczone są **tylko dwie**
+kategorie — `materace-kieszeniowe` i `materace-piankowe`. **Toppery
+(`materace-nawierzchniowe`) są świadomie pominięte**, nie „trzecie w kolejności".
+Alfabetycznie te dwie wypadają w tej samej kolejności co teraz, więc pierwszy
+zapis kategorii łóżka **niczego dziś nie przestawi** — ryzyko jest generyczne, na
+przyszłe zestawy, nie aktualne. Instrukcja dla właścicielki poprawiona.
+
+Konsekwencja tej poprawki, o której trzeba wiedzieć: zaznaczenie korzenia
+„MATERACE" DZIAŁA, ale **wciąga też toppery** (28 produktów), czyli zmienia
+asortyment propozycji. Dlatego NIE zalecam tego jako domyślnej drogi — zapisane
+w instrukcji jako świadomy wybór z ostrzeżeniem.
+
+**A-stare. Cross-sell nie rozwija poddrzewa — zrobić PRZED pierwszą samodzielną sesją
 Oli w panelu.** `resolveCrossSellTargets` (`app/_lib/products.ts:292-312`)
 dopasowuje kategorie dokładnie (`.in("category", targetSlugs)`), a panel
 pokazuje jako kandydatów **wszystkie 23 węzły**, w tym korzenie. Ola zaznaczy
