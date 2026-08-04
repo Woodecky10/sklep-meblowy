@@ -60,8 +60,8 @@ describe("buildNewProductPayload", () => {
     }
   });
 
-  it("inne kategorie narożników (narozniki, pufy) → variants null (opt-in przez toggle)", () => {
-    for (const category of ["narozniki", "pufy", "sofy"]) {
+  it("inne kategorie narożników (narozniki, naroznik-u) → variants null (opt-in przez toggle)", () => {
+    for (const category of ["narozniki", "naroznik-u", "sofy"]) {
       const r = buildNewProductPayload({ ...valid, category });
       expect(r.ok && r.payload.variants).toBeNull();
     }
