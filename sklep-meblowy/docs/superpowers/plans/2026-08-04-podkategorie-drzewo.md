@@ -10,6 +10,172 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-04-podkategorie-drzewo-design.md`
 
+---
+
+## ✅ STAN WYKONANIA (2026-08-04)
+
+Wszystkie 9 tasków zaimplementowane, każdy z recenzją (spec + jakość) i rundami
+naprawczymi tam, gdzie recenzja coś znalazła. Gałąź: `feat/kategorie-drzewo`,
+start `84f7a72` (= `main`).
+
+### Bramki końcowe
+
+| Bramka | Wynik |
+|---|---|
+| `npx tsc --noEmit` | **0 błędów** w całym projekcie |
+| `npm test` | **1094 testy w 85 plikach**, 0 failed (start: 1060) |
+| `npm run lint` | **0 błędów**, 4 warningi — wszystkie pre-existing (`fabrics.test.ts`, `bundles-server.ts`, `variants.ts`) |
+| `npm run build` | **przechodzi**, 59/59 stron |
+| e2e publiczne | `category-menu` 2/2, regresyjnie `corner-side`/`filter-pending`/`home-collections` 6/6 |
+
+### Migracja 68 — ZAAPLIKOWANA na produkcji
+
+Projekt `tlvgsddpiikolgdwuwmc`. Sześć zapytań kontrolnych po aplikacji:
+`parent_id` + indeks istnieją, `group_id` jest nullable, drzewo to **8 korzeni /
+15 dzieci / 23 węzły**, produktów bez istniejącej kategorii **0**, starych
+slugów w `cross_sell_categories` **0**, `reorder_categories` +
+`categories_no_cycle` + trigger na miejscu.
+
+Grupy przejęły zwolnione slugi: korzeń `materace` = „MATERACE", korzeń `pufy` =
+„PUFY", a dawne kategorie dostały `materace-kieszeniowe` i `naroznik-u`. Ósmy
+korzeń to „Schodki dla pupila" — grupa o identycznym slugu celowo nie utworzyła
+węzła.
+
+### Co ZWERYFIKOWANO na żywo (localhost, produkcyjna baza, Playwright)
+
+- **Poddrzewo naprawdę się zbiera:** `?kategoria=materace` → **83 produkty**,
+  `?kategoria=materace-kieszeniowe` → **40**. (Uwaga na pułapkę: listing ma
+  paginację, więc liczba kart na stronie to zawsze 12 — dowodem są liczniki, nie
+  karty.) Drugi dowód pod limitem strony: `pufy` 6 vs `naroznik-u` 4.
+- **Pasek nawigacji:** 8 korzeni, każdy z panelem zawierającym skrót
+  „Wszystkie …" + dzieci, wszystkie linki przez `?kategoria=`.
+- **Okruszki:** `materace-kieszeniowe` → „MATERACE / Materace kieszeniowe",
+  `naroznik-u` → „Narożniki / Narożnik w kształcie U". Dla korzenia okruszków
+  nie ma i **tak ma być** (`trail.length > 1`).
+- **Pasek dzieci na korzeniu:** `materace` → piankowe / nawierzchniowe /
+  kieszeniowe; `pufy` → Pufy tapicerowane.
+- **Legacy alias:** `?sekcja=salon` daje identyczną stronę co
+  `?kategoria=salon` (oba „Narożniki", te same liczniki); to samo dla
+  `sypialnia` → „ŁÓŻKA". Historyczne slugi grup (`salon`, `sypialnia`,
+  `z-produkcji`) nadal działają jako slugi korzeni.
+- **Stopka:** kolumny = korzenie, pozycje = ich dzieci.
+- **Mobile 390 px:** hamburger (`aria-label="Menu"`) otwiera akordeon, pierwszy
+  poziom to dokładnie te 8 korzeni, rozwinięcie „Fotele" pokazuje
+  „Wszystkie fotele" + „Fotele tapicerowane".
+- **Cross-sell przeżył przemianowanie slugu:** strona łóżka tapicerowanego
+  pokazuje sekcję „Materace w rozmiarze 140×200 cm" z **14 materacami**.
+
+### Czego NIE sprawdzono na żywo (ważne — nie zakładać, że działa)
+
+1. **CAŁY panel `/admin/kategorie`.** Brak dostępu: zapisana sesja Playwrighta
+   (`e2e/.auth/admin.json`) jest z 24 lipca i wygasła, a w `.env.e2e` nie ma
+   danych logowania administratora (plik jest do tego zapisany w kodowaniu,
+   którego `dotenv` może nie odczytać — patrz follow-up 4). **Nieprzetestowane
+   na żywo: przeciąganie, zapis kolejności, przenoszenie polem „Rodzic",
+   komunikat przy próbie zapętlenia, oba guardy usuwania, liczniki
+   „własne / w poddrzewie".** Wszystko to jest pokryte kodem i testami
+   jednostkowymi (`reorderSiblings` — 9 testów), ale ani jedno kliknięcie nie
+   zostało wykonane. Lista do odklikania w 5 minut jest w Task 9 Step 3.
+2. **Trzeci poziom megamenu.** W produkcyjnym drzewie są dziś tylko dwa poziomy
+   (korzenie = dawne grupy, dzieci = dawne kategorie), więc trzeci poziom
+   **nie miał na czym się pokazać**. Zacznie działać dokładnie wtedy, gdy Ola
+   zbuduje „MEBLE" (MEBLE → Sofy → Sofa 3-osobowa). Logika jest pokryta testami
+   `menuProjection`, ale nie widziałem jej na ekranie.
+3. **Zachowanie przeciągania po refaktorze `ref`** (patrz rozstrzygnięcie 4
+   poniżej) — zmiana była oceniona wyłącznie po kodzie, w dwóch niezależnych
+   recenzjach, bez kliknięcia w przeglądarce.
+4. **Strony `/de`** — locale zamrożone flagą `DE_ENABLED`, nie ruszane.
+
+### Rozstrzygnięcia PONAD planem (nie „naprawiać" ich z powrotem)
+
+1. **`buildTree` w planie zwracał strukturę cykliczną** — snippet z Taska 2
+   Step 3 tworzył cykl, na którym każde przejście drzewa bez zbioru odwiedzonych
+   zapętlało się (menu, filtry, panel, selekty). Implementer dodał filtr
+   krawędzi wstecznych w `walk`; recenzja potwierdziła trzema reprodukcjami.
+   Snippet w planie poprawiony commitem `11f6f04`.
+2. **`app/not-found.tsx`** nie był na liście wyjątku bramki, a używał usuniętego
+   `getSections` — przepisany w Tasku 3 na `buildTree(getCategories())`.
+3. **Odmiana liczebnika:** brief podawał `childCount === 1 ? "podkategorię" :
+   "podkategorii"`, co dla 2–4 dawało „ma 3 podkategorii". Wiąże Global
+   Constraint „PL-only, pełnymi zdaniami", nie snippet → użyta istniejąca
+   `pluralForm` z `app/_lib/plural.ts`. **Wyjątek 12–14 świadomie nieobsłużony**
+   — tak działa cała aplikacja (komentarz w `plural.ts`), zmiana ruszyłaby
+   widoczne etykiety sklepu.
+4. **`useSortable` mierzył całe poddrzewo.** Struktura z briefu trzymała
+   `ref={setNodeRef}` na kontenerze obejmującym kartę wiersza **i** jej
+   potomków, więc `closestCenter` liczył środek pełnej wysokości poddrzewa —
+   przy korzeniu z kilkunastoma dziećmi upuszczenie obok nagłówka nie trafiało
+   tam, gdzie widać. Wiąże wymaganie właściciela („kolejność ustawialna w
+   jakikolwiek sposób") → `ref` przeniesiony na sam wiersz, `{children}` jako
+   rodzeństwo poza refem. Przy okazji wydzielona czysta
+   `reorderSiblings(items, parentId, activeId, overId)` do `category-tree.ts`
+   (bez importu `@dnd-kit` — moduł jest celowo bez zależności).
+5. **`corner-side.ts` — luka SPECYFIKACJI, nie implementacji.** Spec przewidział
+   dwie konsekwencje przemianowania slugów (kaskada FK na `products`, przepisanie
+   `cross_sell_categories`) i przeoczył trzecią: `EXTRA_CORNER_CATEGORY_SLUGS =
+   new Set(["pufy"])` istniało tylko dlatego, że kategoria „Narożnik w kształcie
+   U" miała rozjechany slug `pufy`. Po migracji `pufy` to nowy węzeł „PUFY", więc
+   produkt w tej grupie dostawałby wybór strony narożnika. Lista wyjątków
+   usunięta (commit `6935dce`). **Klasa błędu do zapamiętania:** przemianowanie
+   slugu w bazie dotyka też miejsc, gdzie slug jest zaszyty w kodzie jako
+   *znaczenie*, nie jako klucz.
+6. **`check (category in (...))` z `schema.sql:48-52` jest MARTWY** —
+   sprawdzone, nie założone: migracja 09 zdejmuje wszystkie ograniczenia check
+   pętlą `execute format('alter table public.products drop constraint %I', cname)`
+   i wstawia FK `products_category_fk`. `schema.sql` to nieaktualny zrzut bazowy.
+   Żadnej listy dozwolonych slugów na produkcji nie ma.
+7. **Test e2e nie zakłada, KTÓRY korzeń ma dzieci** — pierwsza wersja
+   (z briefu) brała `categoryLinks.first()` i padłaby, gdyby najniższy
+   `sort_order` trafił na płaską kategorię. Teraz szuka dowolnego korzenia
+   z duplikatem `href`. Jedyne pozostałe założenie — „istnieje przynajmniej
+   jeden korzeń z dziećmi" — jest nazwane w komentarzu w teście.
+8. **Martwy prop `categories` w `ProductEditor`** usunięty; uzasadnienie briefu
+   („karmi komunikat o dobieraniu rozmiaru") odnosiło się do lokalnej zmiennej
+   w `[id]/page.tsx`, nie do propa komponentu.
+
+### Follow-upy w kolejności wagi
+
+1. **Odkliknąć panel na żywo** (Task 9 Step 3) — jedyna nieprzetestowana
+   interaktywnie część funkcji, w tym samo przeciąganie. Wymaga świeżych danych
+   logowania administratora.
+2. **Migracja 69 — sprzątanie po modelu expand-first:** usunąć
+   `categories.group_id` i tabelę `category_groups`. Dopiero **gdy nowa wersja
+   posiedzi na produkcji** i będzie jasne, że nie wracamy.
+3. **Cross-sell zapisuje kolejność alfabetyczną, nie kolejność klikania.**
+   Rozjazd istniał przed tą gałęzią: `candidates` w `KategorieEditor` są
+   sortowane alfabetycznie, a `formData.getAll` oddaje kolejność DOM.
+   Konsekwencja: ustawiona dziś ręcznie kolejność (kieszeniowe → piankowe →
+   nawierzchniowe) **przestawi się na alfabetyczną przy pierwszym zapisie
+   kategorii łóżka**, czyli toppery awansują na drugie miejsce.
+   `docs/jak-dodac-kategorie.md` mówi teraz prawdę o tym zachowaniu; jeśli ma
+   działać kolejność klikania, trzeba poprawić panel.
+4. **`.env.e2e` prawdopodobnie w UTF-16.** Pliku nie da się odczytać ani
+   `grep`em, ani ripgrepem, mimo 174 bajtów — objaw zapisu z PowerShella przez
+   `>` albo `Set-Content` bez `-Encoding utf8`. Jeśli tak, `dotenv` też nie
+   odczyta zmiennych i `auth.setup.ts` padnie z „Brak danych logowania" mimo
+   poprawnie wpisanych danych. Zapisać w UTF-8.
+5. **Brak testu e2e przeciągania w panelu** — czeka na odnowioną sesję admina.
+   Wzorzec: `e2e/samples.spec.ts`, kilkanaście linijek.
+6. **Okruszki `<nav>` bez `aria-label`** (`app/sklep/page.tsx:246`) — na stronie
+   jest kilka elementów `<nav>` i czytnik ekranu ich nie rozróżni. Drobiazg
+   dostępnościowy, jedna linijka.
+7. **Drobiazgi zaparkowane w recenzjach:** dwie funkcje odmiany w repo
+   (`pluralForm` bez wyjątku 12–14 i prywatna `pluralPl` z wyjątkiem — duplikat
+   sprzed tej gałęzi); `flattenMenuNodes` mieszka w `FilterBar.tsx`, a pasowałby
+   do `category-tree.ts`, gdzie dostałby test za darmo; `parseParentId` bez
+   testu jednostkowego; niekonsekwentne cudzysłowy w `KategorieEditor.tsx`
+   (typograficzny + prosty w tym samym stringu); etykiety opcji w edytorze
+   produktu doklejają `(slug)`, a w formularzu nowego produktu nie.
+
+### Czego ta gałąź świadomie NIE robi
+
+Nie tworzy „MEBLI" (buduje je Ola w panelu — instrukcja w
+`docs/jak-dodac-kategorie.md`), nie zmienia adresów na `/kategoria/<slug>`,
+nie przegląda wartości tłumaczeń DE, nie dodaje obrazków w megamenu ani
+przenoszenia produktów hurtem.
+
+---
+
 ## Global Constraints
 
 - **To NIE jest Next.js z treningu** — wersja 16 ma breaking changes. Przed kodem Server Component/Action sprawdź `node_modules/next/dist/docs/`. `params`/`searchParams` to Promise. (`sklep-meblowy/AGENTS.md`)
