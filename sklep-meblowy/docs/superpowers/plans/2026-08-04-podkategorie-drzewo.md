@@ -23,10 +23,51 @@ start `84f7a72` (= `main`).
 | Bramka | Wynik |
 |---|---|
 | `npx tsc --noEmit` | **0 błędów** w całym projekcie |
-| `npm test` | **1094 testy w 85 plikach**, 0 failed (start: 1060) |
+| `npm test` | **1100 testów w 86 plikach**, 0 failed (start: 1060) |
 | `npm run lint` | **0 błędów**, 4 warningi — wszystkie pre-existing (`fabrics.test.ts`, `bundles-server.ts`, `variants.ts`) |
 | `npm run build` | **przechodzi**, 59/59 stron |
-| e2e publiczne | `category-menu` 2/2, regresyjnie `corner-side`/`filter-pending`/`home-collections` 6/6 |
+| e2e publiczne | `category-menu` 2/2 (na buildzie produkcyjnym), regresyjnie `corner-side`/`filter-pending`/`home-collections` 6/6 |
+
+### Recenzja całej gałęzi: Approved with conditions → wszystkie 4 warunki SPEŁNIONE (`871e75c`)
+
+1. **Migracja 68 nie była idempotentna.** Przemianowania slugów stały PRZED
+   guardem, a backfill w tym samym przebiegu tworzy korzeń o slugu `materace` —
+   więc drugie odpalenie albo wywalało się na unikalnym slugu, albo (gdyby liść
+   `materace-kieszeniowe` kiedyś zniknął) **po cichu przemianowywało żywy
+   korzeń** i gasiło zaindeksowany adres. Cały backfill (slugi + cross-sell +
+   insert grup) stoi teraz pod jednym guardem „drzewo już zbudowane".
+   Zmiana pliku NIE rusza produkcji — migracja jest tam już zaaplikowana.
+2. **`/sklep?kategoria=a&kategoria=b` dawało 500.** Next oddaje wtedy `string[]`,
+   a `SearchParams` obiecuje `string`, więc `.trim()` rzucał `TypeError` na
+   publicznej stronie (stary kod pokazywał pustą listę). Helper `first()`
+   zastosowany do `kategoria`, `sekcja`, `q` i `kolekcja`. Zweryfikowane
+   curl-em na buildzie produkcyjnym: wszystkie cztery warianty **HTTP 200**.
+3. **Surowy błąd Postgresa przy rodzicu-widmie.** FK `23503` obsłużony w
+   `createCategory` i `updateCategory`; `validateParent` rozdziela „rodzic nie
+   istnieje" od „rodzic jest twoim potomkiem" — wcześniej oba dawały komunikat
+   o cyklu i wysyłały administratorkę szukać problemu, którego nie ma.
+   **+6 testów** (`app/admin/kategorie/__tests__/actions.test.ts`) na fake
+   kliencie Supabase, w tym asercja, że kod `23505` został nietknięty.
+4. **Instrukcja podawała nazwę przycisku, którego nie ma** — panel ma
+   „+ Nowa pozycja menu" i skrót „+ Podkategoria" przy wierszu.
+
+### Stan produkcji PRZED wdrożeniem kodu (zmierzony, nie wywnioskowany)
+
+Migracja poszła przed kodem, więc produkcja stoi na starym kodzie z nowym
+schematem. Sprawdzone `curl`em na mollien.pl 2026-08-04:
+
+```
+?kategoria=materace              → HTTP 200, 0 produktów
+?kategoria=pufy                  → HTTP 200, 0 produktów
+?kategoria=materace-kieszeniowe  → HTTP 200, 24 linki (12 produktów)
+```
+
+Stary kod dopasowuje kategorię dokładnie (`eq("category", slug)`), a produkty
+pojechały kaskadą FK na nowe slugi — więc **dwa zaindeksowane adresy oddają dziś
+puste strony**. Nowy kod rozwiązuje je jako korzenie (83 i 6 produktów).
+**Deploy to naprawia, nie psuje** — to argument za wdrożeniem szybciej, nie
+później. W menu tych pozycji nie ma (stary kod czyta `group_id`, nowe korzenie
+mają je puste), więc dotyczy tylko wejść z linków i wyszukiwarki.
 
 ### Migracja 68 — ZAAPLIKOWANA na produkcji
 
@@ -132,6 +173,72 @@ węzła.
 8. **Martwy prop `categories` w `ProductEditor`** usunięty; uzasadnienie briefu
    („karmi komunikat o dobieraniu rozmiaru") odnosiło się do lokalnej zmiennej
    w `[id]/page.tsx`, nie do propa komponentu.
+
+### Follow-upy DOPISANE przez recenzję gałęzi (ważniejsze od listy poniżej)
+
+**A. Cross-sell nie rozwija poddrzewa — zrobić PRZED pierwszą samodzielną sesją
+Oli w panelu.** `resolveCrossSellTargets` (`app/_lib/products.ts:292-312`)
+dopasowuje kategorie dokładnie (`.in("category", targetSlugs)`), a panel
+pokazuje jako kandydatów **wszystkie 23 węzły**, w tym korzenie. Ola zaznaczy
+naturalnie brzmiące „MATERACE" zamiast trzech liści → `targetSlugs = ['materace']`
+→ żaden produkt nie ma tej kategorii bezpośrednio → **sekcja polecanych materacy
+gaśnie na stronie każdego łóżka, bez żadnego komunikatu**. Fix trzyliniowy i w
+duchu tej gałęzi: przepuścić wynik przez `descendantSlugs`, dokładnie jak
+listing. Waży więcej niż follow-up 3 poniżej: tamten przestawia kolejność, ten
+gasi sekcję całkowicie.
+
+**B. Geometria przeciągania — pierwsza rzecz do odklikania.** `renderLevel`
+tworzy osobny, zagnieżdżony `DndContext` na każdy poziom, a `{children}` leży
+między kartami rodzeństwa. Przeniesienie `ref` (rozstrzygnięcie 4) było
+konieczne, ale `verticalListSortingStrategy` zakłada, że elementy jednego
+`SortableContext` tworzą **ciągłą kolumnę** — tu między kartą korzenia A i B leży
+całe poddrzewo A. Wyliczona kolejność będzie poprawna (`reorderSiblings` ma 9
+testów), ale **animacja podglądu w trakcie ciągnięcia** może skakać. Statycznie
+nierozstrzygalne — patrzeć nie na wynik po odświeżeniu, a na to, jak się to
+rusza.
+
+**C. Kolejność odklikania panelu** (wg recenzji): (1) przeciągnięcie w
+zagnieżdżonym poziomie w gałęzi z kilkoma dziećmi, (2) przeciągnięcie zakładki
+na najwyższym poziomie — tam między kartami leżą całe poddrzewa, (3)
+przeniesienie gałęzi z dziećmi polem „Rodzic" i sprawdzenie, czy wnuki nie
+wyparowały z megamenu, (4) oba guardy usuwania z odmianą liczebnika przy 2, 3 i
+5, (5) utworzenie kategorii o zajętym slugu → polski komunikat, nie surowy błąd.
+
+**D. Ze SPECU USUNĄĆ wiersz o sierocie** (`...design.md`, okolice linii 341):
+wymaga, żeby węzeł z nieistniejącym rodzicem „nie renderował się w menu". FK
+`parent_id → categories(id) on delete restrict` czyni ten stan **niedosiężnym**,
+a kod świadomie robi coś innego (traktuje sierotę jak korzeń) i ma na to
+komentarz plus testy. Naprawianie kodu pod ten wiersz byłoby cofaniem się.
+
+**E. Spec kłamie o kanonikalach** (linia 248: „kanonikale są rozłączne per
+węzeł"). `app/sklep/page.tsx:35` ustawia `canonical: /sklep` dla KAŻDEGO
+wariantu z filtrem, a `app/sitemap.ts:61-65` wypisuje 23 adresy `?kategoria=`,
+z których każdy kanonikalizuje się do `/sklep`. Pre-existing, praktycznie
+nieszkodliwe (Google i tak nie indeksuje tych filtrów), ale spec do poprawienia.
+
+**F. Luki testowe wskazane imiennie:** migracja nie ma żadnego testu, choć spec
+go wymagał (i to dokładnie tam wyszedł warunek 1); warstwa danych też była w
+specu i ma pokrytą tylko czystą `resolveCategoryFilter` — sklejenie z
+`.in("category", ...)`, gałąź „nieznany slug → sentinel UUID" i `effectiveActive`
+w `getCategories` są bez testu; przypadek `parent_id === id` nie ma testu w
+żadnej funkcji, mimo że `buildTree:67` ma na to jawny warunek.
+
+**G. Drobiazgi z recenzji gałęzi:** pasek dzieci (`sklep/page.tsx:150-156`) nie
+sortuje `byTreeOrder`, więc przy remisie `sort_order` może pokazać inną
+kolejność niż megamenu (jedno `.sort()`); `admin/kategorie/page.tsx:26-33`
+czyta `select("category")` bez paginacji, więc po przekroczeniu domyślnego
+limitu PostgREST (1000 wierszy) liczniki poddrzewa zaniżą się i będzie to
+wyglądać na błąd drzewa; usunięcie kategorii nie sprząta jej sluga z
+`cross_sell_categories` innych węzłów (tablica bez FK); `FilterBar.tsx:268`
+dla węzła z poziomu 4+ pokazuje „1 filtr aktywny" bez zdejmowalnego chipa;
+`home-tiles.ts:110` linkuje `?kategoria=lozko-tapicerowane`, a żywy slug to
+`lozka-tapicerowane` (pre-existing, martwe dopóki `home_tiles` niepuste).
+
+**H. Stopka zwinie się do jednej kolumny po zbudowaniu „MEBLI"** —
+`Footer.tsx:26` woła `menuProjection(categories, 2)`, czyli kolumna = korzeń,
+pozycje = poziom 2. To wymusza spec i nie jest defektem, ale jest **widoczną
+zmianą wyglądu, która nastąpi dokładnie w momencie, gdy Ola wykona instrukcję
+z dokumentacji**. Warto ją o tym uprzedzić albo zmienić projekcję stopki.
 
 ### Follow-upy w kolejności wagi
 
