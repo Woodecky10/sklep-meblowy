@@ -22,6 +22,8 @@
 - **Widoczność (`active`) dotyczy nawigacji i filtrów, nie dostępności produktu.** Tak jest dziś i tak zostaje: ukrycie węzła zdejmuje go z menu, filtrów i sitemapy, ale produkty pozostają w `/sklep`, w wyszukiwarce i pod własnymi adresami. To NIE jest błąd do naprawienia.
 - Slug jest unikalny w całej tabeli `categories` — dla każdego poziomu. `?kategoria=<slug>` musi wskazywać jednoznacznie.
 - Bramki przed każdym commitem: `npx tsc --noEmit` (0 błędów), `npm test` (wszystko zielone), `npm run build` (przechodzi), `npm run lint` (0 błędów).
+- **WYJĄTEK od bramki `tsc`/`build`, rozstrzygnięty przez właściciela 2026-08-04:** Task 3 usuwa stare API kategorii, którego konsumenci są przepisywani w Taskach 4-8. Dlatego **w Taskach 3-7 `tsc` może zgłaszać błędy — ale WYŁĄCZNIE w plikach należących do późniejszych tasków** (lista plików jest w sekcji „Struktura plików"), a `npm run build` może nie przechodzić. Każdy taki task nadal musi mieć zielone `npm test` i `npm run lint` dla plików, które tknął. **Pełne zero `tsc` i przechodzący `build` obowiązują od Taska 8** — to pierwszy commit, na którym gałąź jest budowalna. Błąd `tsc` w pliku, którego żaden dalszy task nie wymienia, jest zawsze usterką do naprawienia, nie skutkiem tego wyjątku.
+- W repo **nie ma git hooków** (`.git/hooks` puste, brak husky/lint-staged), więc `--no-verify` niczego nie pomija i nie należy go używać.
 - **Stan wyjściowy testów: 1060 testów w 85 plikach.** Odpal `npm test` przed Taskiem 1 i zapisz realną liczbę — będzie punktem odniesienia.
 - E2E bez `E2E_BASE_URL` lecą **w produkcję**. Lokalnie: `E2E_BASE_URL=http://localhost:3000 npm run test:e2e -- <plik>`.
 
@@ -1228,14 +1230,16 @@ Expected: zielone (testy `category-tree` przechodzą, testy `categories` usunię
 
 - [ ] **Step 8: Commit**
 
-Nie commituj, dopóki `tsc` ma błędy w plikach, których nie tkniesz w tym tasku — zamiast tego przejdź od razu do Taska 4 i commituj razem z nim. Jeśli jednak chcesz zapisać postęp:
+Czerwony `tsc` jest tu sankcjonowany wyjątkiem z Global Constraints — pod warunkiem, że **każdy** zgłoszony plik jest wymieniony w „Strukturze plików" jako zmieniany w Taskach 4-8. Jeśli `tsc` wskazuje jakikolwiek inny plik, to usterka: napraw ją, zanim scommitujesz.
 
 ```bash
 git add app/_lib/categories.ts app/_lib/products.ts app/sitemap.ts
-git commit -m "refactor(kategorie): warstwa danych na drzewie, jeden filtr poddrzewem" --no-verify
-```
+git commit -m "refactor(kategorie): warstwa danych na drzewie, jeden filtr poddrzewem
 
-⚠️ `--no-verify` tylko tutaj i tylko wtedy, gdy jedyne błędy `tsc` są w plikach z kolejnych tasków. Wpisz to w treść commita.
+Konsumenci starego API (nawigacja, listing, panel, selecty produktu) sa
+przepisywani w Taskach 4-8, wiec na tym commicie tsc jest czerwony
+w plikach tych taskow - wyjatek uzgodniony w Global Constraints."
+```
 
 ---
 
@@ -2135,7 +2139,7 @@ Expected: błędy tylko w `KategorieEditor.tsx` (Task 7) i `app/admin/produkty/*
 
 ```bash
 git add app/admin/kategorie/actions.ts app/admin/kategorie/page.tsx
-git commit -m "feat(admin/kategorie): akcje na drzewie, reorder rodzenstwa i guardy usuwania" --no-verify
+git commit -m "feat(admin/kategorie): akcje na drzewie, reorder rodzenstwa i guardy usuwania"
 ```
 
 ---
@@ -2720,7 +2724,7 @@ Run: `npm test && npm run lint`
 
 ```bash
 git add app/admin/kategorie/KategorieEditor.tsx
-git commit -m "feat(admin/kategorie): lista-drzewo z przeciaganiem wsrod rodzenstwa i polem Rodzic" --no-verify
+git commit -m "feat(admin/kategorie): lista-drzewo z przeciaganiem wsrod rodzenstwa i polem Rodzic"
 ```
 
 ---
