@@ -767,6 +767,16 @@ export function buildTree(nodes: CategoryNode[]): CategoryTreeNode[] {
       if (seen.has(n.id)) continue;
       seen.add(n.id);
       n.depth = depth;
+      // Krawędź wsteczna musi wypaść ze ZWRACANEJ struktury, nie tylko
+      // z tego przebiegu. Faza budowania wyżej wpycha każdy węzeł do tablicy
+      // `children` rodzica bez sprawdzania cyklu, więc przy A→B→A zwrócone
+      // drzewo zawiera `tree[0].children[0].children[0] === tree[0]`. Sam
+      // zbiór `seen` chroni tylko przypisywanie `depth` — konsument, który
+      // schodzi rekurencyjnie po `children` (menu, filtry, panel, selecty),
+      // wpadłby w nieskończoną rekurencję. W drzewie bez cyklu ten filtr jest
+      // matematycznym no-op: każdy węzeł ma jeden `parent_id`, więc trafia do
+      // dokładnie jednej tablicy `children` i nie może być jeszcze odwiedzony.
+      n.children = n.children.filter((c) => !seen.has(c.id));
       walk(n.children, depth + 1);
     }
   }
@@ -779,6 +789,7 @@ export function buildTree(nodes: CategoryNode[]): CategoryTreeNode[] {
     node.depth = 0;
     roots.push(node);
     seen.add(node.id);
+    node.children = node.children.filter((c) => !seen.has(c.id));
     walk(node.children, 1);
   }
 
