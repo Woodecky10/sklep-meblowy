@@ -4,3 +4,9 @@
 .playwright-mcp/
 /*.png
 /node_modules
+
+# Konfiguracja serwerow MCP — trzyma osobisty token dostepu do Supabase.
+# Ignorowana byla dotad tylko w sklep-meblowy/, a Claude Code czyta ten plik
+# z KATALOGU URUCHOMIENIA, czyli z korzenia repo — bez tego wpisu token
+# lezalby tu jako plik nieignorowany.
+.mcp.json
