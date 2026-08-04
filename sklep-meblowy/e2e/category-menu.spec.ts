@@ -2,12 +2,20 @@ import { test, expect } from "@playwright/test";
 
 // Guard megamenu kategorii (migracja 68 — drzewo bez limitu głębokości).
 //
-// Test jest odporny na to, JAK Ola ułoży drzewo: nie zna nazw kategorii ani
-// liczby poziomów. Pilnuje trzech rzeczy, które muszą być prawdziwe zawsze:
+// Test jest odporny na to, JAK Ola ułoży drzewo: nie zna nazw kategorii, nie
+// zna liczby poziomów i NIE ZAKŁADA, który konkretnie korzeń ma podkategorie —
+// szuka dowolnego korzenia z duplikatem href (trigger + skrót w panelu), a nie
+// bierze pierwszego z sort_order. Jedyne założenie: że w CAŁYM drzewie istnieje
+// przynajmniej jeden korzeń z dziećmi — to jest właśnie scenariusz, który ma
+// pilnować (panel „wszystkie…"), więc jeśli akurat to przestanie być prawdą
+// (drzewo całkiem spłaszczone), test słusznie się o to potknie.
+// Pilnuje trzech rzeczy, które muszą być prawdziwe zawsze:
 // 1. pasek pokazuje co najmniej jedną pozycję kategorii,
 // 2. wszystkie linki kategorii w nagłówku prowadzą przez ?kategoria=,
 //    a nie przez legacy ?sekcja= (te zostają obsłużone, ale nie generowane),
-// 3. panel rozwijany ma skrót „wszystkie" do listingu całego poddrzewa.
+// 3. panel rozwijany ma skrót „wszystkie" do listingu całego poddrzewa —
+//    dla przynajmniej jednego korzenia z dziećmi, niezależnie od tego, który
+//    to korzeń.
 test.describe("megamenu kategorii", () => {
   test("pasek linkuje przez ?kategoria= i ma skrót do całego poddrzewa", async ({
     page,
@@ -21,15 +29,38 @@ test.describe("megamenu kategorii", () => {
     // Żadna pozycja paska nie generuje już legacy ?sekcja=.
     await expect(header.locator('a[href*="/sklep?sekcja="]')).toHaveCount(0);
 
-    // Pierwsza pozycja paska: hover otwiera panel ze skrótem „wszystkie …".
-    const firstTrigger = categoryLinks.first();
-    const rootHref = await firstTrigger.getAttribute("href");
-    expect(rootHref).toBeTruthy();
-    await firstTrigger.hover();
+    // Panel „wszystkie…" duplikuje href korzenia (trigger w pasku + link
+    // w panelu) — ale TYLKO dla korzeni, które mają dzieci (NavStrip.tsx
+    // renderuje panel warunkowo na root.children.length > 0). Nie wiemy,
+    // KTÓRY korzeń to jest, więc sprawdzamy wszystkie unikalne hrefy i
+    // szukamy choćby jednego z duplikatem — bez przesądzania pozycji.
+    const hrefs = await categoryLinks.evaluateAll((els) =>
+      Array.from(
+        new Set(
+          els.map((el) => el.getAttribute("href")).filter((h): h is string => !!h)
+        )
+      )
+    );
+    expect(hrefs.length, "brak żadnego linku kategorii w headerze").toBeGreaterThan(0);
 
-    // Skrót w panelu prowadzi do tego samego listingu co nagłówek pozycji.
+    let rootWithChildrenHref: string | null = null;
+    for (const href of hrefs) {
+      const count = await header.locator(`a[href="${href}"]`).count();
+      if (count >= 2) {
+        rootWithChildrenHref = href;
+        break;
+      }
+    }
+    expect(
+      rootWithChildrenHref,
+      "żaden korzeń paska nie ma podkategorii — brak duplikatu href (trigger + skrót w panelu)"
+    ).toBeTruthy();
+
+    // Hover na trigger TEGO korzenia (ten z duplikatem) otwiera panel — skrót
+    // w panelu prowadzi do tego samego listingu co nagłówek pozycji.
+    await header.locator(`a[href="${rootWithChildrenHref}"]`).first().hover();
     await expect(
-      header.locator(`a[href="${rootHref}"]`).nth(1)
+      header.locator(`a[href="${rootWithChildrenHref}"]`).nth(1)
     ).toBeVisible({ timeout: 5_000 });
   });
 

@@ -87,7 +87,6 @@ export default async function AdminProductEditPage({
       )}
       <ProductEditor
       product={product}
-      categories={categories}
       categoryGroups={flattenForSelect(categories)}
       de={de}
       sizeGroupMembers={sizeGroupMembers}
