@@ -108,15 +108,49 @@ węzła.
 
 ### Czego NIE sprawdzono na żywo (ważne — nie zakładać, że działa)
 
-1. **CAŁY panel `/admin/kategorie`.** Brak dostępu: zapisana sesja Playwrighta
-   (`e2e/.auth/admin.json`) jest z 24 lipca i wygasła, a w `.env.e2e` nie ma
-   danych logowania administratora (plik jest do tego zapisany w kodowaniu,
-   którego `dotenv` może nie odczytać — patrz follow-up 4). **Nieprzetestowane
-   na żywo: przeciąganie, zapis kolejności, przenoszenie polem „Rodzic",
-   komunikat przy próbie zapętlenia, oba guardy usuwania, liczniki
-   „własne / w poddrzewie".** Wszystko to jest pokryte kodem i testami
-   jednostkowymi (`reorderSiblings` — 9 testów), ale ani jedno kliknięcie nie
-   zostało wykonane. Lista do odklikania w 5 minut jest w Task 9 Step 3.
+1. ~~CAŁY panel `/admin/kategorie`~~ → **ZWERYFIKOWANY NA ŻYWO 2026-08-04**,
+   po tym jak właściciel podał dane logowania. Sesja odnowiona przez
+   `auth.setup`, testy przez Playwrighta na buildzie produkcyjnym
+   (`localhost:3100`, produkcyjna baza). Wyniki:
+   - **drzewo i liczniki** — 23 wiersze, 8 korzeni / 15 dzieci, liczniki
+     „własne · w poddrzewie" zgadzają się arytmetycznie (ŁÓŻKA 98+35+41 = 174),
+     odmiana liczebnika poprawna („1 własny produkt");
+   - **przeciąganie myszą wśród rodzeństwa** — „Materace kieszeniowe"
+     przesunięte na koniec, **zmiana przetrwała odświeżenie** (czyli zapis do
+     bazy działa), potem **przywrócone klawiaturą** i po odświeżeniu stan
+     identyczny z wyjściowym;
+   - **przeciąganie klawiaturą** działa (Space / strzałki / Space) —
+     `KeyboardSensor` z `sortableKeyboardCoordinates` jest zarejestrowany;
+   - **utworzenie pozycji menu i podkategorii** — „+ Podkategoria" ustawia pole
+     „Rodzic" z góry, dziecko ląduje na poziomie 1;
+   - **ukrycie** — wiersz dostaje oznaczenie `(ukryta)` i pozostaje edytowalny;
+   - **guard usuwania z dzieckiem** — „ma 1 podkategorię. Najpierw przenieś je
+     pod inną kategorię (pole „Rodzic") albo usuń.";
+   - **ochrona przed pętlą** — pole „Rodzic" nie zawiera ani samej kategorii,
+     ani jej potomków (25 opcji, `allowedParents` wycina poddrzewo); po
+     **wstrzyknięciu własnego id przez DOM** i zapisie wychodzi polski
+     komunikat „Kategoria nie może być swoim własnym rodzicem", nie surowy błąd
+     Postgresa;
+   - **sprzątanie** — obie kategorie testowe usunięte, stan końcowy identyczny
+     z wyjściowym (23 wiersze), zero śladów w produkcyjnej bazie.
+
+   **ZNALEZIONY PRZY TYM DEFEKT (naprawiany osobno, gałąź
+   `fix/kategorie-podglad-przeciagania`):** podgląd przeciągania na najwyższym
+   poziomie pokazuje **nieprawdziwe drzewo**. `verticalListSortingStrategy`
+   przesuwa transformami tylko karty, a poddrzewa zostają na miejscu. Zmierzone
+   przy ciągnięciu „Fotele" nad „Narożniki" (karty 66 px):
+   `Fotele +482px`, `MATERACE −156px`, `Narożniki −320px` — nierówne i
+   wielokrotnie większe od karty. Na ekranie „Fotele tapicerowane" wygląda wtedy
+   jak dziecko MATERACE, a materace jak dzieci Narożników. **Zapis wychodzi
+   poprawny — kłamie wyłącznie animacja.** Decyzja właściciela: zwijać
+   podkategorie na czas przeciągania, żeby karty były ciągłą kolumną i podgląd
+   pokazywał to, co zostanie zapisane.
+
+   Weryfikację geometrii da się robić **bez mutacji bazy**: przeciągnięcie
+   anulowane `Escape` nie woła `reorderCategories`, a dnd-kit wystawia w
+   `aria-live` wynik detekcji kolizji. Skrypt tej metody jest w scratchpadzie
+   sesji (`panel-04-geometria-bez-zapisu.mjs`) — warto go odtworzyć, jeśli
+   ktoś będzie ruszał dnd w tym panelu.
 2. **Trzeci poziom megamenu.** W produkcyjnym drzewie są dziś tylko dwa poziomy
    (korzenie = dawne grupy, dzieci = dawne kategorie), więc trzeci poziom
    **nie miał na czym się pokazać**. Zacznie działać dokładnie wtedy, gdy Ola
@@ -240,11 +274,33 @@ pozycje = poziom 2. To wymusza spec i nie jest defektem, ale jest **widoczną
 zmianą wyglądu, która nastąpi dokładnie w momencie, gdy Ola wykona instrukcję
 z dokumentacji**. Warto ją o tym uprzedzić albo zmienić projekcję stopki.
 
+**I. Komunikaty dnd-kit dla czytników ekranu są PO ANGIELSKU i wypisują UUID-y.**
+Zmierzone w trakcie przeciągania: `"Draggable item c0fba5ff-88ba-47ec-bc60-…
+was moved over droppable area 6e4fcb18-…"`, a po Escape `"Dragging was
+cancelled. Draggable item … was dropped."`. To domyślne `announcements` dnd-kit,
+których nikt nie nadpisał. Panel jest **PL-only** (Global Constraint), więc to
+realna, choć drobna, luka — dnd-kit przyjmuje własne `announcements` i
+`screenReaderInstructions`, a etykiety samych uchwytów są już poprawnie polskie
+(„Przeciągnij żeby zmienić kolejność: Fotele"). Dotyczy też
+`CollectionsEditor`/`SliderEditor`/`FeaturedEditor`/`TilesEditor` — ten sam
+wzorzec, jedno miejsce do naprawienia raz dla wszystkich.
+
+**J. Panel liczy produkty UKRYTE, sklep nie — i nikt o tym nie wie.**
+Panel pokazuje dla MATERACE „84 w poddrzewie", a `/sklep?kategoria=materace`
+liczy 83. Różnica jest poprawna: `admin/kategorie/page.tsx` czyta
+`select("category")` klientem admina bez filtra, a sklep widzi tylko aktywne
+produkty (RLS). Czyli jeden materac jest ukryty. Nie błąd, ale liczby się
+rozjeżdżają i przy pierwszym zauważeniu wygląda to na usterkę drzewa —
+warto albo dopisać to do instrukcji, albo rozbić licznik na „aktywne / wszystkie".
+
 ### Follow-upy w kolejności wagi
 
-1. **Odkliknąć panel na żywo** (Task 9 Step 3) — jedyna nieprzetestowana
-   interaktywnie część funkcji, w tym samo przeciąganie. Wymaga świeżych danych
-   logowania administratora.
+1. ~~Odkliknąć panel na żywo~~ **ZROBIONE 2026-08-04** — właściciel podał dane
+   logowania, sesja odnowiona, wszystkie punkty Step 3 przeszły. Szczegóły w
+   sekcji „Czego NIE sprawdzono", punkt 1. Zostaje z tego jeden defekt
+   (podgląd przeciągania) naprawiany na gałęzi
+   `fix/kategorie-podglad-przeciagania` i jedna obserwacja (follow-up I:
+   angielskie komunikaty dnd-kit dla czytników ekranu).
 2. **Migracja 69 — sprzątanie po modelu expand-first:** usunąć
    `categories.group_id` i tabelę `category_groups`. Dopiero **gdy nowa wersja
    posiedzi na produkcji** i będzie jasne, że nie wracamy.
