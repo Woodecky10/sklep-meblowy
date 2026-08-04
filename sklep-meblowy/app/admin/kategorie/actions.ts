@@ -5,6 +5,7 @@ import { createAdminClient, createClient } from "@/app/_lib/supabase/server";
 import { isAdmin, requireAdmin } from "@/app/_lib/admin";
 import { getAllCategories, invalidateCategoriesCache } from "@/app/_lib/categories";
 import { allowedParents } from "@/app/_lib/category-tree";
+import { pluralForm } from "@/app/_lib/plural";
 
 // ============================================================
 // Wspólne typy odpowiedzi dla wszystkich akcji admin/kategorie
@@ -178,12 +179,15 @@ export async function deleteCategory(formData: FormData): Promise<ActionResult> 
     .select("id", { count: "exact", head: true })
     .eq("parent_id", id);
 
-  if ((childCount ?? 0) > 0) {
+  const children = childCount ?? 0;
+  if (children > 0) {
     return {
       ok: false,
-      error: `Nie można usunąć kategorii "${label}" — ma ${childCount} ${
-        childCount === 1 ? "podkategorię" : "podkategorii"
-      }. Najpierw przenieś je pod inną kategorię (pole „Rodzic") albo usuń.`,
+      error: `Nie można usunąć kategorii "${label}" — ma ${children} ${pluralForm(children, {
+        one: "podkategorię",
+        few: "podkategorie",
+        many: "podkategorii",
+      })}. Najpierw przenieś je pod inną kategorię (pole „Rodzic") albo usuń.`,
     };
   }
 
@@ -194,12 +198,15 @@ export async function deleteCategory(formData: FormData): Promise<ActionResult> 
     .select("id", { count: "exact", head: true })
     .eq("category", slug);
 
-  if ((count ?? 0) > 0) {
+  const products = count ?? 0;
+  if (products > 0) {
     return {
       ok: false,
-      error: `Nie można usunąć kategorii "${label}" — ma ${count} ${
-        count === 1 ? "produkt" : "produktów"
-      }. Najpierw zmień kategorię tych produktów lub je usuń.`,
+      error: `Nie można usunąć kategorii "${label}" — ma ${products} ${pluralForm(products, {
+        one: "produkt",
+        few: "produkty",
+        many: "produktów",
+      })}. Najpierw zmień kategorię tych produktów lub je usuń.`,
     };
   }
 
