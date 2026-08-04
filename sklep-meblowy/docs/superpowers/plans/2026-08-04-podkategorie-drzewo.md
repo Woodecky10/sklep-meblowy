@@ -256,11 +256,13 @@ z dokumentacji**. Warto ją o tym uprzedzić albo zmienić projekcję stopki.
    kategorii łóżka**, czyli toppery awansują na drugie miejsce.
    `docs/jak-dodac-kategorie.md` mówi teraz prawdę o tym zachowaniu; jeśli ma
    działać kolejność klikania, trzeba poprawić panel.
-4. **`.env.e2e` prawdopodobnie w UTF-16.** Pliku nie da się odczytać ani
-   `grep`em, ani ripgrepem, mimo 174 bajtów — objaw zapisu z PowerShella przez
-   `>` albo `Set-Content` bez `-Encoding utf8`. Jeśli tak, `dotenv` też nie
-   odczyta zmiennych i `auth.setup.ts` padnie z „Brak danych logowania" mimo
-   poprawnie wpisanych danych. Zapisać w UTF-8.
+4. **`.env.e2e` to niewypełniony szablon** — 174 bajty samych komentarzy, zero
+   zmiennych. Dlatego `grep` nie znajduje w nim żadnego `NAZWA=`. (W trakcie tej
+   gałęzi postawiłem tu fałszywą hipotezę o zapisie w UTF-16 — nie jest to
+   problem kodowania, plik po prostu nigdy nie został wypełniony.) Odblokowanie
+   follow-upów 1 i 5: właściciel wpisuje `E2E_ADMIN_EMAIL` i
+   `E2E_ADMIN_PASSWORD`, potem `npx playwright test auth.setup` odnawia sesję
+   w `e2e/.auth/admin.json`.
 5. **Brak testu e2e przeciągania w panelu** — czeka na odnowioną sesję admina.
    Wzorzec: `e2e/samples.spec.ts`, kilkanaście linijek.
 6. **Okruszki `<nav>` bez `aria-label`** (`app/sklep/page.tsx:246`) — na stronie
