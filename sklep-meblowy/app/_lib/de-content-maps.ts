@@ -8,30 +8,26 @@
 // Gdy admin uzupełni właściwe kolumny `_de` (np. categories.label_de), one mają
 // pierwszeństwo — te mapy są fallbackiem dla locale=de.
 
-// ── Kategorie i grupy (klucz = slug; categories.label_de/category_groups.label_de
-//    puste w DB, więc tłumaczymy etykietę WYŚWIETLANĄ wg slug) ──
-export const GROUP_LABEL_DE: Record<string, string> = {
+// ── Kategorie (klucz = slug; categories.label_de wygrywa, gdy admin uzupełni) ──
+// Jedna mapa dla całego drzewa — od migracji 68 grupy i kategorie to jedna
+// tabela, więc dwie mapy nie mają po czym się rozdzielać.
+//
+// Świadomie BEZ wpisów dla `fotele` i `materace-kieszeniowe`: stara mapa
+// tłumaczyła `fotele` jako „2-Sitzer-Sofa", a `materace` jako „Topper-Matratzen"
+// i obie wartości są po prostu złe. Brak wpisu = fallback do PL, czyli widocznie
+// nieprzetłumaczone — lepsze niż cicho błędne. `/de` jest zamrożone flagą
+// DE_ENABLED, więc przegląd wartości DE to zadanie na odmrożenie.
+export const CATEGORY_LABEL_DE: Record<string, string> = {
   salon: "Ecksofas",
   sofy: "Sofas",
-  inne: "Matratzen",
   sypialnia: "Betten",
-  "dostepne-od-reki": "Sofort verfügbar",
-};
-
-export const CATEGORY_LABEL_DE: Record<string, string> = {
-  "lozko-kontynentalne": "Boxspringbetten",
-  narozniki: "Ecksofas",
-  sofy: "Sofas",
-  lozka: "Betten",
-  "lozko-tapicerowane": "Polsterbetten",
-  "sofa-3-osobowa": "3-Sitzer-Sofa",
-  "materace-piankowe": "Schaumstoffmatratzen",
-  pufy: "U-förmiges Ecksofa",
   "naroznik-l": "L-förmiges Ecksofa",
-  "materace-sprezynowe": "Federkernmatratzen",
-  materace: "Topper-Matratzen",
+  "naroznik-u": "U-förmiges Ecksofa",
+  "sofa-3-osobowa": "3-Sitzer-Sofa",
+  "lozko-kontynentalne": "Boxspringbetten",
+  "lozka-tapicerowane": "Polsterbetten",
   "lozka-dzieciece": "Kinderbetten",
-  fotele: "2-Sitzer-Sofa",
+  "materace-piankowe": "Schaumstoffmatratzen",
 };
 
 // ── Wolnotekstowe pola produktu (klucz = dokładny string PL z DB) ──

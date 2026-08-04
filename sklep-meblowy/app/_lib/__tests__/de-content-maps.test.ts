@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  GROUP_LABEL_DE,
   CATEGORY_LABEL_DE,
   mapDe,
   VARIANT_OPTION_DE,
@@ -16,31 +15,24 @@ import {
   PROMO_ERROR_DE,
 } from "@/app/_lib/de-content-maps";
 
-// Slugi obecne w produkcyjnej DB (category_groups / categories) — gdyby ktoś
-// usunął wpis z mapy, kategoria renderowałaby się po polsku na /de. Ten test
-// pilnuje pełnego pokrycia bieżącego katalogu.
-const DB_GROUP_SLUGS = ["salon", "sofy", "inne", "sypialnia", "dostepne-od-reki"];
+// Slugi obecne w produkcyjnej DB (categories) — od migracji 68, grupy i kategorie
+// to jedno drzewo. Test pilnuje pełnego pokrycia bieżącego katalogu dla tych slugów,
+// które mają tłumaczenia DE. Świadomie BEZ `fotele` i `materace-kieszeniowe`
+// — stare tłumaczenia były błędne, fallback do PL jest lepszy.
 const DB_CATEGORY_SLUGS = [
-  "lozko-kontynentalne",
-  "narozniki",
+  "salon",
   "sofy",
-  "lozka",
-  "lozko-tapicerowane",
-  "sofa-3-osobowa",
-  "materace-piankowe",
-  "pufy",
+  "sypialnia",
+  "lozko-kontynentalne",
   "naroznik-l",
-  "materace-sprezynowe",
-  "materace",
+  "naroznik-u",
+  "sofa-3-osobowa",
+  "lozka-tapicerowane",
   "lozka-dzieciece",
-  "fotele",
+  "materace-piankowe",
 ];
 
-describe("de-content-maps — pokrycie kategorii", () => {
-  it("każda grupa z DB ma niemiecką etykietę", () => {
-    const missing = DB_GROUP_SLUGS.filter((s) => !GROUP_LABEL_DE[s]?.trim());
-    expect(missing).toEqual([]);
-  });
+describe("de-content-maps — pokrycie kategorii (drzewo)", () => {
   it("każda kategoria z DB ma niemiecką etykietę", () => {
     const missing = DB_CATEGORY_SLUGS.filter((s) => !CATEGORY_LABEL_DE[s]?.trim());
     expect(missing).toEqual([]);
@@ -67,7 +59,6 @@ describe("badge — zamknięta lista z tłumaczeniem DE", () => {
 
 // Integralność: żadne tłumaczenie w żadnej mapie nie jest puste/whitespace.
 const ALL_MAPS: Record<string, Record<string, string>> = {
-  GROUP_LABEL_DE,
   CATEGORY_LABEL_DE,
   CONSTRUCTION_DE,
   DELIVERY_TIME_DE,

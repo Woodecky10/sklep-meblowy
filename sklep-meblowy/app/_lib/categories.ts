@@ -10,14 +10,14 @@ import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
 import { localizeCategory, localizeCategoryGroup } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
-import { GROUP_LABEL_DE, CATEGORY_LABEL_DE } from "./de-content-maps";
+import { CATEGORY_LABEL_DE } from "./de-content-maps";
 
 // Lokalizacja etykiety DE: najpierw kolumna `label_de` z DB (gdy admin uzupełni),
 // w przeciwnym razie ręczna mapa po slug (de-content-maps), na końcu fallback PL.
 function deGroup(g: Section, locale: Locale): Section {
   const r = localizeCategoryGroup(g, locale);
   if (locale === "de" && !(g.label_de && g.label_de.trim())) {
-    const de = GROUP_LABEL_DE[g.slug];
+    const de = CATEGORY_LABEL_DE[g.slug];
     if (de) return { ...r, label: de };
   }
   return r;
