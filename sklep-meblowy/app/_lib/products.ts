@@ -1,7 +1,8 @@
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createClient as createBareAnonClient } from "@supabase/supabase-js";
 import { createClient, createAdminClient } from "./supabase/server";
-import { getCategories } from "./categories";
+import { getAllCategories } from "./categories";
+import { resolveCategoryFilter } from "./category-tree";
 import { searchTokens, rankByNameMatch, escapeIlike } from "./search-filter";
 import { sizeLabelOf } from "./size-groups";
 import { localizeProduct } from "./localize";
@@ -77,11 +78,10 @@ export type ProductFilters = {
   // Slug kolekcji — filtruje produkty należące do konkretnej kolekcji
   // (np. ?kolekcja=lisbon w URL).
   collectionSlug?: string;
-  // Slug sekcji (grupy kategorii) — np. "naroznik" pokaże WSZYSTKIE produkty
-  // z naroznik-l + naroznik-u. Używane gdy user kliknie na sam HEADER
-  // sekcji w Navbarze (?sekcja=naroznik), zamiast wybierać konkretną
-  // sub-kategorię. Gdy oba `category` i `sectionSlug` są ustawione,
-  // `category` wygrywa (bardziej szczegółowy filtr).
+  // Legacy alias `?sekcja=` — od migracji 68 sekcje i kategorie to jedno drzewo,
+  // więc ten parametr rozwiązuje się dokładnie tak samo jak `category`.
+  // Zostaje dla zaindeksowanych i zabookmarkowanych linków. Gdy oba są
+  // ustawione, `category` wygrywa (patrz resolveCategoryFilter).
   sectionSlug?: string;
   // Język odczytu — gdy "de", pola tekstowe (name/description/color/material/
   // sekcje) wracają zlokalizowane (z fallbackiem PL), a wyszukiwanie szuka po
@@ -114,21 +114,23 @@ export async function getProducts(filters: ProductFilters = {}) {
 
   let query = supabase.from("products").select("*", { count: "exact" });
 
-  if (category) {
-    query = query.eq("category", category);
-  } else if (sectionSlug) {
-    // Filtr po sekcji = pokaż wszystkie produkty których kategoria należy
-    // do tej sekcji. Robione przez lookup wszystkich kategorii z
-    // group_slug = sectionSlug + .in("category", [slugs]).
-    const allCats = await getCategories();
-    const sectionCategorySlugs = allCats
-      .filter((c) => c.group_slug === sectionSlug)
-      .map((c) => c.slug);
-    if (sectionCategorySlugs.length === 0) {
-      // Brak kategorii w tej sekcji → zwracamy puste wyniki
+  // Jeden filtr dla całego drzewa: węzeł pokazuje produkty z siebie ORAZ z całego
+  // poddrzewa. Wcześniej były dwie gałęzie (dokładny `category` i lookup po
+  // `group_slug`), bo model miał dokładnie dwa poziomy.
+  //
+  // getAllCategories(), NIE getCategories(): ukryta podkategoria nie ma chować
+  // swoich produktów przed listingiem rodzica (patrz Global Constraints).
+  const categoryFilter = resolveCategoryFilter(await getAllCategories(), {
+    kategoria: category,
+    sekcja: sectionSlug,
+  });
+
+  if (categoryFilter) {
+    if (categoryFilter.slugs.length === 0) {
+      // Nieznany slug → pusty listing, nie „wszystkie produkty".
       query = query.eq("id", "00000000-0000-0000-0000-000000000000");
     } else {
-      query = query.in("category", sectionCategorySlugs);
+      query = query.in("category", categoryFilter.slugs);
     }
   }
 
