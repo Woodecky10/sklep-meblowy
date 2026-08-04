@@ -262,3 +262,44 @@ export function subtreeProductCounts(
   }
   return result;
 }
+
+// Przesunięcie węzła wśród RODZEŃSTWA — czysta logika za przeciąganiem w panelu.
+// Rodzeństwo liczymy TU (parent_id === parentId, `null` porównywane z `null`,
+// więc najwyższy poziom to węzły BEZ rodzica, nie "wszystkie węzły"), po
+// byTreeOrder — jedno źródło prawdy, żeby wynik przeciągania i to, co idzie
+// do reorder_categories, nigdy się nie rozjechały.
+//
+// `null`, gdy żądanie nie ma sensu: activeId === overId, albo któryś z nich
+// nie należy do tego rodzeństwa (inna gałąź/inny poziom). RPC ma klauzulę
+// `parent_id is not distinct from p_parent` i taki wiersz po cichu zignoruje
+// — lepiej nie wysłać żądania niż wysłać połowiczną kolejność.
+//
+// BEZ arrayMove z @dnd-kit/sortable: ten moduł jest celowo bez zależności
+// (importują go i serwer, i komponenty klienckie), więc przesunięcie robimy
+// zwykłym splice — usuń, potem wstaw w już-skróconą tablicę (identyczny
+// efekt jak arrayMove, patrz jego implementacja).
+export function reorderSiblings(
+  items: CategoryNode[],
+  parentId: string | null,
+  activeId: string,
+  overId: string
+): { items: CategoryNode[]; ids: string[] } | null {
+  if (activeId === overId) return null;
+
+  const siblings = items.filter((n) => n.parent_id === parentId).sort(byTreeOrder);
+
+  const oldIndex = siblings.findIndex((n) => n.id === activeId);
+  const newIndex = siblings.findIndex((n) => n.id === overId);
+  if (oldIndex === -1 || newIndex === -1) return null;
+
+  const reordered = siblings.slice();
+  const [moved] = reordered.splice(oldIndex, 1);
+  reordered.splice(newIndex, 0, moved);
+
+  const orderById = new Map(reordered.map((n, i) => [n.id, i]));
+  const newItems = items.map((n) =>
+    orderById.has(n.id) ? { ...n, sort_order: orderById.get(n.id)! } : n
+  );
+
+  return { items: newItems, ids: reordered.map((n) => n.id) };
+}

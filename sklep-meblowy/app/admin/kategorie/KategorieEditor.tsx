@@ -13,7 +13,6 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
@@ -26,6 +25,7 @@ import { useConfirm } from "@/app/_context/ConfirmContext";
 import {
   buildTree,
   allowedParents,
+  reorderSiblings,
   type CategoryNode,
   type CategoryTreeNode,
 } from "@/app/_lib/category-tree";
@@ -83,33 +83,25 @@ export default function KategorieEditor({
   // Przeciąganie działa TYLKO wśród rodzeństwa: każdy poziom ma własny
   // SortableContext, a zapis idzie przez reorder_categories(parent, ids).
   // Przenoszenie między gałęziami to pole „Rodzic" w formularzu — świadoma
-  // decyzja właściciela (mniej kodu, brak pomyłkowych upuszczeń).
-  function onDragEnd(parentId: string | null, siblings: CategoryTreeNode[]) {
+  // decyzja właściciela (mniej kodu, brak pomyłkowych upuszczeń). Czystą
+  // logikę „stan + activeId/overId → nowy stan" liczy reorderSiblings
+  // (app/_lib/category-tree.ts, ma własne testy) — tu zostaje tylko stan,
+  // rollback i toast.
+  function onDragEnd(parentId: string | null) {
     return (event: DragEndEvent) => {
       const { active, over } = event;
-      if (!over || active.id === over.id) return;
+      if (!over) return;
 
-      const oldIndex = siblings.findIndex((n) => n.id === active.id);
-      const newIndex = siblings.findIndex((n) => n.id === over.id);
-      if (oldIndex === -1 || newIndex === -1) return;
-
-      const reordered = arrayMove(siblings, oldIndex, newIndex);
-      const orderById = new Map(reordered.map((n, i) => [n.id, i]));
+      const result = reorderSiblings(items, parentId, String(active.id), String(over.id));
+      if (!result) return;
 
       // Cofnięcie wraca do OSTATNIEGO DOBREGO stanu, nie do propów — inaczej
       // nieudany zapis wymazuje wcześniejsze udane przestawienia.
       const prev = items;
-      setItems(
-        items.map((n) =>
-          orderById.has(n.id) ? { ...n, sort_order: orderById.get(n.id)! } : n
-        )
-      );
+      setItems(result.items);
 
       startTransition(async () => {
-        const res = await reorderCategories(
-          parentId,
-          reordered.map((n) => n.id)
-        );
+        const res = await reorderCategories(parentId, result.ids);
         if (!res.ok) {
           setItems(prev);
           showToast({ type: "error", message: res.error });
@@ -125,7 +117,7 @@ export default function KategorieEditor({
         id={`categories-dnd-${parentId ?? "root"}`}
         sensors={sensors}
         collisionDetection={closestCenter}
-        onDragEnd={onDragEnd(parentId, siblings)}
+        onDragEnd={onDragEnd(parentId)}
       >
         <SortableContext
           items={siblings.map((n) => n.id)}
@@ -272,19 +264,27 @@ function TreeRow({
   const [pendingDelete, startDeleteTransition] = useTransition();
   const confirm = useConfirm();
 
+  // useSortable mierzy DOKŁADNIE ten element, na którym siedzi ref — musi
+  // opakowywać TYLKO kartę wiersza, nigdy {children} (całe zagnieżdżone
+  // poddrzewo). Inaczej closestCenter liczyłby środek kolizji do środka
+  // WYSOKOŚCI CAŁEGO poddrzewa węzła z wieloma dziećmi, nie do środka jego
+  // widocznego nagłówka — przeciąganie krótkiego węzła nad rozbudowaną
+  // gałęzią celowałoby w złe miejsce.
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
+    marginLeft: node.depth * 24,
   };
 
   const c = counts[node.slug] ?? { own: 0, subtree: 0 };
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <div>
       <div
+        ref={setNodeRef}
+        style={style}
         className="border border-[var(--border)] rounded-xl bg-[var(--card-bg)]"
-        style={{ marginLeft: node.depth * 24 }}
       >
         <div className="flex items-center gap-3 p-3 flex-wrap">
           <button

@@ -9,6 +9,7 @@ import {
   allowedParents,
   resolveCategoryFilter,
   subtreeProductCounts,
+  reorderSiblings,
   type CategoryNode,
 } from "@/app/_lib/category-tree";
 
@@ -313,5 +314,98 @@ describe("subtreeProductCounts", () => {
     expect(counts.get("narozniki")).toEqual({ own: 0, subtree: 10 });
     expect(counts.get("meble")).toEqual({ own: 1, subtree: 19 });
     expect(counts.get("inspiracje")).toEqual({ own: 0, subtree: 0 });
+  });
+});
+
+describe("reorderSiblings", () => {
+  // Cztery rodzeństwo najwyższego poziomu, tylko dla tego describe — TREE ma
+  // ich tam za mało (dwa), a testy „środek listy” potrzebują co najmniej trzech.
+  const FOUR: CategoryNode[] = [
+    node({ id: "p", slug: "p", sort_order: 0 }),
+    node({ id: "q", slug: "q", sort_order: 1 }),
+    node({ id: "r", slug: "r", sort_order: 2 }),
+    node({ id: "s", slug: "s", sort_order: 3 }),
+  ];
+
+  function sortOrders(items: CategoryNode[]): Record<string, number> {
+    return Object.fromEntries(items.map((n) => [n.id, n.sort_order]));
+  }
+
+  it("przesuwa węzeł w środku listy — nowa kolejność i sort_order 0..n-1", () => {
+    const result = reorderSiblings(FOUR, null, "r", "q");
+    expect(result).not.toBeNull();
+    expect(result!.ids).toEqual(["p", "r", "q", "s"]);
+    expect(sortOrders(result!.items)).toEqual({ p: 0, r: 1, q: 2, s: 3 });
+  });
+
+  it("przesuwa pierwszy na koniec", () => {
+    const THREE = FOUR.slice(0, 3); // p, q, r
+    const result = reorderSiblings(THREE, null, "p", "r");
+    expect(result).not.toBeNull();
+    expect(result!.ids).toEqual(["q", "r", "p"]);
+    expect(sortOrders(result!.items)).toEqual({ q: 0, r: 1, p: 2 });
+  });
+
+  it("przesuwa ostatni na początek", () => {
+    const THREE = FOUR.slice(0, 3); // p, q, r
+    const result = reorderSiblings(THREE, null, "r", "p");
+    expect(result).not.toBeNull();
+    expect(result!.ids).toEqual(["r", "p", "q"]);
+    expect(sortOrders(result!.items)).toEqual({ r: 0, p: 1, q: 2 });
+  });
+
+  it("activeId spoza rodzeństwa daje null", () => {
+    // "6" (sofa-2) jest dzieckiem "5" (sofy) — nie jest rodzeństwem "2"/"5"
+    // (dzieci "1"), mimo że wszystkie trzy leżą w tym samym drzewie.
+    expect(reorderSiblings(TREE, "1", "6", "5")).toBeNull();
+  });
+
+  it("overId spoza rodzeństwa daje null", () => {
+    expect(reorderSiblings(TREE, "1", "2", "6")).toBeNull();
+  });
+
+  it("activeId === overId daje null (żadnego id nie trzeba nawet szukać)", () => {
+    expect(reorderSiblings(TREE, null, "1", "1")).toBeNull();
+  });
+
+  it("reorder na poziomie zagnieżdżonym nie zmienia sort_order węzłów z innej gałęzi ani z najwyższego poziomu", () => {
+    // Zamiana dzieci "narozniki" (id "2"): naroznik-modulowy (3) <-> naroznik-l (4).
+    const result = reorderSiblings(TREE, "2", "3", "4");
+    expect(result).not.toBeNull();
+    expect(result!.ids).toEqual(["4", "3"]);
+    const orders = sortOrders(result!.items);
+    expect(orders["4"]).toBe(0);
+    expect(orders["3"]).toBe(1);
+    // Rodzic, rodzeństwo rodzica, inna gałąź i korzenie — nietknięte.
+    expect(orders["1"]).toBe(0); // meble
+    expect(orders["2"]).toBe(0); // narozniki
+    expect(orders["5"]).toBe(1); // sofy
+    expect(orders["6"]).toBe(0); // sofa-2
+    expect(orders["7"]).toBe(1); // inspiracje
+  });
+
+  it("parentId = null obsługuje WYŁĄCZNIE węzły najwyższego poziomu, nie wszystkie węzły", () => {
+    // Rodzeństwo na najwyższym poziomie to tylko "1" (meble) i "7" (inspiracje).
+    const result = reorderSiblings(TREE, null, "1", "7");
+    expect(result).not.toBeNull();
+    expect(result!.ids).toEqual(["7", "1"]);
+    const orders = sortOrders(result!.items);
+    expect(orders["7"]).toBe(0);
+    expect(orders["1"]).toBe(1);
+    // Węzły spoza najwyższego poziomu mają własne sort_order zaczynające się
+    // od 0 — gdyby funkcja porównywała rodzica np. przez `!n.parent_id`
+    // (błędnie: pusty string też by „nie miał" rodzica) albo inaczej niż
+    // ścisłe `=== null`, złapałaby też je.
+    expect(orders["2"]).toBe(0); // narozniki
+    expect(orders["3"]).toBe(0); // naroznik-modulowy
+    expect(orders["4"]).toBe(1); // naroznik-l
+    expect(orders["5"]).toBe(1); // sofy
+    expect(orders["6"]).toBe(0); // sofa-2
+  });
+
+  it("nie mutuje wejścia", () => {
+    const before = TREE.map((n) => n.sort_order);
+    reorderSiblings(TREE, "2", "3", "4");
+    expect(TREE.map((n) => n.sort_order)).toEqual(before);
   });
 });
