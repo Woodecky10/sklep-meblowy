@@ -9,12 +9,7 @@ import {
   FEATURE_PARAM_PREFIX,
   FEATURE_PARAM_SEPARATOR,
 } from "@/app/_lib/feature-filter";
-
-export type FilterBarSection = {
-  slug: string;
-  label: string;
-  categories: { slug: string; label: string }[];
-};
+import type { MenuNode } from "@/app/_lib/category-tree";
 
 export type FilterBarCollection = {
   slug: string;
@@ -46,7 +41,8 @@ type Props = {
   featureFacets?: FilterBarOptionFacet[];
   optionFacets?: FilterBarOptionFacet[];
   dimensionBounds?: FilterBarDimensionBounds;
-  sections?: FilterBarSection[];
+  // Drzewo kategorii do trzech poziomów (ta sama projekcja co megamenu).
+  nodes?: MenuNode[];
   collections?: FilterBarCollection[];
 };
 
@@ -63,11 +59,25 @@ type DropdownKey =
 // Parametry URL zakresów wymiarów (cm) — kolejność = kolejność pól w panelu.
 const DIM_KEYS = ["szer_od", "szer_do", "gl_od", "gl_do", "wys_od", "wys_do"] as const;
 
+// Drzewo → płaska lista (DFS) — aktywny węzeł może być na każdym poziomie,
+// nie tylko liściem. Funkcja modułowa (nie IIFE w komponencie): rekurencyjna
+// funkcja nazwana wewnątrz komponentu usypia bailout react-compiler-lint,
+// który wtedy przestaje raportować cokolwiek w tym komponencie (i odsłania
+// „Unused eslint-disable directive" na niezwiązanym efekcie wyżej).
+function flattenMenuNodes(list: MenuNode[]): MenuNode[] {
+  const out: MenuNode[] = [];
+  for (const n of list) {
+    out.push(n);
+    out.push(...flattenMenuNodes(n.children));
+  }
+  return out;
+}
+
 export default function FilterBar({
   featureFacets = [],
   optionFacets = [],
   dimensionBounds,
-  sections = [],
+  nodes = [],
   collections = [],
 }: Props) {
   const router = useRouter();
@@ -254,9 +264,8 @@ export default function FilterBar({
     setOpenDropdown(openDropdown === key ? null : key);
   }
 
-  const activeCategory = sections
-    .flatMap((s) => s.categories)
-    .find((c) => c.slug === category);
+  // Aktywny węzeł może być na każdym poziomie drzewa, nie tylko liściem.
+  const activeCategory = flattenMenuNodes(nodes).find((c) => c.slug === category);
 
   const activeCollection = collections.find((c) => c.slug === collection);
 
@@ -310,7 +319,7 @@ export default function FilterBar({
       {/* Pasek filtrów. Na mobile: horizontal scroll (overflow-x-auto), żeby
           nie wieszały się na 3 linie. Na desktop: flex-wrap z gap. */}
       <div className="flex items-center gap-2 overflow-x-auto md:overflow-x-visible md:flex-wrap pb-2 md:pb-0 -mx-1 px-1 scrollbar-thin">
-        {sections.length > 0 && (
+        {nodes.length > 0 && (
           <FilterPill
             label={t.filter.category}
             count={categoryCount}
@@ -406,27 +415,56 @@ export default function FilterBar({
           >
             {t.filter.allCategories}
           </button>
-          {sections.map((section) => (
-            <div key={section.slug} className="mb-3 last:mb-0">
-              <p className="text-[10px] font-sans uppercase tracking-widest text-[var(--muted)] mb-1.5">
-                {section.label}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {section.categories.map((c) => (
-                  <button
-                    key={c.slug}
-                    onClick={() => {
-                      update("kategoria", c.slug);
-                      setOpenDropdown(null);
-                    }}
-                    className={`px-3 py-1.5 rounded-full text-xs font-sans transition-colors ${
-                      category === c.slug
-                        ? "bg-[var(--color-navy)] text-white"
-                        : "border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
-                    }`}
-                  >
-                    {c.label}
-                  </button>
+          {nodes.map((root) => (
+            <div key={root.slug} className="mb-3 last:mb-0">
+              <button
+                onClick={() => {
+                  update("kategoria", root.slug);
+                  setOpenDropdown(null);
+                }}
+                className={`mb-1.5 text-[10px] font-sans uppercase tracking-widest transition-colors ${
+                  category === root.slug
+                    ? "text-[var(--color-gold)]"
+                    : "text-[var(--muted)] hover:text-[var(--color-gold)]"
+                }`}
+              >
+                {root.label}
+              </button>
+              <div className="flex flex-col gap-1.5">
+                {root.children.map((child) => (
+                  <div key={child.slug} className="flex flex-wrap gap-1.5 items-center">
+                    <button
+                      onClick={() => {
+                        update("kategoria", child.slug);
+                        setOpenDropdown(null);
+                      }}
+                      className={`px-3 py-1.5 rounded-full text-xs font-sans transition-colors ${
+                        category === child.slug
+                          ? "bg-[var(--color-navy)] text-white"
+                          : "border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
+                      }`}
+                    >
+                      {child.label}
+                    </button>
+                    {/* Trzeci poziom — wcięty i mniejszy, żeby było widać,
+                        że należy do chipa po lewej. */}
+                    {child.children.map((grand) => (
+                      <button
+                        key={grand.slug}
+                        onClick={() => {
+                          update("kategoria", grand.slug);
+                          setOpenDropdown(null);
+                        }}
+                        className={`ml-1 px-2.5 py-1 rounded-full text-[11px] font-sans transition-colors ${
+                          category === grand.slug
+                            ? "bg-[var(--color-navy)] text-white"
+                            : "border border-dashed border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
+                        }`}
+                      >
+                        {grand.label}
+                      </button>
+                    ))}
+                  </div>
                 ))}
               </div>
             </div>

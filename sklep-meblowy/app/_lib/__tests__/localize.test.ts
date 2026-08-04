@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   localizeProduct,
   localizeCategory,
-  localizeCategoryGroup,
   localizeCollection,
   localizeReview,
   buildLocalizedFacets,
@@ -134,14 +133,11 @@ describe("localizeProduct — pola wolnotekstowe + cechy z importu (mapy DE)", (
   });
 });
 
-describe("localizeCategory / localizeCategoryGroup", () => {
+describe("localizeCategory", () => {
   it("DE z label_de → zamienia label", () => {
     expect(localizeCategory({ slug: "sofy", label: "Sofy", label_de: "Sofas" }, "de").label).toBe(
       "Sofas"
     );
-    expect(
-      localizeCategoryGroup({ slug: "salon", label: "Salon", label_de: "Wohnzimmer" }, "de").label
-    ).toBe("Wohnzimmer");
   });
 
   it("DE bez label_de → fallback PL", () => {

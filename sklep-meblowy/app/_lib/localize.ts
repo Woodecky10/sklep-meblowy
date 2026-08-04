@@ -107,9 +107,6 @@ export function localizeCategory<T extends LabelLocalizable>(
   return { ...row, label: pickLocalized(row.label, row.label_de, locale) };
 }
 
-// Grupy kategorii mają identyczny kształt (label/label_de) — alias dla czytelności.
-export const localizeCategoryGroup = localizeCategory;
-
 type CollectionLocalizable = {
   label: string;
   label_de?: string | null;

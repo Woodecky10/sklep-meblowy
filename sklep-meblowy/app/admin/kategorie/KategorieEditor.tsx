@@ -1,48 +1,180 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Card, EmptyState, Field, ToastView, type Toast } from "@/app/admin/_shared";
-import type { Section, CategoryDef } from "@/app/_lib/categories";
+import { useRouter } from "next/navigation";
+import { Card, EmptyState, Field, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
 import {
-  createGroup,
-  updateGroup,
-  deleteGroup,
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { useConfirm } from "@/app/_context/ConfirmContext";
+// Czyste helpery — z category-tree, NIE z categories.ts: ten drugi ciągnie
+// next/cache, więc import stąd ("use client") wysypałby build.
+import {
+  buildTree,
+  allowedParents,
+  reorderSiblings,
+  type CategoryNode,
+  type CategoryTreeNode,
+} from "@/app/_lib/category-tree";
+import {
   createCategory,
   updateCategory,
   deleteCategory,
+  reorderCategories,
   type ActionResult,
 } from "./actions";
-import { useConfirm } from "@/app/_context/ConfirmContext";
 
-type Props = {
-  sections: Section[];
-  categories: CategoryDef[];
-  productCounts: Record<string, number>;
-};
+type Counts = Record<string, { own: number; subtree: number }>;
 
 export default function KategorieEditor({
-  sections,
-  categories,
-  productCounts,
-}: Props) {
+  nodes,
+  counts,
+}: {
+  nodes: CategoryNode[];
+  counts: Counts;
+}) {
+  const [items, setItems] = useState<CategoryNode[]>(nodes);
+  // Sync stanu z propów po router.refresh() (ten sam wzorzec co CollectionsEditor).
+  const [prevNodes, setPrevNodes] = useState(nodes);
+  if (nodes !== prevNodes) {
+    setPrevNodes(nodes);
+    setItems(nodes);
+  }
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [creatingUnder, setCreatingUnder] = useState<string | null | undefined>(undefined);
   const [toast, setToast] = useState<Toast>(null);
-  const [openGroupForm, setOpenGroupForm] = useState<string | null>(null);
-  const [openCategoryForm, setOpenCategoryForm] = useState<string | null>(null);
-  const [openNewCategoryForGroup, setOpenNewCategoryForGroup] = useState<string | null>(null);
-  const [openNewGroup, setOpenNewGroup] = useState(false);
+  const [, startTransition] = useTransition();
+  const router = useRouter();
 
   function showToast(t: Toast) {
     setToast(t);
     if (t) setTimeout(() => setToast(null), 4000);
   }
 
-  function handleResult(result: ActionResult, onSuccess?: () => void) {
-    if (result.ok) {
-      showToast({ type: "success", message: result.message ?? "Zapisano" });
+  function handleResult(res: ActionResult, onSuccess?: () => void) {
+    if (res.ok) {
+      showToast({ type: "success", message: res.message ?? "Zapisano" });
       onSuccess?.();
     } else {
-      showToast({ type: "error", message: result.error });
+      showToast({ type: "error", message: res.error });
     }
+  }
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const tree = buildTree(items);
+
+  // Przeciąganie działa TYLKO wśród rodzeństwa: każdy poziom ma własny
+  // SortableContext, a zapis idzie przez reorder_categories(parent, ids).
+  // Przenoszenie między gałęziami to pole „Rodzic" w formularzu — świadoma
+  // decyzja właściciela (mniej kodu, brak pomyłkowych upuszczeń). Czystą
+  // logikę „stan + activeId/overId → nowy stan" liczy reorderSiblings
+  // (app/_lib/category-tree.ts, ma własne testy) — tu zostaje tylko stan,
+  // rollback i toast.
+  function onDragEnd(parentId: string | null) {
+    return (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over) return;
+
+      const result = reorderSiblings(items, parentId, String(active.id), String(over.id));
+      if (!result) return;
+
+      // Cofnięcie wraca do OSTATNIEGO DOBREGO stanu, nie do propów — inaczej
+      // nieudany zapis wymazuje wcześniejsze udane przestawienia.
+      const prev = items;
+      setItems(result.items);
+
+      startTransition(async () => {
+        const res = await reorderCategories(parentId, result.ids);
+        if (!res.ok) {
+          setItems(prev);
+          showToast({ type: "error", message: res.error });
+        }
+      });
+    };
+  }
+
+  function renderLevel(siblings: CategoryTreeNode[], parentId: string | null) {
+    if (siblings.length === 0) return null;
+    return (
+      <DndContext
+        id={`categories-dnd-${parentId ?? "root"}`}
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={onDragEnd(parentId)}
+      >
+        <SortableContext
+          items={siblings.map((n) => n.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="flex flex-col gap-2">
+            {siblings.map((node) => (
+              <TreeRow
+                key={node.id}
+                node={node}
+                counts={counts}
+                expanded={editingId === node.id}
+                onToggleExpand={() =>
+                  setEditingId(editingId === node.id ? null : node.id)
+                }
+                onEdit={async (fd) => {
+                  const res = await updateCategory(fd);
+                  handleResult(res, () => {
+                    setEditingId(null);
+                    router.refresh();
+                  });
+                }}
+                onDelete={async () => {
+                  const fd = new FormData();
+                  fd.set("id", node.id);
+                  const res = await deleteCategory(fd);
+                  handleResult(res, () => router.refresh());
+                }}
+                onAddChild={() => setCreatingUnder(node.id)}
+                allParents={allowedParents(items, node.id)}
+                allCategories={items}
+              >
+                {renderLevel(node.children, node.id)}
+                {creatingUnder === node.id && (
+                  <Card>
+                    <CategoryForm
+                      mode="create"
+                      parentId={node.id}
+                      allParents={allowedParents(items, "")}
+                      allCategories={items}
+                      onCancel={() => setCreatingUnder(undefined)}
+                      onSubmit={async (fd) => {
+                        const res = await createCategory(fd);
+                        handleResult(res, () => {
+                          setCreatingUnder(undefined);
+                          router.refresh();
+                        });
+                      }}
+                    />
+                  </Card>
+                )}
+              </TreeRow>
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+    );
   }
 
   return (
@@ -52,347 +184,225 @@ export default function KategorieEditor({
           <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
             Mollien
           </p>
-          <h1 className="font-display text-4xl font-bold text-[var(--fg)]">
-            Kategorie
-          </h1>
+          <h1 className="font-display text-4xl font-bold text-[var(--fg)]">Kategorie</h1>
           <p className="text-sm text-[var(--muted)] mt-2 max-w-2xl">
-            Zarządzaj grupami i kategoriami widocznymi w nawigacji sklepu.
-            Zmiany zapisują się od razu — sklep odświeży się przy następnej wizycie klienta.
+            Kategorie tworzą drzewo bez limitu głębokości. Pozycje najwyższego poziomu to
+            zakładki w górnym menu sklepu, a pod nimi widać dwa kolejne poziomy.
+            Głębsze podkategorie klient znajdzie na stronie kategorii, nad produktami.
+            Przeciągaj chwytem, żeby zmienić kolejność w obrębie jednego rodzica;
+            żeby przenieść gałąź gdzie indziej, użyj pola „Rodzic” w edycji.
           </p>
         </div>
         <button
-          onClick={() => setOpenNewGroup(true)}
+          onClick={() => {
+            setCreatingUnder(null);
+            setEditingId(null);
+          }}
           className="shrink-0 px-5 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
         >
-          + Nowa grupa
+          + Nowa pozycja menu
         </button>
       </div>
 
       {toast && <ToastView toast={toast} onClose={() => setToast(null)} />}
 
-      {/* Formularz nowej grupy */}
-      {openNewGroup && (
+      {creatingUnder === null && (
         <Card>
-          <GroupForm
+          <CategoryForm
             mode="create"
-            onCancel={() => setOpenNewGroup(false)}
+            parentId={null}
+            allParents={allowedParents(items, "")}
+            allCategories={items}
+            onCancel={() => setCreatingUnder(undefined)}
             onSubmit={async (fd) => {
-              const res = await createGroup(fd);
-              handleResult(res, () => setOpenNewGroup(false));
+              const res = await createCategory(fd);
+              handleResult(res, () => {
+                setCreatingUnder(undefined);
+                router.refresh();
+              });
             }}
           />
         </Card>
       )}
 
-      {/* Lista grup z kategoriami */}
-      {sections.length === 0 ? (
-        <EmptyState message="Brak grup. Dodaj pierwszą żeby zacząć." />
+      {items.length === 0 ? (
+        <EmptyState message="Brak kategorii. Dodaj pierwszą pozycję menu, żeby zacząć." />
       ) : (
-        <div className="flex flex-col gap-6">
-          {sections.map((section) => {
-            const sectionCategories = categories.filter(
-              (c) => c.group_id === section.id
-            );
-            return (
-              <Card key={section.id}>
-                <div className="flex items-start justify-between gap-4 mb-4">
-                  <div>
-                    <h2 className="font-display text-xl font-semibold text-[var(--fg)] flex items-center gap-3">
-                      {section.label}
-                      {!section.active && (
-                        <span className="px-2 py-0.5 bg-stone-200 dark:bg-stone-800 text-[var(--muted)] text-[10px] font-sans uppercase tracking-widest rounded-full">
-                          ukryta
-                        </span>
-                      )}
-                    </h2>
-                    <p className="text-xs font-sans text-[var(--muted)] mt-1">
-                      slug: <code>{section.slug}</code> · kolejność: {section.sort_order} ·{" "}
-                      {sectionCategories.length} kategorii
-                    </p>
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      onClick={() =>
-                        setOpenGroupForm(openGroupForm === section.id ? null : section.id)
-                      }
-                      className="px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--border)] text-[var(--fg)] rounded-full hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
-                    >
-                      Edytuj
-                    </button>
-                    <DeleteButton
-                      label="Usuń"
-                      confirmMessage={`Usunąć grupę "${section.label}"? Tej operacji nie da się cofnąć.`}
-                      onConfirm={async () => {
-                        const fd = new FormData();
-                        fd.set("id", section.id);
-                        const res = await deleteGroup(fd);
-                        handleResult(res);
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Edycja istniejącej grupy */}
-                {openGroupForm === section.id && (
-                  <div className="mb-4 p-4 bg-[var(--bg)] border border-[var(--border)] rounded-xl">
-                    <GroupForm
-                      mode="update"
-                      initial={section}
-                      onCancel={() => setOpenGroupForm(null)}
-                      onSubmit={async (fd) => {
-                        const res = await updateGroup(fd);
-                        handleResult(res, () => setOpenGroupForm(null));
-                      }}
-                    />
-                  </div>
-                )}
-
-                {/* Lista kategorii w grupie */}
-                <div className="flex flex-col gap-2">
-                  {sectionCategories.length === 0 ? (
-                    <p className="text-sm text-[var(--muted)] italic py-2">
-                      Brak kategorii w tej grupie
-                    </p>
-                  ) : (
-                    sectionCategories.map((cat) => {
-                      const productCount = productCounts[cat.slug] ?? 0;
-                      const editing = openCategoryForm === cat.id;
-                      return (
-                        <div key={cat.id}>
-                          <div
-                            className={`flex items-center justify-between gap-3 px-4 py-3 border border-[var(--border)] rounded-xl ${
-                              cat.active ? "bg-[var(--bg)]" : "bg-stone-100 dark:bg-stone-900 opacity-60"
-                            }`}
-                          >
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-sans font-semibold text-[var(--fg)] truncate">
-                                {cat.label}
-                                {!cat.active && (
-                                  <span className="ml-2 text-[10px] uppercase tracking-widest text-[var(--muted)]">
-                                    (ukryta)
-                                  </span>
-                                )}
-                              </p>
-                              <p className="text-xs text-[var(--muted)] truncate">
-                                <code>{cat.slug}</code> · {productCount}{" "}
-                                {productCount === 1 ? "produkt" : "produktów"}
-                              </p>
-                            </div>
-                            <div className="flex gap-2 shrink-0">
-                              <button
-                                onClick={() =>
-                                  setOpenCategoryForm(editing ? null : cat.id)
-                                }
-                                className="px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--border)] text-[var(--fg)] rounded-full hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
-                              >
-                                Edytuj
-                              </button>
-                              <DeleteButton
-                                label="Usuń"
-                                disabled={productCount > 0}
-                                disabledTitle={
-                                  productCount > 0
-                                    ? `Nie można usunąć — kategoria ma ${productCount} ${
-                                        productCount === 1 ? "produkt" : "produktów"
-                                      }`
-                                    : undefined
-                                }
-                                confirmMessage={`Usunąć kategorię "${cat.label}"?`}
-                                onConfirm={async () => {
-                                  const fd = new FormData();
-                                  fd.set("id", cat.id);
-                                  const res = await deleteCategory(fd);
-                                  handleResult(res);
-                                }}
-                              />
-                            </div>
-                          </div>
-                          {editing && (
-                            <div className="mt-2 p-4 bg-[var(--bg)] border border-[var(--border)] rounded-xl">
-                              <CategoryForm
-                                mode="update"
-                                initial={cat}
-                                groups={sections}
-                                allCategories={categories}
-                                onCancel={() => setOpenCategoryForm(null)}
-                                onSubmit={async (fd) => {
-                                  const res = await updateCategory(fd);
-                                  handleResult(res, () => setOpenCategoryForm(null));
-                                }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-
-                {/* Dodawanie nowej kategorii do grupy */}
-                {openNewCategoryForGroup === section.id ? (
-                  <div className="mt-3 p-4 bg-[var(--bg)] border border-[var(--border)] rounded-xl">
-                    <CategoryForm
-                      mode="create"
-                      defaultGroupId={section.id}
-                      groups={sections}
-                      allCategories={categories}
-                      onCancel={() => setOpenNewCategoryForGroup(null)}
-                      onSubmit={async (fd) => {
-                        const res = await createCategory(fd);
-                        handleResult(res, () => setOpenNewCategoryForGroup(null));
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setOpenNewCategoryForGroup(section.id)}
-                    className="self-start mt-3 text-xs font-sans uppercase tracking-widest text-[var(--color-gold)] hover:underline"
-                  >
-                    + Dodaj kategorię do tej grupy
-                  </button>
-                )}
-              </Card>
-            );
-          })}
-        </div>
+        renderLevel(tree, null)
       )}
     </div>
   );
 }
 
-// ============================================================
-// Formularz grupy
-// ============================================================
-
-function GroupForm({
-  mode,
-  initial,
-  onSubmit,
-  onCancel,
+function TreeRow({
+  node,
+  counts,
+  expanded,
+  onToggleExpand,
+  onEdit,
+  onDelete,
+  onAddChild,
+  allParents,
+  allCategories,
+  children,
 }: {
-  mode: "create" | "update";
-  initial?: Section;
-  onSubmit: (fd: FormData) => Promise<void>;
-  onCancel: () => void;
+  node: CategoryTreeNode;
+  counts: Counts;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  onEdit: (fd: FormData) => Promise<void>;
+  onDelete: () => Promise<void>;
+  onAddChild: () => void;
+  allParents: { id: string; label: string; depth: number }[];
+  // Kandydaci do cross-sellu — CAŁE drzewo, bo cross-sell nie ma nic wspólnego
+  // z hierarchią (łóżko wskazuje materace z zupełnie innej gałęzi).
+  allCategories: CategoryNode[];
+  children?: React.ReactNode;
 }) {
-  const [pending, startTransition] = useTransition();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: node.id });
+  const [pendingDelete, startDeleteTransition] = useTransition();
+  const confirm = useConfirm();
+
+  // useSortable mierzy DOKŁADNIE ten element, na którym siedzi ref — musi
+  // opakowywać TYLKO kartę wiersza, nigdy {children} (całe zagnieżdżone
+  // poddrzewo). Inaczej closestCenter liczyłby środek kolizji do środka
+  // WYSOKOŚCI CAŁEGO poddrzewa węzła z wieloma dziećmi, nie do środka jego
+  // widocznego nagłówka — przeciąganie krótkiego węzła nad rozbudowaną
+  // gałęzią celowałoby w złe miejsce.
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    marginLeft: node.depth * 24,
+  };
+
+  const c = counts[node.slug] ?? { own: 0, subtree: 0 };
 
   return (
-    <form
-      action={(fd) => startTransition(() => onSubmit(fd))}
-      className="flex flex-col gap-3"
-    >
-      {initial && <input type="hidden" name="id" value={initial.id} />}
+    <div>
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="border border-[var(--border)] rounded-xl bg-[var(--card-bg)]"
+      >
+        <div className="flex items-center gap-3 p-3 flex-wrap">
+          <button
+            {...attributes}
+            {...listeners}
+            aria-label={`Przeciągnij żeby zmienić kolejność: ${node.label}`}
+            className="shrink-0 w-8 h-8 flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] cursor-grab active:cursor-grabbing"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="9" cy="6" r="1.5" />
+              <circle cx="15" cy="6" r="1.5" />
+              <circle cx="9" cy="12" r="1.5" />
+              <circle cx="15" cy="12" r="1.5" />
+              <circle cx="9" cy="18" r="1.5" />
+              <circle cx="15" cy="18" r="1.5" />
+            </svg>
+          </button>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <Field label="Nazwa wyświetlana" required>
-          <input
-            name="label"
-            defaultValue={initial?.label ?? ""}
-            required
-            minLength={2}
-            placeholder="np. Salon"
-            className="w-full px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
-          />
-        </Field>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-[var(--fg)] truncate">
+              {node.label}
+              {!node.active && (
+                <span className="ml-2 text-xs font-normal text-[var(--muted)]">
+                  (ukryta)
+                </span>
+              )}
+            </p>
+            <p className="text-xs text-[var(--muted)]">
+              slug: <code>{node.slug}</code> · {c.own}{" "}
+              {c.own === 1 ? "własny produkt" : "własnych produktów"}
+              {c.subtree !== c.own && ` · ${c.subtree} w poddrzewie`}
+            </p>
+          </div>
 
-        <Field
-          label="Nazwa po niemiecku (DE)"
-          hint="Pokazywana w niemieckiej wersji sklepu. Zostaw puste = polska nazwa."
-        >
-          <input
-            name="label_de"
-            defaultValue={initial?.label_de ?? ""}
-            placeholder="np. Wohnzimmer"
-            className="w-full px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
-          />
-        </Field>
+          <button
+            onClick={onAddChild}
+            className="shrink-0 px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--border)] rounded-full text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
+          >
+            + Podkategoria
+          </button>
+          <button
+            onClick={onToggleExpand}
+            className="shrink-0 px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--border)] rounded-full text-[var(--fg)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
+          >
+            {expanded ? "Zamknij" : "Edytuj"}
+          </button>
+          <button
+            disabled={pendingDelete}
+            onClick={async () => {
+              const ok = await confirm({
+                title: `Usunąć kategorię „${node.label}"?`,
+                message: "Tej operacji nie można cofnąć.",
+                danger: true,
+              });
+              if (!ok) return;
+              startDeleteTransition(async () => {
+                await onDelete();
+              });
+            }}
+            className="shrink-0 px-3 py-1.5 text-xs font-sans uppercase tracking-widest text-red-600 hover:text-red-700 transition-colors disabled:opacity-50"
+          >
+            Usuń
+          </button>
+        </div>
 
-        {mode === "create" && (
-          <Field label="Slug (link)" hint="Zostaw puste żeby wygenerować z nazwy">
-            <input
-              name="slug"
-              placeholder="np. salon"
-              className="w-full px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
+        {expanded && (
+          <div className="border-t border-[var(--border)] p-4">
+            <CategoryForm
+              mode="update"
+              initial={node}
+              parentId={node.parent_id}
+              allParents={allParents}
+              allCategories={allCategories}
+              onCancel={onToggleExpand}
+              onSubmit={onEdit}
             />
-          </Field>
+          </div>
         )}
-
-        <Field label="Kolejność" hint="Mniejsze na początku">
-          <input
-            type="number"
-            name="sort_order"
-            defaultValue={initial?.sort_order ?? 0}
-            className="w-full px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
-          />
-        </Field>
       </div>
 
-      {mode === "update" && initial && (
-        <label className="flex items-center gap-2 text-sm text-[var(--fg)] cursor-pointer">
-          <input
-            type="checkbox"
-            name="active"
-            value="1"
-            defaultChecked={initial.active}
-            className="h-4 w-4 accent-[var(--color-gold)]"
-          />
-          <span>Pokazuj w nawigacji</span>
-        </label>
-      )}
-
-      <div className="flex gap-2 pt-2">
-        <button
-          type="submit"
-          disabled={pending}
-          className="px-5 py-2 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
-        >
-          {pending ? "Zapisuję..." : mode === "create" ? "Dodaj grupę" : "Zapisz"}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={pending}
-          className="px-5 py-2 border border-[var(--border)] text-[var(--fg)] font-sans text-sm uppercase tracking-widest rounded-full hover:border-[var(--color-gold)] transition-colors"
-        >
-          Anuluj
-        </button>
-      </div>
-    </form>
+      {children && <div className="mt-2 flex flex-col gap-2">{children}</div>}
+    </div>
   );
 }
-
-// ============================================================
-// Formularz kategorii
-// ============================================================
 
 function CategoryForm({
   mode,
   initial,
-  defaultGroupId,
-  groups,
+  parentId,
+  allParents,
   allCategories,
-  onSubmit,
   onCancel,
+  onSubmit,
 }: {
   mode: "create" | "update";
-  initial?: CategoryDef;
-  defaultGroupId?: string;
-  groups: Section[];
-  allCategories: CategoryDef[];
-  onSubmit: (fd: FormData) => Promise<void>;
+  initial?: CategoryNode;
+  parentId: string | null;
+  allParents: { id: string; label: string; depth: number }[];
+  allCategories: CategoryNode[];
   onCancel: () => void;
+  onSubmit: (fd: FormData) => Promise<void>;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [crossSell, setCrossSell] = useState<string[]>(initial?.crossSellCategories ?? []);
+  const [pending, startFormTransition] = useTransition();
 
-  // Inne kategorie (oprócz aktualnie edytowanej) jako kandydatów do cross-sell.
+  // Cross-sell przenoszony 1:1 z dzisiejszego formularza (ukryty checkbox
+  // w stylizowanym <label>). NIE zmieniaj tu mechaniki — patrz ostrzeżenie
+  // pod tym blokiem kodu.
+  const [crossSell, setCrossSell] = useState<string[]>(
+    initial?.crossSellCategories ?? []
+  );
+
+  // Kandydaci: całe drzewo oprócz edytowanego węzła, alfabetycznie.
   const candidates = allCategories
     .filter((c) => c.id !== initial?.id)
     .slice()
-    .sort((a, b) => a.label.localeCompare(b.label));
+    .sort((a, b) => a.label.localeCompare(b.label, "pl"));
 
-  function toggle(slug: string) {
+  function toggleCrossSell(slug: string) {
     setCrossSell((prev) =>
       prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]
     );
@@ -400,96 +410,93 @@ function CategoryForm({
 
   return (
     <form
-      action={(fd) => startTransition(() => onSubmit(fd))}
-      className="flex flex-col gap-3"
+      onSubmit={(e) => {
+        // preventDefault + onSubmit, NIE <form action={fn}>: React 19 po akcji
+        // formularza robi form.reset(), który cofa niekontrolowane <select>
+        // do wartości z mountu (regresja opisana w e2e/product-category-save).
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget);
+        startFormTransition(async () => {
+          await onSubmit(fd);
+        });
+      }}
+      className="flex flex-col gap-4"
     >
-      {initial && <input type="hidden" name="id" value={initial.id} />}
+      {mode === "update" && <input type="hidden" name="id" defaultValue={initial?.id} />}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <Field label="Nazwa wyświetlana" required>
-          <input
-            name="label"
-            defaultValue={initial?.label ?? ""}
-            required
-            minLength={2}
-            placeholder="np. Sofa 3-osobowa"
-            className="w-full px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
-          />
+      <Field label="Nazwa wyświetlana" required>
+        <input name="label" defaultValue={initial?.label ?? ""} required className={inputCls} />
+      </Field>
+
+      <Field label="Nazwa po niemiecku (DE)" hint="Puste = pokaże się polska">
+        <input name="label_de" defaultValue={initial?.label_de ?? ""} className={inputCls} />
+      </Field>
+
+      {/* hint w nawiasach klamrowych, NIE w cudzysłowie: tekst sam zawiera
+          cudzysłowy i zamknąłby atrybut. */}
+      <Field
+        label="Rodzic"
+        hint={
+          "„Najwyższy poziom” = zakładka w górnym menu. Lista nie zawiera tej kategorii ani jej podkategorii."
+        }
+      >
+        <select name="parent_id" defaultValue={parentId ?? ""} className={inputCls}>
+          <option value="">— najwyższy poziom —</option>
+          {allParents.map((p) => (
+            <option key={p.id} value={p.id}>
+              {" ".repeat(p.depth * 4)}
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      {mode === "create" && (
+        <Field label="Slug (link)" hint="Zostaw puste — wygeneruje się z nazwy">
+          <input name="slug" className={inputCls} />
         </Field>
+      )}
 
-        <Field
-          label="Nazwa po niemiecku (DE)"
-          hint="Pokazywana w niemieckiej wersji sklepu. Zostaw puste = polska nazwa."
-        >
-          <input
-            name="label_de"
-            defaultValue={initial?.label_de ?? ""}
-            placeholder="np. 3-Sitzer-Sofa"
-            className="w-full px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
-          />
-        </Field>
+      <Field label="Kolejność" hint="Mniejsze na początku. Zwykle wygodniej przeciągnąć.">
+        <input
+          name="sort_order"
+          type="number"
+          defaultValue={initial?.sort_order ?? 0}
+          className={inputCls}
+        />
+      </Field>
 
-        <Field label="Grupa" required>
-          <select
-            name="group_id"
-            defaultValue={initial?.group_id ?? defaultGroupId ?? ""}
-            required
-            className="w-full px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
-          >
-            <option value="">— wybierz grupę —</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        {mode === "create" && (
-          <Field label="Slug (link)" hint="Zostaw puste żeby wygenerować z nazwy">
-            <input
-              name="slug"
-              placeholder="np. sofa-3-osobowa"
-              className="w-full px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
-            />
-          </Field>
-        )}
-
-        <Field label="Kolejność" hint="Mniejsze na początku">
-          <input
-            type="number"
-            name="sort_order"
-            defaultValue={initial?.sort_order ?? 0}
-            className="w-full px-3 py-2 bg-transparent border border-[var(--border)] rounded-lg text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)]"
-          />
-        </Field>
-      </div>
-
-      {mode === "update" && initial && (
-        <label className="flex items-center gap-2 text-sm text-[var(--fg)] cursor-pointer">
+      {mode === "update" && (
+        <label className="flex items-start gap-3 text-sm text-[var(--fg)]">
           <input
             type="checkbox"
             name="active"
             value="1"
-            defaultChecked={initial.active}
-            className="h-4 w-4 accent-[var(--color-gold)]"
+            defaultChecked={initial?.active ?? true}
+            className="mt-1"
           />
-          <span>Pokazuj w sklepie</span>
+          <span>
+            Pokazuj w sklepie
+            <span className="block text-xs text-[var(--muted)]">
+              ⚠️ Odznaczenie chowa z menu, filtrów i mapy strony CAŁE poddrzewo tej
+              kategorii — razem ze wszystkimi podkategoriami. Produkty zostają
+              dostępne w sklepie i w wyszukiwarce.
+            </span>
+          </span>
         </label>
       )}
 
-      {/* Cross-sell — multi-select kategorii polecanych */}
       {candidates.length > 0 && (
-        <div className="flex flex-col gap-2 pt-2 border-t border-[var(--border)]">
+        <div className="flex flex-col gap-2">
           <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
             Polecaj klientom z tych kategorii (cross-sell)
           </span>
           <p className="text-xs text-[var(--muted)] leading-snug">
-            Klient kupuje produkt z tej kategorii → w koszyku i na karcie
-            produktu pokażemy mu produkty z zaznaczonych kategorii poniżej.
+            Klient kupuje produkt z tej kategorii → w koszyku i na karcie produktu
+            pokażemy mu produkty z zaznaczonych kategorii poniżej.
           </p>
-          {/* Hidden input gwarantujący że FormData zna ten klucz nawet
-              gdy lista jest pusta (server zinterpretuje getAll() = []) */}
+          {/* Hidden input gwarantujący, że FormData zna ten klucz nawet gdy lista
+              jest pusta (server zinterpretuje getAll() = []) */}
           {crossSell.length === 0 && (
             <input type="hidden" name="cross_sell_categories" value="" />
           )}
@@ -510,7 +517,7 @@ function CategoryForm({
                     name="cross_sell_categories"
                     value={c.slug}
                     checked={active}
-                    onChange={() => toggle(c.slug)}
+                    onChange={() => toggleCrossSell(c.slug)}
                     className="hidden"
                   />
                   {c.label}
@@ -521,19 +528,18 @@ function CategoryForm({
         </div>
       )}
 
-      <div className="flex gap-2 pt-2">
+      <div className="flex items-center gap-3">
         <button
           type="submit"
           disabled={pending}
-          className="px-5 py-2 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
+          className="px-5 py-2.5 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
         >
-          {pending ? "Zapisuję..." : mode === "create" ? "Dodaj kategorię" : "Zapisz"}
+          {mode === "create" ? "Dodaj kategorię" : "Zapisz"}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          disabled={pending}
-          className="px-5 py-2 border border-[var(--border)] text-[var(--fg)] font-sans text-sm uppercase tracking-widest rounded-full hover:border-[var(--color-gold)] transition-colors"
+          className="px-5 py-2.5 text-sm font-sans uppercase tracking-widest text-[var(--muted)] hover:text-[var(--fg)] transition-colors"
         >
           Anuluj
         </button>
@@ -541,45 +547,3 @@ function CategoryForm({
     </form>
   );
 }
-
-// ============================================================
-// Pomocnicze komponenty
-// ============================================================
-
-function DeleteButton({
-  label,
-  confirmMessage,
-  onConfirm,
-  disabled,
-  disabledTitle,
-}: {
-  label: string;
-  confirmMessage: string;
-  onConfirm: () => Promise<void>;
-  disabled?: boolean;
-  disabledTitle?: string;
-}) {
-  const [pending, startTransition] = useTransition();
-  const confirm = useConfirm();
-
-  return (
-    <button
-      type="button"
-      disabled={disabled || pending}
-      title={disabledTitle}
-      onClick={async () => {
-        if (disabled) return;
-        if (!(await confirm({ message: confirmMessage, danger: true }))) return;
-        startTransition(() => onConfirm());
-      }}
-      className={`px-3 py-1.5 text-xs font-sans uppercase tracking-widest rounded-full transition-colors ${
-        disabled
-          ? "border border-[var(--border)] text-[var(--muted)] opacity-50 cursor-not-allowed"
-          : "border border-red-300 dark:border-red-900 text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-      }`}
-    >
-      {pending ? "..." : label}
-    </button>
-  );
-}
-

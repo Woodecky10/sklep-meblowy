@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/app/_lib/supabase/server";
 import { isAdmin, requireAdmin } from "@/app/_lib/admin";
-import { invalidateCategoriesCache } from "@/app/_lib/categories";
+import { getAllCategories, invalidateCategoriesCache } from "@/app/_lib/categories";
+import { allowedParents } from "@/app/_lib/category-tree";
+import { pluralForm } from "@/app/_lib/plural";
 
 // ============================================================
 // Wspólne typy odpowiedzi dla wszystkich akcji admin/kategorie
@@ -49,106 +51,56 @@ function parseInteger(input: unknown, fallback = 0): number {
 }
 
 // ============================================================
-// CATEGORY GROUPS — grupy top-level (np. Salon, Sypialnia)
+// CATEGORIES — węzły drzewa (od migracji 68 nie ma osobnych grup)
 // ============================================================
 
-export async function createGroup(formData: FormData): Promise<ActionResult> {
-  await requireAdmin();
-  const label = sanitizeLabel(formData.get("label"));
-  if (label.length < 2) return { ok: false, error: "Nazwa grupy jest za krótka (min. 2 znaki)" };
+// Puste pole „Rodzic" w formularzu = węzeł najwyższego poziomu (pozycja paska).
+function parseParentId(input: unknown): string | null {
+  const s = typeof input === "string" ? input.trim() : "";
+  return s === "" ? null : s;
+}
 
-  // Slug auto z label, jeśli admin nie podał własnego
-  const slugInput = sanitizeLabel(formData.get("slug"));
-  const slug = slugInput ? toSlug(slugInput) : toSlug(label);
-  if (!slug) return { ok: false, error: "Nie udało się wygenerować sluga z nazwy" };
+// Wiadomość dla FK 23503 na parent_id — współdzielona z createCategory, gdzie
+// walidacja "czy rodzic istnieje" nie ma sensu robić z wyprzedzeniem (formularz
+// nie ma jeszcze id nowego węzła), więc jedyną linią obrony jest złapanie kodu
+// błędu Postgresa PO insercie.
+const PARENT_NOT_FOUND_ERROR = "Wybrana kategoria-rodzic już nie istnieje — odśwież stronę.";
 
-  const labelDe = sanitizeOptionalLabel(formData.get("label_de"));
-  const sortOrder = parseInteger(formData.get("sort_order"));
+// Walidacja rodzica PRZED zapisem — trigger w bazie też to złapie, ale rzuci
+// surowym błędem Postgresa. Admin ma dostać zdanie po polsku.
+async function validateParent(
+  id: string | null,
+  parentId: string | null
+): Promise<string | null> {
+  if (!parentId) return null;
+  if (id && parentId === id) return "Kategoria nie może być swoim własnym rodzicem";
 
-  const supabase = await createAdminClient();
-  const { error } = await supabase
-    .from("category_groups")
-    .insert({ slug, label, label_de: labelDe, sort_order: sortOrder } as never);
+  // Rozdzielone PRZED sprawdzeniem "czy to potomek": "rodzic w ogóle nie
+  // istnieje" (druga zakładka usunęła go w tle) i "rodzic istnieje, ale jest
+  // tobą/twoim potomkiem" to dwie różne sytuacje i dwa różne komunikaty —
+  // pomieszanie ich wysyła admina szukać cyklu, którego nie ma.
+  const nodes = await getAllCategories();
+  if (!nodes.some((n) => n.id === parentId)) return PARENT_NOT_FOUND_ERROR;
 
-  if (error) {
-    if (error.code === "23505") return { ok: false, error: `Grupa o slug "${slug}" już istnieje` };
-    return { ok: false, error: error.message };
+  if (!id) return null; // nowy węzeł nie ma jeszcze potomków
+
+  const allowed = new Set(allowedParents(nodes, id).map((p) => p.id));
+  if (!allowed.has(parentId)) {
+    return "Nie można przenieść kategorii pod jej własną podkategorię — najpierw przenieś podkategorię";
   }
-
-  invalidateCategoriesCache();
-  revalidatePath("/admin/kategorie");
-  return { ok: true, message: `Grupa "${label}" dodana` };
+  return null;
 }
-
-export async function updateGroup(formData: FormData): Promise<ActionResult> {
-  await requireAdmin();
-  const id = String(formData.get("id") ?? "");
-  if (!id) return { ok: false, error: "Brak id grupy" };
-
-  const label = sanitizeLabel(formData.get("label"));
-  if (label.length < 2) return { ok: false, error: "Nazwa grupy jest za krótka" };
-
-  const labelDe = sanitizeOptionalLabel(formData.get("label_de"));
-  const sortOrder = parseInteger(formData.get("sort_order"));
-  const active = formData.get("active") === "1";
-
-  const supabase = await createAdminClient();
-  const { error } = await supabase
-    .from("category_groups")
-    .update({ label, label_de: labelDe, sort_order: sortOrder, active } as never)
-    .eq("id", id);
-
-  if (error) return { ok: false, error: error.message };
-
-  invalidateCategoriesCache();
-  revalidatePath("/admin/kategorie");
-  return { ok: true, message: "Grupa zaktualizowana" };
-}
-
-export async function deleteGroup(formData: FormData): Promise<ActionResult> {
-  await requireAdmin();
-  const id = String(formData.get("id") ?? "");
-  if (!id) return { ok: false, error: "Brak id grupy" };
-
-  const supabase = await createAdminClient();
-
-  // Walidacja: blokujemy usunięcie grupy która ma kategorie
-  const { count } = await supabase
-    .from("categories")
-    .select("id", { count: "exact", head: true })
-    .eq("group_id", id);
-
-  if ((count ?? 0) > 0) {
-    return {
-      ok: false,
-      error: `Nie można usunąć — grupa ma ${count} kategorii. Najpierw przenieś lub usuń kategorie.`,
-    };
-  }
-
-  const { error } = await supabase.from("category_groups").delete().eq("id", id);
-  if (error) return { ok: false, error: error.message };
-
-  invalidateCategoriesCache();
-  revalidatePath("/admin/kategorie");
-  return { ok: true, message: "Grupa usunięta" };
-}
-
-// ============================================================
-// CATEGORIES — pojedyncze kategorie produktów
-// ============================================================
 
 export async function createCategory(formData: FormData): Promise<ActionResult> {
   await requireAdmin();
   const label = sanitizeLabel(formData.get("label"));
   if (label.length < 2) return { ok: false, error: "Nazwa kategorii jest za krótka" };
 
-  const groupId = String(formData.get("group_id") ?? "");
-  if (!groupId) return { ok: false, error: "Wybierz grupę" };
-
   const slugInput = sanitizeLabel(formData.get("slug"));
   const slug = slugInput ? toSlug(slugInput) : toSlug(label);
   if (!slug) return { ok: false, error: "Nie udało się wygenerować sluga" };
 
+  const parentId = parseParentId(formData.get("parent_id"));
   const labelDe = sanitizeOptionalLabel(formData.get("label_de"));
   const sortOrder = parseInteger(formData.get("sort_order"));
   const crossSellCategories = formData
@@ -157,19 +109,23 @@ export async function createCategory(formData: FormData): Promise<ActionResult> 
     .filter((v) => v.length > 0);
 
   const supabase = await createAdminClient();
-  const { error } = await supabase
-    .from("categories")
-    .insert({
-      slug,
-      label,
-      label_de: labelDe,
-      group_id: groupId,
-      cross_sell_categories: crossSellCategories,
-      sort_order: sortOrder,
-    } as never);
+  const { error } = await supabase.from("categories").insert({
+    slug,
+    label,
+    label_de: labelDe,
+    parent_id: parentId,
+    cross_sell_categories: crossSellCategories,
+    sort_order: sortOrder,
+  } as never);
 
   if (error) {
-    if (error.code === "23505") return { ok: false, error: `Kategoria o slug "${slug}" już istnieje` };
+    if (error.code === "23505")
+      return { ok: false, error: `Kategoria o slug "${slug}" już istnieje` };
+    // FK parent_id: rodzic zniknął między wyrenderowaniem formularza a
+    // zapisem (np. druga zakładka panelu usunęła go w tle). Bez tego admin
+    // dostaje surowy błąd Postgresa ("insert or update on table categories
+    // violates foreign key constraint...").
+    if (error.code === "23503") return { ok: false, error: PARENT_NOT_FOUND_ERROR };
     return { ok: false, error: error.message };
   }
 
@@ -186,8 +142,9 @@ export async function updateCategory(formData: FormData): Promise<ActionResult> 
   const label = sanitizeLabel(formData.get("label"));
   if (label.length < 2) return { ok: false, error: "Nazwa kategorii jest za krótka" };
 
-  const groupId = String(formData.get("group_id") ?? "");
-  if (!groupId) return { ok: false, error: "Wybierz grupę" };
+  const parentId = parseParentId(formData.get("parent_id"));
+  const parentError = await validateParent(id, parentId);
+  if (parentError) return { ok: false, error: parentError };
 
   const labelDe = sanitizeOptionalLabel(formData.get("label_de"));
   const sortOrder = parseInteger(formData.get("sort_order"));
@@ -203,14 +160,20 @@ export async function updateCategory(formData: FormData): Promise<ActionResult> 
     .update({
       label,
       label_de: labelDe,
-      group_id: groupId,
+      parent_id: parentId,
       cross_sell_categories: crossSellCategories,
       sort_order: sortOrder,
       active,
     } as never)
     .eq("id", id);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    // validateParent już sprawdził istnienie rodzica przed tym zapytaniem, ale
+    // między odczytem i update jest okno na wyścig (druga zakładka usuwa
+    // rodzica w tym samym momencie) — bez tego admin dostałby surowy błąd FK.
+    if (error.code === "23503") return { ok: false, error: PARENT_NOT_FOUND_ERROR };
+    return { ok: false, error: error.message };
+  }
 
   invalidateCategoriesCache();
   revalidatePath("/admin/kategorie");
@@ -223,10 +186,6 @@ export async function deleteCategory(formData: FormData): Promise<ActionResult> 
   if (!id) return { ok: false, error: "Brak id kategorii" };
 
   const supabase = await createAdminClient();
-
-  // Walidacja: blokujemy usunięcie kategorii która ma produkty
-  // (FK products.category → categories.slug też by to wyłapał, ale damy
-  // czytelny komunikat zamiast błędu DB)
   const { data: cat } = await supabase
     .from("categories")
     .select("slug, label")
@@ -234,21 +193,44 @@ export async function deleteCategory(formData: FormData): Promise<ActionResult> 
     .single();
 
   if (!cat) return { ok: false, error: "Kategoria nie znaleziona" };
+  const { slug, label } = cat as { slug: string; label: string };
 
-  const slug = (cat as { slug: string }).slug;
-  const label = (cat as { label: string }).label;
+  // Dzieci PRZED produktami: kategoria-rodzic zwykle nie ma własnych produktów,
+  // więc bez tego warunku komunikat brzmiałby „można usunąć", a baza odrzuciłaby
+  // zapis przez FK parent_id (on delete restrict) surowym błędem.
+  const { count: childCount } = await supabase
+    .from("categories")
+    .select("id", { count: "exact", head: true })
+    .eq("parent_id", id);
 
+  const children = childCount ?? 0;
+  if (children > 0) {
+    return {
+      ok: false,
+      error: `Nie można usunąć kategorii "${label}" — ma ${children} ${pluralForm(children, {
+        one: "podkategorię",
+        few: "podkategorie",
+        many: "podkategorii",
+      })}. Najpierw przenieś je pod inną kategorię (pole „Rodzic") albo usuń.`,
+    };
+  }
+
+  // FK products.category → categories.slug też by to wyłapał, ale damy czytelny
+  // komunikat zamiast błędu DB.
   const { count } = await supabase
     .from("products")
     .select("id", { count: "exact", head: true })
     .eq("category", slug);
 
-  if ((count ?? 0) > 0) {
+  const products = count ?? 0;
+  if (products > 0) {
     return {
       ok: false,
-      error: `Nie można usunąć kategorii "${label}" — ma ${count} ${
-        count === 1 ? "produkt" : "produktów"
-      }. Najpierw zmień kategorię tych produktów lub je usuń.`,
+      error: `Nie można usunąć kategorii "${label}" — ma ${products} ${pluralForm(products, {
+        one: "produkt",
+        few: "produkty",
+        many: "produktów",
+      })}. Najpierw zmień kategorię tych produktów lub je usuń.`,
     };
   }
 
@@ -258,6 +240,35 @@ export async function deleteCategory(formData: FormData): Promise<ActionResult> 
   invalidateCategoriesCache();
   revalidatePath("/admin/kategorie");
   return { ok: true, message: `Kategoria "${label}" usunięta` };
+}
+
+// Kolejność wśród RODZEŃSTWA. `parentId === null` = najwyższy poziom.
+// Wzorem reorderCollections: odrzucamy całe żądanie, gdy którekolwiek id jest
+// puste — reorder_categories przenumerowuje dokładnie to, co dostanie, więc
+// samo `.filter(Boolean)` przestawiłoby podzbiór i zameldowało sukces.
+export async function reorderCategories(
+  parentId: string | null,
+  ids: string[]
+): Promise<ActionResult> {
+  await requireAdmin();
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return { ok: false, error: "Pusta lista kolejności" };
+  }
+  if (ids.some((id) => !id)) {
+    return { ok: false, error: "Lista kolejności zawiera puste id — nic nie zapisano" };
+  }
+
+  const supabase = await createAdminClient();
+  const { error } = await supabase.rpc("reorder_categories", {
+    p_parent: parentId,
+    p_ids: ids,
+  });
+  if (error) return { ok: false, error: `Reorder zawiódł: ${error.message}` };
+
+  invalidateCategoriesCache();
+  revalidatePath("/admin/kategorie");
+  return { ok: true, message: "Kolejność zapisana" };
 }
 
 // ============================================================

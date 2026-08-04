@@ -7,6 +7,7 @@ import {
   getVariantImageSuggestionsAdmin,
 } from "@/app/_lib/products";
 import { getAllCategories } from "@/app/_lib/categories";
+import { flattenForSelect } from "@/app/_lib/category-tree";
 import { getAllFabrics, getFabricPriceGroups } from "@/app/_lib/fabrics";
 import { getVariantInfoMap } from "@/app/_lib/variant-info-data";
 import { sleepSizeOf } from "@/app/_lib/sleep-size";
@@ -86,7 +87,7 @@ export default async function AdminProductEditPage({
       )}
       <ProductEditor
       product={product}
-      categories={categories}
+      categoryGroups={flattenForSelect(categories)}
       de={de}
       sizeGroupMembers={sizeGroupMembers}
       fabrics={fabrics}

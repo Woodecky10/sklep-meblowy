@@ -1,10 +1,5 @@
 import LocalizedLink from "../ui/LocalizedLink";
-
-export type NavStripSection = {
-  slug: string;
-  label: string;
-  categories: { slug: string; label: string }[];
-};
+import type { MenuNode } from "@/app/_lib/category-tree";
 
 export type NavStripPageLink = { id: string; href: string; label: string };
 
@@ -12,8 +7,8 @@ export type NavStripPageLink = { id: string; href: string; label: string };
 // rzędu pozycje wysokie na całą wysokość headera dałyby pasek na ~190 px.
 const TRIGGER_CLS =
   "font-sans text-xs uppercase tracking-widest py-2 flex items-center whitespace-nowrap text-[var(--muted)] transition-colors";
-const DROPDOWN_CLS =
-  "absolute top-full left-1/2 -translate-x-1/2 z-20 min-w-[220px] bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-2xl py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all";
+const PANEL_CLS =
+  "absolute top-full left-1/2 -translate-x-1/2 z-20 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-2xl p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all";
 
 function Chevron() {
   return (
@@ -32,21 +27,24 @@ function Chevron() {
   );
 }
 
-// Pasek nawigacji desktopowej: grupy kategorii + linki do podstron.
+// Pasek nawigacji desktopowej: korzenie drzewa kategorii + linki do podstron.
+//
+// Poziom 1 = pozycja paska, poziom 2 = nagłówek kolumny, poziom 3 = linki pod
+// nagłówkiem. Głębsze poziomy są odcięte w menuProjection (MENU_MAX_DEPTH)
+// i dostępne paskiem dzieci na stronie kategorii — panel rozwijany ma skończoną
+// wysokość i przy głębokim drzewie zrobiłby się nieczytelny.
 //
 // Gdy pozycji jest więcej, niż mieści się w szerokości kontenera, ZAWIJAJĄ SIĘ
 // do kolejnego rzędu (flex-wrap) i header rośnie w dół — strona nigdy nie
-// rozszerza się w prawo. Wcześniej pozycje były `shrink-0` w kontenerze bez
-// `min-w-0`, więc nadmiar wypływał poza wiersz i był obcinany przez
-// `overflow-x: clip`, zabierając ze sobą ikony (łącznie z koszykiem).
+// rozszerza się w prawo.
 //
 // Czysty CSS, zero JS: brak przeskoku po hydracji i brak CLS.
 export default function NavStrip({
-  sections,
+  nodes,
   pageLinks,
   labels,
 }: {
-  sections: NavStripSection[];
+  nodes: MenuNode[];
   pageLinks: NavStripPageLink[];
   labels: { allInSection: string };
 }) {
@@ -54,46 +52,72 @@ export default function NavStrip({
     // min-w-0 jest tu nośne: bez niego kontener nie może zwężyć się poniżej
     // szerokości treści, więc nic by się nie zawinęło.
     <div className="hidden lg:flex items-center flex-1 justify-center min-w-0">
-      {/* justify-start, NIE center: przy zawinięciu każdy rząd startuje z tej
-          samej linii co pierwsza pozycja u góry. Przy center rzędy centrowałyby
-          się niezależnie i dolny „wisiał" w środku. Sam pasek pozostaje
-          wyśrodkowany, dopóki mieści się w jednym rzędzie — wtedy jego szerokość
-          to max-content, a centruje go justify-center rodzica. */}
       <nav className="flex flex-wrap items-center justify-start gap-x-6 gap-y-1">
-        {sections.map((section) => (
-          <div key={section.slug} className="relative group shrink-0">
-            {/* Sam HEADER sekcji jest klikalny — prowadzi do /sklep?sekcja=<slug>
-                pokazując WSZYSTKIE produkty z sekcji. Hover otwiera dropdown
-                z sub-kategoriami dla precyzyjniejszego filtra. */}
-            <LocalizedLink
-              href={`/sklep?sekcja=${section.slug}`}
-              className={`${TRIGGER_CLS} gap-1 group-hover:text-[var(--color-gold)]`}
-            >
-              {section.label}
-              <Chevron />
-            </LocalizedLink>
-            <div className={DROPDOWN_CLS}>
+        {nodes.map((root) => {
+          // Megamenu (kolumny z nagłówkami) tylko wtedy, gdy jest co grupować.
+          // Przy płaskiej gałęzi zostaje jedna kolumna — dokładnie dzisiejszy
+          // wygląd, więc migracja nie zmienia menu, dopóki Ola nie pogłębi drzewa.
+          const hasGrandchildren = root.children.some((c) => c.children.length > 0);
+          return (
+            <div key={root.slug} className="relative group shrink-0">
+              {/* Sam nagłówek pozycji jest klikalny — prowadzi do listingu
+                  całego poddrzewa. Hover otwiera panel z podkategoriami. */}
               <LocalizedLink
-                href={`/sklep?sekcja=${section.slug}`}
-                className="block px-5 py-2.5 text-sm text-[var(--color-gold)] hover:bg-[var(--bg)] transition-colors border-b border-[var(--border)] mb-1 font-medium"
+                href={`/sklep?kategoria=${root.slug}`}
+                className={`${TRIGGER_CLS} gap-1 group-hover:text-[var(--color-gold)]`}
               >
-                {labels.allInSection} {section.label.toLowerCase()}
+                {root.label}
+                <Chevron />
               </LocalizedLink>
-              {section.categories.map((c) => (
-                <LocalizedLink
-                  key={c.slug}
-                  href={`/sklep?kategoria=${c.slug}`}
-                  className="block px-5 py-2.5 text-sm text-[var(--fg)] hover:bg-[var(--bg)] hover:text-[var(--color-gold)] transition-colors"
-                >
-                  {c.label}
-                </LocalizedLink>
-              ))}
-            </div>
-          </div>
-        ))}
 
-        {/* Podstrony z menu (admin: /admin/podstrony) — zawijają się razem z
-            grupami, bez osobnego limitu. */}
+              {root.children.length > 0 && (
+                <div
+                  className={`${PANEL_CLS} ${
+                    hasGrandchildren
+                      ? "grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-x-6 gap-y-4 w-max max-w-[min(90vw,880px)]"
+                      : "min-w-[220px]"
+                  }`}
+                >
+                  <LocalizedLink
+                    href={`/sklep?kategoria=${root.slug}`}
+                    className={`block px-3 py-2 text-sm text-[var(--color-gold)] hover:bg-[var(--bg)] transition-colors border-b border-[var(--border)] font-medium ${
+                      hasGrandchildren ? "col-span-full" : "mb-1"
+                    }`}
+                  >
+                    {labels.allInSection} {root.label.toLowerCase()}
+                  </LocalizedLink>
+
+                  {root.children.map((child) => (
+                    <div key={child.slug} className="min-w-0">
+                      <LocalizedLink
+                        href={`/sklep?kategoria=${child.slug}`}
+                        className={
+                          child.children.length > 0
+                            ? "block px-3 py-1.5 text-xs font-sans uppercase tracking-widest text-[var(--color-gold-text)] hover:text-[var(--color-gold)] transition-colors"
+                            : "block px-3 py-2.5 text-sm text-[var(--fg)] hover:bg-[var(--bg)] hover:text-[var(--color-gold)] transition-colors"
+                        }
+                      >
+                        {child.label}
+                      </LocalizedLink>
+                      {child.children.map((grand) => (
+                        <LocalizedLink
+                          key={grand.slug}
+                          href={`/sklep?kategoria=${grand.slug}`}
+                          className="block px-3 py-1.5 text-sm text-[var(--fg)] hover:bg-[var(--bg)] hover:text-[var(--color-gold)] transition-colors"
+                        >
+                          {grand.label}
+                        </LocalizedLink>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Podstrony z menu (admin: /admin/podstrony) — zawijają się razem
+            z kategoriami, bez osobnego limitu. */}
         {pageLinks.map((item) => (
           <div key={item.id} className="shrink-0">
             <LocalizedLink

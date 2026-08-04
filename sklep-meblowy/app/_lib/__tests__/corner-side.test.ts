@@ -43,8 +43,8 @@ describe("isCornerCategorySlug — kategorie narożników", () => {
     expect(isCornerCategorySlug("narozniki")).toBe(true);
     expect(isCornerCategorySlug("naroznik-u")).toBe(true);
   });
-  it("pufy (slug przerobiony na narożniki U w prod DB) → true", () => {
-    expect(isCornerCategorySlug("pufy")).toBe(true);
+  it("pufy (po migracji 68 to węzeł \"PUFY\", nie narożniki) → false", () => {
+    expect(isCornerCategorySlug("pufy")).toBe(false);
   });
   it("sofy / null / undefined / pusty → false", () => {
     expect(isCornerCategorySlug("sofy")).toBe(false);

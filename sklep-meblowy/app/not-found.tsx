@@ -1,5 +1,6 @@
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
-import { getSections, getCategories } from "@/app/_lib/categories";
+import { getCategories } from "@/app/_lib/categories";
+import { buildTree } from "@/app/_lib/category-tree";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { getDictionary } from "@/app/_lib/dictionaries";
 
@@ -12,18 +13,13 @@ import { getDictionary } from "@/app/_lib/dictionaries";
 export default async function NotFound() {
   const locale = await getLocale();
   const t = getDictionary(locale);
-  const [sections, categories] = await Promise.all([
-    getSections(locale),
-    getCategories(locale),
-  ]);
+  const categories = await getCategories(locale);
 
-  // Bierzemy do 4 kategorii z pierwszej sekcji (zazwyczaj "Salon" / "Sypialnia")
-  // jako quick-links. Jeśli brak sekcji (świeży deploy bez setupu), pokażemy
-  // tylko CTA do sklepu.
-  const firstSection = sections[0];
-  const quickCategories = firstSection
-    ? categories.filter((c) => c.group_slug === firstSection.slug).slice(0, 4)
-    : [];
+  // Bierzemy do 4 dzieci pierwszego węzła najwyższego poziomu drzewa
+  // (zazwyczaj "Salon" / "Sypialnia") jako quick-links. Jeśli brak węzłów
+  // (świeży deploy bez setupu), pokażemy tylko CTA do sklepu.
+  const firstRoot = buildTree(categories)[0];
+  const quickCategories = firstRoot ? firstRoot.children.slice(0, 4) : [];
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-24 md:py-32 text-center">

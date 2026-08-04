@@ -1,10 +1,6 @@
 import { requireAdmin } from "@/app/_lib/admin";
-import {
-  getAllSections,
-  getAllCategories,
-  type Section,
-  type CategoryDef,
-} from "@/app/_lib/categories";
+import { getAllCategories, type CategoryDef } from "@/app/_lib/categories";
+import { subtreeProductCounts } from "@/app/_lib/category-tree";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import KategorieEditor from "./KategorieEditor";
 
@@ -13,24 +9,19 @@ export const metadata = { title: "Kategorie — Admin" };
 export default async function AdminKategoriePage() {
   await requireAdmin();
 
-  const [sections, categories, productCounts] = await Promise.all([
-    getAllSections(),
+  const [nodes, ownCounts] = await Promise.all([
     getAllCategories(),
     getProductCountsByCategorySlug(),
   ]);
 
-  return (
-    <KategorieEditor
-      sections={sections}
-      categories={categories}
-      productCounts={productCounts}
-    />
-  );
+  // Liczniki własne i z poddrzewa liczy czysty moduł — panel dostaje gotowe
+  // pary, żeby nie powtarzać tej arytmetyki w komponencie klienckim.
+  const counts = Object.fromEntries(subtreeProductCounts(nodes, ownCounts));
+
+  return <KategorieEditor nodes={nodes} counts={counts} />;
 }
 
-// Dla każdej kategorii (slug) — ile produktów ma ją przypisaną.
-// Używane w UI żeby pokazać "(3 produkty)" przy każdej kategorii i blokować
-// usunięcie kategorii z produktami.
+// Dla każdej kategorii (slug) — ile produktów ma ją przypisaną BEZPOŚREDNIO.
 async function getProductCountsByCategorySlug(): Promise<Record<string, number>> {
   const supabase = await createAdminClient();
   const { data } = await supabase.from("products").select("category");
@@ -42,4 +33,4 @@ async function getProductCountsByCategorySlug(): Promise<Record<string, number>>
   return counts;
 }
 
-export type { Section, CategoryDef };
+export type { CategoryDef };

@@ -54,7 +54,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // env, chwilowa awaria), degradujemy do tras statycznych zamiast wywalać
   // cały build/deploy — Google dostanie minimum, kolejny render uzupełni.
   try {
-    // Wszystkie kategorie jako filtry /sklep?kategoria=X
+    // Każdy WIDOCZNY węzeł drzewa jako filtr /sklep?kategoria=X. Listing węzła
+    // jest nadzbiorem listingów jego dzieci — to zwykły układ kategorii
+    // w sklepie, kanonikale są rozłączne per węzeł. Ukryte gałęzie nie wchodzą
+    // (getCategories filtruje efektywną widoczność).
     const categories = await getCategories();
     const categoryRoutes: MetadataRoute.Sitemap = categories.map((c) => ({
       url: `${BASE}/sklep?kategoria=${c.slug}`,

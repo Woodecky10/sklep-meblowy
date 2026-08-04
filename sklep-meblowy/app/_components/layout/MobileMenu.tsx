@@ -4,12 +4,7 @@ import { useState } from "react";
 import LocalizedLink from "../ui/LocalizedLink";
 import { signOut } from "@/app/_lib/auth-actions";
 import LanguageSwitcher from "./LanguageSwitcher";
-
-export type MobileMenuSection = {
-  slug: string;
-  label: string;
-  categories: { slug: string; label: string }[];
-};
+import type { MenuNode } from "@/app/_lib/category-tree";
 
 export type PageLink = { id: string; href: string; label: string };
 
@@ -27,13 +22,13 @@ export type MobileMenuLabels = {
 export default function MobileMenu({
   isLoggedIn = false,
   isAdmin = false,
-  sections = [],
+  nodes = [],
   pageLinks = [],
   labels,
 }: {
   isLoggedIn?: boolean;
   isAdmin?: boolean;
-  sections?: MobileMenuSection[];
+  nodes?: MenuNode[];
   pageLinks?: PageLink[];
   labels: MobileMenuLabels;
 }) {
@@ -60,15 +55,15 @@ export default function MobileMenu({
       {open && (
         <div className="absolute top-full left-0 right-0 bg-[var(--card-bg)] border-b border-[var(--border)] shadow-lg lg:hidden max-h-[calc(100dvh-8.5rem)] overflow-y-auto">
           <nav className="flex flex-col px-6 py-4 gap-3">
-            {sections.map((section) => {
-              const isOpen = openSection === section.slug;
+            {nodes.map((root) => {
+              const isOpen = openSection === root.slug;
               return (
-                <div key={section.slug}>
+                <div key={root.slug}>
                   <button
-                    onClick={() => setOpenSection(isOpen ? null : section.slug)}
+                    onClick={() => setOpenSection(isOpen ? null : root.slug)}
                     className="w-full flex items-center justify-between font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors py-1"
                   >
-                    <span>{section.label}</span>
+                    <span>{root.label}</span>
                     <svg
                       width="12"
                       height="12"
@@ -85,23 +80,43 @@ export default function MobileMenu({
                   </button>
                   {isOpen && (
                     <div className="flex flex-col gap-2 mt-2 pl-4 border-l border-[var(--border)]">
-                      {/* Skrót do całej sekcji bez wybierania sub-kategorii. */}
+                      {/* Skrót do całego poddrzewa bez wybierania podkategorii. */}
                       <LocalizedLink
-                        href={`/sklep?sekcja=${section.slug}`}
+                        href={`/sklep?kategoria=${root.slug}`}
                         onClick={() => setOpen(false)}
                         className="text-sm text-[var(--color-gold)] hover:underline transition-colors font-medium"
                       >
-                        {labels.allInSection} {section.label.toLowerCase()}
+                        {labels.allInSection} {root.label.toLowerCase()}
                       </LocalizedLink>
-                      {section.categories.map((c) => (
-                        <LocalizedLink
-                          key={c.slug}
-                          href={`/sklep?kategoria=${c.slug}`}
-                          onClick={() => setOpen(false)}
-                          className="text-sm text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors"
-                        >
-                          {c.label}
-                        </LocalizedLink>
+                      {root.children.map((child) => (
+                        <div key={child.slug} className="flex flex-col gap-2">
+                          <LocalizedLink
+                            href={`/sklep?kategoria=${child.slug}`}
+                            onClick={() => setOpen(false)}
+                            className={
+                              child.children.length > 0
+                                ? "text-xs font-sans uppercase tracking-widest text-[var(--color-gold-text)]"
+                                : "text-sm text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors"
+                            }
+                          >
+                            {child.label}
+                          </LocalizedLink>
+                          {/* Trzeci poziom — wcięty, żeby było widać, czyj jest. */}
+                          {child.children.length > 0 && (
+                            <div className="flex flex-col gap-2 pl-4 border-l border-[var(--border)]">
+                              {child.children.map((grand) => (
+                                <LocalizedLink
+                                  key={grand.slug}
+                                  href={`/sklep?kategoria=${grand.slug}`}
+                                  onClick={() => setOpen(false)}
+                                  className="text-sm text-[var(--muted)] hover:text-[var(--color-gold)] transition-colors"
+                                >
+                                  {grand.label}
+                                </LocalizedLink>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       ))}
                     </div>
                   )}

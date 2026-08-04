@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, Field, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
 import { createProduct } from "../actions";
+import type { SelectGroup } from "@/app/_lib/category-tree";
 
-type SelectSection = { label: string; categories: { slug: string; label: string }[] };
-type Props = { sections: SelectSection[] };
+type Props = { groups: SelectGroup[] };
 
-export default function NewProductForm({ sections }: Props) {
+export default function NewProductForm({ groups }: Props) {
   const router = useRouter();
   const [toast, setToast] = useState<Toast>(null);
   const [isPending, startTransition] = useTransition();
@@ -19,7 +19,7 @@ export default function NewProductForm({ sections }: Props) {
     if (t) setTimeout(() => setToast(null), 4000);
   }
 
-  if (sections.length === 0) {
+  if (groups.length === 0) {
     return (
       <div className="flex flex-col gap-4">
         <h1 className="font-display text-4xl font-bold text-[var(--fg)]">Nowy produkt</h1>
@@ -82,11 +82,12 @@ export default function NewProductForm({ sections }: Props) {
               <option value="" disabled>
                 — wybierz kategorię —
               </option>
-              {sections.map((s) => (
-                <optgroup key={s.label} label={s.label}>
-                  {s.categories.map((c) => (
-                    <option key={c.slug} value={c.slug}>
-                      {c.label}
+              {groups.map((g) => (
+                <optgroup key={g.label} label={g.label}>
+                  {g.options.map((o) => (
+                    <option key={o.slug} value={o.slug}>
+                      {" ".repeat(o.depth * 4)}
+                      {o.label}
                     </option>
                   ))}
                 </optgroup>

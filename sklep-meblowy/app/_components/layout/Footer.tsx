@@ -1,6 +1,7 @@
 import LocalizedLink from "../ui/LocalizedLink";
 import Image from "next/image";
-import { getSections, getCategories } from "@/app/_lib/categories";
+import { getCategories } from "@/app/_lib/categories";
+import { menuProjection } from "@/app/_lib/category-tree";
 import { COMPANY, isFilled } from "@/app/_lib/company";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { getDictionary } from "@/app/_lib/dictionaries";
@@ -12,8 +13,7 @@ import { getContactInfo } from "@/app/_lib/contact-server";
 export default async function Footer() {
   const locale = await getLocale();
   const t = getDictionary(locale);
-  const [sections, categories, texts, menuRows] = await Promise.all([
-    getSections(locale),
+  const [categories, texts, menuRows] = await Promise.all([
     getCategories(locale),
     getSiteTexts(),
     getMenuItems(),
@@ -21,6 +21,10 @@ export default async function Footer() {
   const contact = await getContactInfo();
   const tagline = siteText(texts, "footer_tagline", locale, t.footer.tagline);
   const footerItems = prepareMenuItems(menuRows, "footer", locale);
+
+  // Stopka bierze DWA poziomy: kolumna = pozycja paska, w niej jej dzieci.
+  // Trzeci poziom dorzucałby kilkanaście linków i rozdmuchał stopkę.
+  const footerNodes = menuProjection(categories, 2);
 
   const infoLinks: [string, string][] = [
     [t.footer.about, "/o-nas"],
@@ -32,14 +36,6 @@ export default async function Footer() {
     [t.footer.terms, "/regulamin"],
     [t.footer.privacy, "/prywatnosc"],
   ];
-
-  // Grupowanie kategorii pod sekcjami — jedna iteracja zamiast O(sekcje × kategorie).
-  const categoriesBySection = new Map<string, typeof categories>();
-  for (const c of categories) {
-    const arr = categoriesBySection.get(c.group_slug) ?? [];
-    arr.push(c);
-    categoriesBySection.set(c.group_slug, arr);
-  }
 
   return (
     <footer className="bg-[var(--color-navy)] text-white">
@@ -71,22 +67,27 @@ export default async function Footer() {
           </p>
         </div>
 
-        {sections.map((section) => (
-          <div key={section.slug}>
+        {footerNodes.map((root) => (
+          <div key={root.slug}>
             <p className="font-sans text-xs uppercase tracking-widest text-[var(--color-gold)] mb-4">
-              {section.label}
+              <LocalizedLink
+                href={`/sklep?kategoria=${root.slug}`}
+                className="hover:text-white transition-colors"
+              >
+                {root.label}
+              </LocalizedLink>
             </p>
             <ul className="space-y-3 text-sm text-white/70">
-              {(categoriesBySection.get(section.slug) ?? []).map((c) => (
-                  <li key={c.slug}>
-                    <LocalizedLink
-                      href={`/sklep?kategoria=${c.slug}`}
-                      className="hover:text-[var(--color-gold)] transition-colors"
-                    >
-                      {c.label}
-                    </LocalizedLink>
-                  </li>
-                ))}
+              {root.children.map((child) => (
+                <li key={child.slug}>
+                  <LocalizedLink
+                    href={`/sklep?kategoria=${child.slug}`}
+                    className="hover:text-[var(--color-gold)] transition-colors"
+                  >
+                    {child.label}
+                  </LocalizedLink>
+                </li>
+              ))}
             </ul>
           </div>
         ))}

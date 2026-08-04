@@ -16,15 +16,16 @@ export const CORNER_SIDE_VALUES = ["Lewostronny", "Prawostronny"];
 // Kategoria, której produkty dostają wybór strony domyślnie (decyzja: opt-out).
 export const CORNER_SIDE_DEFAULT_CATEGORY = "naroznik-l";
 
-// Slugi kategorii narożników spoza wzorca "naroznik*" — prod DB ma slug "pufy"
-// przerobiony na narożniki U (CATEGORY_LABEL_DE: pufy → "U-förmiges Ecksofa").
-const EXTRA_CORNER_CATEGORY_SLUGS = new Set(["pufy"]);
-
 // Czy kategoria to narożnik — steruje widocznością toggle'a w adminie.
+//
+// Migracja 68 (drzewo kategorii, 2026-08-04) zdjęła potrzebę listy wyjątków:
+// kategoria „Narożnik w kształcie U" miała w prod DB rozjechany slug „pufy"
+// i wymagała osobnego wpisu. Po migracji ma slug „naroznik-u", który łapie
+// wzorzec poniżej, a slug „pufy" należy do NOWEGO węzła najwyższego poziomu
+// „PUFY" — zostawienie go na liście dawałoby pufom wybór strony narożnika.
 export function isCornerCategorySlug(slug: string | null | undefined): boolean {
   if (!slug) return false;
-  const s = slug.trim().toLowerCase();
-  return s.includes("naroznik") || EXTRA_CORNER_CATEGORY_SLUGS.has(s);
+  return slug.trim().toLowerCase().includes("naroznik");
 }
 
 // Nazwy opcji rozpoznawane jako "strona narożnika" (po znormalizowaniu).

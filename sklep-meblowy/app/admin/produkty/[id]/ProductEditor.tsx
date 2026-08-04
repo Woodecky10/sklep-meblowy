@@ -8,7 +8,7 @@ import { updateProductBasics, updateProductImages, duplicateProduct } from "../a
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { Product, ActionResult, Fabric, FabricPriceGroup } from "@/app/_lib/types";
 import type { VariantInfoEntry } from "@/app/_lib/variant-info";
-import type { CategoryDef } from "@/app/_lib/categories";
+import type { SelectGroup } from "@/app/_lib/category-tree";
 import { Field, IconBtn, inputClass, CollapsibleSection, type Toast } from "./_shared";
 import { useImageUpload } from "./useImageUpload";
 import VariantsEditor from "./VariantsEditor";
@@ -23,7 +23,7 @@ import type { VariantImageGroup } from "@/app/_lib/variant-image-suggestions";
 
 export default function ProductEditor({
   product,
-  categories,
+  categoryGroups,
   de,
   sizeGroupMembers,
   fabrics,
@@ -34,7 +34,7 @@ export default function ProductEditor({
   variantImageGroups,
 }: {
   product: Product;
-  categories: CategoryDef[];
+  categoryGroups: SelectGroup[];
   de: ProductDeFields;
   sizeGroupMembers: SizeGroupMember[];
   fabrics: Fabric[];
@@ -328,10 +328,15 @@ export default function ProductEditor({
 
           <Field label="Kategoria" required>
             <select name="category" defaultValue={product.category} required className={inputClass}>
-              {categories.map((c) => (
-                <option key={c.slug} value={c.slug}>
-                  {c.label} ({c.slug})
-                </option>
+              {categoryGroups.map((g) => (
+                <optgroup key={g.label} label={g.label}>
+                  {g.options.map((o) => (
+                    <option key={o.slug} value={o.slug}>
+                      {" ".repeat(o.depth * 4)}
+                      {o.label} ({o.slug})
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </Field>
