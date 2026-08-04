@@ -4,11 +4,8 @@ import { getProducts, getFilterFacets } from "@/app/_lib/products";
 import { parseOptionFilterParams } from "@/app/_lib/option-filter";
 import { parseFeatureFilterParams } from "@/app/_lib/feature-filter";
 import { getRatingsForProducts } from "@/app/_lib/reviews";
-import {
-  getCategoryLabel,
-  getSections,
-  getCategories,
-} from "@/app/_lib/categories";
+import { getCategories, getAllCategories } from "@/app/_lib/categories";
+import { menuProjection, pathTo } from "@/app/_lib/category-tree";
 import { getCollection, getAllCollections } from "@/app/_lib/collections";
 import { localizeCollection } from "@/app/_lib/localize";
 import { getUserWishlistIds } from "@/app/_lib/wishlist";
@@ -21,7 +18,9 @@ import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import { baseOpenGraph } from "@/app/_lib/seo-og";
 import ProductCard from "@/app/_components/ui/ProductCard";
 import FilterBar from "@/app/_components/ui/FilterBar";
+import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import CollectionIntro from "./CollectionIntro";
+import CategoryChildren from "./CategoryChildren";
 import Pagination from "@/app/_components/ui/Pagination";
 
 // /sklep jest w pełni przetłumaczone przez słownik UI → DE zawsze (hasDe: true).
@@ -103,10 +102,9 @@ export default async function SklepPage({
   const [
     { products, total, pages },
     facets,
-    sections,
+    visibleCategories,
     allCategories,
     allCollections,
-    categoryLabel,
     collection,
     wishlistIds,
     rate,
@@ -127,10 +125,12 @@ export default async function SklepPage({
       locale,
     }),
     getFilterFacets(locale),
-    getSections(locale),
+    // Filtry i pasek dzieci pokazują tylko widoczne gałęzie…
     getCategories(locale),
+    // …a etykieta i okruszki muszą działać też dla ukrytego węzła, bo jego
+    // adres pozostaje dostępny (patrz Global Constraints).
+    getAllCategories(locale),
     getAllCollections(),
-    getCategoryLabel(category, locale),
     collectionSlug ? getCollection(collectionSlug, locale) : Promise.resolve(null),
     // wishlist i kurs NIE zależą od listy produktów — kiedyś czekały w drugiej
     // paczce (pełny dodatkowy łańcuch RTT po products).
@@ -141,6 +141,19 @@ export default async function SklepPage({
   // Oceny wymagają id produktów — jedyne genuinie sekwencyjne zapytanie.
   const ratings = await getRatingsForProducts(products.map((p) => p.id));
   const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
+
+  // Ścieżka od korzenia do wybranego węzła — nagłówek, nadkreślenie i okruszki.
+  // `kategoria` wygrywa nad legacy `sekcja`, dokładnie jak w resolveCategoryFilter.
+  const activeSlug = category ?? sectionSlug;
+  const trail = activeSlug ? pathTo(allCategories, activeSlug) : [];
+  const activeNode = trail.length > 0 ? trail[trail.length - 1] : null;
+
+  // Dzieci węzła — TYLKO widoczne, bo to element nawigacji.
+  const childNodes = activeNode
+    ? visibleCategories
+        .filter((c) => c.parent_id === activeNode.id)
+        .map((c) => ({ slug: c.slug, label: c.label }))
+    : [];
 
   // Zachowaj wszystkie aktywne filtry w linkach paginacji
   const rawParams: Record<string, string> = {};
@@ -165,18 +178,12 @@ export default async function SklepPage({
       rawParams[k] = val;
   }
 
-  // Label sekcji z `sections` (np. "Narożniki" zamiast surowego slug "naroznik").
-  const sectionLabel = sectionSlug
-    ? sections.find((s) => s.slug === sectionSlug)?.label
-    : null;
-
   // Najbardziej szczegółowy filtr wygrywa: kolekcja > wyszukiwanie > kategoria
-  // > sekcja > domyślny tytuł.
+  // (dowolny poziom drzewa) > domyślny tytuł.
   function resolveHeading(): string {
     if (collection) return collection.label;
     if (search) return `${t.shop.searchPrefix}: „${search}”`;
-    if (category) return categoryLabel ?? t.shop.title;
-    if (sectionLabel) return sectionLabel;
+    if (activeNode) return activeNode.label;
     return t.shop.allProducts;
   }
   const heading = resolveHeading();
@@ -188,21 +195,15 @@ export default async function SklepPage({
   function resolveEyebrow(): string {
     if (collection) return t.shop.eyebrowCollection;
     if (search) return t.shop.eyebrowSearch;
-    if (category) return t.shop.eyebrowCategory;
-    // Sekcja to grupa kategorii (np. „Narożniki”), więc też „Kategoria”.
-    if (sectionLabel) return t.shop.eyebrowCategory;
+    // Każdy poziom drzewa to dla klienta „kategoria" — pasek i podkategoria
+    // niczym się dla niego nie różnią.
+    if (activeNode) return t.shop.eyebrowCategory;
     return t.shop.eyebrowShop;
   }
   const eyebrow = resolveEyebrow();
 
-  // Projekcja dla FilterBar (client) — slug + label per sekcja.
-  const filterSections = sections.map((s) => ({
-    slug: s.slug,
-    label: s.label,
-    categories: allCategories
-      .filter((c) => c.group_slug === s.slug)
-      .map((c) => ({ slug: c.slug, label: c.label })),
-  }));
+  // Drzewo do trzech poziomów — te same dane co megamenu, ten sam moduł.
+  const filterNodes = menuProjection(visibleCategories);
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
@@ -239,18 +240,39 @@ export default async function SklepPage({
         />
       )}
 
+      {/* Okruszki: ścieżka w drzewie. Sam nagłówek nie mówi, gdzie klient jest,
+          gdy ta sama nazwa może wystąpić na dwóch gałęziach. */}
+      {trail.length > 1 && (
+        <nav className="flex flex-wrap items-center gap-2 mb-4 text-xs text-[var(--muted)]">
+          {trail.slice(0, -1).map((n) => (
+            <span key={n.slug} className="flex items-center gap-2">
+              <LocalizedLink
+                href={`/sklep?kategoria=${n.slug}`}
+                className="hover:text-[var(--color-gold)] transition-colors"
+              >
+                {n.label}
+              </LocalizedLink>
+              <span aria-hidden="true">/</span>
+            </span>
+          ))}
+          <span className="text-[var(--fg)]">{activeNode?.label}</span>
+        </nav>
+      )}
+
       <Suspense>
         <FilterBar
           featureFacets={facets.features}
           optionFacets={facets.options}
           dimensionBounds={facets.dimensions}
-          sections={filterSections}
+          nodes={filterNodes}
           collections={allCollections.map((c) => {
             const lc = localizeCollection(c, locale);
             return { slug: lc.slug, label: lc.label };
           })}
         />
       </Suspense>
+
+      <CategoryChildren items={childNodes} />
 
       {products.length === 0 ? (
         <div className="text-center py-24 text-[var(--muted)]">
