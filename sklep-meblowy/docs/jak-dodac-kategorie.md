@@ -22,6 +22,11 @@ decyduje to, **co jest czyim rodzicem**.
 3. Przy każdej pozycji są dwie liczby: ile produktów ma **ona sama** i ile ma
    **razem z podkategoriami**
 
+> ℹ️ **Te liczby obejmują też produkty ukryte**, a sklep pokazuje klientowi
+> tylko widoczne. Dlatego panel może pisać „84 w poddrzewie", a listing w
+> sklepie policzy 83 — różnica to produkty, które sama schowałaś. Nic się nie
+> psuje, po prostu panel pokazuje pełny stan magazynu, a sklep ofertę.
+
 ## Krok 2 — Dodaj kategorię
 
 Są dwie drogi — wybierz tę, która pasuje do sytuacji:
@@ -65,6 +70,12 @@ albo w dół. Przeciąganie działa **tylko wśród rodzeństwa**, czyli w obrę
 jednego rodzica. Nie da się przeciągnięciem wrzucić kategorii pod inną —
 i to jest zamierzone, bo inaczej łatwo byłoby przenieść pół sklepu jednym
 nieuważnym ruchem.
+
+> ℹ️ **W momencie chwycenia karty podkategorie na tym poziomie się chowają**,
+> a lista skraca się do samych przenoszonych pozycji. Tak ma być: dzięki temu
+> widzisz dokładnie tę kolejność, która zostanie zapisana, i nie musisz się
+> domyślać, gdzie karta wyląduje. Po puszczeniu (albo po wciśnięciu `Esc`)
+> podkategorie wracają na swoje miejsce.
 
 **Przeniesienie — pole „Rodzic".** Żeby kategoria trafiła w inne miejsce
 drzewa, wejdź w **„Edytuj"** i zmień pole **Rodzic**. To wszystko. Wybór
@@ -114,6 +125,14 @@ pozycją „MEBLE", zrób to tak:
 
 Efekt: jedna zakładka „MEBLE", pod nią dawne zakładki, a pod nimi ich
 kategorie. Wtedy właśnie zaczynają działać wszystkie trzy poziomy menu.
+
+> ⚠️ **Uprzedzenie: zmieni się też stopka.** Kolumny w stopce to pozycje
+> najwyższego poziomu, a pod nimi ich podkategorie. Dziś jest tam osiem kolumn.
+> Jeśli wciągniesz wszystko pod „MEBLE", **stopka zwinie się do jednej kolumny**
+> „MEBLE" z listą dawnych zakładek. To nie awaria — stopka po prostu pokazuje
+> to samo drzewo co menu. Jeśli wolisz zachować szeroką stopkę, zostaw część
+> pozycji na najwyższym poziomie albo powiedz, zmienimy sposób, w jaki stopka
+> czyta drzewo.
 
 Nie musisz przenosić wszystkiego. Możesz zostawić część pozycji na najwyższym
 poziomie — na przykład „Nasze realizacje" obok „MEBLE", jeśli mają być
