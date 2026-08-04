@@ -10,6 +10,7 @@ import {
   resolveCategoryFilter,
   subtreeProductCounts,
   reorderSiblings,
+  expandCrossSellTargets,
   type CategoryNode,
 } from "@/app/_lib/category-tree";
 
@@ -135,6 +136,52 @@ describe("descendantSlugs", () => {
       node({ id: "2", slug: "ukryte-dziecko", parent_id: "1", active: false }),
     ];
     expect(descendantSlugs(nodes, "rodzic")).toEqual(["rodzic", "ukryte-dziecko"]);
+  });
+});
+
+describe("expandCrossSellTargets", () => {
+  it("korzeń rozwija się na siebie + całe poddrzewo, w kolejności drzewa", () => {
+    expect(expandCrossSellTargets(TREE, ["meble"], [])).toEqual([
+      "meble",
+      "narozniki",
+      "naroznik-modulowy",
+      "naroznik-l",
+      "sofy",
+      "sofa-2",
+    ]);
+  });
+
+  it("liść zostaje sam sobą (jeden element)", () => {
+    expect(expandCrossSellTargets(TREE, ["sofa-2"], [])).toEqual(["sofa-2"]);
+  });
+
+  it("slug nieistniejący w nodes zostaje zachowany bez zmian", () => {
+    expect(expandCrossSellTargets(TREE, ["usunieta-kategoria"], [])).toEqual([
+      "usunieta-kategoria",
+    ]);
+  });
+
+  it("slug z sourceSlugs jest pomijany, także gdy wchodzi do wyniku jako potomek rozwiniętego korzenia", () => {
+    // Łóżko wisi pod "naroznik-l", a jego cross-sell wskazuje na korzeń
+    // "meble" — bez filtra post-expansion "naroznik-l" wróciłby jako potomek
+    // i dałby same-sell.
+    expect(
+      expandCrossSellTargets(TREE, ["meble"], ["naroznik-l"])
+    ).toEqual(["meble", "narozniki", "naroznik-modulowy", "sofy", "sofa-2"]);
+  });
+
+  it("dwa źródła wskazujące na wspólny cel → brak duplikatów, kolejność pierwszego wystąpienia", () => {
+    expect(expandCrossSellTargets(TREE, ["sofy", "narozniki"], [])).toEqual([
+      "sofy",
+      "sofa-2",
+      "narozniki",
+      "naroznik-modulowy",
+      "naroznik-l",
+    ]);
+  });
+
+  it("pusta lista rawTargets → pusta tablica", () => {
+    expect(expandCrossSellTargets(TREE, [], [])).toEqual([]);
   });
 });
 
