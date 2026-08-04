@@ -9,7 +9,8 @@ import SearchBox from "./SearchBox";
 import WishlistIcon from "./WishlistIcon";
 import { createClient } from "@/app/_lib/supabase/server";
 import { isAdmin } from "@/app/_lib/admin";
-import { getSections, getCategories } from "@/app/_lib/categories";
+import { getCategories } from "@/app/_lib/categories";
+import { menuProjection } from "@/app/_lib/category-tree";
 import { getWishlistCount } from "@/app/_lib/wishlist";
 import { COMPANY } from "@/app/_lib/company";
 import { getLocale } from "@/app/_lib/i18n-server";
@@ -26,13 +27,11 @@ export default async function Navbar() {
     {
       data: { user },
     },
-    sections,
     categories,
     wishlistCount,
     menuRows,
   ] = await Promise.all([
     supabase.auth.getUser(),
-    getSections(locale),
     getCategories(locale),
     getWishlistCount(),
     getMenuItems(),
@@ -40,24 +39,9 @@ export default async function Navbar() {
 
   const navbarItems = prepareMenuItems(menuRows, "navbar", locale);
 
-  // Grupowanie kategorii pod sekcjami — jedna iteracja zamiast N+1 zapytań.
-  const categoriesBySection = new Map<string, typeof categories>();
-  for (const c of categories) {
-    const arr = categoriesBySection.get(c.group_slug) ?? [];
-    arr.push(c);
-    categoriesBySection.set(c.group_slug, arr);
-  }
-
-  // Lekka projekcja dla komponentów klienckich (NavStrip, MobileMenu) — bez
-  // rzeczy nie potrzebnych.
-  const clientSections = sections.map((s) => ({
-    slug: s.slug,
-    label: s.label,
-    categories: (categoriesBySection.get(s.slug) ?? []).map((c) => ({
-      slug: c.slug,
-      label: c.label,
-    })),
-  }));
+  // Drzewo do trzech poziomów: pozycje paska → nagłówki → linki. Ręczne
+  // grupowanie po group_slug odeszło razem z tabelą grup (migracja 68).
+  const menuNodes = menuProjection(categories);
 
   return (
     <header className="bg-[var(--bg)] border-b border-[var(--border)] backdrop-blur-sm">
@@ -88,7 +72,7 @@ export default async function Navbar() {
             miejsca pozycje zawijają się do kolejnego rzędu, więc dodanie grupy
             w panelu nigdy nie ucina prawej części strony. */}
         <NavStrip
-          sections={clientSections}
+          nodes={menuNodes}
           pageLinks={navbarItems}
           labels={{ allInSection: t.nav.allInSection }}
         />
@@ -112,7 +96,7 @@ export default async function Navbar() {
           <MobileMenu
             isLoggedIn={!!user}
             isAdmin={isAdmin(user)}
-            sections={clientSections}
+            nodes={menuNodes}
             pageLinks={navbarItems}
             labels={{
               menu: t.nav.menu,
