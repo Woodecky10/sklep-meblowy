@@ -23,7 +23,10 @@ export default function PromoRibbon({
   return (
     <span
       aria-hidden={decorative || undefined}
-      className={`pointer-events-none absolute ${geometry} -rotate-45 text-center bg-[var(--color-navy)] text-[var(--color-gold-light)] font-sans font-bold uppercase tracking-[0.2em] shadow-md`}
+      // whitespace-nowrap + overflow-hidden są WYMAGANE, nie kosmetyczne: panel
+      // wpuszcza napis do 16 znaków, a span o stałej szerokości bez nowrap zawija
+      // tekst na dwie linie WEWNĄTRZ obrotu -45° — brzydsze niż obcięcie.
+      className={`pointer-events-none absolute ${geometry} -rotate-45 whitespace-nowrap overflow-hidden text-center bg-[var(--color-navy)] text-[var(--color-gold-light)] font-sans font-bold uppercase tracking-[0.2em] shadow-md`}
     >
       {text}
     </span>
