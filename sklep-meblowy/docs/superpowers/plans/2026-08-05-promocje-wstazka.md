@@ -1262,5 +1262,81 @@ Te kroki nie są taskami dla subagenta; robi je człowiek albo agent z dostępem
 - [ ] **`CRON_SECRET` w Vercelu** — dodać zmienną (dowolny długi losowy string) i zrobić **Redeploy**; samo dodanie nie wystarcza.
 - [ ] **Sprawdzić cron ręcznie** po deployu: `curl -sL -H "Authorization: Bearer <CRON_SECRET>" https://mollien.pl/api/cron/promocje` — oczekiwane `{"switched":[]}` przy braku przejść. Nie odpalać w pętli: ciasne pętle curl na `mollien.pl` wywołują 403 per-IP na kilka minut.
 - [ ] **Potwierdzić migrację 69 na produkcji** (`list_tables`), jeśli Task 1 był wykonywany na innej bazie.
-- [ ] **Sesja admina do e2e** wygasła 2026-07-29, a `.env.e2e` nie ma danych logowania — e2e panelu wymaga jej odnowienia. Testy z Task 9 celowo nie wymagają logowania.
+- [x] **Sesja admina do e2e** — sprawdzone 2026-08-05: `.env.e2e` JEST wypełniony, a sesja w `e2e/.auth/admin.json` odświeżona 2026-08-04, więc panel da się testować. (Wcześniejsza treść tego punktu była nieaktualna.)
 - [ ] Wpisy `crons` z `vercel.json` aktywują się dopiero na deploymencie produkcyjnym.
+
+---
+
+## STAN WYKONANIA (2026-08-05, gałąź `feat/promocje-wstazka`)
+
+Ledger SDD (`.superpowers/sdd/`) jest gitignorowany, więc to jest jedyny nośnik
+rozstrzygnięć między komputerami. **Wszystkie 9 tasków zamknięte**, każdy przez
+review + rundy naprawcze, gdzie były potrzebne.
+
+| task | commity | uwaga |
+|---|---|---|
+| 1 migracja + typ | `f8a8189` | migracja 69 **zaaplikowana na produkcji** (`20260805081016`) |
+| 2 logika okien | `d0bf76f` | 25 testów |
+| 3 `ribbonText` + detektor | `c3ee6e6` | 19 testów |
+| 4 reconciler + zapis | `af8c71a` | — |
+| 5 wstążka | `534688b`, `1b194ec` | drugi commit z weryfikacji na żywo |
+| 6 panel | `bd3e50e` | — |
+| 7 cron | `4c45e86` | — |
+| 8 duplikat bez promocji | `8db3986` | naprawa błędu sprzed tej gałęzi |
+| 9 weryfikacja na żywo | `f2a289b`, `c93d487` | — |
+
+Poza funkcją: `b1e6630` podmienia numer telefonu firmy (prośba właściciela w trakcie).
+
+### Rozstrzygnięcia, których nie widać w kodzie
+
+- **Znak obrotu wstążki był błędny i wyszło to tylko na renderze.** Przy `-rotate-45`
+  pas w lewym **dolnym** narożniku biegnie w górę-prawo, więc nie przecina obu brzegów
+  kontenera: jeden koniec jest przycięty, drugi urywa się w środku zdjęcia jako klin.
+  Uphill czyta się wyłącznie w narożniku górnym-lewym i dolnym-prawym. Offsety zostały
+  bez zmian, bo zmiana znaku nie zmienia bounding boxa.
+- **Reconciler cofa `sale_price`, gdy zapis historii padnie** (`c93d487`). Powód jest
+  poważniejszy niż sam stan połowiczny: `planSaleActivation` zgłasza wiersz tylko gdy
+  `desired !== sale_price`, więc bez cofnięcia produkt zostawał z obniżką bez
+  `omnibus_price` **na zawsze** — żaden kolejny przebieg ani zapis w panelu by tego nie
+  ponowił, a panel pokazywałby zwyczajne „aktywna". Komunikat błędu rozróżnia „cofnięto"
+  od „cofnięcie TEŻ padło" i w obu przypadkach podaje id produktu.
+- **Sekret crona porównujemy stałoczasowo.** Nie z ostrożności — ten projekt rozstrzygnął
+  to w audycie 2026-06-11 (`29edffd`) właśnie dla sekretów crona. Helper i jego testy
+  wróciły **verbatim z historii** (`git show 9a8bdce^:...`), nie zostały napisane od nowa.
+- **`force-dynamic` usunięte** jako martwa konfiguracja: w tej wersji Next handlery GET
+  nie są cache'owane domyślnie, a ten handler nie woła `fetch()`.
+- **13 odłożonych minorów przetriażowanych na koniec:** 12 zostaje świadomie, 1 okazał
+  się nieaktualny (`new-product.ts` — obie ścieżki twardo zerują promocję).
+
+### Czego NIE sprawdzono na żywo
+
+- **Cron nigdy nie odpalił się z harmonogramu Vercela.** Endpoint wołałem ręcznie
+  (401 bez/ze złym nagłówkiem, `{"switched":[]}` z dobrym) — ale samo wywołanie przez
+  Vercel Cron o 23:05 UTC zobaczy się dopiero po deployu.
+- **Nie widziałem, jak okno od–do otwiera się i gaśnie samo.** Promocję kontrolną
+  ustawiałem bez dat (natychmiastową). Przełączanie po granicy doby pokrywają wyłącznie
+  testy jednostkowe.
+- **Ścieżka „cofnięcie też padło" jest tylko przetestowana jednostkowo** — realnej awarii
+  bazy w tym miejscu nie wywoływałem.
+- `e2e/promocje.spec.ts` **pomija się, gdy żaden produkt nie ma promocji**, a skoro
+  promocje wygasają same, będzie tak przez większość czasu. To ręcznie uzbrajany
+  smoke-check, nie stały strażnik regresji. Mocniejszy wariant, jeśli kiedyś będzie
+  potrzebny: spec sam tworzy produkt tymczasowy (wzorem `product-category-save.spec.ts`),
+  ustawia na nim promocję i usuwa go w `afterEach` — wtedy nie brudzi historii cen
+  żadnego prawdziwego produktu.
+
+### Follow-upy
+
+- **`CRON_SECRET` w Vercelu + Redeploy** — bez tego endpoint zwraca 500 i okna nie
+  przełączają się same. To jedyna rzecz blokująca działanie funkcji po merge'u.
+- Promocja kontrolna 339 → 289 zł była włączona na produkcji ok. 37 minut i została
+  wyczyszczona. **Skutek trwały:** 289 zł zostaje najniższą ceną z 30 dni dla materaca
+  `d1dc85bb-d019-4a8d-b890-40f04e311886` do ~2026-09-04, więc każda prawdziwa obniżka na
+  nim przed tą datą musi pokazać 289 zł.
+- Limit 16 znaków na `promo_badge` jest tylko w aplikacji, bez `CHECK` w bazie. Dziś panel
+  jest jedynym pisarzem, więc zostawione świadomie.
+- Martwy scaffold `Desktop/python/sklep-meblowy/` do usunięcia **osobnym PR-em** (decyzja
+  właściciela).
+- Do zrzutów i e2e w tym repo używać `npm run build` + `npm start`, nie `next dev`: dev
+  umierał po każdym pojedynczym teście Playwrighta (port słuchał, nawigacja `ERR_ABORTED`),
+  6 min na test; build produkcyjny — 17 s na te same trzy testy.
