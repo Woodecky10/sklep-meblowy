@@ -15,7 +15,9 @@ export async function applySaleSchedule(
   const supabase = await createAdminClient();
 
   let query = supabase.from("products").select(SCHEDULE_COLUMNS);
-  if (ids && ids.length > 0) {
+  // `ids` podane (choćby puste) = zawężenie do konkretnych produktów. Pusta
+  // tablica musi być no-opem, nie przypadkowym pełnym przebiegiem crona.
+  if (ids) {
     query = query.in("id", ids);
   } else {
     // Cron: tylko wiersze, które MOGĄ wymagać przełączenia — nie cała tabela.
@@ -34,12 +36,19 @@ export async function applySaleSchedule(
 
   const changes = planSaleActivation(rows, warsawToday());
 
+  // Pierwszy błąd przerywa cały przebieg i zostawia stan częściowy. Jest to
+  // bezpieczne, bo planSaleActivation jest idempotentna — kolejny przebieg
+  // dokończy nieprzełączone wiersze. Alternatywa (zbieranie błędów i jazda
+  // dalej) ukrywałaby awarię w logu crona, którego nikt nie czyta.
   for (const c of changes) {
     const { error: updErr } = await supabase
       .from("products")
       .update({ sale_price: c.sale_price } as never)
       .eq("id", c.id);
-    if (updErr) throw new Error(`applySaleSchedule update failed: ${updErr.message}`);
+    // Id produktu MUSI być w komunikacie: to leci z crona bez nadzoru, po wielu
+    // wierszach — bez id operator nie wie, który produkt zatrzymał przebieg.
+    if (updErr)
+      throw new Error(`applySaleSchedule update failed for ${c.id}: ${updErr.message}`);
     // Kolejność jest istotna: recordPriceHistory czyta świeży stan z bazy.
     await recordPriceHistory(c.id);
   }
