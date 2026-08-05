@@ -12,6 +12,7 @@ import { getAllFabrics, getFabricPriceGroups } from "@/app/_lib/fabrics";
 import { getVariantInfoMap } from "@/app/_lib/variant-info-data";
 import { sleepSizeOf } from "@/app/_lib/sleep-size";
 import { createAdminClient } from "@/app/_lib/supabase/server";
+import { warsawToday } from "@/app/_lib/sale-schedule";
 import ProductEditor from "./ProductEditor";
 import type { ProductDeFields } from "./TranslationEditor";
 import type { ProductDescriptionSection } from "@/app/_lib/types";
@@ -96,6 +97,7 @@ export default async function AdminProductEditPage({
       featureKeySuggestions={featureSuggestions.keys}
       featureValueSuggestions={featureSuggestions.valuesByKey}
       variantImageGroups={variantImageGroups}
+      today={warsawToday()}
       />
     </>
   );
