@@ -763,6 +763,7 @@ git commit -m "feat(promocje): ukosna wstazka na kaflach i glownym zdjeciu produ
 
 **Files:**
 - Modify: `sklep-meblowy/app/admin/produkty/[id]/ProductEditor.tsx:315-327`
+- Modify: `sklep-meblowy/app/admin/produkty/[id]/page.tsx` (przekazuje prop `today`)
 - Modify: `sklep-meblowy/app/admin/produkty/page.tsx:19-30`
 - Modify: `sklep-meblowy/app/admin/produkty/ProductsList.tsx:12-21`, `:104-108`
 
@@ -850,7 +851,6 @@ W `ProductEditor.tsx`, obok pozostałych `useState` (np. po `const [galleryPicke
   // Napis wstążki na żywo — ostrzeżenie o Omnibusie ma się pokazać przed
   // zapisem, nie po. Seed z zapisanej wartości.
   const [badgeDraft, setBadgeDraft] = useState(product.promo_badge ?? "");
-  const promoToday = warsawToday();
   const promoStatus = saleStatus(
     {
       id: product.id,
@@ -861,7 +861,7 @@ W `ProductEditor.tsx`, obok pozostałych `useState` (np. po `const [galleryPicke
       sale_to: product.sale_to,
       promo_badge: product.promo_badge,
     },
-    promoToday
+    today
   );
   const promoStatusLabel = describeSaleStatus(promoStatus);
   // Ostrzegamy tylko przy braku AKTYWNEJ ceny promocyjnej — zaplanowana na
@@ -875,9 +875,27 @@ W `ProductEditor.tsx`, obok pozostałych `useState` (np. po `const [galleryPicke
 i importy:
 
 ```tsx
-import { saleStatus, warsawToday, type SaleStatus } from "@/app/_lib/sale-schedule";
+import { saleStatus, type SaleStatus } from "@/app/_lib/sale-schedule";
 import { looksLikeDiscountClaim } from "@/app/_lib/pricing";
 ```
+
+`today` jest **propem**, nie wyliczeniem w komponencie. `ProductEditor` ma `"use client"`, a Next prerenderuje takie komponenty najpierw na serwerze — `warsawToday()` policzone w renderze dałoby na granicy doby dwa różne wyniki i rozjazd hydratacji. Dodaj do sygnatury propsów:
+
+```tsx
+  // Dzień w strefie sklepu, policzony na serwerze (patrz page.tsx) — nie liczymy
+  // go tutaj, bo render kliencki i prerender serwerowy mogłyby trafić w różne dni.
+  today: string;
+```
+
+- [ ] **Step 3a: Przekaż `today` z serwera**
+
+W `app/admin/produkty/[id]/page.tsx`, w renderze `<ProductEditor ... />`, dodaj prop:
+
+```tsx
+        today={warsawToday()}
+```
+
+oraz import `import { warsawToday } from "@/app/_lib/sale-schedule";`.
 
 - [ ] **Step 3: Dodaj funkcję opisującą stan**
 
