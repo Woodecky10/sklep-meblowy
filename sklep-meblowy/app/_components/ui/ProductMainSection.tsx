@@ -12,6 +12,7 @@ import {
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { formatMoney } from "@/app/_lib/money";
+import { ribbonText } from "@/app/_lib/pricing";
 import { pluralForm } from "@/app/_lib/plural";
 import { useEurRate } from "@/app/_lib/rate-context";
 import ImageGallery from "./ImageGallery";
@@ -76,7 +77,11 @@ export default function ProductMainSection({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-16">
       <div className="flex flex-col gap-8 lg:sticky lg:top-40 lg:self-start">
-        <ImageGallery images={images} name={product.name} />
+        <ImageGallery
+          images={images}
+          name={product.name}
+          ribbon={ribbonText(product, t.product.saleBadge)}
+        />
 
         {specifications.length > 0 && (
           <div>

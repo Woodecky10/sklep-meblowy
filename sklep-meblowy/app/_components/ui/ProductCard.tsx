@@ -4,9 +4,10 @@ import type { Product, ProductRating } from "@/app/_lib/types";
 import { DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { formatMoney } from "@/app/_lib/money";
-import { effectivePrice, isOnSale } from "@/app/_lib/pricing";
+import { effectivePrice, isOnSale, ribbonText } from "@/app/_lib/pricing";
 
 import AddToCartButton from "./AddToCartButton";
+import PromoRibbon from "./PromoRibbon";
 import StarRating from "./StarRating";
 import WishlistButton from "./WishlistButton";
 
@@ -41,6 +42,7 @@ export default function ProductCard({
 }) {
   const image = product.images?.[0];
   const t = getDictionary(locale);
+  const ribbon = ribbonText(product, t.product.saleBadge);
 
   return (
     <div className="group flex flex-col">
@@ -64,6 +66,7 @@ export default function ProductCard({
               {badge}
             </span>
           )}
+          {ribbon && <PromoRibbon text={ribbon} />}
         </LocalizedLink>
         <WishlistButton
           productId={product.id}
