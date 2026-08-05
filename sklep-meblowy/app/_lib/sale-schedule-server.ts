@@ -36,10 +36,21 @@ export async function applySaleSchedule(
 
   const changes = planSaleActivation(rows, warsawToday());
 
-  // Pierwszy błąd przerywa cały przebieg i zostawia stan częściowy. Jest to
-  // bezpieczne, bo planSaleActivation jest idempotentna — kolejny przebieg
-  // dokończy nieprzełączone wiersze. Alternatywa (zbieranie błędów i jazda
-  // dalej) ukrywałaby awarię w logu crona, którego nikt nie czyta.
+  // Poprzednia wartość sale_price dla każdego wiersza — z JUŻ znormalizowanych
+  // `rows` (number | null), nie z surowego `data`. Potrzebna wyłącznie do
+  // cofnięcia w razie nieudanego zapisu historii, więc liczymy ją tu, w
+  // warstwie IO, zamiast zmieniać kontrakt planSaleActivation.
+  const previousSalePriceById = new Map(rows.map((r) => [r.id, r.sale_price]));
+
+  // Pierwszy błąd przerywa cały przebieg — i to jest bezpieczne, bo nieudany
+  // zapis historii (blok catch niżej) COFA sale_price do poprzedniej wartości.
+  // Dzięki temu wiersz, na którym padło, dalej różni się od stanu pożądanego,
+  // więc planSaleActivation (idempotentna) zgłosi go ponownie przy następnym
+  // przebiegu. Bez tego cofnięcia sale_price zostałby już przełączony, wiersz
+  // przestałby się różnić od `desired` i żaden kolejny przebieg (ani ręczny
+  // zapis w panelu) nigdy by go nie ponowił — awaria byłaby cicha i trwała.
+  // Alternatywa (zbieranie błędów i jazda dalej) chowałaby ją w logu crona,
+  // którego nikt nie czyta.
   for (const c of changes) {
     const { error: updErr } = await supabase
       .from("products")
@@ -49,8 +60,42 @@ export async function applySaleSchedule(
     // wierszach — bez id operator nie wie, który produkt zatrzymał przebieg.
     if (updErr)
       throw new Error(`applySaleSchedule update failed for ${c.id}: ${updErr.message}`);
+
     // Kolejność jest istotna: recordPriceHistory czyta świeży stan z bazy.
-    await recordPriceHistory(c.id);
+    try {
+      await recordPriceHistory(c.id);
+    } catch (histErr) {
+      const histMessage = histErr instanceof Error ? histErr.message : String(histErr);
+      const previous = previousSalePriceById.get(c.id) ?? null;
+
+      // Cofnięcie MUSI iść przez ten sam mechanizm update — jeśli ono też
+      // padnie (błąd zwrócony LUB rzucony wyjątek, np. zerwane połączenie),
+      // produkt zostaje z sale_price bez wpisu w historii/omnibus, a to jest
+      // dokładnie ta sytuacja, przed którą chronimy: obniżka bez ceny
+      // referencyjnej wymaganej przez Omnibus.
+      let revertOk = false;
+      let revertMessage = "";
+      try {
+        const { error: revertErr } = await supabase
+          .from("products")
+          .update({ sale_price: previous } as never)
+          .eq("id", c.id);
+        if (revertErr) revertMessage = revertErr.message;
+        else revertOk = true;
+      } catch (revertThrown) {
+        revertMessage = revertThrown instanceof Error ? revertThrown.message : String(revertThrown);
+      }
+
+      if (revertOk) {
+        throw new Error(
+          `applySaleSchedule: zapis historii cen nie powiódł się dla produktu ${c.id} — sale_price COFNIĘTY do poprzedniej wartości, kolejny przebieg bezpiecznie ponowi próbę. Błąd recordPriceHistory: ${histMessage}`
+        );
+      }
+      // Cofnięcie też padło — to jest ten groźny, trwały stan częściowy.
+      throw new Error(
+        `applySaleSchedule: zapis historii cen nie powiódł się dla produktu ${c.id} I COFNIĘCIE sale_price TEŻ SIĘ NIE POWIODŁO — produkt ma NIESPÓJNY, TRWAŁY stan (sale_price zmieniony bez wpisu w historii/omnibus), wymaga RĘCZNEJ interwencji w bazie. Błąd recordPriceHistory: ${histMessage}. Błąd cofnięcia: ${revertMessage}`
+      );
+    }
   }
 
   return changes;
