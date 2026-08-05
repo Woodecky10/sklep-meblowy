@@ -20,6 +20,8 @@ import ImagePickerModal from "./ImagePickerModal";
 import type { SizeGroupMember } from "@/app/_lib/products";
 import { MAX_FEATURES } from "@/app/_lib/product-features";
 import type { VariantImageGroup } from "@/app/_lib/variant-image-suggestions";
+import { saleStatus, type SaleStatus } from "@/app/_lib/sale-schedule";
+import { looksLikeDiscountClaim } from "@/app/_lib/pricing";
 
 export default function ProductEditor({
   product,
@@ -32,6 +34,7 @@ export default function ProductEditor({
   featureKeySuggestions,
   featureValueSuggestions,
   variantImageGroups,
+  today,
 }: {
   product: Product;
   categoryGroups: SelectGroup[];
@@ -48,6 +51,9 @@ export default function ProductEditor({
   // Zdjęcia wartości opcji z innych produktów — zasilają wybierak
   // „+ Wybierz z wgranych" (bez opcji „Tkanina", bez galerii).
   variantImageGroups: VariantImageGroup[];
+  // Dzień w strefie sklepu, policzony na serwerze (patrz page.tsx) — nie liczymy
+  // go tutaj, bo render kliencki i prerender serwerowy mogłyby trafić w różne dni.
+  today: string;
 }) {
   const [images, setImages] = useState<string[]>(product.images ?? []);
   // Baseline ostatnio zapisanej galerii — resetowany na zapisany payload po
@@ -58,6 +64,28 @@ export default function ProductEditor({
   // wartości opcji wariantów (bez „Tkaniny") — patrz spec: galerie innych
   // produktów świadomie nie zasilają listy.
   const [galleryPickerOpen, setGalleryPickerOpen] = useState(false);
+  // Napis wstążki na żywo — ostrzeżenie o Omnibusie ma się pokazać przed
+  // zapisem, nie po. Seed z zapisanej wartości.
+  const [badgeDraft, setBadgeDraft] = useState(product.promo_badge ?? "");
+  const promoStatus = saleStatus(
+    {
+      id: product.id,
+      price: Number(product.price),
+      sale_price: product.sale_price,
+      sale_price_planned: product.sale_price_planned,
+      sale_from: product.sale_from,
+      sale_to: product.sale_to,
+      promo_badge: product.promo_badge,
+    },
+    today
+  );
+  const promoStatusLabel = describeSaleStatus(promoStatus);
+  // Ostrzegamy tylko przy braku AKTYWNEJ ceny promocyjnej — zaplanowana na
+  // przyszłość też jest brakiem, bo wstążka pokaże się od razu.
+  const badgeWarning =
+    badgeDraft.trim() !== "" &&
+    looksLikeDiscountClaim(badgeDraft) &&
+    promoStatus.kind !== "active";
   // Parametry produktu (specyfikacja) — wiersze klucz→wartość, seed z
   // product.features (importowane nie giną); serializacja do hidden
   // features_json w formularzu „Podstawowe dane" (wspólny przycisk zapisu).
@@ -312,19 +340,71 @@ export default function ProductEditor({
             />
           </Field>
 
-          <Field
-            label="Cena promocyjna (zł)"
-            hint="Zostaw puste = brak promocji. Musi być niższa od ceny regularnej."
-          >
-            <input
-              name="sale_price"
-              type="number"
-              step="0.01"
-              min="0"
-              defaultValue={product.sale_price ?? ""}
-              className={inputClass}
-            />
-          </Field>
+          <div className="md:col-span-2 flex flex-col gap-3 p-4 border border-[var(--border)] rounded-xl">
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
+                Promocja
+              </p>
+              <p className="text-xs text-[var(--fg)]">{promoStatusLabel}</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Field
+                label="Cena promocyjna (zł)"
+                hint="Puste = brak promocji. Musi być niższa od ceny regularnej."
+              >
+                <input
+                  name="sale_price_planned"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  defaultValue={product.sale_price_planned ?? ""}
+                  className={inputClass}
+                />
+              </Field>
+
+              <Field label="Od" hint="Puste = od razu.">
+                <input
+                  name="sale_from"
+                  type="date"
+                  defaultValue={product.sale_from ?? ""}
+                  className={inputClass}
+                />
+              </Field>
+
+              <Field label="Do (włącznie)" hint="Puste = bez końca, trzeba wyłączyć ręcznie.">
+                <input
+                  name="sale_to"
+                  type="date"
+                  defaultValue={product.sale_to ?? ""}
+                  className={inputClass}
+                />
+              </Field>
+            </div>
+
+            <Field
+              label="Napis na wstążce"
+              hint="Puste = „Promocja”. Maks. 16 znaków."
+            >
+              <input
+                name="promo_badge"
+                maxLength={16}
+                defaultValue={product.promo_badge ?? ""}
+                onChange={(e) => setBadgeDraft(e.target.value)}
+                className={inputClass}
+              />
+            </Field>
+
+            {badgeWarning && (
+              <p className="px-3 py-2 text-xs text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 rounded-lg">
+                Ten napis sugeruje obniżkę, a produkt nie ma aktywnej ceny
+                promocyjnej. Dyrektywa Omnibus wymaga wtedy pokazania najniższej
+                ceny z 30 dni przed obniżką. Ustaw cenę promocyjną albo zmień
+                napis na taki, który nie mówi o cenie — np. „Nowość”,
+                „Ostatnie sztuki”.
+              </p>
+            )}
+          </div>
 
           <Field label="Kategoria" required>
             <select name="category" defaultValue={product.category} required className={inputClass}>
@@ -770,4 +850,25 @@ export default function ProductEditor({
 
     </div>
   );
+}
+
+// Data z kolumny `date` (YYYY-MM-DD) na polski zapis dzienny.
+function dayPl(iso: string): string {
+  const [, m, d] = iso.split("-");
+  return `${d}.${m}`;
+}
+
+function describeSaleStatus(s: SaleStatus): string {
+  switch (s.kind) {
+    case "active":
+      return s.until ? `aktywna — do ${dayPl(s.until)}` : "aktywna — bez terminu końca";
+    case "scheduled":
+      return `zaplanowana — startuje ${dayPl(s.from)}`;
+    case "ended":
+      return `zakończona ${dayPl(s.on)}`;
+    case "badgeOnly":
+      return "sam napis na wstążce, bez obniżki ceny";
+    case "none":
+      return "brak promocji";
+  }
 }

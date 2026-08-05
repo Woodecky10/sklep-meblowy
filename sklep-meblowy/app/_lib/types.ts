@@ -135,6 +135,15 @@ export type Product = {
   // Omnibus (migracja 36) — poziom produktu (dla produktów bez wariantów).
   sale_price: number | null;
   omnibus_price: number | null;
+  // Harmonogram promocji (migracja 69). sale_price wyżej = cena OBOWIĄZUJĄCA
+  // TERAZ (pisze ją wyłącznie reconciler z sale-schedule.ts); poniżej jest PLAN,
+  // który reconciler wprowadza w życie. Daty to dni Europe/Warsaw, granice włącznie.
+  sale_price_planned: number | null;
+  sale_from: string | null;
+  sale_to: string | null;
+  // Ręczne nadpisanie napisu na wstążce (maks. 16 znaków). Niezależne od ceny —
+  // wstążka pokaże się także bez obniżki (panel ostrzega wtedy o Omnibusie).
+  promo_badge: string | null;
   // Widoczność w sklepie (RLS). false = ukryty. deactivation_source: kto ukrył.
   is_active: boolean;
   deactivation_source: "auto" | "manual" | null;

@@ -4,6 +4,8 @@ import {
   isOnSale,
   computeOmnibus,
   computePriceUpdates,
+  ribbonText,
+  looksLikeDiscountClaim,
 } from "@/app/_lib/pricing";
 
 describe("effectivePrice / isOnSale", () => {
@@ -103,6 +105,39 @@ describe("computePriceUpdates", () => {
     const plan = computePriceUpdates(units, history, "2026-06-10T00:00:00Z");
     expect(plan.inserts).toEqual([{ variant_key: "Kolor=Beż", effective_price: 700 }]);
     expect(plan.omnibus).toEqual([{ variant_key: "Kolor=Beż", value: 1000 }]);
+  });
+});
+
+describe("ribbonText — co napisać na wstążce", () => {
+  it("ręczny napis wygrywa nad automatem", () => {
+    expect(ribbonText({ price: 1000, sale_price: 800, promo_badge: "-20%" }, "Promocja")).toBe("-20%");
+  });
+  it("brak napisu + aktywna obniżka → tekst ze słownika", () => {
+    expect(ribbonText({ price: 1000, sale_price: 800, promo_badge: null }, "Promocja")).toBe("Promocja");
+    expect(ribbonText({ price: 1000, sale_price: 800, promo_badge: null }, "Sale")).toBe("Sale");
+  });
+  it("ręczny napis działa BEZ obniżki (świadoma decyzja — panel ostrzega o Omnibusie)", () => {
+    expect(ribbonText({ price: 1000, sale_price: null, promo_badge: "Nowość" }, "Promocja")).toBe("Nowość");
+  });
+  it("brak napisu i brak obniżki → brak wstążki", () => {
+    expect(ribbonText({ price: 1000, sale_price: null, promo_badge: null }, "Promocja")).toBeNull();
+  });
+  it("cena promocyjna równa regularnej to nie promocja", () => {
+    expect(ribbonText({ price: 1000, sale_price: 1000, promo_badge: null }, "Promocja")).toBeNull();
+  });
+});
+
+describe("looksLikeDiscountClaim — napis obiecujący obniżkę", () => {
+  it("łapie obietnice obniżki, także z polskimi znakami i w CAPS", () => {
+    for (const t of ["Promocja", "PROMOCJA", "promo", "Sale", "Wyprzedaż", "wyprzedaz",
+                     "Rabat 20", "-30%", "obniżka", "Taniej", "Okazja"]) {
+      expect(looksLikeDiscountClaim(t)).toBe(true);
+    }
+  });
+  it("przepuszcza napisy, które nie mówią o cenie", () => {
+    for (const t of ["Nowość", "Ostatnie sztuki", "Bestseller", "Hit", "Polecamy", ""]) {
+      expect(looksLikeDiscountClaim(t)).toBe(false);
+    }
   });
 });
 

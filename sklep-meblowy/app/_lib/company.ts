@@ -33,7 +33,7 @@ export const COMPANY = {
   // czy przepisuje adres ze strony. Zmieniając tu, zmień też zmienne w Vercelu.
   email: "mollien.julia@gmail.com",
   // Format: "+48 XXX XXX XXX"
-  phone: "+48 789 826 403" as string | null,
+  phone: "+48 570 818 226" as string | null,
 
   // Godziny kontaktu (wyświetlane w /kontakt)
   contactHours: "pon.–pt., 9:00–17:00",

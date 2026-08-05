@@ -86,6 +86,10 @@ const dupSource: DuplicateSource = {
   description: "<p>Opis</p>",
   price: 1299.0,
   sale_price: 999.0,
+  sale_price_planned: 899.0,
+  sale_from: "2026-08-01",
+  sale_to: "2026-08-31",
+  promo_badge: "Wyprzedaż",
   category: "lozka-tapicerowane",
   images: ["https://x/1.jpg", "https://x/2.jpg"],
   stock: 5,
@@ -152,9 +156,15 @@ describe("buildDuplicatePayload", () => {
     expect(p.translated_at).toBe(dupSource.translated_at);
   });
 
-  it("kopiuje sale_price, ale RESETUJE omnibus_price (zgodność z Omnibusem)", () => {
+  it("NIE dziedziczy promocji ani omnibusa — kopia bez historii cen nie może ogłaszać obniżki", () => {
     const p = buildDuplicatePayload(dupSource);
-    expect(p.sale_price).toBe(dupSource.sale_price);
+    // Wcześniej sale_price było kopiowane przy wyzerowanym omnibus_price →
+    // kopia pokazywała obniżkę bez wymaganej najniższej ceny z 30 dni.
+    expect(p.sale_price).toBeNull();
+    expect(p.sale_price_planned).toBeNull();
+    expect(p.sale_from).toBeNull();
+    expect(p.sale_to).toBeNull();
+    expect(p.promo_badge).toBeNull();
     expect(p.omnibus_price).toBeNull();
   });
 

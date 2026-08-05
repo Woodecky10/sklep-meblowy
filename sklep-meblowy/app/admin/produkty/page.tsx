@@ -3,6 +3,7 @@ import { requireAdmin } from "@/app/_lib/admin";
 import { createClient } from "@/app/_lib/supabase/server";
 import type { Product } from "@/app/_lib/types";
 import { hasVariants, totalProductStock } from "@/app/_lib/variants";
+import { promoChipLabel, warsawToday } from "@/app/_lib/sale-schedule";
 import ProductsList, { type AdminProductRow } from "./ProductsList";
 
 export const metadata = { title: "Produkty — Admin" };
@@ -18,6 +19,7 @@ export default async function AdminProductsPage() {
 
   // Projekcja dla client componentu — stock/warianty liczone serwerowo,
   // pełny JSON wariantów nie jedzie do przeglądarki.
+  const today = warsawToday();
   const rows: AdminProductRow[] = ((data ?? []) as Product[]).map((p) => ({
     id: p.id,
     name: p.name,
@@ -27,6 +29,18 @@ export default async function AdminProductsPage() {
     variantCount: p.variants?.options.length ?? 0,
     thumb: p.images[0] ?? null,
     isActive: p.is_active,
+    promoChip: promoChipLabel(
+      {
+        id: p.id,
+        price: Number(p.price),
+        sale_price: p.sale_price,
+        sale_price_planned: p.sale_price_planned,
+        sale_from: p.sale_from,
+        sale_to: p.sale_to,
+        promo_badge: p.promo_badge,
+      },
+      today
+    ),
   }));
 
   return (

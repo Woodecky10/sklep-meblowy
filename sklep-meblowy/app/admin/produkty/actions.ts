@@ -17,6 +17,7 @@ import {
   collectProductImageUrls,
 } from "@/app/_lib/product-images";
 import { recordPriceHistory } from "@/app/_lib/price-history";
+import { applySaleSchedule } from "@/app/_lib/sale-schedule-server";
 import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-html";
 import { buildGroupKey, pickGroupKey } from "@/app/_lib/size-groups";
 import { searchTokens, escapeIlike } from "@/app/_lib/search-filter";
@@ -146,13 +147,20 @@ export async function updateProductBasics(
   const price = parseNumber(formData.get("price"));
   if (price === null || price < 0) return { ok: false, error: "Cena musi być nieujemna" };
 
-  // Cena promocyjna (Omnibus). Puste = brak. Jeśli ustawiona, musi być < cena regularna.
-  const salePriceRaw = parseNumber(formData.get("sale_price"));
-  if (salePriceRaw !== null) {
-    if (salePriceRaw < 0) return { ok: false, error: "Cena promocyjna nie może być ujemna" };
-    if (salePriceRaw >= price)
+  // Harmonogram promocji. `sale_price` NIE jest już zapisywane z formularza —
+  // pisze je wyłącznie reconciler (applySaleSchedule) na podstawie planu poniżej.
+  const salePlanned = parseNumber(formData.get("sale_price_planned"));
+  if (salePlanned !== null) {
+    if (salePlanned < 0) return { ok: false, error: "Cena promocyjna nie może być ujemna" };
+    if (salePlanned >= price)
       return { ok: false, error: "Cena promocyjna musi być niższa od ceny regularnej" };
   }
+  const saleFrom = emptyToNull(sanitize(formData.get("sale_from"), 10));
+  const saleTo = emptyToNull(sanitize(formData.get("sale_to"), 10));
+  if (saleFrom !== null && saleTo !== null && saleTo < saleFrom)
+    return { ok: false, error: "Data końca nie może być przed datą początku" };
+  if (salePlanned === null && (saleFrom !== null || saleTo !== null))
+    return { ok: false, error: "Podaj cenę promocyjną albo wyczyść daty" };
 
   const category = sanitize(formData.get("category"), 100);
   if (!category) return { ok: false, error: "Kategoria jest wymagana" };
@@ -171,10 +179,6 @@ export async function updateProductBasics(
   // przez sekcje w DescriptionSectionsEditor, nie przez to pole.
   const supabase = await createAdminClient();
 
-  // Model tylko-opcje: cena promocyjna jest produktowa także dla produktów z
-  // opcjami (dopłaty per wartość dolicza się do niej przy wyświetlaniu/checkout).
-  const salePriceToSave = salePriceRaw;
-
   const updates: Record<string, unknown> = {
     name,
     price,
@@ -190,7 +194,10 @@ export async function updateProductBasics(
     // surowych liczb i utrzymuje pokrycie tłumaczeń DE. Wolny tekst przechodzi bez zmian.
     delivery_time: emptyToNull(normalizeDeliveryTime(sanitize(formData.get("delivery_time"), 100))),
     warranty: emptyToNull(normalizeWarranty(sanitize(formData.get("warranty"), 100))),
-    sale_price: salePriceToSave,
+    sale_price_planned: salePlanned,
+    sale_from: saleFrom,
+    sale_to: saleTo,
+    promo_badge: emptyToNull(sanitize(formData.get("promo_badge"), 16)),
     // Parametry produktu (sekcja Specyfikacja) — pełny stan wierszy z
     // formularza nadpisuje całą tablicę (spójnie z resztą pól sekcji).
     features: parseFeatureRows(formData.get("features_json")),
@@ -204,6 +211,11 @@ export async function updateProductBasics(
   if (error) return { ok: false, error: error.message };
 
   await recordPriceHistory(id);
+  // Promocja bez dat ma działać od razu, nie od najbliższego crona.
+  // recordPriceHistory zostaje WYŻEJ, bo zmiana samej ceny regularnej też musi
+  // trafić do historii; applySaleSchedule woła je ponownie tylko gdy faktycznie
+  // przełączy cenę, a computePriceUpdates pomija brak zmiany — więc jest to bezpieczne.
+  await applySaleSchedule([id]);
   revalidatePath(`/admin/produkty/${id}`);
   revalidatePath(`/produkt/${id}`);
   invalidateFacetsCache();

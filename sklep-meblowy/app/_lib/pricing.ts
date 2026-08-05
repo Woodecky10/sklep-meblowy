@@ -88,3 +88,29 @@ export function computePriceUpdates(
   }
   return { inserts, omnibus };
 }
+
+// Co napisać na wstążce (albo nic). Precedencja: ręczny napis > automat z ceny >
+// brak wstążki. Ręczny napis działa też bez obniżki — to świadoma decyzja
+// właściciela; formularz w panelu ostrzega wtedy o Omnibusie.
+export function ribbonText(
+  p: { price: number; sale_price: number | null; promo_badge: string | null },
+  fallback: string
+): string | null {
+  if (p.promo_badge) return p.promo_badge;
+  return isOnSale(p.price, p.sale_price) ? fallback : null;
+}
+
+// Czy napis obiecuje obniżkę ceny. Używane WYŁĄCZNIE do ostrzeżenia w panelu:
+// „Promocja" bez faktycznej ceny promocyjnej to komunikat o obniżce, a wtedy
+// dyrektywa Omnibus wymaga pokazania najniższej ceny z 30 dni. Heurystyka ma
+// łapać typowe napisy, nie udawać prawnika — dlatego ostrzega, a nie blokuje.
+const DISCOUNT_CLAIM = /promo|sale|rabat|%|wyprzedaz|obnizk|obniz|taniej|okazj/;
+
+export function looksLikeDiscountClaim(text: string): boolean {
+  const normalized = text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // zdejmuje kreski/ogonki: ż→z, ą→a, ó→o
+    .replace(/ł/g, "l");             // ł NIE rozkłada się przez NFD — osobno
+  return DISCOUNT_CLAIM.test(normalized);
+}

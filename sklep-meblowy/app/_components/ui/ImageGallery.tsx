@@ -6,8 +6,20 @@ import { createPortal } from "react-dom";
 import { useModal } from "@/app/_lib/useModal";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
+import PromoRibbon from "./PromoRibbon";
 
-export default function ImageGallery({ images, name }: { images: string[]; name: string }) {
+export default function ImageGallery({
+  images,
+  name,
+  ribbon = null,
+}: {
+  images: string[];
+  name: string;
+  // Napis na wstążce liczony serwerowo (ribbonText) — null = bez wstążki.
+  // Świadomie NIE trafia do lightboxa: po powiększeniu klient patrzy na mebel,
+  // a wstążka jest elementem interfejsu, nie częścią fotografii.
+  ribbon?: string | null;
+}) {
   const t = getDictionary(useClientLocale());
   const [active, setActive] = useState(0);
   const [lightbox, setLightbox] = useState(false);
@@ -178,6 +190,7 @@ export default function ImageGallery({ images, name }: { images: string[]; name:
             sizes="(max-width: 768px) 100vw, 50vw"
             className="object-cover"
           />
+          {ribbon && <PromoRibbon text={ribbon} size="hero" decorative />}
         </button>
         {list.length > 1 && (
           <div className="flex gap-3">

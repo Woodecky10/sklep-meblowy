@@ -18,6 +18,9 @@ export type AdminProductRow = {
   variantCount: number;
   thumb: string | null;
   isActive: boolean;
+  // Stan promocji: „Promocja" / „Zaplanowana" / „Wstążka" albo null.
+  // „Wstążka" wyłapuje wyciek: ręczny napis nie ma terminu i sam nie zgaśnie.
+  promoChip: string | null;
 };
 
 function productsWord(n: number): string {
@@ -105,6 +108,11 @@ export default function ProductsList({ products }: { products: AdminProductRow[]
                   {p.category} · {p.price.toFixed(2)} zł · stock: {p.stock}
                   {p.variantCount > 0 &&
                     ` · ${p.variantCount} wariant${p.variantCount === 1 ? "" : p.variantCount < 5 ? "y" : "ów"}`}
+                  {p.promoChip && (
+                    <span className="ml-2 align-middle px-2 py-0.5 text-[10px] font-sans uppercase tracking-widest rounded bg-[var(--color-gold)]/20 text-[var(--color-gold-text)]">
+                      {p.promoChip}
+                    </span>
+                  )}
                 </p>
               </div>
 

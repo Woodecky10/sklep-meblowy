@@ -107,6 +107,10 @@ export type DuplicateSource = {
   description: string;
   price: number;
   sale_price: number | null;
+  sale_price_planned: number | null;
+  sale_from: string | null;
+  sale_to: string | null;
+  promo_badge: string | null;
   category: string;
   images: string[];
   stock: number;
@@ -138,13 +142,19 @@ export type DuplicateSource = {
 // Payload INSERTa duplikatu. Bez id/created_at — zostają defaulty DB.
 export type DuplicateProductPayload = Omit<
   DuplicateSource,
-  "size_group" | "size_label" | "omnibus_price"
+  "size_group" | "size_label" | "omnibus_price" | "sale_price" | "sale_price_planned" | "sale_from" | "sale_to" | "promo_badge"
 > & {
   is_active: boolean;
   deactivation_source: "manual";
   size_group: null;
   size_label: null;
   omnibus_price: null;
+  // Kopia startuje BEZ promocji — patrz komentarz nad buildDuplicatePayload.
+  sale_price: null;
+  sale_price_planned: null;
+  sale_from: null;
+  sale_to: null;
+  promo_badge: null;
 };
 
 // Buduje payload duplikatu wg reguł ze spec-a:
@@ -152,8 +162,10 @@ export type DuplicateProductPayload = Omit<
 // - zdjęcia współdzielone (te same URL-e — patrz imageUrlsToDelete przy usuwaniu),
 // - ukryty szkic (is_active=false, deactivation_source='manual'),
 // - size_group/size_label wyzerowane (grupę ustawia linkowanie, rozmiar to nowy),
-// - omnibus_price wyzerowane (nowa oferta nie dziedziczy „najniższej z 30 dni" —
-//   zgodność z Omnibusem; historię cen zaczynamy od zera po insercie).
+// - promocja NIE jest dziedziczona (sale_price, plan, okno i napis wstążki na
+//   null) razem z omnibus_price: świeża oferta nie ma ceny sprzed 30 dni, więc
+//   nie ma czego ogłaszać. Wcześniej kopia dostawała sale_price przy wyzerowanym
+//   omnibus_price — obniżka bez wymaganej informacji o najniższej cenie.
 export function buildDuplicatePayload(
   source: DuplicateSource
 ): DuplicateProductPayload {
@@ -161,7 +173,11 @@ export function buildDuplicatePayload(
     name: `${source.name} (kopia)`,
     description: source.description,
     price: source.price,
-    sale_price: source.sale_price,
+    sale_price: null,
+    sale_price_planned: null,
+    sale_from: null,
+    sale_to: null,
+    promo_badge: null,
     category: source.category,
     images: [...source.images],
     stock: source.stock,
