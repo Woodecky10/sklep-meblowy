@@ -1341,8 +1341,11 @@ Poza funkcją: `b1e6630` podmienia numer telefonu firmy (prośba właściciela w
   nim przed tą datą musi pokazać 289 zł.
 - Limit 16 znaków na `promo_badge` jest tylko w aplikacji, bez `CHECK` w bazie. Dziś panel
   jest jedynym pisarzem, więc zostawione świadomie.
-- Martwy scaffold `Desktop/python/sklep-meblowy/` do usunięcia **osobnym PR-em** (decyzja
-  właściciela).
+- ~~Martwy scaffold `Desktop/python/sklep-meblowy/` do usunięcia osobnym PR-em~~ —
+  **usunięty** (PR #126). Był to nietknięty szablon `create-next-app` z pierwszego
+  commita `7908a01`: 19 plików, jeden commit w całej historii, zero odwołań z aplikacji.
+  Od teraz `grep -r` po repo nie trafia już w drugą, martwą kopię — nie trzeba ostrzegać
+  agentów, żeby ją ignorowali.
 - Do zrzutów i e2e w tym repo używać `npm run build` + `npm start`, nie `next dev`: dev
   umierał po każdym pojedynczym teście Playwrighta (port słuchał, nawigacja `ERR_ABORTED`),
   6 min na test; build produkcyjny — 17 s na te same trzy testy.
