@@ -3,9 +3,9 @@ import { isValidCodPhone } from "@/app/_lib/cod";
 
 describe("isValidCodPhone — telefon wymagany przy pobraniu", () => {
   it("akceptuje polski numer ze spacjami i prefiksem", () => {
-    expect(isValidCodPhone("+48 789 826 403")).toBe(true);
-    expect(isValidCodPhone("789826403")).toBe(true);
-    expect(isValidCodPhone("789-826-403")).toBe(true);
+    expect(isValidCodPhone("+48 570 818 226")).toBe(true);
+    expect(isValidCodPhone("570818226")).toBe(true);
+    expect(isValidCodPhone("570-818-226")).toBe(true);
   });
   it("akceptuje niemiecki numer (dłuższy format)", () => {
     expect(isValidCodPhone("+49 30 123456789")).toBe(true);
