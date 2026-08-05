@@ -152,9 +152,15 @@ describe("buildDuplicatePayload", () => {
     expect(p.translated_at).toBe(dupSource.translated_at);
   });
 
-  it("kopiuje sale_price, ale RESETUJE omnibus_price (zgodność z Omnibusem)", () => {
+  it("NIE dziedziczy promocji ani omnibusa — kopia bez historii cen nie może ogłaszać obniżki", () => {
     const p = buildDuplicatePayload(dupSource);
-    expect(p.sale_price).toBe(dupSource.sale_price);
+    // Wcześniej sale_price było kopiowane przy wyzerowanym omnibus_price →
+    // kopia pokazywała obniżkę bez wymaganej najniższej ceny z 30 dni.
+    expect(p.sale_price).toBeNull();
+    expect(p.sale_price_planned).toBeNull();
+    expect(p.sale_from).toBeNull();
+    expect(p.sale_to).toBeNull();
+    expect(p.promo_badge).toBeNull();
     expect(p.omnibus_price).toBeNull();
   });
 
