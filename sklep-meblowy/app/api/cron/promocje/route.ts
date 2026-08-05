@@ -6,15 +6,15 @@
 // Na planie Pro wystarczy zmienić harmonogram na */15 * * * * — funkcja jest
 // idempotentna, więc częstsze odpalanie nic nie kosztuje.
 import { applySaleSchedule } from "@/app/_lib/sale-schedule-server";
-
-export const dynamic = "force-dynamic";
+import { safeCompareSecret } from "@/app/_lib/secure-compare";
 
 export async function GET(request: Request): Promise<Response> {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
     return Response.json({ error: "CRON_SECRET nie ustawiony" }, { status: 500 });
   }
-  if (request.headers.get("authorization") !== `Bearer ${secret}`) {
+  const authHeader = request.headers.get("authorization");
+  if (!safeCompareSecret(authHeader, `Bearer ${secret}`)) {
     return Response.json({ error: "Brak autoryzacji" }, { status: 401 });
   }
 
@@ -23,6 +23,7 @@ export async function GET(request: Request): Promise<Response> {
     return Response.json({ switched });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Nieznany błąd";
+    console.error("Cron promocji — błąd applySaleSchedule:", e);
     return Response.json({ error: message }, { status: 500 });
   }
 }
