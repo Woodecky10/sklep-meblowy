@@ -86,6 +86,14 @@ describe("saleStatus", () => {
     expect(saleStatus(row({ sale_price_planned: 800, sale_to: "2026-08-04" }), "2026-08-05"))
       .toEqual({ kind: "ended", on: "2026-08-04" });
   });
+  it("okno JUŻ otwarte, ale cena nieprzełączona → zaplanowana (sygnał, że cron nie wstał)", () => {
+    expect(saleStatus(row({ sale_price_planned: 800, sale_from: "2026-08-01", sale_to: "2026-08-31" }), "2026-08-05"))
+      .toEqual({ kind: "scheduled", from: "2026-08-01" });
+  });
+  it("promocja natychmiastowa jeszcze nieprzełączona → zaplanowana od dziś", () => {
+    expect(saleStatus(row({ sale_price_planned: 800 }), "2026-08-05"))
+      .toEqual({ kind: "scheduled", from: "2026-08-05" });
+  });
   it("sam napis bez ceny", () => {
     expect(saleStatus(row({ promo_badge: "Nowość" }), "2026-08-05")).toEqual({ kind: "badgeOnly" });
   });
@@ -114,6 +122,9 @@ describe("promoChipLabel", () => {
   });
   it("czysty produkt → brak chipa", () => {
     expect(promoChipLabel(row(), "2026-08-05")).toBeNull();
+  });
+  it("sam napis bez ceny i bez okna → Wstążka", () => {
+    expect(promoChipLabel(row({ promo_badge: "Nowość" }), "2026-08-05")).toBe("Wstążka");
   });
 });
 
