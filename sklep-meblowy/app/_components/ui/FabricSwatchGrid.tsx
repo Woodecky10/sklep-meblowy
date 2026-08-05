@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { swatchImages } from "@/app/_lib/fabric-swatch-images";
@@ -34,8 +35,16 @@ export default function FabricSwatchGrid({
           const tile = (
             <span className="relative block w-full aspect-square rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--bg)]">
               {img ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={img} alt={`${name} ${code}`} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                // Siatka: 3 kolumny do 640px, 4 do 768px, dalej 6 w kontenerze
+                // max-w-7xl → ok. 200px. Bez `sizes` next/image przyjąłby 100vw
+                // i ściągał pełnowymiarowe zdjęcie do próbki wielkości kciuka.
+                <Image
+                  src={img}
+                  alt={`${name} ${code}`}
+                  fill
+                  sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, 200px"
+                  className="object-cover"
+                />
               ) : (
                 <span className="absolute inset-0 flex items-center justify-center text-sm text-[var(--muted)]">
                   {code}

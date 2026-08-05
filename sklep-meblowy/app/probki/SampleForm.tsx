@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { submitSampleOrder } from "./actions";
 import {
@@ -308,12 +309,13 @@ export default function SampleForm({
                                 poza kafelek (patrz PR #79). */}
                             <span className="relative block w-full aspect-square rounded-lg overflow-hidden border border-[var(--border)] bg-[var(--bg)]">
                               {img ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
+                                // Siatka: 3 kolumny do 640px, 5 do 768px, dalej 8.
+                                <Image
                                   src={img}
                                   alt=""
-                                  loading="lazy"
-                                  className="absolute inset-0 w-full h-full object-cover"
+                                  fill
+                                  sizes="(max-width: 640px) 33vw, (max-width: 768px) 20vw, 120px"
+                                  className="object-cover"
                                 />
                               ) : (
                                 <span className="absolute inset-0 flex items-center justify-center text-sm text-[var(--muted)]">

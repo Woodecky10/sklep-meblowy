@@ -1,3 +1,4 @@
+import Image from "next/image";
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 
 // Sekcja „Meble w tej tkaninie" na stronie tkaniny: siatka kafelków wybranych
@@ -18,12 +19,13 @@ export default function FabricFeaturedProducts({
         >
           <span className="relative block aspect-[4/3] rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--bg)]">
             {p.image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              // Siatka: 2 kolumny do 768px, dalej 3 w kontenerze max-w-7xl.
+              <Image
                 src={p.image}
                 alt=""
-                loading="lazy"
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                fill
+                sizes="(max-width: 768px) 50vw, 400px"
+                className="object-cover transition-transform duration-300 group-hover:scale-105"
               />
             ) : (
               <span className="absolute inset-0 flex items-center justify-center text-xs text-[var(--muted)]">

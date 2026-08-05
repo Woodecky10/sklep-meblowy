@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { LocalizedGalleryContent } from "@/app/_lib/blocks";
 
 export default function GalleryBlock({ content }: { content: LocalizedGalleryContent }) {
@@ -9,10 +10,9 @@ export default function GalleryBlock({ content }: { content: LocalizedGalleryCon
   // przycinane. Liczba kolumn dopasowana do liczby zdjęć — jedno zdjęcie
   // wypełnia szerokość (nie wisi w wąskiej kolumnie po lewej), dwa dają dwie
   // kolumny, trzy i więcej pełną siatkę. `columns` (z formularza) nadpisuje
-  // ten auto-wybór, poza przypadkiem jednego zdjęcia. Zwykły <img> zamiast
-  // next/image, bo przy images.unoptimized=true (next.config) next/image nic
-  // nie optymalizuje, a wymagałby width/height/fill — co blokuje naturalne
-  // proporcje.
+  // ten auto-wybór, poza przypadkiem jednego zdjęcia. Naturalne proporcje
+  // zachowuje `h-auto` — width/height poniżej to tylko zaczep proporcji dla
+  // next/image (wymiary zdjęć z panelu nie są znane).
   const containerCls = single
     ? "max-w-4xl mx-auto"
     : columns === "2"
@@ -36,12 +36,16 @@ export default function GalleryBlock({ content }: { content: LocalizedGalleryCon
           <figure key={`${img.url}-${i}`} className={single ? "" : "mb-4 break-inside-avoid"}>
             {/* Podpis (jeśli jest) renderuje się jako widoczny figcaption, więc
                 alt="" żeby czytnik ekranu nie czytał tego samego dwa razy. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src={img.url}
               alt=""
-              loading="lazy"
-              decoding="async"
+              width={1200}
+              height={900}
+              sizes={
+                single
+                  ? "(max-width: 896px) 100vw, 896px"
+                  : "(max-width: 640px) 100vw, (max-width: 768px) 50vw, 400px"
+              }
               className="w-full h-auto rounded-2xl"
             />
             {img.alt && (

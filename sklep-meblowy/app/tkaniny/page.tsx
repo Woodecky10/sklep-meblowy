@@ -8,6 +8,7 @@ import { getEurRate } from "@/app/_lib/store-settings";
 import { formatMoney } from "@/app/_lib/money";
 import { colorsLabel } from "@/app/_lib/fabric-labels";
 import Link from "next/link";
+import Image from "next/image";
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import type { Fabric } from "@/app/_lib/types";
 
@@ -91,8 +92,14 @@ export default async function TkaninyPage() {
                 >
                   <span className="relative block aspect-square rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--bg)]">
                     {thumb ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={thumb} alt={pickLocalized(f.name, f.name_de, locale)} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                      // Siatka: 2 kolumny do 640px, 3 do 1024px, dalej 5.
+                      <Image
+                        src={thumb}
+                        alt={pickLocalized(f.name, f.name_de, locale)}
+                        fill
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 240px"
+                        className="object-cover"
+                      />
                     ) : (
                       <span className="absolute inset-0 flex items-center justify-center text-xs text-[var(--muted)]">
                         {f.name.slice(0, 2).toUpperCase()}

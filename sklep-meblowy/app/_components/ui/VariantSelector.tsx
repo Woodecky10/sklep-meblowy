@@ -301,8 +301,8 @@ function FabricSwatchGroup({
           }`}
         >
           {img ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={img} alt={label} loading="lazy" className="w-full h-full object-cover" />
+            // Kółko próbki ma stałe 64px (w-16 h-16), więc `sizes` jest stały.
+            <Image src={img} alt={label} fill sizes="64px" className="object-cover" />
           ) : (
             <span className="w-full h-full flex items-center justify-center bg-[var(--bg)] text-[10px] text-[var(--muted)]">
               {v.split(" ").pop()}
@@ -530,8 +530,8 @@ function ValueImageSwatchGroup({
               }`}
             >
               {img ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={img} alt={label} loading="lazy" className="w-full h-full object-cover" />
+                // Kółko próbki ma stałe 64px (w-16 h-16), więc `sizes` jest stały.
+                <Image src={img} alt={label} fill sizes="64px" className="object-cover" />
               ) : (
                 <span className="w-full h-full flex items-center justify-center bg-[var(--bg)] text-[10px] text-[var(--muted)]">
                   {v.split(" ").pop()}

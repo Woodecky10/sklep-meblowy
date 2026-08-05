@@ -205,7 +205,7 @@ export default function ImageGallery({
                   i === active ? "border-[var(--color-gold)]" : "border-transparent hover:border-[var(--color-gold)]/50"
                 }`}
               >
-                <Image src={src} alt={`${name} ${i + 1}`} fill className="object-cover" />
+                <Image src={src} alt={`${name} ${i + 1}`} fill sizes="80px" className="object-cover" />
               </button>
             ))}
           </div>

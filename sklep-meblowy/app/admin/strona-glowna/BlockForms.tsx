@@ -142,7 +142,7 @@ export function BannerForm({ block, onResult }: BlockFormProps) {
         >
           {imageUrl && (
             <div className="relative w-40 aspect-[4/3] rounded-lg overflow-hidden">
-              <Image src={imageUrl} alt="" fill className="object-cover" />
+              <Image src={imageUrl} alt="" fill sizes="160px" className="object-cover" />
             </div>
           )}
           <div className="flex items-center gap-3 flex-wrap text-xs">
@@ -321,7 +321,7 @@ export function GalleryForm({ block, onResult }: BlockFormProps) {
                   </button>
                 </div>
                 <div className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0">
-                  <Image src={img.url} alt="" fill className="object-cover" />
+                  <Image src={img.url} alt="" fill sizes="64px" className="object-cover" />
                 </div>
                 <input
                   value={img.alt}

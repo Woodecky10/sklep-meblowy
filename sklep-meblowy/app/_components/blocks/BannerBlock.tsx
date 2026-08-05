@@ -51,7 +51,13 @@ export default function BannerBlock({ content }: { content: LocalizedBannerConte
       <section className="max-w-7xl mx-auto px-6 py-24">
         <div className="relative rounded-2xl overflow-hidden min-h-[380px] flex items-center justify-center px-6 py-16 bg-[var(--color-navy)]">
           {image_url && (
-            <Image src={image_url} alt={heading ?? ""} fill className="object-cover" />
+            <Image
+              src={image_url}
+              alt={heading ?? ""}
+              fill
+              sizes="(max-width: 1280px) 100vw, 1280px"
+              className="object-cover"
+            />
           )}
           <div className="absolute inset-0 bg-black/50" aria-hidden="true" />
           <div className="relative">{text}</div>
@@ -66,8 +72,22 @@ export default function BannerBlock({ content }: { content: LocalizedBannerConte
       <section className="max-w-7xl mx-auto px-6 py-24">
         {image_url && (
           <div className={`${imgWrap} rounded-2xl overflow-hidden mb-10`}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={image_url} alt={heading ?? ""} loading="lazy" decoding="async" className="w-full h-auto" />
+            {/* Naturalne proporcje — baner nie jest przycinany. Wymiary zdjęcia
+                z panelu nie są znane, więc width/height to tylko zaczep na
+                proporcje (wzorzec „Responsive images with a remote URL" z
+                dokumentacji next/image); `h-auto` i tak oddaje realny kształt. */}
+            <Image
+              src={image_url}
+              alt={heading ?? ""}
+              width={1280}
+              height={720}
+              sizes={
+                layout === "full"
+                  ? "(max-width: 1280px) 100vw, 1280px"
+                  : "(max-width: 768px) 100vw, 768px"
+              }
+              className="w-full h-auto"
+            />
           </div>
         )}
         <div className="max-w-3xl mx-auto text-center">{text}</div>
@@ -85,14 +105,14 @@ export default function BannerBlock({ content }: { content: LocalizedBannerConte
             }`}
           >
             {/* Naturalne proporcje — zdjęcie w banerze nie jest przycinane (jak
-                w galerii). Zwykły <img> bo images.unoptimized=true; patrz
-                GalleryBlock. Wysokość dopasowuje się do zdjęcia. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+                w galerii). Wysokość dopasowuje się do zdjęcia; width/height to
+                tylko zaczep na proporcje, bo wymiary z panelu nie są znane. */}
+            <Image
               src={image_url}
               alt={heading ?? ""}
-              loading="lazy"
-              decoding="async"
+              width={1280}
+              height={720}
+              sizes="(max-width: 768px) 100vw, 584px"
               className="w-full h-auto"
             />
           </div>
