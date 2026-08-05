@@ -1259,11 +1259,11 @@ git commit -m "test(promocje): e2e wstazki na karcie produktu i brak wstazki w l
 
 Te kroki nie są taskami dla subagenta; robi je człowiek albo agent z dostępem do paneli:
 
-- [ ] **`CRON_SECRET` w Vercelu** — dodać zmienną (dowolny długi losowy string) i zrobić **Redeploy**; samo dodanie nie wystarcza.
-- [ ] **Sprawdzić cron ręcznie** po deployu: `curl -sL -H "Authorization: Bearer <CRON_SECRET>" https://mollien.pl/api/cron/promocje` — oczekiwane `{"switched":[]}` przy braku przejść. Nie odpalać w pętli: ciasne pętle curl na `mollien.pl` wywołują 403 per-IP na kilka minut.
-- [ ] **Potwierdzić migrację 69 na produkcji** (`list_tables`), jeśli Task 1 był wykonywany na innej bazie.
+- [x] **`CRON_SECRET` w Vercelu** — **już był ustawiony**, nic nie trzeba dodawać ani robić Redeploy. Potwierdzone po deployu 2026-08-05: endpoint bez nagłówka zwraca 401, a nie 500 (500 leci wyłącznie przy pustym `process.env.CRON_SECRET`). Zmienna najpewniej została po starym cronie `reconcile-bl`.
+- [x] **Sprawdzić cron po deployu** — zrobione jednym zapytaniem: `curl -sL https://mollien.pl/api/cron/promocje` → **401** `{"error":"Brak autoryzacji"}`, czyli route żyje i autoryzacja działa. Pełnego przebiegu `{"switched":[]}` nie da się stąd potwierdzić bez znajomości wartości sekretu — lokalnie, na buildzie produkcyjnym, sprawdzone wszystkie trzy ścieżki (brak zmiennej → 500, zły nagłówek → 401, dobry → `{"switched":[]}`). Nie odpalać w pętli: ciasne pętle curl na `mollien.pl` wywołują 403 per-IP na kilka minut.
+- [x] **Potwierdzić migrację 69 na produkcji** — zaaplikowana ręcznie i potwierdzona przez `list_tables` (wersja `20260805081016`).
 - [x] **Sesja admina do e2e** — sprawdzone 2026-08-05: `.env.e2e` JEST wypełniony, a sesja w `e2e/.auth/admin.json` odświeżona 2026-08-04, więc panel da się testować. (Wcześniejsza treść tego punktu była nieaktualna.)
-- [ ] Wpisy `crons` z `vercel.json` aktywują się dopiero na deploymencie produkcyjnym.
+- [x] Wpisy `crons` z `vercel.json` aktywują się dopiero na deploymencie produkcyjnym — gałąź zmergowana (PR #124, `73e8a5c`), więc harmonogram jest już aktywny. Pierwsze odpalenie: 23:05 UTC, czyli 01:05 czasu lokalnego.
 
 ---
 
@@ -1327,8 +1327,14 @@ Poza funkcją: `b1e6630` podmienia numer telefonu firmy (prośba właściciela w
 
 ### Follow-upy
 
-- **`CRON_SECRET` w Vercelu + Redeploy** — bez tego endpoint zwraca 500 i okna nie
-  przełączają się same. To jedyna rzecz blokująca działanie funkcji po merge'u.
+- ~~**`CRON_SECRET` w Vercelu + Redeploy**~~ — **nic do zrobienia, sprawdzone po deployu
+  2026-08-05:** zmienna jest już ustawiona w środowisku produkcyjnym. Dowód:
+  `curl -sL https://mollien.pl/api/cron/promocje` (bez nagłówka) zwraca **401**
+  `{"error":"Brak autoryzacji"}`, a nie 500 — a route zwraca 500 wyłącznie wtedy, gdy
+  `process.env.CRON_SECRET` jest puste. Zmienna została najpewniej po którymś ze starych
+  cronów (`reconcile-bl` używał tej samej nazwy). Vercel Cron wysyła
+  `Authorization: Bearer $CRON_SECRET` z tej samej zmiennej, więc wartość zgadza się
+  z konstrukcji i nie trzeba jej nigdzie przepisywać.
 - Promocja kontrolna 339 → 289 zł była włączona na produkcji ok. 37 minut i została
   wyczyszczona. **Skutek trwały:** 289 zł zostaje najniższą ceną z 30 dni dla materaca
   `d1dc85bb-d019-4a8d-b890-40f04e311886` do ~2026-09-04, więc każda prawdziwa obniżka na
