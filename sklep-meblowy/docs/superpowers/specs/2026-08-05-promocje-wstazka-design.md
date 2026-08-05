@@ -150,14 +150,24 @@ sprawia, że częste odpalanie nic nie kosztuje.
 `app/api/cron/promocje/route.ts`: `GET`, sprawdza `Authorization: Bearer
 ${CRON_SECRET}` (Vercel wstrzykuje nagłówek sam, gdy zmienna istnieje), woła
 `applySaleSchedule()`, zwraca JSON z listą przełączonych produktów do logu,
-`export const dynamic = "force-dynamic"`. Bez poprawnego sekretu → 401.
+Bez poprawnego sekretu → 401, bez `CRON_SECRET` w środowisku → 500.
+
+Sekret porównujemy **stałoczasowo** (`safeCompareSecret`, `crypto.timingSafeEqual`) —
+to nie nadmiarowa ostrożność, tylko rozstrzygnięcie, które ten projekt już podjął
+w audycie 2026-06-11 (commit `29edffd`) właśnie dla sekretów crona; helper wrócił
+z historii, bo po usunięciu BaseLinkera stracił wywołania.
+
+Żadnego `export const dynamic` **nie** ustawiamy: w tej wersji Next handlery GET
+nie są cache'owane domyślnie, a ten handler nie woła `fetch()` — `force-dynamic`
+byłby martwą konfiguracją.
 
 ### Awarie i wyjścia awaryjne
 
 | Co się psuje | Skutek | Wyjście |
 |---|---|---|
 | Cron nie odpalił | Promocja nie startuje; front pokazuje cenę regularną, panel mówi „zaplanowana" | Wejść w produkt i zapisać — reconciler jedzie po każdym zapisie |
-| `apply_price_changes` padnie | Jedna transakcja (migr. 39), więc brak stanu połowicznego | Wiersz zostaje „zaplanowany", kolejny przebieg powtarza |
+| `apply_price_changes` padnie | Sam RPC jest atomowy (migr. 39), ale zapis `sale_price` idzie **osobną** transakcją przed nim — dlatego reconciler w bloku `catch` **cofa** `sale_price` do poprzedniej wartości | Po cofnięciu wiersz nadal różni się od stanu pożądanego, więc kolejny przebieg go powtarza. Błąd nazywa produkt i mówi, czy cofnięcie się udało |
+| Cofnięcie `sale_price` też padnie | Produkt zostaje z ceną promocyjną bez wiersza historii i bez `omnibus_price` — obniżka bez ceny referencyjnej wymaganej przez Omnibus | Jedyny stan wymagający ręcznej interwencji: komunikat błędu mówi to wprost i podaje id produktu. Naprawa = wejść w produkt i zapisać |
 | Cena regularna zjechała poniżej promocyjnej | Reconciler wylicza „brak promocji" i gasi ją | Samo się leczy, linijka stanu wyjaśnia dlaczego |
 | Koniec okna | `sale_price` → null, wiersz historii z ceną regularną, `omnibus_price` → null | Robi to istniejący `computePriceUpdates` |
 
