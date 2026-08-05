@@ -238,6 +238,14 @@ describe("saleStatus", () => {
     expect(saleStatus(row({ sale_price_planned: 800, sale_to: "2026-08-04" }), "2026-08-05"))
       .toEqual({ kind: "ended", on: "2026-08-04" });
   });
+  it("okno JUŻ otwarte, ale cena nieprzełączona → zaplanowana (sygnał, że cron nie wstał)", () => {
+    expect(saleStatus(row({ sale_price_planned: 800, sale_from: "2026-08-01", sale_to: "2026-08-31" }), "2026-08-05"))
+      .toEqual({ kind: "scheduled", from: "2026-08-01" });
+  });
+  it("promocja natychmiastowa jeszcze nieprzełączona → zaplanowana od dziś", () => {
+    expect(saleStatus(row({ sale_price_planned: 800 }), "2026-08-05"))
+      .toEqual({ kind: "scheduled", from: "2026-08-05" });
+  });
   it("sam napis bez ceny", () => {
     expect(saleStatus(row({ promo_badge: "Nowość" }), "2026-08-05")).toEqual({ kind: "badgeOnly" });
   });
@@ -356,12 +364,15 @@ export function saleStatus(row: SaleScheduleRow, today: string): SaleStatus {
     return { kind: "active", until: row.sale_to };
   }
   if (row.sale_price_planned !== null && isOnSale(row.price, row.sale_price_planned)) {
-    if (row.sale_from !== null && today < row.sale_from) {
-      return { kind: "scheduled", from: row.sale_from };
-    }
     if (row.sale_to !== null && today > row.sale_to) {
       return { kind: "ended", on: row.sale_to };
     }
+    // Plan jest aktualny, a cena jeszcze nie przełączona: albo okno się nie
+    // otworzyło, albo otworzyło się i reconciler jeszcze nie przejechał (cron
+    // chodzi raz na dobę). Dla człowieka oba przypadki to „zaplanowana" — i to
+    // jest JEDYNY sygnał w panelu, że cron nie wstał, więc absolutnie nie może
+    // wpadać w „brak promocji" (spec, tabela awarii: „panel mówi zaplanowana").
+    return { kind: "scheduled", from: row.sale_from ?? today };
   }
   if (row.promo_badge) return { kind: "badgeOnly" };
   return { kind: "none" };
