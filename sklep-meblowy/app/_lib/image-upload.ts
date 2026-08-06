@@ -15,22 +15,31 @@ const MIME_TO_EXT: Record<string, string> = {
 
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
+// Węższa allowlista dla kafelka udostępnień (og:image). Satori — renderer
+// next/og — rasteryzuje wyłącznie JPEG i PNG; na WebP i AVIF wywala się
+// błędem "u2 is not iterable", co zgasiłoby og:image na WSZYSTKICH stronach.
+// Panel konwertuje wgrany plik do JPEG jeszcze w przeglądarce, więc ta stała
+// jest drugą bramką — na wypadek wysyłki z pominięciem UI.
+export const OG_IMAGE_MIME = ["image/jpeg", "image/png"] as const;
+
 export type ImageValidation =
   | { ok: true; file: File; ext: string; contentType: string }
   | { ok: false; error: string };
 
 export function validateImageUpload(
   file: unknown,
-  maxBytes: number = MAX_IMAGE_BYTES
+  maxBytes: number = MAX_IMAGE_BYTES,
+  allowedMime: readonly string[] = Object.keys(MIME_TO_EXT)
 ): ImageValidation {
   if (!(file instanceof File) || file.size === 0) {
     return { ok: false, error: "Brak pliku" };
   }
-  const ext = MIME_TO_EXT[file.type];
+  const ext = allowedMime.includes(file.type) ? MIME_TO_EXT[file.type] : undefined;
   if (!ext) {
+    const nazwy = allowedMime.map((m) => MIME_TO_EXT[m]?.toUpperCase() ?? m).join(", ");
     return {
       ok: false,
-      error: "Dozwolone formaty: JPG, PNG, WebP, AVIF (SVG i inne niedozwolone)",
+      error: `Dozwolone formaty: ${nazwy} (SVG i inne niedozwolone)`,
     };
   }
   if (file.size > maxBytes) {
