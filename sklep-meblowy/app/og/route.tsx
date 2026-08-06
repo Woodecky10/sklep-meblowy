@@ -1,9 +1,17 @@
 import { ImageResponse } from "next/og";
 import { COMPANY } from "@/app/_lib/company";
-import { ogBrandPalette } from "@/app/_lib/seo-og";
+import { OG_BRAND_TAGLINE, ogBrandPalette } from "@/app/_lib/seo-og";
 import { getThemeSettings } from "@/app/_lib/theme-settings";
+import { getOgImageUrl } from "@/app/_lib/og-image-settings";
+import { getActiveSlides } from "@/app/_lib/slides";
+import { loadOgPhotoDataUri, ogPhotoCandidates } from "@/app/_lib/og-image";
 
 // Brandowy obrazek udostępnień (og:image) — PNG 1200×630.
+//
+// TREŚĆ: zdjęcie mebla na całą powierzchnię, BEZ napisów. Facebook renderuje
+// pod obrazkiem własny pasek z domeną i tytułem strony, więc tekst na grafice
+// byłby drugim nagłówkiem w tym samym kafelku. Napisy zostają wyłącznie na
+// karcie awaryjnej, gdy nie ma żadnego zdjęcia.
 //
 // DLACZEGO ROUTE HANDLER, A NIE app/opengraph-image.tsx:
 // konwencja plikowa Next dokłada obrazek TYLKO wtedy, gdy dany segment nie
@@ -17,16 +25,63 @@ import { getThemeSettings } from "@/app/_lib/theme-settings";
 // renderują SVG, więc każdy udostępniony link szedł bez obrazka.
 
 // `revalidate` włącza prerender (bez tego route liczyłby PNG przy każdym
-// żądaniu). Kolory czytamy przez getThemeSettings, którego wpis w cache ma tag
-// "theme" unieważniany przez /admin/wyglad — dzięki temu obrazek przerysowuje
-// się po zmianie palety, bez czekania na deploy. NIE używamy tu
-// `force-static`: zamroziłoby paletę na wersję z buildu.
+// żądaniu). Dane czytamy przez unstable_cache z tagami ("theme", "og-image",
+// "home-slides"), unieważnianymi w panelu — dzięki temu obrazek przerysowuje
+// się po zmianie, bez czekania na deploy. NIE używamy `force-static`:
+// zamroziłoby zdjęcie i paletę na wersję z buildu.
+//
+// UWAGA: 3600 to GÓRNA granica, nie faktyczny odstęp. Next bierze minimum
+// z route'a i cache'ów w środku, a getActiveSlides ma revalidate 60 — dlatego
+// `next build` raportuje dla /og "1m". Nawet gdyby propagacja tagów zawiodła,
+// obrazek dogoni zmianę w minutę.
 export const revalidate = 3600;
 
+const OG_WIDTH = 1200;
+const OG_HEIGHT = 630;
+
 export async function GET() {
-  // Satori nie zna zmiennych CSS — potrzebuje literałów, więc rozwiązujemy
-  // tokeny motywu do konkretnych hexów.
-  const { background, accent, text } = ogBrandPalette(await getThemeSettings());
+  const [theme, configuredUrl, slides] = await Promise.all([
+    getThemeSettings(),
+    getOgImageUrl(),
+    // Slajdy to tylko siatka bezpieczeństwa — ich brak nie może wywrócić route'a.
+    getActiveSlides().catch(() => []),
+  ]);
+
+  const photo = await loadOgPhotoDataUri(
+    ogPhotoCandidates(
+      configuredUrl,
+      slides.map((s) => s.imageUrl)
+    )
+  );
+
+  if (photo) {
+    return new ImageResponse(
+      (
+        <div style={{ display: "flex", width: "100%", height: "100%" }}>
+          {/* Zdjęcie wypełnia cały kadr; `cover` przycina nadmiar zamiast
+              dokładać pasy — kafelek ma być pełen obrazu, nie letterboxem.
+              To JSX Satoriego rysowany do PNG, a NIE DOM: next/image nie ma tu
+              zastosowania, a tekst alternatywny podglądu niesie `alt`
+              z OG_BRAND_IMAGE (seo-og.ts), nie ten element. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            alt=""
+            src={photo}
+            width={OG_WIDTH}
+            height={OG_HEIGHT}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        </div>
+      ),
+      { width: OG_WIDTH, height: OG_HEIGHT }
+    );
+  }
+
+  // ŚCIEŻKA AWARYJNA: brak zdjęcia w panelu, brak slajdów, albo żaden plik nie
+  // nadawał się do narysowania. Lepiej karta z nazwą marki niż udostępnienie
+  // bez obrazka. Satori nie zna zmiennych CSS — potrzebuje literałów, więc
+  // tokeny motywu rozwiązujemy do konkretnych hexów.
+  const { background, accent, text } = ogBrandPalette(theme);
 
   return new ImageResponse(
     (
@@ -69,7 +124,7 @@ export async function GET() {
               letterSpacing: "0.02em",
             }}
           >
-            Meble tapicerowane na wymiar
+            {OG_BRAND_TAGLINE}
           </div>
           <div
             style={{
@@ -85,6 +140,6 @@ export async function GET() {
         </div>
       </div>
     ),
-    { width: 1200, height: 630 }
+    { width: OG_WIDTH, height: OG_HEIGHT }
   );
 }

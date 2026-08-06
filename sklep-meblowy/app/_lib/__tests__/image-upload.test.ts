@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateImageUpload } from "@/app/_lib/image-upload";
+import { MAX_IMAGE_BYTES, OG_IMAGE_MIME, validateImageUpload } from "@/app/_lib/image-upload";
 
 function makeFile(type: string, size = 1000, name = "x") {
   return new File([new Uint8Array(size)], name, { type });
@@ -46,5 +46,33 @@ describe("validateImageUpload — allowlist (audyt LOW: SVG = stored XSS)", () =
     const r = validateImageUpload(makeFile("image/png", 1000, "evil.svg"));
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.ext).toBe("png");
+  });
+});
+
+// Kafelek udostępnień ma węższą allowlistę niż reszta panelu: Satori
+// (renderer next/og) rasteryzuje tylko JPEG i PNG, a na WebP/AVIF rzuca
+// "u2 is not iterable" — jeden taki plik zgasiłby og:image na całym sklepie.
+describe("validateImageUpload — węższa allowlista dla og:image", () => {
+  it("przepuszcza JPG i PNG", () => {
+    for (const mime of OG_IMAGE_MIME) {
+      expect(validateImageUpload(makeFile(mime), MAX_IMAGE_BYTES, OG_IMAGE_MIME).ok).toBe(true);
+    }
+  });
+
+  it("odrzuca WebP i AVIF, które przechodzą przy domyślnej allowliście", () => {
+    for (const mime of ["image/webp", "image/avif"]) {
+      expect(validateImageUpload(makeFile(mime)).ok).toBe(true);
+      expect(validateImageUpload(makeFile(mime), MAX_IMAGE_BYTES, OG_IMAGE_MIME).ok).toBe(false);
+    }
+  });
+
+  it("komunikat wymienia tylko formaty faktycznie dozwolone", () => {
+    const r = validateImageUpload(makeFile("image/webp"), MAX_IMAGE_BYTES, OG_IMAGE_MIME);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).toContain("JPG");
+      expect(r.error).toContain("PNG");
+      expect(r.error).not.toContain("WEBP");
+    }
   });
 });

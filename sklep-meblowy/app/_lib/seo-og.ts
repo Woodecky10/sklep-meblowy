@@ -18,13 +18,21 @@ import { resolveThemeTokens, type ThemeSettings } from "./theme";
 
 export type OgImage = { url: string; width?: number; height?: number; alt?: string };
 
+// Podpis marki na kafelku udostępnień — JEDNO źródło dla tekstu alternatywnego
+// i dla karty awaryjnej w app/og/route.tsx.
+//
+// Wcześniej ten sam tekst był wpisany osobno w obu miejscach i głosił „meble
+// tapicerowane NA WYMIAR" — czego Mollien nie robi. Poprawka w jednym miejscu
+// zostawiłaby nieprawdę w drugim, więc tekst mieszka tu i tylko tu.
+export const OG_BRAND_TAGLINE = "Meble tapicerowane";
+
 // Domyślny obrazek udostępnień. `url` musi zgadzać się ze ścieżką route handlera
 // w app/og/route.tsx (relatywna — Next rozwiąże ją względem metadataBase).
 export const OG_BRAND_IMAGE = {
   url: "/og",
   width: 1200,
   height: 630,
-  alt: `${COMPANY.brandName} — meble tapicerowane na wymiar`,
+  alt: `${COMPANY.brandName} — ${OG_BRAND_TAGLINE.toLowerCase()}`,
 } as const satisfies OgImage;
 
 // Pełny blok openGraph dla strony. `extra.images` to zwykle zdjęcia produktu —
