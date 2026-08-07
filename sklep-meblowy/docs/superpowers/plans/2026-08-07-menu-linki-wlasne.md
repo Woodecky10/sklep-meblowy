@@ -871,11 +871,43 @@ Push wymaga konta `Woodecky10` — domyślne `mwlo1403` dostaje 403. Deploy = me
 
 Sekcja przenosi stan między komputerami i sesjami — `.superpowers/sdd/` jest gitignorowany, więc to jedyny nośnik. Uzupełniaj na bieżąco.
 
-- **Task 1** — niezaczęty
-- **Task 2** — niezaczęty (migracja NIE zaaplikowana)
-- **Task 3** — niezaczęty
-- **Task 4** — niezaczęty
-- **Task 5** — niezaczęty
+- **Task 1** — ZROBIONY (`8cc222e..4e960a6`). Przegląd znalazł błąd krytyczny: `prepareMenuItems`
+  sprawdzał `r.href !== null`, a runtime dostarcza `undefined` (select nie pobierał wtedy kolumny,
+  a `menu-server.ts` rzutuje przez `as unknown as`). Skutkiem był omijany warunek `published`
+  i puste adresy. Naprawione helperem `linkHref`, który traktuje wiersz jako link własny tylko
+  gdy `href` jest niepustym stringiem przechodzącym `validateMenuHref` — czyli walidacja działa
+  też w miejscu renderu, nie tylko przy zapisie.
+- **Task 2** — ZROBIONY (`ae5828b`). **Migracja 71 ZAAPLIKOWANA na produkcji** przez MCP.
+  Zweryfikowane: 3 wiersze zasiane, celowo błędny INSERT odbity przez `menu_items_href_needs_label`,
+  polityka RLS nie rozluźnia widoczności szkiców.
+- **Task 3** — ZROBIONY (`df2986c..e5bf5ba`). Poprawka: odczyt sprawdzający istnienie wiersza
+  nie gubi już błędu bazy. Decyzja właściciela: analogiczny `maxRows` w `addMenuItem` zostaje
+  nietknięty (poza zakresem tej zmiany).
+- **Task 4** — ZROBIONY (`bec0235`). Dwa znaleziska Important plan-mandated — patrz niżej.
+- **Task 5** — **OKROJONY decyzją właściciela (presja czasu).** Wykonany: `npm run build` (przeszedł).
+  **POMINIĘTE: cała weryfikacja wizualna** — zrzuty headera na desktopie i mobile oraz przeklikanie
+  panelu na żywo.
+
+**Czego NIE sprawdzono na żywo (dług do spłacenia):**
+- Gałąź `pageLinks` w `NavStrip.tsx` **nigdy nie renderowała się z danymi** — `menu_items` było
+  puste od zawsze. Testy pokrywają logikę wyliczania pozycji, nie wygląd paska.
+- Nie potwierdzono wizualnie kolejności pozycji w headerze ani działania przełącznika trybu
+  w panelu.
+- Nie przeklikano ścieżki: dodanie linku własnego → przestawienie → ukrycie → usunięcie.
+
+**Rozstrzygnięcia podjęte przy planowaniu:**
+- Rejestr `MENU_ROUTES` jest wyselekcjonowanym podzbiorem `RESERVED_SLUGS`, pilnowanym testem
+  niezmiennika — literówka w ścieżce pada na `npm test`, a nie na produkcji.
+- Zasiew idzie w migracji, nie ręcznym klikaniem, a stary kod filtruje zasiane wiersze
+  (`page: null`), więc produkcja nie pokazywała ich przed deployem.
+
+**Znaleziska Important odziedziczone z kodu w tym planie (Task 4):**
+1. Formularz dodawania czyści pola **także po nieudanej próbie** — a nieudana próba jest
+   realna od pierwszego kliknięcia, bo wszystkie trzy trasy z zasiewu już istnieją i dadzą
+   „Ten link już jest w tym menu". Administratorka traci wpisane dane.
+2. `chooseRoute` rozpoznaje „etykieta była podpowiedziana" przez porównanie wartości z listą
+   etykiet, a nie przez śledzenie pochodzenia — ręcznie wpisana etykieta zgodna z jedną
+   z dziewięciu kanonicznych nazw zostanie nadpisana przy zmianie trasy.
 
 **Rozstrzygnięcia podjęte przy planowaniu:**
 - Rejestr `MENU_ROUTES` jest wyselekcjonowanym podzbiorem `RESERVED_SLUGS`, pilnowanym testem niezmiennika — literówka w ścieżce pada na `npm test`, a nie na produkcji.
