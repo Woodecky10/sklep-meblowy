@@ -8,7 +8,7 @@ import { createAdminClient } from "@/app/_lib/supabase/server";
 import { slugifyTitle, validatePageSlug } from "@/app/_lib/pages";
 import { invalidatePagesCache } from "@/app/_lib/pages-server";
 import { invalidatePageBlocksCache } from "@/app/_lib/blocks-server";
-import { isMenuLocation } from "@/app/_lib/menu";
+import { isMenuLocation, validateMenuHref, MENU_HREF_MAX } from "@/app/_lib/menu";
 import { invalidateMenuCache } from "@/app/_lib/menu-server";
 import type { ActionResult } from "@/app/_lib/types";
 
@@ -157,10 +157,30 @@ export async function deletePage(formData: FormData): Promise<ActionResult> {
 
 export async function addMenuItem(formData: FormData): Promise<ActionResult> {
   await requireAdmin();
-  const pageId = sanitize(formData.get("page_id"), 40);
-  if (!UUID_RE.test(pageId)) return { ok: false, error: "Wybierz stronę" };
   const location = sanitize(formData.get("location"), 20);
   if (!isMenuLocation(location)) return { ok: false, error: "Nieznana lokalizacja menu" };
+  // Brak pola = stary formularz podstrony (wstecznie zgodne).
+  const kind = sanitize(formData.get("kind"), 10) || "page";
+
+  // Wspólny XOR: albo podstrona, albo adres — nigdy oba, nigdy żadne.
+  let target: { page_id: string; href: null } | { page_id: null; href: string };
+  let label: string | null = null;
+  let labelDe: string | null = null;
+
+  if (kind === "href") {
+    const href = sanitize(formData.get("href"), MENU_HREF_MAX).toLowerCase();
+    const valid = validateMenuHref(href);
+    if (!valid.ok) return { ok: false, error: valid.error };
+    label = sanitize(formData.get("label"), 100);
+    if (!label) return { ok: false, error: "Link własny musi mieć etykietę" };
+    labelDe = emptyToNull(sanitize(formData.get("label_de"), 100));
+    target = { page_id: null, href };
+  } else {
+    const pageId = sanitize(formData.get("page_id"), 40);
+    if (!UUID_RE.test(pageId)) return { ok: false, error: "Wybierz stronę" };
+    target = { page_id: pageId, href: null };
+  }
+
   const supabase = await createAdminClient();
   const { data: maxRows } = await supabase
     .from("menu_items")
@@ -170,15 +190,21 @@ export async function addMenuItem(formData: FormData): Promise<ActionResult> {
     .limit(1);
   const nextOrder =
     ((maxRows?.[0] as { sort_order: number } | undefined)?.sort_order ?? -1) + 1;
+
   const { error } = await supabase.from("menu_items").insert({
     location,
-    page_id: pageId,
+    ...target,
+    label,
+    label_de: labelDe,
     sort_order: nextOrder,
     visible: true,
   } as never);
   if (error) {
     if (error.code === "23505") {
-      return { ok: false, error: "Ta strona już jest w tym menu" };
+      return {
+        ok: false,
+        error: kind === "href" ? "Ten link już jest w tym menu" : "Ta strona już jest w tym menu",
+      };
     }
     if (error.code === "23503") return { ok: false, error: "Ta strona już nie istnieje" };
     return { ok: false, error: error.message };
@@ -192,10 +218,23 @@ export async function updateMenuItemLabel(formData: FormData): Promise<ActionRes
   const id = sanitize(formData.get("id"), 40);
   if (!UUID_RE.test(id)) return { ok: false, error: "Nie znaleziono pozycji menu" };
   const supabase = await createAdminClient();
+  // Link własny bez etykiety byłby klikalny, ale niewidoczny. Baza odrzuci to
+  // constraintem — sprawdzamy wcześniej, żeby administratorka dostała
+  // komunikat po polsku zamiast surowego błędu Postgresa.
+  const { data: existing } = await supabase
+    .from("menu_items")
+    .select("href")
+    .eq("id", id)
+    .maybeSingle();
+  if (!existing) return { ok: false, error: "Nie znaleziono pozycji menu" };
+  const label = sanitize(formData.get("label"), 100);
+  if ((existing as { href: string | null }).href !== null && !label) {
+    return { ok: false, error: "Link własny musi mieć etykietę" };
+  }
   const { data, error } = await supabase
     .from("menu_items")
     .update({
-      label: emptyToNull(sanitize(formData.get("label"), 100)),
+      label: emptyToNull(label),
       label_de: emptyToNull(sanitize(formData.get("label_de"), 100)),
       updated_at: new Date().toISOString(),
     } as never)
