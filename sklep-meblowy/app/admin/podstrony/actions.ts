@@ -221,11 +221,12 @@ export async function updateMenuItemLabel(formData: FormData): Promise<ActionRes
   // Link własny bez etykiety byłby klikalny, ale niewidoczny. Baza odrzuci to
   // constraintem — sprawdzamy wcześniej, żeby administratorka dostała
   // komunikat po polsku zamiast surowego błędu Postgresa.
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from("menu_items")
     .select("href")
     .eq("id", id)
     .maybeSingle();
+  if (existingError) return { ok: false, error: existingError.message };
   if (!existing) return { ok: false, error: "Nie znaleziono pozycji menu" };
   const label = sanitize(formData.get("label"), 100);
   if ((existing as { href: string | null }).href !== null && !label) {
