@@ -10,7 +10,7 @@ import type { MenuItemRow } from "./menu";
 export const MENU_CACHE_TAG = "menu";
 
 const MENU_SELECT =
-  "id, location, page_id, label, label_de, sort_order, visible, page:pages(slug, title, title_de, published)";
+  "id, location, page_id, href, label, label_de, sort_order, visible, page:pages(slug, title, title_de, published)";
 
 const fetchMenuItems = unstable_cache(
   async (): Promise<MenuItemRow[] | null> => {

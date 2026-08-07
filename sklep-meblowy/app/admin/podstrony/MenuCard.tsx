@@ -14,6 +14,7 @@ import {
 } from "./actions";
 import {
   MENU_LOCATIONS,
+  MENU_ROUTES,
   type MenuItemRow,
   type MenuLocation,
 } from "@/app/_lib/menu";
@@ -25,7 +26,7 @@ import { useConfirm } from "@/app/_context/ConfirmContext";
 const LOCATION_META: Record<MenuLocation, { name: string; desc: string }> = {
   navbar: {
     name: "Menu główne",
-    desc: "Linki obok kategorii u góry strony (powyżej 4 pozycji reszta trafia do rozwijanego „Więcej”).",
+    desc: "Linki obok kategorii u góry strony. Gdy nie mieszczą się w jednym rzędzie, zawijają się do następnego.",
   },
   footer: {
     name: "Stopka",
@@ -131,7 +132,7 @@ export default function MenuCard({
     return (
       (item.label && item.label.trim()) ||
       item.page?.title ||
-      "(strona usunięta)"
+      (item.href ? item.href : "(strona usunięta)")
     );
   }
 
@@ -208,7 +209,7 @@ export default function MenuCard({
                           )}
                         </div>
                         <p className="text-xs text-[var(--muted)] font-mono">
-                          /{item.page?.slug ?? "?"}
+                          {item.href ?? `/${item.page?.slug ?? "?"}`}
                         </p>
                       </div>
                       <button
@@ -263,41 +264,121 @@ function AddItemForm({
   pages: PageRow[];
   onResult: (r: ActionResult) => void;
 }) {
+  const [kind, setKind] = useState<"page" | "href">("page");
   const [pageId, setPageId] = useState("");
+  const [href, setHref] = useState("");
+  const [label, setLabel] = useState("");
   const [adding, startTransition] = useTransition();
+
+  // Wybór trasy podpowiada etykietę, ale tylko dopóki administratorka nie
+  // wpisze własnej — nadpisywanie jej tekstu byłoby wrogie.
+  function chooseRoute(value: string) {
+    setHref(value);
+    const known = MENU_ROUTES.find((r) => r.href === value);
+    if (known && (label === "" || MENU_ROUTES.some((r) => r.label === label))) {
+      setLabel(known.label);
+    }
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!pageId) return;
     const fd = new FormData();
-    fd.set("page_id", pageId);
     fd.set("location", location);
+    fd.set("kind", kind);
+    if (kind === "page") {
+      if (!pageId) return;
+      fd.set("page_id", pageId);
+    } else {
+      if (!href || !label.trim()) return;
+      fd.set("href", href);
+      fd.set("label", label.trim());
+    }
     startTransition(async () => {
       onResult(await addMenuItem(fd));
       setPageId("");
+      setHref("");
+      setLabel("");
     });
   }
 
+  const disabled =
+    adding || (kind === "page" ? !pageId : !href || label.trim() === "");
+
+  // Jeden przycisk dla obu trybów — różnią się polami nad nim, nie akcją.
+  const submitButton = (
+    <button
+      type="submit"
+      disabled={disabled}
+      className="px-4 py-2.5 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors disabled:opacity-50"
+    >
+      {adding ? "Dodaję..." : "+ Dodaj"}
+    </button>
+  );
+
   return (
-    <form onSubmit={submit} className="flex items-end gap-2 flex-wrap">
-      <Field label="Dodaj stronę do menu" className="flex-1 min-w-[220px]">
-        <select value={pageId} onChange={(e) => setPageId(e.target.value)} className={inputCls}>
-          <option value="">— wybierz stronę —</option>
-          {pages.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.title}
-              {p.published ? "" : " (szkic)"}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <button
-        type="submit"
-        disabled={adding || !pageId}
-        className="px-4 py-2.5 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors disabled:opacity-50"
-      >
-        {adding ? "Dodaję..." : "+ Dodaj"}
-      </button>
+    <form onSubmit={submit} className="flex flex-col gap-3">
+      <div className="flex gap-2">
+        {(["page", "href"] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setKind(k)}
+            aria-pressed={kind === k}
+            className={`px-3 py-1.5 text-xs font-sans uppercase tracking-widest rounded-full border transition-colors ${
+              kind === k
+                ? "border-[var(--color-gold)] text-[var(--color-gold)]"
+                : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)]"
+            }`}
+          >
+            {k === "page" ? "Podstrona" : "Link własny"}
+          </button>
+        ))}
+      </div>
+
+      {kind === "page" ? (
+        <div className="flex items-end gap-2 flex-wrap">
+          <Field label="Dodaj stronę do menu" className="flex-1 min-w-[220px]">
+            <select value={pageId} onChange={(e) => setPageId(e.target.value)} className={inputCls}>
+              <option value="">— wybierz stronę —</option>
+              {pages.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.title}
+                  {p.published ? "" : " (szkic)"}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {submitButton}
+        </div>
+      ) : (
+        <div className="flex items-end gap-2 flex-wrap">
+          <Field label="Strona sklepu" className="flex-1 min-w-[200px]">
+            <select value={href} onChange={(e) => chooseRoute(e.target.value)} className={inputCls}>
+              <option value="">— wybierz stronę —</option>
+              {MENU_ROUTES.map((r) => (
+                <option key={r.href} value={r.href}>
+                  {r.label} ({r.href})
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Etykieta w menu" className="flex-1 min-w-[160px]">
+            <input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              maxLength={100}
+              className={inputCls}
+            />
+          </Field>
+          {submitButton}
+        </div>
+      )}
+      {kind === "href" && (
+        <p className="text-xs text-[var(--muted)]">
+          Stałe strony sklepu (Tkaniny, O nas, Kontakt) — te, których nie ma na
+          liście podstron, bo są częścią kodu, a nie treścią do edycji.
+        </p>
+      )}
     </form>
   );
 }
