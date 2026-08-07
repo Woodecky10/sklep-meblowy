@@ -118,6 +118,27 @@ describe("prepareMenuItems", () => {
     const rows = [row({ id: "x", visible: false, page_id: null, href: "/tkaniny", label: "T", page: null })];
     expect(prepareMenuItems(rows, "navbar", "pl")).toEqual([]);
   });
+  it("href pusty/brakujący nie robi z pozycji linku własnego", () => {
+    expect(prepareMenuItems([row({ href: "" })], "navbar", "pl")).toEqual([
+      { id: "i1", href: "/pielegnacja", label: "Pielęgnacja" },
+    ]);
+  });
+  it("href niezdefiniowany w wierszu (np. brak kolumny w SELECT) nie robi z pozycji linku własnego", () => {
+    // Symuluje realny defekt: menu-server.ts rzutuje wynik zapytania przez
+    // `unknown`, więc jeśli SELECT nie pobiera href, w runtime jest
+    // `undefined`, nie `null` — mimo że typ deklaruje `string | null`.
+    const rows = [{ ...row({}), href: undefined } as unknown as MenuItemRow];
+    expect(prepareMenuItems(rows, "navbar", "pl")).toEqual([
+      { id: "i1", href: "/pielegnacja", label: "Pielęgnacja" },
+    ]);
+  });
+  it("link własny z niepoprawnym href (obchodzącym walidację zapisu) wypada z listy, nie trafia do podstrony", () => {
+    const rows = [
+      row({ id: "a", page_id: null, href: "//evil.com", label: "A", page: null }),
+      row({ id: "b", sort_order: 1, page_id: null, href: "https://evil.com", label: "B", page: null }),
+    ];
+    expect(prepareMenuItems(rows, "navbar", "pl")).toEqual([]);
+  });
 });
 
 describe("MENU_ROUTES", () => {

@@ -91,10 +91,29 @@ export type MenuItemRow = {
 
 export type LocalizedMenuItem = { id: string; href: string; label: string };
 
+// Wiersz jest linkiem własnym TYLKO, gdy `href` jest niepustym i poprawnym
+// adresem wewnętrznym. Trzy pułapki, przed którymi to broni:
+// 1. `href` nie zawsze wróci z bazy jako `null` — jeśli SELECT go nie
+//    pobiera (dziś tak jest, MENU_SELECT w menu-server.ts nie ma tej
+//    kolumny), w runtime jest `undefined`, a `undefined !== null` daje
+//    fałszywy pozytyw. `menu-server.ts` rzutuje wynik przez `unknown`, więc
+//    tsc tego nie złapie — sprawdzamy to więc tutaj, ręcznie.
+// 2. `""` z bazy to też nie `null` — bez tego wiersz renderowałby `<a href="">`.
+// 3. Format sprawdzany tym samym `validateMenuHref`, co przy zapisie w
+//    Tasku 3 — na wypadek gdyby dane w bazie obszedły tamtą walidację, ten
+//    chokepoint (jedyny wspólny dla NavStrip/MobileMenu/Footer) i tak nie
+//    puści adresu spoza sklepu do globalnej nawigacji.
+function linkHref(r: MenuItemRow): string | null {
+  const h = typeof r.href === "string" ? r.href.trim() : "";
+  if (h === "") return null;
+  return validateMenuHref(h).ok ? h : null;
+}
+
 // Renderują się wyłącznie pozycje widoczne. Podstrona CMS musi być dodatkowo
 // OPUBLIKOWANA (cofnięcie publikacji chowa link automatycznie); link własny
-// wskazuje trasę z kodu, więc nie ma czego sprawdzać. Etykieta: własna
-// (label_de→label per pole) wygrywa nad tytułem strony (title_de→title).
+// wskazuje trasę z kodu, więc nie ma czego sprawdzać — o ile `href` jest
+// poprawny (patrz `linkHref`). Etykieta: własna (label_de→label per pole)
+// wygrywa nad tytułem strony (title_de→title).
 export function prepareMenuItems(
   rows: MenuItemRow[] | null,
   location: MenuLocation,
@@ -108,15 +127,16 @@ export function prepareMenuItems(
       (r) =>
         r.location === location &&
         r.visible &&
-        (r.href !== null || (r.page !== null && r.page.published))
+        (linkHref(r) !== null || (r.page !== null && r.page.published))
     )
     .sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id))
     .map((r) => {
       const custom = pick(r.label_de, r.label);
       // Link własny: etykieta jest jedynym źródłem nazwy (constraint
       // menu_items_href_needs_label pilnuje jej w bazie).
-      if (r.href !== null) {
-        return { id: r.id, href: r.href, label: (custom ?? "").trim() };
+      const h = linkHref(r);
+      if (h !== null) {
+        return { id: r.id, href: h, label: (custom ?? "").trim() };
       }
       const page = r.page!;
       const label =
