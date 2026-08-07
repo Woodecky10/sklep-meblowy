@@ -901,13 +901,70 @@ Sekcja przenosi stan między komputerami i sesjami — `.superpowers/sdd/` jest 
 - Zasiew idzie w migracji, nie ręcznym klikaniem, a stary kod filtruje zasiane wiersze
   (`page: null`), więc produkcja nie pokazywała ich przed deployem.
 
-**Znaleziska Important odziedziczone z kodu w tym planie (Task 4):**
-1. Formularz dodawania czyści pola **także po nieudanej próbie** — a nieudana próba jest
-   realna od pierwszego kliknięcia, bo wszystkie trzy trasy z zasiewu już istnieją i dadzą
-   „Ten link już jest w tym menu". Administratorka traci wpisane dane.
-2. `chooseRoute` rozpoznaje „etykieta była podpowiedziana" przez porównanie wartości z listą
-   etykiet, a nie przez śledzenie pochodzenia — ręcznie wpisana etykieta zgodna z jedną
-   z dziewięciu kanonicznych nazw zostanie nadpisana przy zmianie trasy.
+## DO POPRAWY — zaległość świadomie zmergowana
+
+Zmergowane do `main` 2026-08-07 z tymi dwiema usterkami w środku. Obie dotyczą **wygody
+pracy w panelu**, nie tego, co widzi klient w sklepie — dlatego nie blokowały wdrożenia.
+Obie są odziedziczone z kodu podanego w tym planie, nie z pomyłki wykonawcy.
+
+Wszystko poniżej jest samowystarczalne — do zrobienia bez wracania do tej rozmowy.
+
+### 1. Formularz czyści pola także po NIEUDANEJ próbie dodania
+
+**Plik:** `app/admin/podstrony/MenuCard.tsx`, w `AddItemForm`, funkcja `submit`.
+
+**Kiedy boli:** przy pierwszym wejściu w kartę „Menu". Wszystkie trzy trasy z zasiewu
+(`/tkaniny`, `/o-nas`, `/kontakt`) już istnieją, więc próba dodania którejkolwiek zwraca
+„Ten link już jest w tym menu" — i w tym momencie wybrana trasa oraz wpisana etykieta
+znikają, mimo że nic się nie zapisało.
+
+**Jest:**
+
+```tsx
+startTransition(async () => {
+  onResult(await addMenuItem(fd));
+  setPageId("");
+  setHref("");
+  setLabel("");
+});
+```
+
+**Ma być:**
+
+```tsx
+startTransition(async () => {
+  const res = await addMenuItem(fd);
+  onResult(res);
+  // Czyścimy dopiero po sukcesie — inaczej odbita próba (np. duplikat linku)
+  // kasuje wpisane dane i trzeba je wystukać od nowa.
+  if (res.ok) {
+    setPageId("");
+    setHref("");
+    setLabel("");
+  }
+});
+```
+
+### 2. Podpowiadanie etykiety może nadpisać tekst wpisany ręcznie
+
+**Plik:** `app/admin/podstrony/MenuCard.tsx`, funkcja `chooseRoute`.
+
+**Na czym polega:** warunek rozpoznaje „ta etykieta była podpowiedziana" przez sprawdzenie,
+czy jej wartość znajduje się na liście kanonicznych nazw z `MENU_ROUTES`. To przybliżenie,
+nie fakt — ręcznie wpisana etykieta, która przypadkiem zgadza się z jedną z dziewięciu nazw
+(np. wpisane „Kontakt" przy wybranej innej trasie), zostanie po cichu nadpisana przy zmianie
+trasy w selekcie. Prawdopodobieństwo niskie, ale to realna utrata danych wejściowych.
+
+**Kierunek poprawki:** śledzić pochodzenie zamiast porównywać wartość — flaga (`useRef`)
+ustawiana przy podpowiedzi i kasowana przy każdej ręcznej edycji pola etykiety. Nadpisujemy
+tylko wtedy, gdy flaga mówi, że bieżąca wartość pochodzi z podpowiedzi.
+
+### Czego dodatkowo NIE zweryfikowano (patrz sekcja wyżej)
+
+Przy poprawianiu powyższych warto przy okazji domknąć pominiętą weryfikację wizualną —
+zwłaszcza to, że gałąź `pageLinks` w `NavStrip.tsx` nigdy nie renderowała się z danymi.
+Sposób: `npm run build` + `npm start`, potem Playwright na 1440 i 390 px. **Nie na `next dev`** —
+pada po pierwszym teście.
 
 **Rozstrzygnięcia podjęte przy planowaniu:**
 - Rejestr `MENU_ROUTES` jest wyselekcjonowanym podzbiorem `RESERVED_SLUGS`, pilnowanym testem niezmiennika — literówka w ścieżce pada na `npm test`, a nie na produkcji.
