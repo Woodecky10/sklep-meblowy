@@ -150,10 +150,16 @@ describe("validateMenuHref", () => {
     expect(validateMenuHref("/\\evil.com").ok).toBe(false);
     expect(validateMenuHref("javascript:alert(1)").ok).toBe(false);
   });
-  it("komunikat błędu jest po polsku", () => {
-    const res = validateMenuHref("https://evil.com");
-    expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.error).toMatch(/[ąćęłńóśźż]|Adres/);
+  it("komunikaty błędów są konkretne, nie ogólnikowe", () => {
+    expect(validateMenuHref("")).toEqual({ ok: false, error: "Adres jest wymagany" });
+    expect(validateMenuHref("https://evil.com")).toEqual({
+      ok: false,
+      error: "Adres musi zaczynać się od „/”",
+    });
+    expect(validateMenuHref("//evil.com")).toEqual({
+      ok: false,
+      error: "Adres nie może prowadzić poza sklep",
+    });
   });
 });
 ```
@@ -667,6 +673,17 @@ function AddItemForm({
   const disabled =
     adding || (kind === "page" ? !pageId : !href || label.trim() === "");
 
+  // Jeden przycisk dla obu trybów — różnią się polami nad nim, nie akcją.
+  const submitButton = (
+    <button
+      type="submit"
+      disabled={disabled}
+      className="px-4 py-2.5 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors disabled:opacity-50"
+    >
+      {adding ? "Dodaję..." : "+ Dodaj"}
+    </button>
+  );
+
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
       <div className="flex gap-2">
@@ -700,13 +717,7 @@ function AddItemForm({
               ))}
             </select>
           </Field>
-          <button
-            type="submit"
-            disabled={disabled}
-            className="px-4 py-2.5 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors disabled:opacity-50"
-          >
-            {adding ? "Dodaję..." : "+ Dodaj"}
-          </button>
+          {submitButton}
         </div>
       ) : (
         <div className="flex items-end gap-2 flex-wrap">
@@ -728,13 +739,7 @@ function AddItemForm({
               className={inputCls}
             />
           </Field>
-          <button
-            type="submit"
-            disabled={disabled}
-            className="px-4 py-2.5 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors disabled:opacity-50"
-          >
-            {adding ? "Dodaję..." : "+ Dodaj"}
-          </button>
+          {submitButton}
         </div>
       )}
       {kind === "href" && (
