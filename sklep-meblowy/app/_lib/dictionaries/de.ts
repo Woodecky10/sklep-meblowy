@@ -40,10 +40,44 @@ export const de: DeepPartial<PlShape> = {
     collectionsCollapse: "Einklappen",
     aboutEyebrow: "Über den Shop",
     aboutHeading: "Polstermöbel direkt vom Hersteller",
-    aboutBody:
-      "Mollien ist ein Online-Shop für Polstermöbel, die wir in Polen fertigen — Boxspringbetten und Polsterbetten, Matratzen, Ecksofas, Sofas und Sessel. Das meiste entsteht auf Bestellung, Sie wählen also nicht nur das Modell, sondern auch Stoff, Farbe und Maß.",
+    aboutIntro:
+      "Wir schaffen Möbel, die mehr sein sollen als bloße Einrichtung. Mollien ist ein Online-Shop für Polstermöbel — Betten, Matratzen, Ecksofas, Sofas und Sessel — bei dem wir auf die Verbindung von modernem Design, Komfort und Verarbeitungsqualität setzen, damit jedes Möbelstück nicht nur am Kauftag gut aussieht, sondern sich vor allem im Alltag bewährt.",
+    aboutItems: [
+      {
+        title: "Produktion in Polen",
+        body: "Unsere Möbel entstehen in Polen, mit Sorgfalt in jedem Fertigungsschritt. Wir arbeiten mit erfahrenen Herstellern zusammen und können so für die Qualität von Konstruktion, Materialien und Verarbeitung sorgen.",
+      },
+      {
+        title: "Modernes Design",
+        body: "Wir gestalten Kollektionen, die von aktuellen Trends inspiriert sind, uns aber ebenso wichtig ist, dass unsere Möbel zeitlos bleiben. Abgerundete Formen, weiche Linien und markante Details lassen ein Interieur mit eigenem Charakter entstehen.",
+      },
+      {
+        title: "Möbel, die zu Ihnen passen",
+        body: "Viele unserer Kollektionen sind modular aufgebaut, sodass Sie eine Anordnung schaffen können, die zu Ihrem Raum passt. Sofa, Ecksofa oder ein größeres Set? Sie entscheiden, wie Ihr Möbelstück aussieht.",
+      },
+      {
+        title: "Wählen Sie Ihren Stoff",
+        body: "Wir wissen, dass jeder einen anderen Geschmack hat. Deshalb bieten wir eine große Auswahl an Stoffen und Farben, mit denen Sie das Möbelstück an Ihr Interieur anpassen können. Sie möchten das Material vor dem Kauf sehen? Bestellen Sie kostenlose Stoffmuster.",
+      },
+      {
+        title: "Komfort, der zählt",
+        body: "Gutes Design ist nicht alles. Ein Möbelstück soll vor allem bequem sein. Deshalb achten wir auf Proportionen, Sitztiefe, Höhe und die richtige Profilierung der einzelnen Elemente.",
+      },
+      {
+        title: "Wir beraten, nicht nur verkaufen",
+        body: "Die Wahl eines Sofas oder Ecksofas ist eine Anschaffung für Jahre. Wenn Sie nicht wissen, welches Modell, welche Größe oder welcher Stoff die beste Wahl ist, melden Sie sich bei uns. Wir helfen Ihnen gerne, die passende Lösung für Ihr Interieur zu finden.",
+      },
+      {
+        title: "Kostenloser Versand in ganz Polen",
+        body: "Wir möchten, dass der Möbelkauf auch logistisch einfach ist. Deshalb liefern wir in ganz Polen versandkostenfrei.",
+      },
+    ],
+    aboutClosingHeading: "Mollien — Ihr Möbelstück, Ihr Stil",
+    aboutClosing:
+      "Wir wollen keine Möbel schaffen, die in jedem Zuhause gleich aussehen. Wir möchten Ihnen die Möglichkeit geben, Ihr Interieur nach Ihren Vorstellungen zu gestalten. Wählen Sie Modell, Konfiguration, Größe und Stoff — um die Ausführung kümmern wir uns.",
+    aboutTagline: "Mollien — polnische Möbel, gemacht für Ihr Zuhause.",
     aboutAccount:
-      "Stoffe und Materialien prüfen wir persönlich, bevor sie in die Fertigung gehen, und Stoffmuster schicken wir kostenlos zu — Farbe beurteilt man besser zu Hause als am Bildschirm. Ein Kundenkonto, per E-Mail oder über Google angelegt, dient dazu, die Bestellung zu verfolgen, die Kaufhistorie einzusehen und Lieblingsmodelle zu speichern; zum Stöbern im Angebot ist es nicht erforderlich.",
+      "Ein Kundenkonto, per E-Mail oder über Google angelegt, dient dazu, die Bestellung zu verfolgen, die Kaufhistorie einzusehen und Lieblingsmodelle zu speichern; zum Stöbern im Angebot ist es nicht erforderlich.",
     productOne: "Produkt",
     productFew: "Produkte",
     productMany: "Produkte",

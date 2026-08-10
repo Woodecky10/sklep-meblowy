@@ -41,7 +41,11 @@ export type PlShape = {
     // zaufania jest wyłączony); normalnie nagłówek daje pasek.
     aboutEyebrow: string;
     aboutHeading: string;
-    aboutBody: string;
+    aboutIntro: string;
+    aboutItems: readonly { title: string; body: string }[];
+    aboutClosingHeading: string;
+    aboutClosing: string;
+    aboutTagline: string;
     aboutAccount: string;
   };
   product: {
@@ -404,10 +408,44 @@ export const pl = {
     featuredEmpty: "Brak polecanych produktów.",
     aboutEyebrow: "O sklepie",
     aboutHeading: "Meble tapicerowane prosto od producenta",
-    aboutBody:
-      "Mollien to sklep internetowy z meblami tapicerowanymi, które szyjemy w Polsce — łóżka kontynentalne i tapicerowane, materace, narożniki, sofy i fotele. Większość powstaje na zamówienie, więc wybierasz nie tylko model, ale też tkaninę, kolor i wymiar.",
+    aboutIntro:
+      "Tworzymy meble, które mają być czymś więcej niż tylko wyposażeniem wnętrza. Mollien to sklep internetowy z meblami tapicerowanymi — łóżkami, materacami, narożnikami, sofami i fotelami — w którym stawiamy na połączenie nowoczesnego designu, komfortu i jakości wykonania, aby każdy mebel dobrze wyglądał nie tylko w dniu zakupu, ale przede wszystkim sprawdzał się na co dzień.",
+    aboutItems: [
+      {
+        title: "Polska produkcja",
+        body: "Nasze meble powstają w Polsce, z dbałością o każdy etap ich wykonania. Współpracujemy z doświadczonymi producentami, dzięki czemu możemy zadbać o jakość konstrukcji, materiałów i wykończenia.",
+      },
+      {
+        title: "Nowoczesny design",
+        body: "Tworzymy kolekcje inspirowane współczesnymi trendami, ale zależy nam również na tym, aby nasze meble były ponadczasowe. Zaokrąglone bryły, miękkie formy i charakterystyczne detale pozwalają stworzyć wnętrze z własnym charakterem.",
+      },
+      {
+        title: "Meble dopasowane do Ciebie",
+        body: "Wiele naszych kolekcji ma modułową konstrukcję, dzięki której możesz stworzyć układ odpowiadający Twojej przestrzeni. Sofa, narożnik czy większy zestaw? To Ty decydujesz, jak będzie wyglądał Twój mebel.",
+      },
+      {
+        title: "Wybierz swoją tkaninę",
+        body: "Wiemy, że każdy ma inny gust. Dlatego oferujemy szeroki wybór tkanin i kolorów, dzięki którym możesz dopasować mebel do swojego wnętrza. Chcesz zobaczyć materiał przed zakupem? Możesz zamówić bezpłatne próbki tkanin.",
+      },
+      {
+        title: "Komfort, który ma znaczenie",
+        body: "Dobry design to nie wszystko. Mebel powinien być przede wszystkim wygodny. Dlatego zwracamy uwagę na proporcje, głębokość siedzisk, wysokość oraz odpowiednie wyprofilowanie poszczególnych elementów.",
+      },
+      {
+        title: "Doradzamy, nie tylko sprzedajemy",
+        body: "Wybór sofy czy narożnika to zakup na lata. Jeśli nie wiesz, który model, rozmiar albo tkanina będzie najlepszym wyborem, możesz się z nami skontaktować. Chętnie pomożemy dobrać rozwiązanie odpowiednie do Twojego wnętrza i potrzeb.",
+      },
+      {
+        title: "Darmowa dostawa na terenie całej Polski",
+        body: "Chcemy, aby zakup mebli był prosty również od strony logistycznej. Zapewniamy darmową dostawę na terenie całej Polski.",
+      },
+    ],
+    aboutClosingHeading: "Mollien — Twój mebel, Twój styl",
+    aboutClosing:
+      "Nie chcemy tworzyć mebli, które wyglądają tak samo w każdym domu. Chcemy dać Ci możliwość stworzenia wnętrza po swojemu. Wybierz model, konfigurację, rozmiar i tkaninę, a my zadbamy o jego wykonanie.",
+    aboutTagline: "Mollien — polskie meble stworzone z myślą o Twoim wnętrzu.",
     aboutAccount:
-      "Tkaniny i materiały sprawdzamy osobiście, zanim trafią do produkcji, a próbki wysyłamy za darmo — kolor lepiej ocenić u siebie w domu niż na ekranie. Konto, zakładane adresem e-mail lub przez Google, służy do śledzenia zamówienia, historii zakupów i zapisywania ulubionych modeli; do przeglądania oferty nie jest potrzebne.",
+      "Konto w sklepie, zakładane adresem e-mail lub przez Google, służy do śledzenia zamówienia, historii zakupów i zapisywania ulubionych modeli; do przeglądania oferty nie jest potrzebne.",
   },
   product: {
     addToCart: "Dodaj do koszyka",
