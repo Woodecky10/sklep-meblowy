@@ -81,6 +81,22 @@ export default async function HomePage() {
     .filter((b): b is LocalizedBlock => b !== null);
   const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
   const hasTrustBar = blocks.some((b) => b.visible && b.type === "trust_bar");
+  // h1 wisi pod hero. Gdyby blok hero wyłączono w panelu, strona zostałaby bez
+  // jedynego h1 — i bez zdania wyjaśniającego, czym jest sklep.
+  const hasHero = blocks.some((b) => b.visible && b.type === "hero");
+
+  function purposeHeading() {
+    return (
+      <section className="max-w-3xl mx-auto px-6 pt-10 text-center">
+        <h1 className="font-display text-2xl md:text-3xl font-bold text-[var(--fg)]">
+          {t.home.h1}
+        </h1>
+        <p className="mt-3 text-sm text-[var(--muted)] leading-relaxed">
+          {t.home.h1Lead}
+        </p>
+      </section>
+    );
+  }
   // Fallback gdy admin jeszcze nic nie dodał — żeby home nie była pusta.
   // localizeSlide/localizeTile tłumaczą treść (DB i fallback) na DE przez mapy.
   const slides = (dbSlides.length > 0 ? dbSlides : [DEFAULT_FALLBACK_SLIDE]).map(
@@ -112,8 +128,18 @@ export default async function HomePage() {
   function renderBlock(b: LocalizedBlock): ReactNode {
     switch (b.type) {
       case "hero":
-        // Hero — slider z auto-rotacją (6s) i nawigacją (strzałki + kropki)
-        return <HomeHeroSlider slides={slides} />;
+        // Hero — slider z auto-rotacją (6s) i nawigacją (strzałki + kropki).
+        // Pod nim JEDYNY <h1> strony: do 2026-08-10 home nie miała go wcale,
+        // a nad zgięciem stały same hasła („Meble, które opowiadają historię"),
+        // przez co weryfikacja marki Google odrzucała ją z powodem „strona
+        // główna nie wyjaśnia celu aplikacji". Tekst jest wyciszony, ale nie
+        // ukryty — ukrycie Google traktuje jak cloaking.
+        return (
+          <>
+            <HomeHeroSlider slides={slides} />
+            {purposeHeading()}
+          </>
+        );
 
       case "tiles":
         // Kategorie
@@ -244,6 +270,7 @@ export default async function HomePage() {
 
   return (
     <>
+      {!hasHero && purposeHeading()}
       {blocks
         .filter((b) => b.visible)
         .map((b) => (

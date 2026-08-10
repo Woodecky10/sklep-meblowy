@@ -39,6 +39,12 @@ export type PlShape = {
     // Opis sklepu na stronie głównej — patrz AboutStore.tsx.
     // Eyebrow i nagłówek używane TYLKO w wariancie samodzielnym (gdy pasek
     // zaufania jest wyłączony); normalnie nagłówek daje pasek.
+    // Jedyny <h1> strony głównej. Do 2026-08-10 home NIE MIAŁA h1 w ogóle —
+    // ani nagłówka, ani tytułu ze słowem „sklep", przez co weryfikacja marki
+    // Google trzy razy odrzuciła home z powodem „nie wyjaśnia celu aplikacji".
+    // Nie zamieniać z powrotem na hasło marketingowe.
+    h1: string;
+    h1Lead: string;
     aboutEyebrow: string;
     aboutHeading: string;
     // Treść domyślna, gdy w panelu (site_texts → home_about) nic nie wpisano.
@@ -407,6 +413,9 @@ export const pl = {
     productFew: "produkty",
     productMany: "produktów",
     featuredEmpty: "Brak polecanych produktów.",
+    h1: "Sklep internetowy z meblami tapicerowanymi",
+    h1Lead:
+      "Mollien.pl — łóżka, materace, narożniki, sofy i fotele produkowane w Polsce, w większości na zamówienie. Konto, zakładane adresem e-mail lub przez Google, służy do śledzenia zamówień i zapisywania ulubionych modeli.",
     aboutEyebrow: "O sklepie",
     aboutHeading: "Meble tapicerowane prosto od producenta",
     aboutDefaultHtml: [
@@ -573,9 +582,9 @@ export const pl = {
   meta: {
     tagline: "Meble premium",
     description:
-      "Odkryj kolekcję eleganckich mebli premium. Sofy, narożniki, łóżka, fotele i pufy najwyższej jakości.",
+      "Mollien.pl to sklep internetowy z meblami tapicerowanymi produkowanymi w Polsce: łóżka, materace, narożniki, sofy, fotele i pufy. Darmowe próbki tkanin i darmowa dostawa.",
     keywords: "meble, sofy, narożniki, łóżka, fotele, sklep meblowy",
-    homeTitle: "Meble Premium | Eleganckie Meble do Twojego Domu",
+    homeTitle: "Mollien.pl — sklep internetowy z meblami tapicerowanymi",
     shopTitle: "Sklep",
     wishlistTitle: "Ulubione",
   },
