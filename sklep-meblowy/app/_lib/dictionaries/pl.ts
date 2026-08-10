@@ -36,6 +36,9 @@ export type PlShape = {
     productFew: string;
     productMany: string;
     featuredEmpty: string;
+    aboutHeading: string;
+    aboutBody: string;
+    aboutAccount: string;
   };
   product: {
     addToCart: string;
@@ -395,6 +398,11 @@ export const pl = {
     productFew: "produkty",
     productMany: "produktów",
     featuredEmpty: "Brak polecanych produktów.",
+    aboutHeading: "O sklepie Mollien",
+    aboutBody:
+      "Mollien to internetowy sklep z meblami tapicerowanymi — narożnikami, sofami, łóżkami i fotelami — produkowanymi na zamówienie w Polsce. Wybierasz model, tkaninę i kolor, zamawiasz online, a gotowy mebel dostarczamy pod wskazany adres. Przed zakupem możesz bezpłatnie zamówić próbki tkanin.",
+    aboutAccount:
+      "Konto w sklepie — zakładane adresem e-mail lub przez Google — służy do śledzenia statusu zamówienia, przeglądania historii zakupów i zapisywania ulubionych modeli. Do przeglądania oferty nie jest potrzebne.",
   },
   product: {
     addToCart: "Dodaj do koszyka",

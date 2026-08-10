@@ -224,6 +224,28 @@ export default async function HomePage() {
         .map((b) => (
           <Fragment key={b.id}>{renderBlock(b)}</Fragment>
         ))}
+
+      {/* Opis sklepu zwykłym językiem — WYMÓG weryfikacji marki Google.
+          Recenzent musi wyczytać ze strony głównej, czym aplikacja jest i po co
+          jest w niej konto; reszta home mówi wyłącznie hasłami („Meble, które
+          opowiadają historię"), przez co Google odrzucił zgłoszenie z powodem
+          „strona główna nie wyjaśnia celu aplikacji".
+          Świadomie NIE jest blokiem z panelu ani tekstem z site_texts — ma być
+          niewyłączalne, żeby nie zniknęło przy porządkowaniu strony i nie
+          cofnęło weryfikacji. Zmiana treści = zmiana w słowniku. */}
+      <section className="border-t border-[var(--border)]">
+        <div className="max-w-3xl mx-auto px-6 py-16 text-center">
+          <h2 className="font-display text-2xl font-bold text-[var(--fg)] mb-4">
+            {t.home.aboutHeading}
+          </h2>
+          <p className="text-sm text-[var(--muted)] leading-relaxed mb-3">
+            {t.home.aboutBody}
+          </p>
+          <p className="text-sm text-[var(--muted)] leading-relaxed">
+            {t.home.aboutAccount}
+          </p>
+        </div>
+      </section>
     </>
   );
 }
