@@ -1,6 +1,6 @@
 # Product Marketing Context
 
-**Document version:** v2
+**Document version:** v3
 **Last updated:** 2026-08-10
 
 > Szkic wygenerowany z repozytorium i z bazy produkcyjnej. Sekcje oznaczone
@@ -117,6 +117,14 @@ Skąd to wziąć, w kolejności od najtańszego:
 **Style:** Opisowy, zmysłowy — mówi o fakturze tkaniny i o świetle, nie o parametrach.
 **Personality:** elegancka · rzemieślnicza · ciepła · polska · ponadczasowa
 
+**Akcent wskazany przez właściciela (2026-08-10):** w tekstach o sklepie prowadzić
+**produktem, jakością i polską produkcją** — w tej kolejności. „Polska produkcja" ma
+być częścią zdania definiującego sklep, nie odznaką doklejoną na końcu. Jakość
+pokazywać dowodem (materiały sprawdzane osobiście, darmowe próbki, 2 lata
+gwarancji), nie przymiotnikiem — „wysoka jakość" i podobne zwroty nic nie znaczą.
+Darmowe próbki tkanin zostają w komunikacji, ale jako dowód jakości, a nie jako
+główny haczyk.
+
 ⚠️ Ryzyko tego tonu: obecna strona główna operuje wyłącznie hasłami („Meble, które opowiadają historię", „COŚ WIĘCEJ NIŻ MEBLE") i nie mówi konkretów. Google odrzucił weryfikację marki właśnie z powodem „strona główna nie wyjaśnia celu aplikacji". Elegancja nie może zjadać treści.
 
 ## Proof Points
@@ -151,5 +159,6 @@ Wpływają na to, co wolno pisać w tekstach:
 ## Changelog
 
 *Newest first. One line per revision: what changed and why.*
+- v3 (2026-08-10) — Właściciel wskazał akcent komunikacji: produkt, jakość, polska produkcja; próbki tkanin zdegradowane z głównego haczyka do dowodu jakości. Zapisane w Brand Voice, opis na home przepisany pod ten akcent.
 - v2 (2026-08-10) — Rozstrzygnięta rozbieżność gwarancji: `/o-nas` obiecywało 2–10 lat bez pokrycia w danych, obowiązuje 2 lata; tekst poprawiony w PL i DE. Zaktualizowane Proof Points.
 - v1 (2026-08-10) — Initial context. Auto-szkic z repo i bazy produkcyjnej; sekcje Competitive Landscape, Objections, Customer Language i Goals zostawione jako luki do uzupełnienia przez właściciela.
