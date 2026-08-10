@@ -4,11 +4,31 @@
 // sanitizera; nonce nie obejmuje atrybutu style). script-src NIE ma
 // 'unsafe-inline' — tam liczy się ochrona przed XSS.
 
-export type CspOpts = { isDev: boolean; supabaseOrigin: string | null };
+export type CspOpts = {
+  isDev: boolean;
+  supabaseOrigin: string | null;
+  // Domyślnie false: bez skonfigurowanego GA polityka zostaje wąska.
+  gaEnabled?: boolean;
+};
 
-export function buildCsp(nonce: string, { isDev, supabaseOrigin }: CspOpts): string {
+// Hosty Google Analytics 4. Do script-src NIE trafiają celowo: 'strict-dynamic'
+// unieważnia listę hostów, a gtag.js jest wstrzykiwany przez zaufany skrypt
+// bundla, więc dziedziczy zaufanie. Potrzebne są tylko kanały wysyłki danych.
+const GA_CONNECT = [
+  "https://www.googletagmanager.com",
+  "https://*.google-analytics.com",
+  "https://*.analytics.google.com",
+];
+const GA_IMG = ["https://www.googletagmanager.com", "https://*.google-analytics.com"];
+
+export function buildCsp(
+  nonce: string,
+  { isDev, supabaseOrigin, gaEnabled = false }: CspOpts
+): string {
   const sbHttps = supabaseOrigin ? [supabaseOrigin] : [];
   const sbWss = supabaseOrigin ? [supabaseOrigin.replace(/^https:/, "wss:")] : [];
+  const gaConnect = gaEnabled ? GA_CONNECT : [];
+  const gaImg = gaEnabled ? GA_IMG : [];
 
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
@@ -19,9 +39,16 @@ export function buildCsp(nonce: string, { isDev, supabaseOrigin }: CspOpts): str
       ...(isDev ? ["'unsafe-eval'"] : []),
     ],
     "style-src": ["'self'", "'unsafe-inline'"],
-    "img-src": ["'self'", "data:", "blob:", ...sbHttps, "https://images.unsplash.com"],
+    "img-src": [
+      "'self'",
+      "data:",
+      "blob:",
+      ...sbHttps,
+      "https://images.unsplash.com",
+      ...gaImg,
+    ],
     "font-src": ["'self'"],
-    "connect-src": ["'self'", ...sbHttps, ...sbWss],
+    "connect-src": ["'self'", ...sbHttps, ...sbWss, ...gaConnect],
     "worker-src": ["'self'", "blob:"],
     "object-src": ["'none'"],
     "base-uri": ["'self'"],

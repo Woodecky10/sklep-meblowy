@@ -25,17 +25,31 @@ const CONSENT_VERSION = 1;
 const secondaryBtnClass =
   "px-5 py-2.5 text-sm font-sans font-semibold uppercase tracking-wider rounded-full border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--fg)] transition-colors";
 
-export function getConsent(): CookieConsent | null {
+// Surowy wpis z localStorage. Osobno od parsowania, bo useSyncExternalStore
+// wymaga snapshotu STABILNEGO referencyjnie — string jest, sparsowany obiekt
+// nie (nowa referencja przy każdym odczycie = pętla renderów).
+export function readConsentRaw(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
+    return localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function parseConsent(raw: string | null): CookieConsent | null {
+  if (!raw) return null;
+  try {
     const parsed = JSON.parse(raw) as CookieConsent;
     if (parsed.version !== CONSENT_VERSION) return null;
     return parsed;
   } catch {
     return null;
   }
+}
+
+export function getConsent(): CookieConsent | null {
+  return parseConsent(readConsentRaw());
 }
 
 function saveConsent(analytics: boolean, marketing: boolean) {
@@ -53,9 +67,14 @@ function saveConsent(analytics: boolean, marketing: boolean) {
 
 // Subskrypcja na decyzję cookie — saveConsent dispatchuje event
 // "cookie-consent", więc baner zamyka się sam po zapisie zgody.
-function subscribeConsent(callback: () => void): () => void {
+// "storage" dokłada wypadek zmiany zgody w INNEJ karcie tej samej domeny.
+export function subscribeConsent(callback: () => void): () => void {
   window.addEventListener("cookie-consent", callback);
-  return () => window.removeEventListener("cookie-consent", callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener("cookie-consent", callback);
+    window.removeEventListener("storage", callback);
+  };
 }
 
 export default function CookieBanner() {

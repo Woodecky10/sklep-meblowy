@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { frozenDeRedirectPath, localizePath, stripLocale } from "../i18n";
 import { buildCsp } from "../csp";
+import { GA_MEASUREMENT_ID } from "../analytics";
 
 export async function updateSession(request: NextRequest) {
   // Rozbij ścieżkę na locale + ścieżkę bez prefiksu '/de'.
@@ -48,6 +49,8 @@ export async function updateSession(request: NextRequest) {
   const csp = buildCsp(nonce, {
     isDev: process.env.NODE_ENV !== "production",
     supabaseOrigin,
+    // Ten sam warunek co w komponencie GA: bez poprawnego id nie luzujemy CSP.
+    gaEnabled: GA_MEASUREMENT_ID !== "",
   });
   requestHeaders.set("Content-Security-Policy", csp);
 
