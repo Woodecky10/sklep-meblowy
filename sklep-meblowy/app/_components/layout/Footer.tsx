@@ -57,6 +57,13 @@ export default async function Footer() {
           <p className="text-sm text-white/60 leading-relaxed max-w-xs mb-4">
             {tagline}
           </p>
+          {/* Czym jest ta strona i po co jest w niej konto — wymóg weryfikacji
+              marki Google. W stopce, bo jest na każdej podstronie i recenzent
+              nie musi scrollować całej home. Ściszone wizualnie, ale realnie
+              widoczne — ukrywanie tego byłoby cloakingiem. */}
+          <p className="text-xs text-white/60 leading-relaxed max-w-xs mb-4">
+            {t.footer.whatWeAre}
+          </p>
           <p className="text-xs text-white/70 leading-relaxed">
             {contact.email}
             {contact.phone && (
