@@ -273,6 +273,17 @@ Kod **nie blokuje** ani weryfikacji marki, ani wizytówki — wszystko, czego Go
 wymaga, już jest: `/prywatnosc`, `/regulamin`, strona główna, Organization JSON-LD z
 adresem, telefonem i NIP-em (`app/_lib/seo-jsonld.ts`).
 
+**Co realnie daje weryfikacja marki — sprawdzone na żywo 2026-08-10.** Klient klikający
+„Zaloguj przez Google" na `mollien.pl` widzi dziś ekran Google z napisem *„Przejdź do
+aplikacji **tlvgsddpiikolgdwuwmc.supabase.co**"* — czyli surowy host bazy zamiast marki.
+Weryfikacja podmienia ten string na `Mollien.pl`. Skoro Google nadal pokazuje hosta
+Supabase, zgłoszenie z 2026-07-30 **nie przeszło** (w toku albo odrzucone) — to jest
+najprostszy sposób sprawdzenia statusu bez wchodzenia do konsoli.
+Zakres to `scope=email profile` (dane niewrażliwe), więc weryfikacja **niczego nie
+blokuje**: logowanie działa, nie ma limitu 100 użytkowników ani ekranu „niezweryfikowana
+aplikacja". To kwestia wyłącznie zaufania i wyglądu, ale przy pierwszym logowaniu
+klienta cena jest realna.
+
 Dwie rzeczy do pilnowania:
 1. **Nazwa aplikacji na ekranie zgody musi zgadzać się z logo w Navbarze** — test Google
    jest dosłowny i to był jeden z trzech powodów pierwszego odrzucenia. W repo
