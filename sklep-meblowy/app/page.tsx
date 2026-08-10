@@ -21,6 +21,7 @@ import { localizeBlock, type LocalizedBlock } from "./_lib/blocks";
 import { getHomeBlocks } from "./_lib/blocks-server";
 import ContentBlock from "./_components/blocks/ContentBlock";
 import HomeCollections from "./_components/blocks/HomeCollections";
+import AboutStore from "./_components/blocks/AboutStore";
 
 // Home jest w pełni przetłumaczone przez słownik UI → DE zawsze (hasDe: true).
 // generateMetadata na poziomie strony nadpisuje statyczne metadata z layoutu
@@ -65,6 +66,7 @@ export default async function HomePage() {
     .map((b) => localizeBlock(b, locale))
     .filter((b): b is LocalizedBlock => b !== null);
   const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
+  const hasTrustBar = blocks.some((b) => b.visible && b.type === "trust_bar");
   // Fallback gdy admin jeszcze nic nie dodał — żeby home nie była pusta.
   // localizeSlide/localizeTile tłumaczą treść (DB i fallback) na DE przez mapy.
   const slides = (dbSlides.length > 0 ? dbSlides : [DEFAULT_FALLBACK_SLIDE]).map(
@@ -194,10 +196,19 @@ export default async function HomePage() {
         );
 
       case "trust_bar":
-        // Pasek zaufania — dlaczego warto kupować u nas (spec 2026-07-06)
+        // Pasek zaufania — dlaczego warto kupować u nas (spec 2026-07-06).
+        // `intro` dokłada opis sklepu wymagany przez weryfikację marki Google —
+        // tematycznie to ta sama sekcja („kim jesteśmy"), więc nie wygląda jak
+        // doklejony blok SEO. Zapas na wypadek wyłączenia paska: niżej.
         return (
           <section className="max-w-7xl mx-auto px-6 py-24">
-            <TrustBar withHeading locale={locale} heading={b.heading} eyebrow={b.subheading} />
+            <TrustBar
+              withHeading
+              locale={locale}
+              heading={b.heading}
+              eyebrow={b.subheading}
+              intro={<AboutStore locale={locale} />}
+            />
           </section>
         );
 
@@ -225,27 +236,14 @@ export default async function HomePage() {
           <Fragment key={b.id}>{renderBlock(b)}</Fragment>
         ))}
 
-      {/* Opis sklepu zwykłym językiem — WYMÓG weryfikacji marki Google.
-          Recenzent musi wyczytać ze strony głównej, czym aplikacja jest i po co
-          jest w niej konto; reszta home mówi wyłącznie hasłami („Meble, które
-          opowiadają historię"), przez co Google odrzucił zgłoszenie z powodem
-          „strona główna nie wyjaśnia celu aplikacji".
-          Świadomie NIE jest blokiem z panelu ani tekstem z site_texts — ma być
-          niewyłączalne, żeby nie zniknęło przy porządkowaniu strony i nie
-          cofnęło weryfikacji. Zmiana treści = zmiana w słowniku. */}
-      <section className="border-t border-[var(--border)]">
-        <div className="max-w-3xl mx-auto px-6 py-16 text-center">
-          <h2 className="font-display text-2xl font-bold text-[var(--fg)] mb-4">
-            {t.home.aboutHeading}
-          </h2>
-          <p className="text-sm text-[var(--muted)] leading-relaxed mb-3">
-            {t.home.aboutBody}
-          </p>
-          <p className="text-sm text-[var(--muted)] leading-relaxed">
-            {t.home.aboutAccount}
-          </p>
-        </div>
-      </section>
+      {/* Zapasowe wyjście dla opisu sklepu. Normalnie jest on wstępem paska
+          zaufania, ale ten pasek da się wyłączyć w panelu — a na opisie wisi
+          weryfikacja marki Google, więc nie może zniknąć razem z paskiem. */}
+      {!hasTrustBar && (
+        <section className="max-w-7xl mx-auto px-6 py-24">
+          <AboutStore locale={locale} withHeading />
+        </section>
+      )}
     </>
   );
 }

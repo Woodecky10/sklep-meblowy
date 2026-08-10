@@ -36,6 +36,10 @@ export type PlShape = {
     productFew: string;
     productMany: string;
     featuredEmpty: string;
+    // Opis sklepu dla weryfikacji marki Google — patrz AboutStore.tsx.
+    // Eyebrow i nagłówek używane TYLKO w wariancie samodzielnym (gdy pasek
+    // zaufania jest wyłączony); normalnie nagłówek daje pasek.
+    aboutEyebrow: string;
     aboutHeading: string;
     aboutBody: string;
     aboutAccount: string;
@@ -398,7 +402,8 @@ export const pl = {
     productFew: "produkty",
     productMany: "produktów",
     featuredEmpty: "Brak polecanych produktów.",
-    aboutHeading: "O sklepie Mollien",
+    aboutEyebrow: "O sklepie",
+    aboutHeading: "Meble tapicerowane prosto od producenta",
     aboutBody:
       "Mollien to internetowy sklep z meblami tapicerowanymi — narożnikami, sofami, łóżkami i fotelami — produkowanymi na zamówienie w Polsce. Wybierasz model, tkaninę i kolor, zamawiasz online, a gotowy mebel dostarczamy pod wskazany adres. Przed zakupem możesz bezpłatnie zamówić próbki tkanin.",
     aboutAccount:
