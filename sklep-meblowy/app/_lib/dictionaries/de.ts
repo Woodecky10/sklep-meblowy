@@ -45,7 +45,7 @@ export const de: DeepPartial<PlShape> = {
     aboutItems: [
       {
         title: "Produktion in Polen",
-        body: "Unsere Möbel entstehen in Polen, mit Sorgfalt in jedem Fertigungsschritt. Wir arbeiten mit erfahrenen Herstellern zusammen und können so für die Qualität von Konstruktion, Materialien und Verarbeitung sorgen.",
+        body: "Unsere Möbel entstehen in Polen, mit Sorgfalt in jedem Fertigungsschritt. Wir fertigen sie selbst und stehen damit für die Qualität von Konstruktion, Materialien und Verarbeitung ein.",
       },
       {
         title: "Modernes Design",

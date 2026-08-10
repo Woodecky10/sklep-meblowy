@@ -1,6 +1,6 @@
 # Product Marketing Context
 
-**Document version:** v3
+**Document version:** v4
 **Last updated:** 2026-08-10
 
 > Szkic wygenerowany z repozytorium i z bazy produkcyjnej. Sekcje oznaczone
@@ -17,6 +17,12 @@
 **Product category:** Sklep internetowy z meblami tapicerowanymi / łóżkami / materacami. Klient szuka fraz typu „narożnik na wymiar", „łóżko kontynentalne 180x200", „materac kieszeniowy".
 
 **Product type:** E-commerce B2C, sprzedaż jednorazowa (nie subskrypcja).
+
+⚠️ **Marka a podmiot (potwierdzone przez właściciela 2026-08-10):** „Mollien" to nazwa
+sklepu i marki; dane firmowe należą do **producenta mebli**. Czyli sklep i wytwórnia to
+ten sam podmiot — **wolno pisać „polski producent" i „produkujemy sami"**. To nie jest
+kosmetyka: „współpracujemy z producentami" osłabiłoby przekaz i kłóciło się z paskiem
+zaufania, który od zawsze głosi „Polski producent".
 
 **Business model:** Marża produktowa. Płatność online przez Przelewy24 (BLIK, karta, Google Pay, Apple Pay) lub za pobraniem. Dostawa darmowa na terenie całej Polski, bez progu kwotowego. Ceny 99–6 239 zł; trzon oferty 1 500–3 000 zł.
 
@@ -66,7 +72,7 @@ Hipotezy do potwierdzenia lub odrzucenia (moje domysły, nie dane):
 **Key differentiators:**
 - **Darmowe próbki tkanin wysyłane pocztą przed zakupem** — 17 tkanin w katalogu; to jedyny wyróżnik wbudowany w produkt, a nie w hasło
 - Meble na zamówienie: dobór tkaniny, konfiguracja narożnika (L/U, strona), rozmiar łóżka
-- Polski producent; dostawcy sprawdzani osobiście
+- **Własna produkcja w Polsce** — nie pośrednictwo i nie import; odpowiedzialność za konstrukcję i wykończenie leży po stronie sklepu. Materiały kupowane od dostawców, sprawdzane osobiście
 - Darmowa dostawa w całej Polsce, bez progu kwotowego
 - Jawny czas realizacji przy każdym produkcie: 14, 21 albo 28 dni roboczych
 
@@ -159,6 +165,7 @@ Wpływają na to, co wolno pisać w tekstach:
 ## Changelog
 
 *Newest first. One line per revision: what changed and why.*
+- v4 (2026-08-10) — Potwierdzone: Mollien to marka sklepu, a podmiot jest producentem mebli — wolno pisać „produkujemy sami". Tekst na home poprawiony ze „współpracujemy z producentami" na własną produkcję; zniknęła sprzeczność z paskiem zaufania.
 - v3 (2026-08-10) — Właściciel wskazał akcent komunikacji: produkt, jakość, polska produkcja; próbki tkanin zdegradowane z głównego haczyka do dowodu jakości. Zapisane w Brand Voice, opis na home przepisany pod ten akcent.
 - v2 (2026-08-10) — Rozstrzygnięta rozbieżność gwarancji: `/o-nas` obiecywało 2–10 lat bez pokrycia w danych, obowiązuje 2 lata; tekst poprawiony w PL i DE. Zaktualizowane Proof Points.
 - v1 (2026-08-10) — Initial context. Auto-szkic z repo i bazy produkcyjnej; sekcje Competitive Landscape, Objections, Customer Language i Goals zostawione jako luki do uzupełnienia przez właściciela.

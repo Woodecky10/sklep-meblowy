@@ -413,7 +413,7 @@ export const pl = {
     aboutItems: [
       {
         title: "Polska produkcja",
-        body: "Nasze meble powstają w Polsce, z dbałością o każdy etap ich wykonania. Współpracujemy z doświadczonymi producentami, dzięki czemu możemy zadbać o jakość konstrukcji, materiałów i wykończenia.",
+        body: "Nasze meble powstają w Polsce, z dbałością o każdy etap ich wykonania. Produkujemy je sami, dzięki czemu odpowiadamy za jakość konstrukcji, materiałów i wykończenia.",
       },
       {
         title: "Nowoczesny design",
