@@ -36,17 +36,13 @@ export type PlShape = {
     productFew: string;
     productMany: string;
     featuredEmpty: string;
-    // Opis sklepu dla weryfikacji marki Google — patrz AboutStore.tsx.
+    // Opis sklepu na stronie głównej — patrz AboutStore.tsx.
     // Eyebrow i nagłówek używane TYLKO w wariancie samodzielnym (gdy pasek
     // zaufania jest wyłączony); normalnie nagłówek daje pasek.
     aboutEyebrow: string;
     aboutHeading: string;
-    aboutIntro: string;
-    aboutItems: readonly { title: string; body: string }[];
-    aboutClosingHeading: string;
-    aboutClosing: string;
-    aboutTagline: string;
-    aboutAccount: string;
+    // Treść domyślna, gdy w panelu (site_texts → home_about) nic nie wpisano.
+    aboutDefaultHtml: string;
   };
   product: {
     addToCart: string;
@@ -408,44 +404,19 @@ export const pl = {
     featuredEmpty: "Brak polecanych produktów.",
     aboutEyebrow: "O sklepie",
     aboutHeading: "Meble tapicerowane prosto od producenta",
-    aboutIntro:
-      "Tworzymy meble, które mają być czymś więcej niż tylko wyposażeniem wnętrza. Mollien to sklep internetowy z meblami tapicerowanymi — łóżkami, materacami, narożnikami, sofami i fotelami — w którym stawiamy na połączenie nowoczesnego designu, komfortu i jakości wykonania, aby każdy mebel dobrze wyglądał nie tylko w dniu zakupu, ale przede wszystkim sprawdzał się na co dzień.",
-    aboutItems: [
-      {
-        title: "Polska produkcja",
-        body: "Nasze meble powstają w Polsce, z dbałością o każdy etap ich wykonania. Produkujemy je sami, dzięki czemu odpowiadamy za jakość konstrukcji, materiałów i wykończenia.",
-      },
-      {
-        title: "Nowoczesny design",
-        body: "Tworzymy kolekcje inspirowane współczesnymi trendami, ale zależy nam również na tym, aby nasze meble były ponadczasowe. Zaokrąglone bryły, miękkie formy i charakterystyczne detale pozwalają stworzyć wnętrze z własnym charakterem.",
-      },
-      {
-        title: "Meble dopasowane do Ciebie",
-        body: "Wiele naszych kolekcji ma modułową konstrukcję, dzięki której możesz stworzyć układ odpowiadający Twojej przestrzeni. Sofa, narożnik czy większy zestaw? To Ty decydujesz, jak będzie wyglądał Twój mebel.",
-      },
-      {
-        title: "Wybierz swoją tkaninę",
-        body: "Wiemy, że każdy ma inny gust. Dlatego oferujemy szeroki wybór tkanin i kolorów, dzięki którym możesz dopasować mebel do swojego wnętrza. Chcesz zobaczyć materiał przed zakupem? Możesz zamówić bezpłatne próbki tkanin.",
-      },
-      {
-        title: "Komfort, który ma znaczenie",
-        body: "Dobry design to nie wszystko. Mebel powinien być przede wszystkim wygodny. Dlatego zwracamy uwagę na proporcje, głębokość siedzisk, wysokość oraz odpowiednie wyprofilowanie poszczególnych elementów.",
-      },
-      {
-        title: "Doradzamy, nie tylko sprzedajemy",
-        body: "Wybór sofy czy narożnika to zakup na lata. Jeśli nie wiesz, który model, rozmiar albo tkanina będzie najlepszym wyborem, możesz się z nami skontaktować. Chętnie pomożemy dobrać rozwiązanie odpowiednie do Twojego wnętrza i potrzeb.",
-      },
-      {
-        title: "Darmowa dostawa na terenie całej Polski",
-        body: "Chcemy, aby zakup mebli był prosty również od strony logistycznej. Zapewniamy darmową dostawę na terenie całej Polski.",
-      },
-    ],
-    aboutClosingHeading: "Mollien — Twój mebel, Twój styl",
-    aboutClosing:
-      "Nie chcemy tworzyć mebli, które wyglądają tak samo w każdym domu. Chcemy dać Ci możliwość stworzenia wnętrza po swojemu. Wybierz model, konfigurację, rozmiar i tkaninę, a my zadbamy o jego wykonanie.",
-    aboutTagline: "Mollien — polskie meble stworzone z myślą o Twoim wnętrzu.",
-    aboutAccount:
-      "Konto w sklepie, zakładane adresem e-mail lub przez Google, służy do śledzenia zamówienia, historii zakupów i zapisywania ulubionych modeli; do przeglądania oferty nie jest potrzebne.",
+    aboutDefaultHtml: [
+      "<p>Tworzymy meble, które mają być czymś więcej niż tylko wyposażeniem wnętrza. Mollien to sklep internetowy z meblami tapicerowanymi — łóżkami, materacami, narożnikami, sofami i fotelami — w którym stawiamy na połączenie nowoczesnego designu, komfortu i jakości wykonania, aby każdy mebel dobrze wyglądał nie tylko w dniu zakupu, ale przede wszystkim sprawdzał się na co dzień.</p>",
+      "<h3>Polska produkcja</h3><p>Nasze meble powstają w Polsce, z dbałością o każdy etap ich wykonania. Produkujemy je sami, dzięki czemu odpowiadamy za jakość konstrukcji, materiałów i wykończenia.</p>",
+      "<h3>Nowoczesny design</h3><p>Tworzymy kolekcje inspirowane współczesnymi trendami, ale zależy nam również na tym, aby nasze meble były ponadczasowe. Zaokrąglone bryły, miękkie formy i charakterystyczne detale pozwalają stworzyć wnętrze z własnym charakterem.</p>",
+      "<h3>Meble dopasowane do Ciebie</h3><p>Wiele naszych kolekcji ma modułową konstrukcję, dzięki której możesz stworzyć układ odpowiadający Twojej przestrzeni. Sofa, narożnik czy większy zestaw? To Ty decydujesz, jak będzie wyglądał Twój mebel.</p>",
+      "<h3>Wybierz swoją tkaninę</h3><p>Wiemy, że każdy ma inny gust. Dlatego oferujemy szeroki wybór tkanin i kolorów, dzięki którym możesz dopasować mebel do swojego wnętrza. Chcesz zobaczyć materiał przed zakupem? Możesz zamówić bezpłatne próbki tkanin.</p>",
+      "<h3>Komfort, który ma znaczenie</h3><p>Dobry design to nie wszystko. Mebel powinien być przede wszystkim wygodny. Dlatego zwracamy uwagę na proporcje, głębokość siedzisk, wysokość oraz odpowiednie wyprofilowanie poszczególnych elementów.</p>",
+      "<h3>Doradzamy, nie tylko sprzedajemy</h3><p>Wybór sofy czy narożnika to zakup na lata. Jeśli nie wiesz, który model, rozmiar albo tkanina będzie najlepszym wyborem, możesz się z nami skontaktować. Chętnie pomożemy dobrać rozwiązanie odpowiednie do Twojego wnętrza i potrzeb.</p>",
+      "<h3>Darmowa dostawa na terenie całej Polski</h3><p>Chcemy, aby zakup mebli był prosty również od strony logistycznej. Zapewniamy darmową dostawę na terenie całej Polski.</p>",
+      "<h3>Mollien — Twój mebel, Twój styl</h3><p>Nie chcemy tworzyć mebli, które wyglądają tak samo w każdym domu. Chcemy dać Ci możliwość stworzenia wnętrza po swojemu. Wybierz model, konfigurację, rozmiar i tkaninę, a my zadbamy o jego wykonanie.</p>",
+      "<p>Konto w sklepie, zakładane adresem e-mail lub przez Google, służy do śledzenia zamówienia, historii zakupów i zapisywania ulubionych modeli; do przeglądania oferty nie jest potrzebne.</p>",
+      "<p><strong>Mollien — polskie meble stworzone z myślą o Twoim wnętrzu.</strong></p>",
+    ].join(""),
   },
   product: {
     addToCart: "Dodaj do koszyka",

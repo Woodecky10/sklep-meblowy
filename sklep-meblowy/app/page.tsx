@@ -22,6 +22,7 @@ import { getHomeBlocks } from "./_lib/blocks-server";
 import ContentBlock from "./_components/blocks/ContentBlock";
 import HomeCollections from "./_components/blocks/HomeCollections";
 import AboutStore from "./_components/blocks/AboutStore";
+import { getSiteTexts, siteText } from "./_lib/site-texts";
 
 // Home jest w pełni przetłumaczone przez słownik UI → DE zawsze (hasDe: true).
 // generateMetadata na poziomie strony nadpisuje statyczne metadata z layoutu
@@ -51,17 +52,30 @@ function protectOrphans(text: string): string {
 export default async function HomePage() {
   const locale = await getLocale();
   const t = getDictionary(locale);
-  const [dbSlides, dbTiles, featured, allCategories, collectionTiles, wishlistIds, rate, dbBlocks] =
-    await Promise.all([
-      getActiveSlides(),
-      getActiveTiles(),
-      getFeaturedOrFallback(locale),
-      getCategories(locale),
-      getCollectionTilesForHome(locale),
-      getUserWishlistIds(),
-      getEurRate(),
-      getHomeBlocks(),
-    ]);
+  const [
+    dbSlides,
+    dbTiles,
+    featured,
+    allCategories,
+    collectionTiles,
+    wishlistIds,
+    rate,
+    dbBlocks,
+    siteTexts,
+  ] = await Promise.all([
+    getActiveSlides(),
+    getActiveTiles(),
+    getFeaturedOrFallback(locale),
+    getCategories(locale),
+    getCollectionTilesForHome(locale),
+    getUserWishlistIds(),
+    getEurRate(),
+    getHomeBlocks(),
+    getSiteTexts(),
+  ]);
+  // Pusty fallback celowo — brak wpisu w panelu obsługuje AboutStore, sięgając
+  // po tekst domyślny ze słownika (i po właściwy język).
+  const aboutHtml = siteText(siteTexts, "home_about", locale, "");
   const blocks = dbBlocks
     .map((b) => localizeBlock(b, locale))
     .filter((b): b is LocalizedBlock => b !== null);
@@ -207,7 +221,7 @@ export default async function HomePage() {
               locale={locale}
               heading={b.heading}
               eyebrow={b.subheading}
-              intro={<AboutStore locale={locale} />}
+              intro={<AboutStore locale={locale} html={aboutHtml} />}
             />
           </section>
         );
@@ -241,7 +255,7 @@ export default async function HomePage() {
           weryfikacja marki Google, więc nie może zniknąć razem z paskiem. */}
       {!hasTrustBar && (
         <section className="max-w-7xl mx-auto px-6 py-24">
-          <AboutStore locale={locale} withHeading />
+          <AboutStore locale={locale} html={aboutHtml} withHeading />
         </section>
       )}
     </>

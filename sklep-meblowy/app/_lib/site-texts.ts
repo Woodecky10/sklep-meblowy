@@ -7,8 +7,17 @@ import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
 import type { Locale } from "./i18n";
 
-export const SITE_TEXT_KEYS = ["topbar_slogan", "footer_tagline"] as const;
+export const SITE_TEXT_KEYS = ["topbar_slogan", "footer_tagline", "home_about"] as const;
 export type SiteTextKey = (typeof SITE_TEXT_KEYS)[number];
+
+// Limit znaków per klucz. Slogany to jedna linijka, ale `home_about` trzyma
+// sformatowany HTML z edytora WYSIWYG — sam markup zjada tam sporo miejsca.
+const DEFAULT_MAX_LEN = 500;
+const MAX_LEN: Partial<Record<SiteTextKey, number>> = { home_about: 20000 };
+
+export function siteTextMaxLen(key: SiteTextKey): number {
+  return MAX_LEN[key] ?? DEFAULT_MAX_LEN;
+}
 
 export type SiteTextsMap = Record<
   string,
