@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
@@ -25,17 +25,31 @@ const CONSENT_VERSION = 1;
 const secondaryBtnClass =
   "px-5 py-2.5 text-sm font-sans font-semibold uppercase tracking-wider rounded-full border border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--fg)] transition-colors";
 
-export function getConsent(): CookieConsent | null {
+// Surowy wpis z localStorage. Osobno od parsowania, bo useSyncExternalStore
+// wymaga snapshotu STABILNEGO referencyjnie — string jest, sparsowany obiekt
+// nie (nowa referencja przy każdym odczycie = pętla renderów).
+export function readConsentRaw(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
+    return localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function parseConsent(raw: string | null): CookieConsent | null {
+  if (!raw) return null;
+  try {
     const parsed = JSON.parse(raw) as CookieConsent;
     if (parsed.version !== CONSENT_VERSION) return null;
     return parsed;
   } catch {
     return null;
   }
+}
+
+export function getConsent(): CookieConsent | null {
+  return parseConsent(readConsentRaw());
 }
 
 function saveConsent(analytics: boolean, marketing: boolean) {
@@ -53,9 +67,23 @@ function saveConsent(analytics: boolean, marketing: boolean) {
 
 // Subskrypcja na decyzję cookie — saveConsent dispatchuje event
 // "cookie-consent", więc baner zamyka się sam po zapisie zgody.
-function subscribeConsent(callback: () => void): () => void {
+// "storage" dokłada wypadek zmiany zgody w INNEJ karcie tej samej domeny.
+export function subscribeConsent(callback: () => void): () => void {
   window.addEventListener("cookie-consent", callback);
-  return () => window.removeEventListener("cookie-consent", callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener("cookie-consent", callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+
+// Ponowne otwarcie banera z dowolnego miejsca (stopka). Zgoda raz podjęta chowa
+// baner na zawsze, więc bez tej furtki nie dało się jej wycofać — a zgoda,
+// której nie da się cofnąć, nie jest zgodą w rozumieniu RODO.
+const SETTINGS_EVENT = "cookie-settings-open";
+
+export function openCookieSettings() {
+  window.dispatchEvent(new CustomEvent(SETTINGS_EVENT));
 }
 
 export default function CookieBanner() {
@@ -69,20 +97,40 @@ export default function CookieBanner() {
   const [showDetails, setShowDetails] = useState(false);
   const [analytics, setAnalytics] = useState(false);
   const [marketing, setMarketing] = useState(false);
+  // Baner wywołany ze stopki po podjętej już decyzji — pokazuje się mimo
+  // consentDecided i od razu rozwinięty, bo użytkownik przyszedł tu edytować.
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const locale = useClientLocale();
   const t = getDictionary(locale);
+
+  useEffect(() => {
+    function onOpen() {
+      // Prefill z zapisanej zgody: „Zapisz wybór" bez zmian ma być no-opem,
+      // a nie cichym zresetowaniem wszystkiego do odmowy.
+      const current = getConsent();
+      setAnalytics(current?.analytics ?? false);
+      setMarketing(current?.marketing ?? false);
+      setShowDetails(true);
+      setSettingsOpen(true);
+    }
+    window.addEventListener(SETTINGS_EVENT, onOpen);
+    return () => window.removeEventListener(SETTINGS_EVENT, onOpen);
+  }, []);
 
   // saveConsent emituje "cookie-consent" → consentDecided=true → baner znika.
   function acceptAll() {
     saveConsent(true, true);
+    setSettingsOpen(false);
   }
 
   function rejectAll() {
     saveConsent(false, false);
+    setSettingsOpen(false);
   }
 
   function saveCustom() {
     saveConsent(analytics, marketing);
+    setSettingsOpen(false);
   }
 
   // Lewy przycisk pełni dwie role w zależności od stanu: przed rozwinięciem
@@ -92,7 +140,7 @@ export default function CookieBanner() {
     else setShowDetails(true);
   }
 
-  if (consentDecided) return null;
+  if (consentDecided && !settingsOpen) return null;
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 px-4 pb-4 pointer-events-none">
@@ -100,10 +148,10 @@ export default function CookieBanner() {
         <div className="flex flex-col gap-4">
           <div>
             <h2 className="font-display text-xl font-bold text-[var(--fg)] mb-2">
-              {t.cookies.heading}
+              {settingsOpen ? t.cookies.settings : t.cookies.heading}
             </h2>
             <p className="text-sm text-[var(--muted)] leading-relaxed">
-              {t.cookies.body}{" "}
+              {settingsOpen ? t.cookies.settingsBody : t.cookies.body}{" "}
               <Link
                 href={localizeHref("/prywatnosc", locale)}
                 className="underline text-[var(--color-gold-text)] hover:opacity-80"

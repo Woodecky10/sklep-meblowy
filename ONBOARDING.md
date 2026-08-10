@@ -228,6 +228,63 @@ Gotchy, które kosztowały czas i wrócą:
 1. **Podprojekt 3 (faktury KSeF)** — czeka na odpowiedź: z jakiego programu fakturowego korzysta księgowa (przesądza drogę); potem spec → plan → wdrożenie.
 3. **Reszta podprojektu 4 (wysyłka)** — termin dostawy, dane transportu, model kosztu.
 
+## 🔑 Przekazanie obsługi — checklista zasobów (2026-08-10)
+
+Powstała, gdy okazało się, że właściciel nie pamiętał, co w ogóle było w Google
+zakładane. **Zasada nadrzędna: marketing dostaje DOSTĘP, nie własność.** Klucze do
+sklepu i pieniędzy (Vercel, Supabase, P24, home.pl) zostają u właściciela.
+
+### Google — zasoby i stan
+
+| Zasób | Gdzie stoi | Co zrobić przy przekazaniu |
+|---|---|---|
+| **Google Cloud + klient OAuth** (logowanie Google w sklepie) | konto `miki19991@gmail.com`, projekt `Sklep-meblowy` nr **614212632886**, **poza organizacją** | dodać osobę w IAM jako **Właściciel**; zaproszenie wymaga akceptacji mailem |
+| **Weryfikacja marki** (ekran zgody OAuth) | ten sam projekt | zgłoszona 2026-07-30; sprawdzić status, **nie edytować pól w trakcie przeglądu** |
+| **Search Console** | weryfikacja **rekordem TXT w DNS w home.pl** | dodać osobę **osobno w każdej z dwóch usług** (Ustawienia → Użytkownicy i uprawnienia) |
+| **Google Analytics 4** | ⚠️ usługa **na koncie zewnętrznym** (`G-GL6DBHYQYT`) | patrz niżej — jedyny zasób, którego właściciel NIE kontroluje |
+| **Merchant Center** | do ustalenia — `/feed.xml` istnieje w kodzie, panel niepotwierdzony | sprawdzić, czy konto istnieje i na czyim koncie |
+| **Wizytówka Google** | **brak śladu** w DNS i w repo — prawdopodobnie nigdy nie założona | jeśli zakładana: dane muszą zgadzać się z JSON-LD (niżej) |
+
+⚠️ **Dwie usługi w Search Console to NIE duplikat.** „Domena" `mollien.pl` daje pełny
+obraz, ale „Prefiks URL" `https://www.mollien.pl/` **jest wymagany przez weryfikację
+marki** — pierwsze zgłoszenie odrzucono właśnie z powodem „strona główna nie jest
+zarejestrowana na Ciebie". Nie kasować jej jako zbędnej.
+
+⚠️ **Największe ryzyko całej układanki:** logowanie przez Google stoi na **prywatnym
+Gmailu**, na projekcie poza organizacją. Utrata tego konta = klienci przestają się
+logować przez Google i nikt nie wie dlaczego. Do rozwiązania niezależnie od tego, komu
+co się oddaje. Uwaga: przełącznik projektów tego projektu **nie znajduje** (filtruje po
+organizacji) — wchodzić wprost linkiem, patrz sekcja „Logowanie Google".
+
+⚠️ **GA4 nie należy do sklepu.** Identyfikator w `NEXT_PUBLIC_GA_ID` (Vercel,
+Production) wskazuje usługę założoną na koncie osoby od marketingu — świadoma decyzja
+właściciela z 2026-08-10, podjęta dla szybkiego startu. Skutek: **historia danych jest
+jej własnością, a GA nie eksportuje historii**, więc rozstanie = licznik od zera. Do
+załatwienia, zanim uzbiera się rok danych: rola **Administratora** na koncie GA (nie
+tylko na usłudze), docelowo przeniesienie usługi na konto kontrolowane przez sklep
+(wymaga uprawnień po obu stronach — musi to kliknąć właścicielka usługi).
+
+### Czego NIE oddawać razem z marketingiem
+Domena i DNS (**home.pl** — na nim stoi weryfikacja Search Console i cała poczta),
+Vercel, Supabase, Przelewy24, Resend, GitHub. To są klucze do sklepu i do pieniędzy.
+
+### Zależności od kodu
+Kod **nie blokuje** ani weryfikacji marki, ani wizytówki — wszystko, czego Google
+wymaga, już jest: `/prywatnosc`, `/regulamin`, strona główna, Organization JSON-LD z
+adresem, telefonem i NIP-em (`app/_lib/seo-jsonld.ts`).
+
+Dwie rzeczy do pilnowania:
+1. **Nazwa aplikacji na ekranie zgody musi zgadzać się z logo w Navbarze** — test Google
+   jest dosłowny i to był jeden z trzech powodów pierwszego odrzucenia. W repo
+   `COMPANY.displayName` = `MOLLIEN.PL` (wersalikami) i tak jest od 2026-05-11, czyli
+   również w dniu zgłoszenia; notatka z 2026-07-30 mówi o nazwie `Mollien.pl`. Jeśli
+   weryfikacja poleci drugi raz — **tu patrzeć najpierw**.
+2. **Wizytówka:** adres, telefon i nazwa muszą być identyczne jak w `COMPANY`
+   (`Dworzyszcze 4, 63-630 Rychtal`, `+48 570 818 226`) — rozjazd Google traktuje jako
+   sygnał niespójności. Po założeniu wizytówki warto dopisać jej URL do `sameAs` w
+   Organization JSON-LD; dziś tego pola **nie ma**. To jedyna realna zmiana w kodzie
+   wynikająca z tej listy.
+
 ## Drobne follow-upy (nieblokujące)
 - `schema.sql` jest niekompletnym baseline'em (pre-existing) — fresh-DB bootstrap z samego pliku byłby niepełny; źródłem prawdy są **migracje**.
 - Stary `.env.local` (gitignored, nie przychodzi z klonem) może mieć nieużywane już zmienne po dawnej integracji magazynowej — można wyczyścić ręcznie, aplikacja ich nie czyta.

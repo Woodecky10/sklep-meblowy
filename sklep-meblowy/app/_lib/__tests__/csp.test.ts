@@ -47,6 +47,47 @@ describe("buildCsp", () => {
     expect(d["img-src"]).toEqual(["'self'", "data:", "blob:", "https://images.unsplash.com"]);
   });
 
+  it("bez GA polityka zostaje wąska (żadnego hosta Google)", () => {
+    const csp = buildCsp("n", { isDev: false, supabaseOrigin: SB });
+    expect(csp).not.toContain("google");
+  });
+
+  it("z GA: kanały wysyłki w connect-src/img-src, ale NIE w script-src", () => {
+    const d = parse(buildCsp("n", { isDev: false, supabaseOrigin: SB, gaEnabled: true }));
+    expect(d["connect-src"]).toContain("https://*.google-analytics.com");
+    expect(d["connect-src"]).toContain("https://*.analytics.google.com");
+    expect(d["connect-src"]).toContain("https://www.googletagmanager.com");
+    expect(d["img-src"]).toContain("https://*.google-analytics.com");
+    // 'strict-dynamic' i tak unieważnia listę hostów w script-src — gtag.js
+    // przechodzi jako skrypt wstawiony przez zaufany bundel.
+    expect(d["script-src"].join(" ")).not.toContain("google");
+    expect(d["script-src"]).toContain("'strict-dynamic'");
+  });
+
+  it("z GA: hosty remarketingu Google Ads w connect-src i img-src", () => {
+    const d = parse(buildCsp("n", { isDev: false, supabaseOrigin: SB, gaEnabled: true }));
+    for (const host of [
+      "https://stats.g.doubleclick.net",
+      "https://googleads.g.doubleclick.net",
+      "https://www.google.com",
+    ]) {
+      expect(d["connect-src"]).toContain(host);
+      expect(d["img-src"]).toContain(host);
+    }
+  });
+
+  it("bez GA nie ma hostów reklamowych", () => {
+    const csp = buildCsp("n", { isDev: false, supabaseOrigin: SB });
+    expect(csp).not.toContain("doubleclick");
+  });
+
+  it("GA nie rozluźnia dyrektyw, które go nie dotyczą", () => {
+    const d = parse(buildCsp("n", { isDev: false, supabaseOrigin: SB, gaEnabled: true }));
+    expect(d["frame-src"]).toEqual(["'none'"]);
+    expect(d["default-src"]).toEqual(["'self'"]);
+    expect(d["form-action"]).toEqual(["'self'"]);
+  });
+
   it("twarde dyrektywy obecne", () => {
     const csp = buildCsp("n", { isDev: false, supabaseOrigin: SB });
     const d = parse(csp);

@@ -118,6 +118,8 @@ export default async function PrywatnoscPage() {
           " – dienen der Präsentation von Werbeinhalten. Erfordern eine Einwilligung.",
         s6_3:
           "Sie können Cookies in den Einstellungen Ihres Browsers sowie über das Cookie-Banner verwalten, das beim ersten Besuch des Shops angezeigt wird.",
+        s6_4:
+          "Zur Verkehrsanalyse nutzen wir Google Analytics 4 (Anbieter: Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland). Das Skript wird erst geladen, nachdem Sie in analytische Cookies eingewilligt haben – ohne diese Einwilligung werden keine Daten an Google übermittelt. Google Analytics speichert u. a. die Cookies _ga und _ga_*, die eine wiederkehrende Sitzung unterscheiden. Dabei können Daten außerhalb des EWR übermittelt werden, auf Grundlage der von der Europäischen Kommission genehmigten Standardvertragsklauseln.",
 
         s7: "§ 7. Ihre Rechte",
         s7Intro:
@@ -251,6 +253,8 @@ export default async function PrywatnoscPage() {
           " – służą do prezentowania treści reklamowych. Wymagają zgody.",
         s6_3:
           "Możesz zarządzać cookies w ustawieniach przeglądarki oraz poprzez baner cookies wyświetlany przy pierwszej wizycie w Sklepie.",
+        s6_4:
+          "Do analizy ruchu korzystamy z Google Analytics 4 (dostawca: Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irlandia). Skrypt ładuje się dopiero po wyrażeniu przez Ciebie zgody na cookies analityczne – bez tej zgody żadne dane nie trafiają do Google. Google Analytics zapisuje m.in. cookies _ga oraz _ga_*, które pozwalają odróżnić powracającą sesję. Dane mogą być przy tym przekazywane poza EOG, na podstawie standardowych klauzul umownych zatwierdzonych przez Komisję Europejską.",
 
         s7: "§ 7. Twoje prawa",
         s7Intro:
@@ -424,6 +428,7 @@ export default async function PrywatnoscPage() {
           </ul>
         </li>
         <li>{c.s6_3}</li>
+        <li>{c.s6_4}</li>
       </ol>
 
       <h2>{c.s7}</h2>

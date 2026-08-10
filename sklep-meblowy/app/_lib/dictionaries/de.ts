@@ -249,6 +249,8 @@ export const de: DeepPartial<PlShape> = {
     save: "Auswahl speichern",
     onlyNecessary: "Nur notwendige",
     acceptAll: "Alle akzeptieren",
+    settings: "Cookie-Einstellungen",
+    settingsBody: "Sie können Ihre Entscheidung jederzeit ändern. Wenn Sie die Analyse deaktivieren, werden auch bereits gesetzte Cookies gelöscht. Details in der",
   },
   notFound: {
     eyebrow: "Seite nicht gefunden",
