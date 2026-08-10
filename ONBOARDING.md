@@ -273,6 +273,23 @@ Kod **nie blokuje** ani weryfikacji marki, ani wizytówki — wszystko, czego Go
 wymaga, już jest: `/prywatnosc`, `/regulamin`, strona główna, Organization JSON-LD z
 adresem, telefonem i NIP-em (`app/_lib/seo-jsonld.ts`).
 
+🔴 **PRZYCZYNA ODRZUCEŃ USTALONA 2026-08-10 — to NIE jest problem z treścią strony.**
+Cztery odrzucenia z powodem „strona główna nie wyjaśnia celu aplikacji" mimo trzech
+poważnych zmian treści. Dowód: ekran Google przy logowaniu pokazuje
+`app_domain=https://tlvgsddpiikolgdwuwmc.supabase.co` i napis „Przejdź do aplikacji
+tlvgsddpiikolgdwuwmc.supabase.co", a w **Domenach autoryzowanych** ekranu zgody stoją
+DWIE pozycje: `tlvgsddpiikolgdwuwmc.supabase.co` oraz `mollien.pl`.
+**Google uważa, że aplikacja mieszka na domenie Supabase**, bo tam prowadzi
+`redirect_uri`. Recenzent ocenia więc cudzą stronę, a domeny `supabase.co` nie da się
+potwierdzić w Search Console jako naszej — czyli weryfikacja jest strukturalnie
+zablokowana, niezależnie od tego, co napiszemy na home.
+⚠️ **Samo usunięcie tej domeny z listy zepsuje logowanie Google** (patrz ostrzeżenie
+niżej) — najpierw trzeba przenieść endpoint auth na własną domenę
+(Supabase → Custom Domain, np. `auth.mollien.pl`), przepiąć `redirect_uri` w Google
+Cloud, i dopiero wtedy usunąć wpis `supabase.co`.
+Test, czy przeszło: w incognito kliknąć „Zaloguj przez Google" — ma się pokazać
+`Mollien.pl`, a nie host Supabase.
+
 **Co realnie daje weryfikacja marki — sprawdzone na żywo 2026-08-10.** Klient klikający
 „Zaloguj przez Google" na `mollien.pl` widzi dziś ekran Google z napisem *„Przejdź do
 aplikacji **tlvgsddpiikolgdwuwmc.supabase.co**"* — czyli surowy host bazy zamiast marki.
