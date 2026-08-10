@@ -241,6 +241,8 @@ export type PlShape = {
     save: string;
     onlyNecessary: string;
     acceptAll: string;
+    settings: string;
+    settingsBody: string;
   };
   notFound: {
     eyebrow: string;
@@ -601,6 +603,8 @@ export const pl = {
     save: "Zapisz wybór",
     onlyNecessary: "Tylko niezbędne",
     acceptAll: "Akceptuj wszystkie",
+    settings: "Ustawienia cookies",
+    settingsBody: "Możesz zmienić swoją decyzję w dowolnym momencie. Wyłączenie analityki usuwa też cookies, które już zostały zapisane. Szczegóły w",
   },
   notFound: {
     eyebrow: "Strona nie znaleziona",

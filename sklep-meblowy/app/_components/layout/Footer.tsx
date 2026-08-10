@@ -9,6 +9,7 @@ import { getSiteTexts, siteText } from "@/app/_lib/site-texts";
 import { getMenuItems } from "@/app/_lib/menu-server";
 import { prepareMenuItems } from "@/app/_lib/menu";
 import { getContactInfo } from "@/app/_lib/contact-server";
+import CookieSettingsLink from "./CookieSettingsLink";
 
 export default async function Footer() {
   const locale = await getLocale();
@@ -104,6 +105,13 @@ export default async function Footer() {
                 </LocalizedLink>
               </li>
             ))}
+            {/* Obok Polityki prywatności, bo tam użytkownik szuka zgód. */}
+            <li>
+              <CookieSettingsLink
+                label={t.cookies.settings}
+                className="text-left cursor-pointer hover:text-[var(--color-gold)] transition-colors"
+              />
+            </li>
             {/* Podstrony z menu stopki (admin: /admin/podstrony). */}
             {footerItems.map((item) => (
               <li key={item.id}>

@@ -21,14 +21,26 @@ const GA_CONNECT = [
 ];
 const GA_IMG = ["https://www.googletagmanager.com", "https://*.google-analytics.com"];
 
+// Remarketing Google Ads: GA4 z włączonymi sygnałami Google pinguje domeny
+// DoubleClick i google.com. Bez nich listy odbiorców w Ads zostają puste, a
+// zapytania są blokowane po cichu. Wpuszczane razem z GA, bo CSP to nagłówek
+// odpowiedzi — nie da się go uzależnić od zgody konkretnego użytkownika; o samą
+// zgodę dba Consent Mode (patrz GoogleAnalytics.tsx), więc bez zgody
+// marketingowej pod te adresy i tak nic nie poleci.
+const GA_ADS = [
+  "https://stats.g.doubleclick.net",
+  "https://googleads.g.doubleclick.net",
+  "https://www.google.com",
+];
+
 export function buildCsp(
   nonce: string,
   { isDev, supabaseOrigin, gaEnabled = false }: CspOpts
 ): string {
   const sbHttps = supabaseOrigin ? [supabaseOrigin] : [];
   const sbWss = supabaseOrigin ? [supabaseOrigin.replace(/^https:/, "wss:")] : [];
-  const gaConnect = gaEnabled ? GA_CONNECT : [];
-  const gaImg = gaEnabled ? GA_IMG : [];
+  const gaConnect = gaEnabled ? [...GA_CONNECT, ...GA_ADS] : [];
+  const gaImg = gaEnabled ? [...GA_IMG, ...GA_ADS] : [];
 
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],

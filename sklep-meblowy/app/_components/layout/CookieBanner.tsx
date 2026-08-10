@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
@@ -77,6 +77,15 @@ export function subscribeConsent(callback: () => void): () => void {
   };
 }
 
+// Ponowne otwarcie banera z dowolnego miejsca (stopka). Zgoda raz podjęta chowa
+// baner na zawsze, więc bez tej furtki nie dało się jej wycofać — a zgoda,
+// której nie da się cofnąć, nie jest zgodą w rozumieniu RODO.
+const SETTINGS_EVENT = "cookie-settings-open";
+
+export function openCookieSettings() {
+  window.dispatchEvent(new CustomEvent(SETTINGS_EVENT));
+}
+
 export default function CookieBanner() {
   // useSyncExternalStore zamiast setState-w-efekcie: na serwerze "zgoda
   // rozstrzygnięta" (baner niewidoczny), po hydracji czytamy localStorage.
@@ -88,20 +97,40 @@ export default function CookieBanner() {
   const [showDetails, setShowDetails] = useState(false);
   const [analytics, setAnalytics] = useState(false);
   const [marketing, setMarketing] = useState(false);
+  // Baner wywołany ze stopki po podjętej już decyzji — pokazuje się mimo
+  // consentDecided i od razu rozwinięty, bo użytkownik przyszedł tu edytować.
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const locale = useClientLocale();
   const t = getDictionary(locale);
+
+  useEffect(() => {
+    function onOpen() {
+      // Prefill z zapisanej zgody: „Zapisz wybór" bez zmian ma być no-opem,
+      // a nie cichym zresetowaniem wszystkiego do odmowy.
+      const current = getConsent();
+      setAnalytics(current?.analytics ?? false);
+      setMarketing(current?.marketing ?? false);
+      setShowDetails(true);
+      setSettingsOpen(true);
+    }
+    window.addEventListener(SETTINGS_EVENT, onOpen);
+    return () => window.removeEventListener(SETTINGS_EVENT, onOpen);
+  }, []);
 
   // saveConsent emituje "cookie-consent" → consentDecided=true → baner znika.
   function acceptAll() {
     saveConsent(true, true);
+    setSettingsOpen(false);
   }
 
   function rejectAll() {
     saveConsent(false, false);
+    setSettingsOpen(false);
   }
 
   function saveCustom() {
     saveConsent(analytics, marketing);
+    setSettingsOpen(false);
   }
 
   // Lewy przycisk pełni dwie role w zależności od stanu: przed rozwinięciem
@@ -111,7 +140,7 @@ export default function CookieBanner() {
     else setShowDetails(true);
   }
 
-  if (consentDecided) return null;
+  if (consentDecided && !settingsOpen) return null;
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 px-4 pb-4 pointer-events-none">
@@ -119,10 +148,10 @@ export default function CookieBanner() {
         <div className="flex flex-col gap-4">
           <div>
             <h2 className="font-display text-xl font-bold text-[var(--fg)] mb-2">
-              {t.cookies.heading}
+              {settingsOpen ? t.cookies.settings : t.cookies.heading}
             </h2>
             <p className="text-sm text-[var(--muted)] leading-relaxed">
-              {t.cookies.body}{" "}
+              {settingsOpen ? t.cookies.settingsBody : t.cookies.body}{" "}
               <Link
                 href={localizeHref("/prywatnosc", locale)}
                 className="underline text-[var(--color-gold-text)] hover:opacity-80"

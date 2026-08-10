@@ -65,9 +65,34 @@ function startTag(id: string, signals: ConsentSignals) {
   document.head.appendChild(script);
 }
 
-function updateConsent(signals: ConsentSignals) {
-  if (!tagStarted) return;
+// Wymaga wystartowanego tagu — pilnuje tego wywołujący.
+function pushConsentUpdate(signals: ConsentSignals) {
   gtag("consent", "update", signals);
+}
+
+function clearGaCookies() {
+  const names = document.cookie
+    .split(";")
+    .map((c) => c.split("=")[0].trim())
+    .filter((n) => n.startsWith("_ga") || n === "_gid");
+  if (names.length === 0) return;
+
+  // GA zapisuje cookie na domenie rejestrowalnej (.mollien.pl), a nie na
+  // hoście (www.mollien.pl) — kasowanie działa tylko przy zgodnym atrybucie
+  // domain, więc lecimy po wszystkich wariantach od hosta w górę.
+  const parts = window.location.hostname.split(".");
+  const domains: (string | null)[] = [null];
+  for (let i = 0; i <= parts.length - 2; i++) {
+    const domain = parts.slice(i).join(".");
+    domains.push(domain, `.${domain}`);
+  }
+
+  for (const name of names) {
+    for (const domain of domains) {
+      const scope = domain ? `; domain=${domain}` : "";
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/${scope}`;
+    }
+  }
 }
 
 export default function GoogleAnalytics() {
@@ -79,10 +104,28 @@ export default function GoogleAnalytics() {
     // Brak decyzji = brak zgody: nie ładujemy nic, dopóki użytkownik nie kliknie.
     if (!GA_MEASUREMENT_ID || !consent) return;
     const signals = gaConsentSignals(consent);
-    if (consent.analytics) startTag(GA_MEASUREMENT_ID, signals);
-    // Cofnięcie zgody w innej karcie: tag już wisi, więc zamiast go usuwać
-    // (czego gtag.js nie wspiera) odcinamy go sygnałem consent.
-    else updateConsent(signals);
+    if (consent.analytics) {
+      // Tag już działa → sama zmiana zgody marketingowej idzie sygnałem.
+      if (tagStarted) pushConsentUpdate(signals);
+      else startTag(GA_MEASUREMENT_ID, signals);
+      return;
+    }
+
+    // Cofnięcie zgody musi zrobić więcej niż sygnał 'consent update': raz
+    // załadowany gtag.js zostaje w pamięci strony i nadal wysyła bezcookie'owe
+    // pingi, a zapisane cookies same nie znikną.
+    if (tagStarted) {
+      // Kolejność ma znaczenie: najpierw odetnij tag sygnałem, potem czyść.
+      // Odwrotnie gtag.js zdąży odtworzyć cookie sesji (_ga_<id>) przy
+      // zamykaniu strony i przeżyje ono przeładowanie — sprawdzone.
+      pushConsentUpdate(signals);
+      clearGaCookies();
+      window.location.reload();
+      return;
+    }
+
+    // Po przeładowaniu tagu nie ma, więc dopiero to kasowanie jest ostateczne.
+    clearGaCookies();
   }, [consent]);
 
   return null;

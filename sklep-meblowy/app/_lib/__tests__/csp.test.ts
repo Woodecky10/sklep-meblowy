@@ -64,6 +64,23 @@ describe("buildCsp", () => {
     expect(d["script-src"]).toContain("'strict-dynamic'");
   });
 
+  it("z GA: hosty remarketingu Google Ads w connect-src i img-src", () => {
+    const d = parse(buildCsp("n", { isDev: false, supabaseOrigin: SB, gaEnabled: true }));
+    for (const host of [
+      "https://stats.g.doubleclick.net",
+      "https://googleads.g.doubleclick.net",
+      "https://www.google.com",
+    ]) {
+      expect(d["connect-src"]).toContain(host);
+      expect(d["img-src"]).toContain(host);
+    }
+  });
+
+  it("bez GA nie ma hostów reklamowych", () => {
+    const csp = buildCsp("n", { isDev: false, supabaseOrigin: SB });
+    expect(csp).not.toContain("doubleclick");
+  });
+
   it("GA nie rozluźnia dyrektyw, które go nie dotyczą", () => {
     const d = parse(buildCsp("n", { isDev: false, supabaseOrigin: SB, gaEnabled: true }));
     expect(d["frame-src"]).toEqual(["'none'"]);
