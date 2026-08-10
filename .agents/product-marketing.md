@@ -1,6 +1,6 @@
 # Product Marketing Context
 
-**Document version:** v1
+**Document version:** v2
 **Last updated:** 2026-08-10
 
 > Szkic wygenerowany z repozytorium i z bazy produkcyjnej. Sekcje oznaczone
@@ -121,7 +121,7 @@ Skąd to wziąć, w kolejności od najtańszego:
 
 ## Proof Points
 
-**Metrics:** 326 aktywnych produktów · 17 tkanin · 409 stron w indeksie Google · ruch z wyszukiwarki od 2026-04-29 · dostawa darmowa w całej PL · realizacja 14–28 dni roboczych
+**Metrics:** 326 aktywnych produktów · 17 tkanin · 409 stron w indeksie Google · ruch z wyszukiwarki od 2026-04-29 · dostawa darmowa w całej PL · realizacja 14–28 dni roboczych · **2 lata gwarancji na wszystkie produkty**
 **Customers:** 7 zamówień — etap bardzo wczesny, brak logotypów i case'ów
 **Testimonials:** **BRAK.** Zero opinii w bazie i na stronie. Przy meblach za kilka tysięcy złotych kupowanych online to najpoważniejszy brak w całej komunikacji.
 
@@ -142,12 +142,14 @@ Skąd to wziąć, w kolejności od najtańszego:
 
 ## Rozbieżności wykryte przy szkicowaniu
 
-Dwie rzeczy do rozstrzygnięcia — obie wpływają na to, co wolno pisać w tekstach:
+Wpływają na to, co wolno pisać w tekstach:
 
-1. **Gwarancja.** Strona `/o-nas` obiecuje „gwarancji od 2 do 10 lat", a w bazie **każdy** aktywny produkt ma `2 lata`. Pasek zaufania też mówi „2 lata gwarancji". Obietnica na `/o-nas` nie ma pokrycia w danych — do poprawienia albo do uzupełnienia w produktach.
+1. ~~**Gwarancja.**~~ **ROZSTRZYGNIĘTE 2026-08-10:** `/o-nas` obiecywało „gwarancji od 2 do 10 lat", podczas gdy w bazie **każdy** aktywny produkt ma `2 lata`. Decyzja właściciela: ujednolicić w dół, na 2 lata. Tekst poprawiony w PL i DE. **Obowiązująca obietnica to 2 lata gwarancji** — nie pisać inaczej w żadnym materiale. Uwaga: mapy tłumaczeń i testy nadal obsługują wartości `3 lata`, `5 lat`, `10 lat`, bo to infrastruktura na przyszłe produkty, a nie deklaracja.
+
 2. **Katalog nie zgadza się z komunikacją.** Strona główna prowadzi narożnikami i sofami, ale realnie **247 z 326 produktów to łóżka (164) i materace (83)**; narożniki i sofy to około 65 pozycji. Sklep komunikuje się jak salon z sofami, a jest przede wszystkim sklepem z łóżkami i materacami. Do świadomej decyzji: zmienić komunikację czy asortyment.
 
 ## Changelog
 
 *Newest first. One line per revision: what changed and why.*
+- v2 (2026-08-10) — Rozstrzygnięta rozbieżność gwarancji: `/o-nas` obiecywało 2–10 lat bez pokrycia w danych, obowiązuje 2 lata; tekst poprawiony w PL i DE. Zaktualizowane Proof Points.
 - v1 (2026-08-10) — Initial context. Auto-szkic z repo i bazy produkcyjnej; sekcje Competitive Landscape, Objections, Customer Language i Goals zostawione jako luki do uzupełnienia przez właściciela.
