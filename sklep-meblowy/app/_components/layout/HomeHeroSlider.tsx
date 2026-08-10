@@ -123,9 +123,15 @@ export default function HomeHeroSlider({ slides }: { slides: HeroSlide[] }) {
                     // mobile: 36px × 1.25 × 4 = 180px
                     // sm:    48px × 1.25 × 3 = 180px
                     // md:    72px × 1.25 × 3 = 270px
-                    <h1 className="font-display text-4xl sm:text-5xl md:text-7xl font-bold text-white leading-tight mb-8 break-words hyphens-auto min-h-[180px] md:min-h-[270px]">
+                    //
+                    // h2, NIE h1: slider trzyma w DOM wszystkie slajdy naraz
+                    // (rotacja jest wizualna), więc jako h1 dawał ich tyle, ile
+                    // slajdów — cztery hasła marketingowe zamiast jednego
+                    // nagłówka strony. Jedyny h1 home to zdanie mówiące, czym
+                    // jest sklep (page.tsx → purposeHeading). Styl bez zmian.
+                    <h2 className="font-display text-4xl sm:text-5xl md:text-7xl font-bold text-white leading-tight mb-8 break-words hyphens-auto min-h-[180px] md:min-h-[270px]">
                       {renderTitleWithHighlight(slide.title, slide.highlightedWord)}
-                    </h1>
+                    </h2>
                   )}
                   {slide.subtitle && (
                     <p className="text-white/70 text-lg max-w-lg mb-10 leading-relaxed">
