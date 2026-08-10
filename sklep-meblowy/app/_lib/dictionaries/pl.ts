@@ -405,9 +405,9 @@ export const pl = {
     aboutEyebrow: "O sklepie",
     aboutHeading: "Meble tapicerowane prosto od producenta",
     aboutBody:
-      "Mollien to internetowy sklep z meblami tapicerowanymi — narożnikami, sofami, łóżkami i fotelami — produkowanymi na zamówienie w Polsce. Wybierasz model, tkaninę i kolor, zamawiasz online, a gotowy mebel dostarczamy pod wskazany adres. Przed zakupem możesz bezpłatnie zamówić próbki tkanin.",
+      "Kolor na ekranie to nie kolor w Twoim salonie — dlatego zanim cokolwiek kupisz, wysyłamy próbki tkanin za darmo. Mollien to sklep internetowy z meblami tapicerowanymi: łóżkami, materacami, narożnikami, sofami i fotelami. Większość szyjemy na zamówienie w Polsce, więc wybierasz nie tylko model, ale też tkaninę, kolor i wymiar.",
     aboutAccount:
-      "Konto w sklepie — zakładane adresem e-mail lub przez Google — służy do śledzenia statusu zamówienia, przeglądania historii zakupów i zapisywania ulubionych modeli. Do przeglądania oferty nie jest potrzebne.",
+      "Gotowy mebel dowozimy pod wskazany adres w całej Polsce, bez kosztów dostawy, a czas realizacji podajemy przy każdym produkcie. Konto — zakładane adresem e-mail lub przez Google — służy do śledzenia zamówienia, historii zakupów i zapisywania ulubionych modeli. Do przeglądania oferty nie jest potrzebne.",
   },
   product: {
     addToCart: "Dodaj do koszyka",

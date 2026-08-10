@@ -41,9 +41,9 @@ export const de: DeepPartial<PlShape> = {
     aboutEyebrow: "Über den Shop",
     aboutHeading: "Polstermöbel direkt vom Hersteller",
     aboutBody:
-      "Mollien ist ein Online-Shop für Polstermöbel — Ecksofas, Sofas, Betten und Sessel — die in Polen auf Bestellung gefertigt werden. Sie wählen Modell, Stoff und Farbe, bestellen online, und wir liefern das fertige Möbelstück an die angegebene Adresse. Vor dem Kauf können Sie kostenlos Stoffmuster bestellen.",
+      "Die Farbe auf dem Bildschirm ist nicht die Farbe in Ihrem Wohnzimmer — deshalb schicken wir Ihnen Stoffmuster kostenlos zu, bevor Sie etwas kaufen. Mollien ist ein Online-Shop für Polstermöbel: Betten, Matratzen, Ecksofas, Sofas und Sessel. Das meiste fertigen wir in Polen auf Bestellung, Sie wählen also nicht nur das Modell, sondern auch Stoff, Farbe und Maß.",
     aboutAccount:
-      "Ein Kundenkonto — per E-Mail oder über Google — dient dazu, den Bestellstatus zu verfolgen, die Kaufhistorie einzusehen und Lieblingsmodelle zu speichern. Zum Stöbern im Angebot ist es nicht erforderlich.",
+      "Das fertige Möbelstück liefern wir in ganz Polen versandkostenfrei an die angegebene Adresse, die Lieferzeit steht bei jedem Produkt. Ein Kundenkonto — per E-Mail oder über Google — dient dazu, die Bestellung zu verfolgen, die Kaufhistorie einzusehen und Lieblingsmodelle zu speichern. Zum Stöbern im Angebot ist es nicht erforderlich.",
     productOne: "Produkt",
     productFew: "Produkte",
     productMany: "Produkte",
