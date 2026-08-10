@@ -366,6 +366,8 @@ export const de: DeepPartial<PlShape> = {
     iconYearsWord: "JAHRE",
   },
   footer: {
+    whatWeAre:
+      "Mollien.pl ist ein Online-Shop für Polstermöbel. Ein Kundenkonto, per E-Mail oder über Google angelegt, dient dazu, Bestellungen zu verfolgen, die Kaufhistorie einzusehen und Lieblingsmodelle zu speichern.",
     information: "Informationen",
     about: "Über uns",
     contact: "Kontakt",

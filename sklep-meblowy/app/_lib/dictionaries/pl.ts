@@ -348,6 +348,11 @@ export type PlShape = {
     iconYearsWord: string;
   };
   footer: {
+    // Jednozdaniowe „czym jest ta strona i po co konto" — dla weryfikacji marki
+    // Google. W stopce, więc obecne na KAŻDEJ podstronie i nie wymaga scrolla
+    // przez całą stronę główną. NIE ukrywać wizualnie: ukryty tekst Google
+    // traktuje jak cloaking, co jest gorsze niż brak tekstu.
+    whatWeAre: string;
     information: string;
     about: string;
     contact: string;
@@ -728,6 +733,8 @@ export const pl = {
     iconYearsWord: "LATA",
   },
   footer: {
+    whatWeAre:
+      "Mollien.pl to sklep internetowy z meblami tapicerowanymi. Konto, zakładane adresem e-mail lub przez Google, służy do śledzenia zamówień, historii zakupów i zapisywania ulubionych modeli.",
     information: "Informacje",
     about: "O nas",
     contact: "Kontakt",
