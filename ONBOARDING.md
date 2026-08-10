@@ -289,6 +289,15 @@ niżej) — najpierw trzeba przenieść endpoint auth na własną domenę
 Cloud, i dopiero wtedy usunąć wpis `supabase.co`.
 Test, czy przeszło: w incognito kliknąć „Zaloguj przez Google" — ma się pokazać
 `Mollien.pl`, a nie host Supabase.
+💰 **Naprawa kosztuje.** Sprawdzone przez API 2026-08-10: `supabase domains get`
+zwraca `entitlement_required` — *„Custom domains require the Custom Domain add-on,
+available on the Pro plan and above."* Projekt jest na planie darmowym, więc fix
+wymaga **przejścia na Pro + wykupienia dodatku**, czyli decyzji biznesowej, a nie
+technicznej. Alternatywy bez wydawania pieniędzy: (a) zostawić jak jest — logowanie
+Google DZIAŁA, zakres to `email profile` (dane niewrażliwe), nie ma limitu 100
+użytkowników ani ekranu „niezweryfikowana aplikacja", jedynym kosztem jest brzydki
+host Supabase na ekranie zgody; (b) zrezygnować z logowania Google i zostawić samą
+rejestrację mailem — problem znika w całości.
 
 **Co realnie daje weryfikacja marki — sprawdzone na żywo 2026-08-10.** Klient klikający
 „Zaloguj przez Google" na `mollien.pl` widzi dziś ekran Google z napisem *„Przejdź do
