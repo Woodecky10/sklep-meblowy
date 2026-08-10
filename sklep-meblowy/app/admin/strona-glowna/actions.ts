@@ -6,7 +6,7 @@ import { requireAdmin } from "@/app/_lib/admin";
 import type { ActionResult } from "@/app/_lib/types";
 import { isTrustIconKey } from "@/app/_components/ui/trust-icons";
 import { invalidateTrustItemsCache } from "@/app/_lib/trust-items";
-import { invalidateSiteTextsCache, SITE_TEXT_KEYS } from "@/app/_lib/site-texts";
+import { invalidateSiteTextsCache, SITE_TEXT_KEYS, siteTextMaxLen } from "@/app/_lib/site-texts";
 import {
   isContentBlockType,
   SYSTEM_BLOCK_TYPES,
@@ -152,10 +152,13 @@ export async function updateSiteTexts(formData: FormData): Promise<ActionResult>
   await requireAdmin();
 
   const supabase = await createAdminClient();
+  // Limit per klucz — `home_about` trzyma HTML z edytora, więc 500 znaków by go
+  // ucięło w połowie tagu. Treść i tak przechodzi przez sanitizeRichHtml przy
+  // renderowaniu, więc obcinanie nie jest tu warstwą bezpieczeństwa.
   const rows = SITE_TEXT_KEYS.map((key) => ({
     key,
-    value: emptyToNull(sanitize(formData.get(key), 500)),
-    value_de: emptyToNull(sanitize(formData.get(`${key}_de`), 500)),
+    value: emptyToNull(sanitize(formData.get(key), siteTextMaxLen(key))),
+    value_de: emptyToNull(sanitize(formData.get(`${key}_de`), siteTextMaxLen(key))),
     updated_at: new Date().toISOString(),
   }));
 

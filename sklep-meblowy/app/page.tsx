@@ -21,6 +21,8 @@ import { localizeBlock, type LocalizedBlock } from "./_lib/blocks";
 import { getHomeBlocks } from "./_lib/blocks-server";
 import ContentBlock from "./_components/blocks/ContentBlock";
 import HomeCollections from "./_components/blocks/HomeCollections";
+import AboutStore from "./_components/blocks/AboutStore";
+import { getSiteTexts, siteText } from "./_lib/site-texts";
 
 // Home jest w pełni przetłumaczone przez słownik UI → DE zawsze (hasDe: true).
 // generateMetadata na poziomie strony nadpisuje statyczne metadata z layoutu
@@ -50,21 +52,35 @@ function protectOrphans(text: string): string {
 export default async function HomePage() {
   const locale = await getLocale();
   const t = getDictionary(locale);
-  const [dbSlides, dbTiles, featured, allCategories, collectionTiles, wishlistIds, rate, dbBlocks] =
-    await Promise.all([
-      getActiveSlides(),
-      getActiveTiles(),
-      getFeaturedOrFallback(locale),
-      getCategories(locale),
-      getCollectionTilesForHome(locale),
-      getUserWishlistIds(),
-      getEurRate(),
-      getHomeBlocks(),
-    ]);
+  const [
+    dbSlides,
+    dbTiles,
+    featured,
+    allCategories,
+    collectionTiles,
+    wishlistIds,
+    rate,
+    dbBlocks,
+    siteTexts,
+  ] = await Promise.all([
+    getActiveSlides(),
+    getActiveTiles(),
+    getFeaturedOrFallback(locale),
+    getCategories(locale),
+    getCollectionTilesForHome(locale),
+    getUserWishlistIds(),
+    getEurRate(),
+    getHomeBlocks(),
+    getSiteTexts(),
+  ]);
+  // Pusty fallback celowo — brak wpisu w panelu obsługuje AboutStore, sięgając
+  // po tekst domyślny ze słownika (i po właściwy język).
+  const aboutHtml = siteText(siteTexts, "home_about", locale, "");
   const blocks = dbBlocks
     .map((b) => localizeBlock(b, locale))
     .filter((b): b is LocalizedBlock => b !== null);
   const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
+  const hasTrustBar = blocks.some((b) => b.visible && b.type === "trust_bar");
   // Fallback gdy admin jeszcze nic nie dodał — żeby home nie była pusta.
   // localizeSlide/localizeTile tłumaczą treść (DB i fallback) na DE przez mapy.
   const slides = (dbSlides.length > 0 ? dbSlides : [DEFAULT_FALLBACK_SLIDE]).map(
@@ -194,10 +210,19 @@ export default async function HomePage() {
         );
 
       case "trust_bar":
-        // Pasek zaufania — dlaczego warto kupować u nas (spec 2026-07-06)
+        // Pasek zaufania — dlaczego warto kupować u nas (spec 2026-07-06).
+        // `intro` dokłada opis sklepu wymagany przez weryfikację marki Google —
+        // tematycznie to ta sama sekcja („kim jesteśmy"), więc nie wygląda jak
+        // doklejony blok SEO. Zapas na wypadek wyłączenia paska: niżej.
         return (
           <section className="max-w-7xl mx-auto px-6 py-24">
-            <TrustBar withHeading locale={locale} heading={b.heading} eyebrow={b.subheading} />
+            <TrustBar
+              withHeading
+              locale={locale}
+              heading={b.heading}
+              eyebrow={b.subheading}
+              intro={<AboutStore locale={locale} html={aboutHtml} />}
+            />
           </section>
         );
 
@@ -224,6 +249,15 @@ export default async function HomePage() {
         .map((b) => (
           <Fragment key={b.id}>{renderBlock(b)}</Fragment>
         ))}
+
+      {/* Zapasowe wyjście dla opisu sklepu. Normalnie jest on wstępem paska
+          zaufania, ale ten pasek da się wyłączyć w panelu — a na opisie wisi
+          weryfikacja marki Google, więc nie może zniknąć razem z paskiem. */}
+      {!hasTrustBar && (
+        <section className="max-w-7xl mx-auto px-6 py-24">
+          <AboutStore locale={locale} html={aboutHtml} withHeading />
+        </section>
+      )}
     </>
   );
 }

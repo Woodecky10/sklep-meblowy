@@ -14,6 +14,8 @@ type Props = {
   // Nagłówek sekcji z page_blocks (admin) — fallback na słownik.
   heading?: string | null;
   eyebrow?: string | null;
+  // Wstęp między nagłówkiem a ikonami (home: opis sklepu dla weryfikacji marki).
+  intro?: React.ReactNode;
 };
 
 export default async function TrustBar({
@@ -21,11 +23,14 @@ export default async function TrustBar({
   withHeading = false,
   heading,
   eyebrow,
+  intro,
 }: Props) {
   const t = getDictionary(locale).trustBar;
   const rows = await getTrustItems();
   const items = prepareTrustItems(rows, locale);
-  if (items.length === 0) return null;
+  // Pusta lista pozycji NIE może zabrać ze sobą wstępu — na home wisi na nim
+  // wymóg weryfikacji marki Google (patrz AboutStore).
+  if (items.length === 0 && !intro) return null;
 
   // undefined = wywołanie bez propsa (karta produktu) → słownik;
   // null/"" = świadomie wyczyszczone w adminie → element się nie renderuje.
@@ -58,6 +63,7 @@ export default async function TrustBar({
           )}
         </div>
       )}
+      {intro}
       <div
         className={`grid grid-cols-1 sm:grid-cols-2 ${lgCols} gap-10 lg:gap-0 lg:divide-x lg:divide-[var(--border)]`}
       >

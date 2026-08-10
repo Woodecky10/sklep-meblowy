@@ -46,7 +46,7 @@ export default async function OnasPage() {
           "Wir liefern in ganz Polen — der Versand ist kostenlos (keine Versandkosten).",
         h2Quality: "Qualität und Garantie",
         quality:
-          "Auf die meisten Produkte gewähren wir eine Garantie von 2 bis 10 Jahren — Einzelheiten finden Sie auf der Produktseite. Wir wählen Lieferanten aus, deren Materialien wir persönlich geprüft haben, und stehen unseren Kunden bei der Auswahl und nach dem Kauf mit Rat und Tat zur Seite.",
+          "Auf unsere Produkte gewähren wir 2 Jahre Garantie — die Angabe finden Sie auch auf jeder Produktseite. Wir wählen Lieferanten aus, deren Materialien wir persönlich geprüft haben, und stehen unseren Kunden bei der Auswahl und nach dem Kauf mit Rat und Tat zur Seite.",
         h2Contact: "Kontaktieren Sie uns",
         contactBefore:
           "Haben Sie eine Frage zu einem Produkt, brauchen Sie Beratung oder möchten Sie sich vergewissern, dass Sie die richtige Wahl treffen? Schreiben Sie uns — wir helfen Ihnen gerne. Die Kontaktdaten finden Sie im Bereich ",
@@ -76,7 +76,7 @@ export default async function OnasPage() {
           "Dostarczamy na terenie całej Polski — wysyłka jest darmowa (nie doliczamy kosztów dostawy).",
         h2Quality: "Jakość i gwarancja",
         quality:
-          "Na większość produktów udzielamy gwarancji od 2 do 10 lat — szczegóły w karcie każdego produktu. Wybieramy dostawców, których materiały sprawdzaliśmy osobiście, a naszym klientom służymy wsparciem przy doborze i po zakupie.",
+          "Na nasze produkty udzielamy 2 lat gwarancji — informację znajdziesz też w karcie każdego produktu. Wybieramy dostawców, których materiały sprawdzaliśmy osobiście, a naszym klientom służymy wsparciem przy doborze i po zakupie.",
         h2Contact: "Skontaktuj się z nami",
         contactBefore:
           "Masz pytanie o produkt, potrzebujesz doradztwa albo chcesz się upewnić, że wybierasz dobrze? Napisz do nas — chętnie pomożemy. Szczegóły kontaktu znajdziesz w zakładce ",
