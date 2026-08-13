@@ -4,6 +4,10 @@ import {
   sanitizeSearchTerm,
   searchTokens,
   rankByNameMatch,
+  foldDiacritics,
+  stemToken,
+  MIN_STEM_LENGTH,
+  searchKeyTokens,
 } from "@/app/_lib/search-filter";
 
 describe("sanitizeSearchTerm — ochrona przed injection w .or() (audyt MED)", () => {
@@ -131,6 +135,42 @@ describe("rankByNameMatch — trafienia w nazwie przed trafieniami w opisie", ()
   });
 });
 
+describe("rankByNameMatch — dopasowanie nazwy po złożeniu znaków", () => {
+  const get = (r: { name: string }) => r.name;
+
+  it("fraza BEZ ogonków rozpoznaje trafienie w nazwie Z ogonkami", () => {
+    const rows = [
+      { name: "Sofa Modena" },
+      { name: "Łóżko kontynentalne Marbella" },
+    ];
+    // Dziś „lozko" nie trafia w „Łóżko" i oba wiersze lądują w grupie „z opisu",
+    // czyli kolejność wejściowa zostaje bez zmian.
+    expect(rankByNameMatch(rows, "lozko", get)).toEqual([
+      { name: "Łóżko kontynentalne Marbella" },
+      { name: "Sofa Modena" },
+    ]);
+  });
+
+  it("liczba mnoga we frazie rozpoznaje pojedynczą w nazwie", () => {
+    const rows = [
+      { name: "Materac kieszeniowy AURELIO" },
+      { name: "Narożnik Alva L" },
+    ];
+    expect(rankByNameMatch(rows, "narożniki", get)[0]).toEqual({
+      name: "Narożnik Alva L",
+    });
+  });
+
+  it("działa dla ścieżki DE (ß w nazwie)", () => {
+    const rows = [
+      { name: "A", name_de: "Sofa klein" },
+      { name: "B", name_de: "Sofa Größe XL" },
+    ];
+    const ranked = rankByNameMatch(rows, "grösse", (r) => r.name_de);
+    expect(ranked[0].name).toBe("B");
+  });
+});
+
 describe("escapeIlike — escape wildcardów (linkGuestOrders, audyt MED)", () => {
   it("escapuje _ i % i backslash", () => {
     expect(escapeIlike("a_b")).toBe("a\\_b");
@@ -145,5 +185,116 @@ describe("escapeIlike — escape wildcardów (linkGuestOrders, audyt MED)", () =
 
   it("zwykły email bez zmian", () => {
     expect(escapeIlike("anna.nowak@x.com")).toBe("anna.nowak@x.com");
+  });
+});
+
+describe("foldDiacritics — składanie znaków na ASCII (musi = translate() w migracji 73)", () => {
+  it("składa wszystkie dziewięć polskich znaków", () => {
+    expect(foldDiacritics("ąćęłńóśźż")).toBe("acelnoszz");
+  });
+
+  it("składa realne frazy z katalogu", () => {
+    expect(foldDiacritics("łóżko")).toBe("lozko");
+    expect(foldDiacritics("narożnik")).toBe("naroznik");
+    expect(foldDiacritics("rozkładana")).toBe("rozkladana");
+  });
+
+  it("sprowadza do małych liter (wielkie znaki też składa)", () => {
+    expect(foldDiacritics("ŁÓŻKO")).toBe("lozko");
+    expect(foldDiacritics("Narożnik ALVA")).toBe("naroznik alva");
+  });
+
+  it("niemieckie: ä ö ü oraz ß jako dwuznak", () => {
+    expect(foldDiacritics("äöü")).toBe("aou");
+    expect(foldDiacritics("Größe")).toBe("grosse");
+  });
+
+  it("tekst bez diakrytyków przechodzi bez zmian (poza wielkością liter)", () => {
+    expect(foldDiacritics("sofa modena")).toBe("sofa modena");
+    expect(foldDiacritics("160x200")).toBe("160x200");
+  });
+
+  it("puste wejście → pusty string", () => {
+    expect(foldDiacritics("")).toBe("");
+  });
+});
+
+describe("stemToken — obcięcie jednej końcówki fleksyjnej", () => {
+  it("liczba mnoga wraca do rdzenia (przypadki z pomiarów na produkcji)", () => {
+    expect(stemToken("narozniki")).toBe("naroznik");
+    expect(stemToken("fotele")).toBe("fotel");
+    expect(stemToken("materace")).toBe("materac");
+    expect(stemToken("sofy")).toBe("sof");
+    expect(stemToken("lozka")).toBe("lozk");
+  });
+
+  it("obcina najdłuższą pasującą końcówkę, nie pierwszą z listy", () => {
+    // „materacami" → „ami" (3 znaki), nie „i" (1 znak).
+    expect(stemToken("materacami")).toBe("materac");
+    expect(stemToken("lozkach")).toBe("lozk");
+    expect(stemToken("stolowi")).toBe("stol");
+  });
+
+  it("obcina TYLKO jedną końcówkę", () => {
+    // „sofami" → „sof"; nie stemujemy dalej do „so".
+    expect(stemToken("sofami")).toBe("sof");
+  });
+
+  it("nie obcina, gdy rdzeń zszedłby poniżej MIN_STEM_LENGTH", () => {
+    expect(MIN_STEM_LENGTH).toBe(3);
+    // „ale" → obcięcie „e" dałoby rdzeń 2-znakowy → zostaw nietknięte.
+    expect(stemToken("ale")).toBe("ale");
+    expect(stemToken("do")).toBe("do");
+    expect(stemToken("na")).toBe("na");
+  });
+
+  it("token bez końcówki z listy zostaje bez zmian", () => {
+    expect(stemToken("materac")).toBe("materac");
+    expect(stemToken("naroznik")).toBe("naroznik");
+    expect(stemToken("vegas")).toBe("vegas");
+  });
+
+  it("wymiary i liczby zostają nietknięte", () => {
+    expect(stemToken("160x200")).toBe("160x200");
+    expect(stemToken("3")).toBe("3");
+  });
+
+  it("pusty token zostaje pusty", () => {
+    expect(stemToken("")).toBe("");
+  });
+});
+
+describe("searchKeyTokens — potok: sanityzacja → składanie → stem", () => {
+  it("fraza bez ogonków trafia w ten sam rdzeń co z ogonkami", () => {
+    expect(searchKeyTokens("łóżko")).toEqual(["lozk"]);
+    expect(searchKeyTokens("lozko")).toEqual(["lozk"]);
+  });
+
+  it("liczba mnoga i pojedyncza dają ten sam rdzeń", () => {
+    expect(searchKeyTokens("narożniki")).toEqual(["naroznik"]);
+    expect(searchKeyTokens("narożnik")).toEqual(["naroznik"]);
+  });
+
+  it("wiele słów → wiele tokenów, kolejność zachowana", () => {
+    expect(searchKeyTokens("narożnik szary")).toEqual(["naroznik", "szar"]);
+  });
+
+  it("odfiltrowuje duplikaty powstałe po stemowaniu", () => {
+    // „sofa" i „sofy" dają oba rdzeń „sof" — jeden warunek ILIKE, nie dwa.
+    expect(searchKeyTokens("sofa sofy")).toEqual(["sof"]);
+  });
+
+  it("dziedziczy sanityzację po searchTokens (injection w .or())", () => {
+    expect(searchKeyTokens("x,price.gt.0")).toEqual(["xpricegt0"]);
+  });
+
+  it("sama interpunkcja / pusta fraza → []", () => {
+    expect(searchKeyTokens(",.()")).toEqual([]);
+    expect(searchKeyTokens("")).toEqual([]);
+  });
+
+  it("respektuje limit MAX_SEARCH_TOKENS (10 unikalnych rdzeni)", () => {
+    const raw = Array.from({ length: 15 }, (_, i) => `wyraz${i}`).join(" ");
+    expect(searchKeyTokens(raw).length).toBeLessThanOrEqual(10);
   });
 });

@@ -3,7 +3,7 @@ import { createClient as createBareAnonClient } from "@supabase/supabase-js";
 import { createClient, createAdminClient } from "./supabase/server";
 import { getAllCategories } from "./categories";
 import { resolveCategoryFilter, expandCrossSellTargets } from "./category-tree";
-import { searchTokens, rankByNameMatch, escapeIlike } from "./search-filter";
+import { searchKeyTokens, rankByNameMatch, escapeIlike } from "./search-filter";
 import { sizeLabelOf } from "./size-groups";
 import { localizeProduct } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
@@ -149,14 +149,16 @@ export async function getProducts(filters: ProductFilters = {}) {
     }
   }
 
-  // Wyszukiwanie odporne na spacje/kolejność: frazę tniemy na słowa i każde
-  // słowo dopasowujemy do kolumny search_key (odspacjowana, bez tagów) przez
-  // ILIKE — wiele .ilike() na tej samej kolumnie PostgREST ANDuje, więc każde
-  // słowo musi wystąpić, niezależnie od kolejności. DE → search_key_de.
-  const searchTerms = searchTokens(search ?? "");
+  // Wyszukiwanie odporne na spacje/kolejność ORAZ na ogonki i odmianę: frazę
+  // tniemy na słowa, każde składamy do ASCII i obcinamy końcówkę
+  // (searchKeyTokens), a potem dopasowujemy do kolumny search_key_fold
+  // (odspacjowana, bez tagów, znaki złożone) przez ILIKE — wiele .ilike() na
+  // tej samej kolumnie PostgREST ANDuje, więc każde słowo musi wystąpić,
+  // niezależnie od kolejności. DE → search_key_fold_de.
+  const searchTerms = searchKeyTokens(search ?? "");
   const searchActive = searchTerms.length > 0;
   if (searchActive) {
-    const keyCol = locale === "de" ? "search_key_de" : "search_key";
+    const keyCol = locale === "de" ? "search_key_fold_de" : "search_key_fold";
     for (const token of searchTerms) {
       query = query.ilike(keyCol, `%${escapeIlike(token)}%`);
     }
@@ -241,7 +243,8 @@ export async function getProducts(filters: ProductFilters = {}) {
     const ranked = rankByNameMatch(
       (data ?? []) as Product[],
       search!,
-      // DE dopasowuje name_de bez fallbacku do PL — spójnie z search_key_de.
+      // DE dopasowuje name_de bez fallbacku do PL — spójnie z filtrem wyżej,
+      // który przy locale „de" pyta o kolumnę search_key_fold_de.
       (p) =>
         locale === "de"
           ? (p as { name_de?: string | null }).name_de ?? ""

@@ -40,25 +40,108 @@ export function searchTokens(raw: string): string[] {
 // zachowując trafienia z opisu niżej — bez utraty wyszukiwania po treści.
 //
 // Kolejność wewnątrz każdej grupy jest zachowana (stabilna), więc sort z DB
-// (alfabetyczny/cena/nowość) pozostaje w mocy. Dopasowanie case-insensitive
-// (jak ILIKE) i po tych samych tokenach co filtr DB — bez
-// diakrytyko-niezależności (identycznie jak zapytanie). Fraza pusta po
-// sanityzacji → wejście bez zmian (nie ma czego rankować).
+// (alfabetyczny/cena/nowość) pozostaje w mocy. Dopasowanie po tych samych
+// tokenach co filtr DB (searchKeyTokens) i po tak samo złożonej nazwie —
+// czyli niezależnie od wielkości liter, ogonków i końcówki fleksyjnej. Fraza
+// pusta po sanityzacji → wejście bez zmian.
 export function rankByNameMatch<T>(
   rows: T[],
   raw: string,
   getName: (row: T) => string | null | undefined
 ): T[] {
-  const tokens = searchTokens(raw);
+  const tokens = searchKeyTokens(raw);
   if (tokens.length === 0) return rows;
   const nameHits: T[] = [];
   const rest: T[] = [];
   for (const row of rows) {
-    // Odspacjowana, małoliterowa nazwa — spójnie z kolumną search_key (bez
-    // zdejmowania diakrytyków). Trafienie w nazwie = KAŻDE słowo obecne.
-    const key = (getName(row) ?? "").toLowerCase().replace(/\s+/g, "");
-    if (tokens.every((t) => key.includes(t.toLowerCase()))) nameHits.push(row);
+    // Klucz nazwy budowany DOKŁADNIE jak kolumna search_key_fold w bazie:
+    // złożone znaki, małe litery, bez spacji. Tokeny są już złożone i
+    // zestemowane, więc żadnego toLowerCase() na nich nie potrzeba.
+    const key = foldDiacritics(getName(row) ?? "").replace(/\s+/g, "");
+    if (tokens.every((t) => key.includes(t))) nameHits.push(row);
     else rest.push(row);
   }
   return [...nameHits, ...rest];
+}
+
+// Składanie znaków diakrytycznych na ASCII.
+//
+// ⚠️ TA LISTA MUSI ODPOWIADAĆ wyrażeniu translate()/replace() w migracji
+// 73_search_key_fold.sql. Rozjazd nie wywala błędu — cicho zeruje wyszukiwanie,
+// bo token przestaje trafiać w klucz. Zmieniasz tu → zmieniasz tam.
+//
+// ß jest dwuznakiem (→ ss), więc idzie osobnym replace, a nie mapą 1:1.
+const FOLD_MAP: Record<string, string> = {
+  ą: "a",
+  ć: "c",
+  ę: "e",
+  ł: "l",
+  ń: "n",
+  ó: "o",
+  ś: "s",
+  ź: "z",
+  ż: "z",
+  ä: "a",
+  ö: "o",
+  ü: "u",
+};
+
+export function foldDiacritics(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/ß/g, "ss")
+    .replace(/[ąćęłńóśźżäöü]/g, (ch) => FOLD_MAP[ch] ?? ch);
+}
+
+// Końcówki fleksyjne w formie JUŻ ZŁOŻONEJ (po foldDiacritics), posortowane od
+// najdłuższej — inaczej „materacami" straciłoby samo „i" zamiast „ami".
+// „ów" po złożeniu to „ow", „ą" to „a", „ę" to „e", dlatego lista jest krótsza,
+// niż wyglądałaby dla surowej polszczyzny.
+const STEM_SUFFIXES = [
+  "ami",
+  "ach",
+  "owi",
+  "iem",
+  "ow",
+  "om",
+  "ie",
+  "em",
+  "y",
+  "i",
+  "e",
+  "a",
+  "u",
+  "o",
+];
+
+// Minimalna długość rdzenia po obcięciu. 3, nie 4 — przy progu 4 fraza „sofy"
+// (rdzeń „sof") nie zostałaby zestemowana i dalej dawałaby zero wyników.
+export const MIN_STEM_LENGTH = 3;
+
+// Obcina JEDNĄ końcówkę. Dopasowanie w bazie jest podciągiem, więc krótszy
+// rdzeń łapie wszystkie dłuższe formy — stemowanie może tylko DODAĆ trafienia,
+// nigdy odebrać.
+export function stemToken(token: string): string {
+  for (const suffix of STEM_SUFFIXES) {
+    if (
+      token.length - suffix.length >= MIN_STEM_LENGTH &&
+      token.endsWith(suffix)
+    ) {
+      return token.slice(0, -suffix.length);
+    }
+  }
+  return token;
+}
+
+// Tokeny gotowe do dopasowania przeciwko kolumnie search_key_fold: sanityzacja
+// (jak searchTokens — w tym ochrona przed injection w .or()) → złożenie znaków
+// → obcięcie końcówki.
+//
+// Duplikaty po stemowaniu są odfiltrowane: „sofa sofy" daje dwa razy „sof",
+// a dwa identyczne warunki ILIKE to zbędna praca dla bazy.
+export function searchKeyTokens(raw: string): string[] {
+  const stemmed = searchTokens(raw).map((token) =>
+    stemToken(foldDiacritics(token))
+  );
+  return [...new Set(stemmed)].filter(Boolean);
 }
