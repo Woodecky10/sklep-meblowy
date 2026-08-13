@@ -9,6 +9,7 @@ import {
   MIN_STEM_LENGTH,
   searchKeyTokens,
   searchKeyTokenForms,
+  searchKeyTokenGroups,
 } from "@/app/_lib/search-filter";
 
 describe("sanitizeSearchTerm — ochrona przed injection w .or() (audyt MED)", () => {
@@ -431,5 +432,36 @@ describe("searchKeyTokenForms — obie formy tokenu (tylko dla rankingu)", () =>
   it("sama interpunkcja / pusta fraza → []", () => {
     expect(searchKeyTokenForms(",.()")).toEqual([]);
     expect(searchKeyTokenForms("")).toEqual([]);
+  });
+});
+
+describe("searchKeyTokenGroups — alternatywy do filtra", () => {
+  it("token bez synonimów daje grupę jednoelementową", () => {
+    expect(searchKeyTokenGroups("materace")).toEqual([["materac"]]);
+  });
+
+  it("token ze słownika daje siebie plus synonimy", () => {
+    expect(searchKeyTokenGroups("kanapa")).toEqual([["kanap", "sof"]]);
+  });
+
+  it("fraza wielosłowna daje jedną grupę na słowo, w kolejności", () => {
+    expect(searchKeyTokenGroups("kanapa welur")).toEqual([
+      ["kanap", "sof"],
+      ["welur"],
+    ]);
+  });
+
+  it("liczba grup zawsze równa liczbie tokenów z searchKeyTokens", () => {
+    // Wiążące: filtr ANDuje grupy, więc rozjazd znaczyłby inny zbiór wymagań
+    // niż ten, którego pilnuje ranking.
+    for (const fraza of ["kanapa", "sofa sofy", "łóżeczko dziecinne", ""]) {
+      expect(searchKeyTokenGroups(fraza)).toHaveLength(
+        searchKeyTokens(fraza).length
+      );
+    }
+  });
+
+  it("pusta fraza → brak grup", () => {
+    expect(searchKeyTokenGroups("   ")).toEqual([]);
   });
 });

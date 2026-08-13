@@ -2,6 +2,8 @@
 // inputu. Wydzielone z products.ts, żeby były testowalne bez mockowania
 // supabase (jak safe-redirect).
 
+import { synonymsFor } from "./search-vocabulary";
+
 // Escape znaków specjalnych ILIKE (% _ \) w wartości dopasowania — bez tego
 // user mógłby użyć wildcardów. Zachowuje dosłowną treść (np. email z "_").
 export function escapeIlike(value: string): string {
@@ -212,4 +214,18 @@ export function searchKeyTokenForms(raw: string): SearchTokenForms[] {
 // daje jedno „sof", bo dwa identyczne warunki ILIKE to zbędna praca dla bazy.
 export function searchKeyTokens(raw: string): string[] {
   return searchKeyTokenForms(raw).map((forms) => forms.stem);
+}
+
+// Grupy alternatyw dla filtra do bazy: każdy token frazy zamienia się w listę
+// „on sam plus jego synonimy" (patrz search-vocabulary.ts).
+//
+// Filtr ANDuje grupy między sobą (każde słowo frazy musi wystąpić) i ORuje
+// alternatywy wewnątrz grupy (w którejkolwiek postaci). Liczba grup jest
+// zawsze równa liczbie tokenów z searchKeyTokens — inaczej filtr wymagałby
+// czego innego niż ranking.
+//
+// Ranking NIE używa tej funkcji: on potrzebuje wiedzieć, którą formą token
+// trafił, i woła searchKeyTokenForms + synonymsFor osobno.
+export function searchKeyTokenGroups(raw: string): string[][] {
+  return searchKeyTokens(raw).map((token) => synonymsFor(token));
 }
