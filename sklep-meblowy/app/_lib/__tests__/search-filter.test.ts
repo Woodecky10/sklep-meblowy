@@ -4,6 +4,7 @@ import {
   sanitizeSearchTerm,
   searchTokens,
   rankByNameMatch,
+  foldDiacritics,
 } from "@/app/_lib/search-filter";
 
 describe("sanitizeSearchTerm — ochrona przed injection w .or() (audyt MED)", () => {
@@ -145,5 +146,36 @@ describe("escapeIlike — escape wildcardów (linkGuestOrders, audyt MED)", () =
 
   it("zwykły email bez zmian", () => {
     expect(escapeIlike("anna.nowak@x.com")).toBe("anna.nowak@x.com");
+  });
+});
+
+describe("foldDiacritics — składanie znaków na ASCII (musi = translate() w migracji 73)", () => {
+  it("składa wszystkie dziewięć polskich znaków", () => {
+    expect(foldDiacritics("ąćęłńóśźż")).toBe("acelnoszz");
+  });
+
+  it("składa realne frazy z katalogu", () => {
+    expect(foldDiacritics("łóżko")).toBe("lozko");
+    expect(foldDiacritics("narożnik")).toBe("naroznik");
+    expect(foldDiacritics("rozkładana")).toBe("rozkladana");
+  });
+
+  it("sprowadza do małych liter (wielkie znaki też składa)", () => {
+    expect(foldDiacritics("ŁÓŻKO")).toBe("lozko");
+    expect(foldDiacritics("Narożnik ALVA")).toBe("naroznik alva");
+  });
+
+  it("niemieckie: ä ö ü oraz ß jako dwuznak", () => {
+    expect(foldDiacritics("äöü")).toBe("aou");
+    expect(foldDiacritics("Größe")).toBe("grosse");
+  });
+
+  it("tekst bez diakrytyków przechodzi bez zmian (poza wielkością liter)", () => {
+    expect(foldDiacritics("sofa modena")).toBe("sofa modena");
+    expect(foldDiacritics("160x200")).toBe("160x200");
+  });
+
+  it("puste wejście → pusty string", () => {
+    expect(foldDiacritics("")).toBe("");
   });
 });

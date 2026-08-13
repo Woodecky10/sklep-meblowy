@@ -62,3 +62,32 @@ export function rankByNameMatch<T>(
   }
   return [...nameHits, ...rest];
 }
+
+// Składanie znaków diakrytycznych na ASCII.
+//
+// ⚠️ TA LISTA MUSI ODPOWIADAĆ wyrażeniu translate()/replace() w migracji
+// 73_search_key_fold.sql. Rozjazd nie wywala błędu — cicho zeruje wyszukiwanie,
+// bo token przestaje trafiać w klucz. Zmieniasz tu → zmieniasz tam.
+//
+// ß jest dwuznakiem (→ ss), więc idzie osobnym replace, a nie mapą 1:1.
+const FOLD_MAP: Record<string, string> = {
+  ą: "a",
+  ć: "c",
+  ę: "e",
+  ł: "l",
+  ń: "n",
+  ó: "o",
+  ś: "s",
+  ź: "z",
+  ż: "z",
+  ä: "a",
+  ö: "o",
+  ü: "u",
+};
+
+export function foldDiacritics(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/ß/g, "ss")
+    .replace(/[ąćęłńóśźżäöü]/g, (ch) => FOLD_MAP[ch] ?? ch);
+}
