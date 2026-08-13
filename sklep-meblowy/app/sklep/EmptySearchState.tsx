@@ -28,8 +28,9 @@ function rodzinyProduktow(nodes: MenuNode[]): Kafelek[] {
 
 // Stan pustego wyniku na /sklep. Trzy przypadki, w tej kolejności:
 //
-//   1. fraza opisuje rzecz, której sklep nie prowadzi (szafa, komoda) →
-//      mówimy to wprost, bo klient inaczej szuka dalej po pustych stronach,
+//   1. fraza opisuje rzecz, której sklep nie prowadzi (szafa, komoda), i jest
+//      JEDYNYM zawężeniem → mówimy to wprost, bo klient inaczej szuka dalej
+//      po pustych stronach,
 //   2. fraza nie trafiła w nic innego → mówimy dla czego nie ma wyników,
 //   3. brak frazy (zero wynika z filtrów) → dotychczasowa podpowiedź o filtrach.
 //
@@ -38,11 +39,14 @@ function rodzinyProduktow(nodes: MenuNode[]): Kafelek[] {
 export default function EmptySearchState({
   query,
   categories,
+  hasOtherFilters,
   locale,
   labels,
 }: {
   query: string | undefined;
   categories: MenuNode[];
+  // Czy poza frazą zawęża wynik cokolwiek jeszcze — patrz warunek gałęzi 1.
+  hasOtherFilters: boolean;
   locale: Locale;
   labels: {
     emptyTitle: string;
@@ -62,10 +66,17 @@ export default function EmptySearchState({
     );
   }
 
-  // NOT_CARRIED sprawdzamy TYLKO tutaj, przy zerowym wyniku — dzięki temu
-  // komunikat „nie prowadzimy X" nie może skłamać: gdyby sklep zaczął
-  // sprzedawać X, fraza dałaby wyniki i ta gałąź w ogóle by się nie wykonała.
-  const nieprowadzone = notCarriedLabel(searchKeyTokens(fraza), locale);
+  // NOT_CARRIED sprawdzamy TYLKO przy zerowym wyniku I TYLKO wtedy, gdy fraza
+  // jest jedynym zawężeniem — oba warunki są potrzebne, żeby komunikat „nie
+  // prowadzimy X" nie mógł skłamać. Sam zerowy wynik nie wystarcza: zero bierze
+  // się też z frazy RAZEM z filtrem, więc „?kategoria=sofy&q=stół" trafiłoby
+  // tutaj także wtedy, gdy stoły są w katalogu. Przy aktywnym filtrze spadamy
+  // do przypadku 2, który niczego o asortymencie nie twierdzi.
+  // Przy samej frazie gwarancja jest domknięta: gdyby sklep sprzedawał X,
+  // fraza dałaby wyniki i tej gałęzi nikt by nie wykonał.
+  const nieprowadzone = hasOtherFilters
+    ? null
+    : notCarriedLabel(searchKeyTokens(fraza), locale);
   const kafelki = rodzinyProduktow(categories);
 
   return (

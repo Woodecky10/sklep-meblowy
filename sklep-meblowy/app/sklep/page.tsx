@@ -187,6 +187,19 @@ export default async function SklepPage({
       rawParams[k] = val;
   }
 
+  // Czy poza frazą zawęża wynik cokolwiek jeszcze (kategoria, cena, kolekcja,
+  // wymiary, facety opcji/cech). Liczy się z rawParams, bo ten zbiera już
+  // WSZYSTKIE aktywne parametry — wystarczy odjąć te, które wyniku nie zawężają.
+  // Potrzebne stanowi pustego wyniku: komunikat „Nie prowadzimy X" wolno
+  // pokazać tylko wtedy, gdy fraza jest jedynym zawężeniem (patrz
+  // EmptySearchState). Liczy zachowawczo — parametr obecny, ale niepoprawny
+  // (np. `cena_od=abc`) też uznaje za zawężenie, a to spycha komunikat do
+  // wariantu, który niczego nie obiecuje.
+  const NIEZAWEZAJACE_PARAMY = new Set(["q", "sortuj"]);
+  const hasOtherFilters = Object.keys(rawParams).some(
+    (k) => !NIEZAWEZAJACE_PARAMY.has(k)
+  );
+
   // Najbardziej szczegółowy filtr wygrywa: kolekcja > wyszukiwanie > kategoria
   // (dowolny poziom drzewa) > domyślny tytuł.
   function resolveHeading(): string {
@@ -287,6 +300,7 @@ export default async function SklepPage({
         <EmptySearchState
           query={search}
           categories={filterNodes}
+          hasOtherFilters={hasOtherFilters}
           locale={locale}
           labels={{
             emptyTitle: t.shop.emptyTitle,
