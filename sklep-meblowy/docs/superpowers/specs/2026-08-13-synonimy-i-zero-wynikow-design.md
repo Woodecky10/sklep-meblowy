@@ -24,7 +24,25 @@ Osobno: fraza, która nie pasuje do niczego, kończy się ślepym zaułkiem — 
 
 ## Czego ten projekt świadomie nie robi
 
-**Materiałów.** `welur` daje zero i naprawa nie należy do tego projektu, bo blokują ją brakujące dane, nie wyszukiwanie. Zmierzony stan: `products.variants` trzyma nazwy handlowe tkanin („Baloo 2071", „Kronos 01"), `fabric_groups` to progi cenowe (Standard, Premium, Premium High), a informacja o materiale istnieje wyłącznie w opisach tkanin wolnym tekstem i tylko dla 7 z 17 (welur: Chill Me, Kronos, Manila, Matt Velvet, Monolith, Trinity, Vena; sztruks: Poso, Tilia). Kolumna `fabrics.category` jest przygotowana i edytowalna z panelu, ale pusta u wszystkich 17 tkanin. Dopóki właściciel jej nie wypełni, każde rozwiązanie byłoby zgadywaniem z opisów, nieskutecznym u 10 tkanin. Osobny spec po wprowadzeniu danych.
+**Materiałów.** `welur` daje zero i naprawa nie należy do tego projektu, bo blokują ją brakujące dane, nie wyszukiwanie. Zmierzony stan: `products.variants` trzyma nazwy handlowe tkanin („Baloo 2071", „Kronos 01"), `fabric_groups` to progi cenowe (Standard, Premium, Premium High), a informacja o materiale istnieje wyłącznie w opisach tkanin wolnym tekstem. Kolumna `fabrics.category` jest przygotowana i edytowalna z panelu (`FabricsEditor.tsx:329`, pole z podpowiedziami z istniejących wartości), ale **pusta u wszystkich 17 tkanin**.
+
+### Zadanie dla właściciela, które odblokowuje ten etap
+
+Wypełnić pole „kategoria" przy tkaninach w panelu. Poniżej materiał **wykryty z opisów** — punkt wyjścia do zatwierdzenia lub poprawienia, nie prawda objawiona, bo pochodzi z wolnego tekstu:
+
+| tkanina | wykryty materiał | uwaga |
+|---|---|---|
+| Chill Me, Vena | Welur | jednoznaczne |
+| Magic Velvet | Welwet | jednoznaczne |
+| Poso, Tilia | Sztruks | jednoznaczne |
+| Baloo | Bawełna | jednoznaczne |
+| Inari | Len | jednoznaczne |
+| Matt Velvet | Welur **i** Welwet | opis wymienia oba — rozstrzygnąć |
+| Kronos, Manila | Welur **i** Plusz | opis wymienia oba — rozstrzygnąć |
+| Monolith, Trinity | Welur **i** Len | opis wymienia oba — rozstrzygnąć |
+| **Leo, Quelle, Sawana, Solar, Woolly** | **brak** | opis nie mówi o materiale — tu trzeba wiedzy właściciela |
+
+Czyli: 6 tkanin jednoznacznych, 5 z konfliktem do rozstrzygnięcia, 5 bez żadnej informacji. Dopóki tego nie ma, każde rozwiązanie po stronie wyszukiwania byłoby zgadywaniem z opisów — nieskutecznym u pięciu tkanin i niejednoznacznym u pięciu kolejnych. Osobny spec po wprowadzeniu danych.
 
 **Wyszukiwania po etykiecie kategorii.** `2-osobowa` i `3-osobowa` dają zero w kluczu wyszukiwania, bo klucz to nazwa plus opis, a rozmiar sofy siedzi w **kategorii**. Dlatego „dwójka" i „trójka" nie wchodzą do słownika — nie mają celu, w który mogłyby trafić. Naprawa wymaga innego mechanizmu (dopasowanie frazy również do etykiet kategorii) i jest odrębnym tematem.
 
