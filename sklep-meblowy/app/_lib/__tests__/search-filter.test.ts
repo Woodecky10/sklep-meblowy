@@ -135,6 +135,42 @@ describe("rankByNameMatch — trafienia w nazwie przed trafieniami w opisie", ()
   });
 });
 
+describe("rankByNameMatch — dopasowanie nazwy po złożeniu znaków", () => {
+  const get = (r: { name: string }) => r.name;
+
+  it("fraza BEZ ogonków rozpoznaje trafienie w nazwie Z ogonkami", () => {
+    const rows = [
+      { name: "Sofa Modena" },
+      { name: "Łóżko kontynentalne Marbella" },
+    ];
+    // Dziś „lozko" nie trafia w „Łóżko" i oba wiersze lądują w grupie „z opisu",
+    // czyli kolejność wejściowa zostaje bez zmian.
+    expect(rankByNameMatch(rows, "lozko", get)).toEqual([
+      { name: "Łóżko kontynentalne Marbella" },
+      { name: "Sofa Modena" },
+    ]);
+  });
+
+  it("liczba mnoga we frazie rozpoznaje pojedynczą w nazwie", () => {
+    const rows = [
+      { name: "Materac kieszeniowy AURELIO" },
+      { name: "Narożnik Alva L" },
+    ];
+    expect(rankByNameMatch(rows, "narożniki", get)[0]).toEqual({
+      name: "Narożnik Alva L",
+    });
+  });
+
+  it("działa dla ścieżki DE (ß w nazwie)", () => {
+    const rows = [
+      { name: "A", name_de: "Sofa klein" },
+      { name: "B", name_de: "Sofa Größe XL" },
+    ];
+    const ranked = rankByNameMatch(rows, "grösse", (r) => r.name_de);
+    expect(ranked[0].name).toBe("B");
+  });
+});
+
 describe("escapeIlike — escape wildcardów (linkGuestOrders, audyt MED)", () => {
   it("escapuje _ i % i backslash", () => {
     expect(escapeIlike("a_b")).toBe("a\\_b");

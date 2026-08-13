@@ -40,24 +40,25 @@ export function searchTokens(raw: string): string[] {
 // zachowując trafienia z opisu niżej — bez utraty wyszukiwania po treści.
 //
 // Kolejność wewnątrz każdej grupy jest zachowana (stabilna), więc sort z DB
-// (alfabetyczny/cena/nowość) pozostaje w mocy. Dopasowanie case-insensitive
-// (jak ILIKE) i po tych samych tokenach co filtr DB — bez
-// diakrytyko-niezależności (identycznie jak zapytanie). Fraza pusta po
-// sanityzacji → wejście bez zmian (nie ma czego rankować).
+// (alfabetyczny/cena/nowość) pozostaje w mocy. Dopasowanie po tych samych
+// tokenach co filtr DB (searchKeyTokens) i po tak samo złożonej nazwie —
+// czyli niezależnie od wielkości liter, ogonków i końcówki fleksyjnej. Fraza
+// pusta po sanityzacji → wejście bez zmian.
 export function rankByNameMatch<T>(
   rows: T[],
   raw: string,
   getName: (row: T) => string | null | undefined
 ): T[] {
-  const tokens = searchTokens(raw);
+  const tokens = searchKeyTokens(raw);
   if (tokens.length === 0) return rows;
   const nameHits: T[] = [];
   const rest: T[] = [];
   for (const row of rows) {
-    // Odspacjowana, małoliterowa nazwa — spójnie z kolumną search_key (bez
-    // zdejmowania diakrytyków). Trafienie w nazwie = KAŻDE słowo obecne.
-    const key = (getName(row) ?? "").toLowerCase().replace(/\s+/g, "");
-    if (tokens.every((t) => key.includes(t.toLowerCase()))) nameHits.push(row);
+    // Klucz nazwy budowany DOKŁADNIE jak kolumna search_key_fold w bazie:
+    // złożone znaki, małe litery, bez spacji. Tokeny są już złożone i
+    // zestemowane, więc żadnego toLowerCase() na nich nie potrzeba.
+    const key = foldDiacritics(getName(row) ?? "").replace(/\s+/g, "");
+    if (tokens.every((t) => key.includes(t))) nameHits.push(row);
     else rest.push(row);
   }
   return [...nameHits, ...rest];
