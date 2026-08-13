@@ -212,6 +212,11 @@ export type PlShape = {
     searchPrefix: string;
     emptyTitle: string;
     emptyHint: string;
+    // Stan pustego wyniku dla frazy (patrz app/sklep/EmptySearchState.tsx):
+    // „Nie prowadzimy szaf." albo „Nie znaleźliśmy nic dla ...” + kafelki.
+    emptyNotCarried: string;
+    emptySearchTitle: string;
+    emptyCategoriesHint: string;
     // Rozwijanie dłuższego opisu kolekcji nad filtrami (>1 akapit).
     descriptionMore: string;
     descriptionLess: string;
@@ -598,6 +603,9 @@ export const pl = {
     searchPrefix: "Wyniki",
     emptyTitle: "Brak produktów",
     emptyHint: "Spróbuj zmienić filtry lub frazę wyszukiwania.",
+    emptyNotCarried: "Nie prowadzimy",
+    emptySearchTitle: "Nie znaleźliśmy nic dla",
+    emptyCategoriesHint: "Sprawdź, co mamy:",
     descriptionMore: "Czytaj więcej",
     descriptionLess: "Zwiń opis",
   },

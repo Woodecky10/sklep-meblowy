@@ -21,6 +21,7 @@ import FilterBar from "@/app/_components/ui/FilterBar";
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import CollectionIntro from "./CollectionIntro";
 import CategoryChildren from "./CategoryChildren";
+import EmptySearchState from "./EmptySearchState";
 import Pagination from "@/app/_components/ui/Pagination";
 
 // /sklep jest w pełni przetłumaczone przez słownik UI → DE zawsze (hasDe: true).
@@ -283,10 +284,18 @@ export default async function SklepPage({
       <CategoryChildren items={childNodes} />
 
       {products.length === 0 ? (
-        <div className="text-center py-24 text-[var(--muted)]">
-          <p className="font-display text-2xl mb-2">{t.shop.emptyTitle}</p>
-          <p className="text-sm">{t.shop.emptyHint}</p>
-        </div>
+        <EmptySearchState
+          query={search}
+          categories={filterNodes}
+          locale={locale}
+          labels={{
+            emptyTitle: t.shop.emptyTitle,
+            emptyHint: t.shop.emptyHint,
+            emptyNotCarried: t.shop.emptyNotCarried,
+            emptySearchTitle: t.shop.emptySearchTitle,
+            emptyCategoriesHint: t.shop.emptyCategoriesHint,
+          }}
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {products.map((product) => (
