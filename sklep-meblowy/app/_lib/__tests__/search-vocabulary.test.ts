@@ -81,6 +81,81 @@ describe("SEARCH_SYNONYMS — klucze osiągalne dla tokenizera", () => {
   });
 });
 
+describe("NOT_CARRIED — klucze osiągalne dla tokenizera", () => {
+  // Ta sama bramka co dla kluczy synonimów, z tego samego powodu: klucz, którego
+  // searchKeyTokens nigdy nie wyprodukuje, nie zgłosi błędu — klient po prostu
+  // nigdy nie zobaczy „Nie prowadzimy ...". Dopasowanie w notCarriedLabel jest
+  // po DOKŁADNYM kluczu, więc rdzeń musi zgadzać się co do znaku.
+  const przypadki: [string, string][] = [
+    ["szafa", "szaf"],
+    ["szafy", "szaf"],
+    ["komoda", "komod"],
+    ["komody", "komod"],
+    ["stół", "stol"],
+    ["stoły", "stol"],
+    ["krzesło", "krzesl"],
+    ["krzesła", "krzesl"],
+    ["biurko", "biurk"],
+    ["biurka", "biurk"],
+    ["dywan", "dywan"],
+    ["dywany", "dywan"],
+    ["lampa", "lamp"],
+    ["lampy", "lamp"],
+    ["regał", "regal"],
+    ["regały", "regal"],
+  ];
+
+  it.each(przypadki)("„%s\" tokenizuje się do „%s\"", (slowo, rdzen) => {
+    expect(searchKeyTokens(slowo)).toEqual([rdzen]);
+    expect(rdzen in NOT_CARRIED).toBe(true);
+  });
+
+  it("każdy klucz listy ma pokrycie w powyższej tabeli", () => {
+    const pokryte = new Set(przypadki.map(([, rdzen]) => rdzen));
+    const niepokryte = Object.keys(NOT_CARRIED).filter((k) => !pokryte.has(k));
+    expect(niepokryte).toEqual([]);
+  });
+});
+
+describe("SEARCH_SYNONYMS — wartości osiągalne dla tokenizera", () => {
+  // Wartości to rdzenie KATALOGOWE: idą do zapytania jako podciąg dopasowywany
+  // do kolumny search_key_fold. Wartość w formie odmienionej („sofy" zamiast
+  // „sof") nie wywali zapytania — po cichu przestanie łapać część wierszy
+  // („…sofa…"), czyli synonim zadziała słabiej, niż wygląda. Przejście tej
+  // tabeli dowodzi, że wartość jest tą najkrótszą formą, którą tokenizer
+  // produkuje z katalogowego słowa, więc łapie wszystkie jego odmiany.
+  const wartosci = new Set(Object.values(SEARCH_SYNONYMS).flat());
+  const przypadki: [string, string][] = [
+    ["sofa", "sof"],
+    ["sofy", "sof"],
+    ["narożnik", "naroznik"],
+    ["narożniki", "naroznik"],
+    ["pufa", "puf"],
+    ["pufy", "puf"],
+    ["łóżko", "lozk"],
+    ["łóżka", "lozk"],
+    ["kontynentalne", "kontynentaln"],
+    ["kontynentalny", "kontynentaln"],
+    ["materac", "materac"],
+    ["materace", "materac"],
+    ["fotel", "fotel"],
+    ["fotele", "fotel"],
+    ["dziecięce", "dzieciec"],
+    ["dziecięcy", "dzieciec"],
+  ];
+
+  it.each(przypadki)("„%s\" tokenizuje się do „%s\"", (slowo, rdzen) => {
+    expect(searchKeyTokens(slowo)).toEqual([rdzen]);
+    expect(wartosci.has(rdzen)).toBe(true);
+  });
+
+  it("każda wartość słownika ma pokrycie w powyższej tabeli", () => {
+    const pokryte = new Set(przypadki.map(([, rdzen]) => rdzen));
+    const niepokryte = [...wartosci].filter((w) => !pokryte.has(w));
+    expect(niepokryte).toEqual([]);
+  });
+});
+
 describe("synonymsFor / notCarriedLabel", () => {
   it("rdzeń ze słownika dostaje siebie na pierwszym miejscu i synonimy dalej", () => {
     expect(synonymsFor("kanap")).toEqual(["kanap", "sof"]);
