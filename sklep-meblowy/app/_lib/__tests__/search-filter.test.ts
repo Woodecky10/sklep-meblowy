@@ -255,6 +255,65 @@ describe("rankByNameMatch — dokładne trafienie bije rdzeń (POSO / pościel)"
   });
 });
 
+describe("rankByNameMatch — trafienie po synonimie", () => {
+  const nazwy = (rows: { name: string }[]) => rows.map((r) => r.name);
+  const pobierz = (r: { name: string }) => r.name;
+
+  it("synonim wyciąga produkt z poziomu „tylko opis” na poziom rdzenia", () => {
+    // „kanapa" nie występuje w ŻADNEJ nazwie sofy, więc bez świadomości
+    // synonimów wszystkie sofy wpadałyby na poziom 3 i mieszały się z szumem
+    // opisowym.
+    const rows = [
+      { name: "Łóżko Lino z pojemnikiem" },
+      { name: "Sofa Modena rozkładana" },
+    ];
+    expect(nazwy(rankByNameMatch(rows, "kanapa", pobierz))).toEqual([
+      "Sofa Modena rozkładana",
+      "Łóżko Lino z pojemnikiem",
+    ]);
+  });
+
+  it("synonim NIE jest trafieniem dokładnym — poziom 1 zostaje pusty", () => {
+    // Gdyby synonim wchodził na poziom 1, fraza „kanapa sofa" ustawiłaby sofy
+    // z „kanapą" w nazwie równo z pozostałymi. Poziom 1 liczy wyłącznie formę
+    // wpisaną przez użytkownika.
+    const rows = [
+      { name: "Sofa Modena" },
+      { name: "Kanapa Modena" }, // hipotetyczna: dokładne trafienie frazy
+    ];
+    expect(nazwy(rankByNameMatch(rows, "kanapa", pobierz))).toEqual([
+      "Kanapa Modena",
+      "Sofa Modena",
+    ]);
+  });
+
+  it("fraza bez synonimów zachowuje się dokładnie jak dotąd", () => {
+    const rows = [
+      { name: "Łóżko Lino na pościel" },
+      { name: "Narożnik Vegas w POSO" },
+    ];
+    expect(nazwy(rankByNameMatch(rows, "poso", pobierz))).toEqual([
+      "Narożnik Vegas w POSO",
+      "Łóżko Lino na pościel",
+    ]);
+  });
+
+  it("synonim wielocelowy działa dla każdego celu", () => {
+    const rows = [
+      { name: "Fotel Uszak" },
+      { name: "Łóżko Sawana" },
+      { name: "Sofa Modena" },
+    ];
+    // „tapczan" → sof ORAZ lozk; fotel zostaje na końcu
+    const wynik = nazwy(rankByNameMatch(rows, "tapczan", pobierz));
+    expect(wynik[2]).toBe("Fotel Uszak");
+    // Kolejność między dwoma celami synonimu jest nieistotna, więc sortujemy.
+    // Goły .sort() porządkuje po jednostkach UTF-16, nie po alfabecie polskim:
+    // „S" (U+0053) < „Ł" (U+0141) — dlatego Sofa jest tu pierwsza.
+    expect(wynik.slice(0, 2).sort()).toEqual(["Sofa Modena", "Łóżko Sawana"]);
+  });
+});
+
 describe("escapeIlike — escape wildcardów (linkGuestOrders, audyt MED)", () => {
   it("escapuje _ i % i backslash", () => {
     expect(escapeIlike("a_b")).toBe("a\\_b");

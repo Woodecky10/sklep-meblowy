@@ -69,6 +69,11 @@ export function searchTokens(raw: string): string[] {
 // trafienia (np. „sofy" — żadna nazwa nie ma „sofy") daje pusty poziom 1
 // i kolejność bit w bit jak wcześniej.
 //
+// Synonimy (search-vocabulary.ts) liczą się na poziomie 2, nigdy na 1. „kanapa"
+// nie występuje w żadnej nazwie sofy, więc bez tego wszystkie sofy wpadałyby na
+// poziom 3 i mieszały się z szumem opisowym. Poziom 1 dalej znaczy „nic nie
+// musiałem rozszerzać" — ani stemem, ani słownikiem.
+//
 // Kolejność wewnątrz każdego poziomu jest zachowana (stabilna), więc sort z DB
 // (alfabetyczny/cena/nowość) rozstrzyga remisy. Fraza pusta po sanityzacji →
 // wejście bez zmian.
@@ -87,7 +92,7 @@ export function rankByNameMatch<T>(
     // złożone znaki, małe litery, bez spacji. Tokeny są już złożone, więc
     // żadnego toLowerCase() na nich nie potrzeba.
     const key = foldDiacritics(getName(row) ?? "").replace(/\s+/g, "");
-    if (!forms.every((f) => key.includes(f.stem))) {
+    if (!forms.every((f) => synonymsFor(f.stem).some((alt) => key.includes(alt)))) {
       rest.push(row);
     } else if (forms.every((f) => key.includes(f.fold))) {
       exactHits.push(row);
