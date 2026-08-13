@@ -20,7 +20,7 @@ import { recordPriceHistory } from "@/app/_lib/price-history";
 import { applySaleSchedule } from "@/app/_lib/sale-schedule-server";
 import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-html";
 import { buildGroupKey, pickGroupKey } from "@/app/_lib/size-groups";
-import { searchTokens, escapeIlike } from "@/app/_lib/search-filter";
+import { searchKeyTokens, escapeIlike } from "@/app/_lib/search-filter";
 import { normalizeDeliveryTime, normalizeWarranty } from "@/app/_lib/spec-format";
 import { parseFeatureRows } from "@/app/_lib/product-features";
 import { normalizeVariantInfoInput } from "@/app/_lib/variant-info";
@@ -753,7 +753,7 @@ export async function searchProductsForSizeGroup(
   query: string
 ): Promise<ActionResult> {
   await requireAdmin();
-  const tokens = searchTokens(query);
+  const tokens = searchKeyTokens(query);
   if (tokens.join("").length < 2) return { ok: true, data: { results: [] } };
   const supabase = await createAdminClient();
   let q = supabase
@@ -761,7 +761,7 @@ export async function searchProductsForSizeGroup(
     .select("id, name, size_group, size_label")
     .neq("id", sanitize(currentId));
   for (const token of tokens) {
-    q = q.ilike("search_key", `%${escapeIlike(token)}%`);
+    q = q.ilike("search_key_fold", `%${escapeIlike(token)}%`);
   }
   const { data, error } = await q.limit(10);
   if (error) return { ok: false, error: error.message };

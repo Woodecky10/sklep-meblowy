@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/app/_lib/supabase/server";
-import { searchTokens, escapeIlike } from "@/app/_lib/search-filter";
+import { searchKeyTokens, escapeIlike } from "@/app/_lib/search-filter";
 import { pickLocalized, isLocale, DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
 import { getCategories } from "@/app/_lib/categories";
 
@@ -22,11 +22,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json<SearchSuggestion[]>([]);
   }
 
-  // Wyszukiwanie odporne na spacje/kolejność: frazę tniemy na słowa i każde
-  // dopasowujemy do kolumny search_key (odspacjowana, bez tagów) przez ILIKE —
-  // wiele .ilike() na tej samej kolumnie PostgREST ANDuje (każde słowo musi
-  // wystąpić). Brak tokenów (sama interpunkcja) → brak podpowiedzi.
-  const tokens = searchTokens(q);
+  // Wyszukiwanie odporne na spacje/kolejność, ogonki i odmianę: frazę tniemy na
+  // słowa, każde składamy do ASCII i obcinamy końcówkę, a potem dopasowujemy do
+  // kolumny search_key_fold przez ILIKE — wiele .ilike() na tej samej kolumnie
+  // PostgREST ANDuje (każde słowo musi wystąpić). Brak tokenów (sama
+  // interpunkcja) → brak podpowiedzi.
+  const tokens = searchKeyTokens(q);
   if (tokens.length === 0) {
     return NextResponse.json<SearchSuggestion[]>([]);
   }
@@ -37,8 +38,9 @@ export async function GET(request: NextRequest) {
     .select("id, name, name_de, price, images, category")
     .order("created_at", { ascending: false })
     .limit(6);
+  const keyCol = locale === "de" ? "search_key_fold_de" : "search_key_fold";
   for (const token of tokens) {
-    query = query.ilike("search_key", `%${escapeIlike(token)}%`);
+    query = query.ilike(keyCol, `%${escapeIlike(token)}%`);
   }
   const { data, error } = await query;
 
