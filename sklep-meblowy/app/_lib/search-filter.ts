@@ -91,3 +91,43 @@ export function foldDiacritics(value: string): string {
     .replace(/ß/g, "ss")
     .replace(/[ąćęłńóśźżäöü]/g, (ch) => FOLD_MAP[ch] ?? ch);
 }
+
+// Końcówki fleksyjne w formie JUŻ ZŁOŻONEJ (po foldDiacritics), posortowane od
+// najdłuższej — inaczej „materacami" straciłoby samo „i" zamiast „ami".
+// „ów" po złożeniu to „ow", „ą" to „a", „ę" to „e", dlatego lista jest krótsza,
+// niż wyglądałaby dla surowej polszczyzny.
+const STEM_SUFFIXES = [
+  "ami",
+  "ach",
+  "owi",
+  "iem",
+  "ow",
+  "om",
+  "ie",
+  "em",
+  "y",
+  "i",
+  "e",
+  "a",
+  "u",
+  "o",
+];
+
+// Minimalna długość rdzenia po obcięciu. 3, nie 4 — przy progu 4 fraza „sofy"
+// (rdzeń „sof") nie zostałaby zestemowana i dalej dawałaby zero wyników.
+export const MIN_STEM_LENGTH = 3;
+
+// Obcina JEDNĄ końcówkę. Dopasowanie w bazie jest podciągiem, więc krótszy
+// rdzeń łapie wszystkie dłuższe formy — stemowanie może tylko DODAĆ trafienia,
+// nigdy odebrać.
+export function stemToken(token: string): string {
+  for (const suffix of STEM_SUFFIXES) {
+    if (
+      token.length - suffix.length >= MIN_STEM_LENGTH &&
+      token.endsWith(suffix)
+    ) {
+      return token.slice(0, -suffix.length);
+    }
+  }
+  return token;
+}

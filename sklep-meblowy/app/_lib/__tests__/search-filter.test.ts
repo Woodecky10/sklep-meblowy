@@ -5,6 +5,8 @@ import {
   searchTokens,
   rankByNameMatch,
   foldDiacritics,
+  stemToken,
+  MIN_STEM_LENGTH,
 } from "@/app/_lib/search-filter";
 
 describe("sanitizeSearchTerm — ochrona przed injection w .or() (audyt MED)", () => {
@@ -177,5 +179,50 @@ describe("foldDiacritics — składanie znaków na ASCII (musi = translate() w m
 
   it("puste wejście → pusty string", () => {
     expect(foldDiacritics("")).toBe("");
+  });
+});
+
+describe("stemToken — obcięcie jednej końcówki fleksyjnej", () => {
+  it("liczba mnoga wraca do rdzenia (przypadki z pomiarów na produkcji)", () => {
+    expect(stemToken("narozniki")).toBe("naroznik");
+    expect(stemToken("fotele")).toBe("fotel");
+    expect(stemToken("materace")).toBe("materac");
+    expect(stemToken("sofy")).toBe("sof");
+    expect(stemToken("lozka")).toBe("lozk");
+  });
+
+  it("obcina najdłuższą pasującą końcówkę, nie pierwszą z listy", () => {
+    // „materacami" → „ami" (3 znaki), nie „i" (1 znak).
+    expect(stemToken("materacami")).toBe("materac");
+    expect(stemToken("lozkach")).toBe("lozk");
+    expect(stemToken("stolowi")).toBe("stol");
+  });
+
+  it("obcina TYLKO jedną końcówkę", () => {
+    // „sofami" → „sof"; nie stemujemy dalej do „so".
+    expect(stemToken("sofami")).toBe("sof");
+  });
+
+  it("nie obcina, gdy rdzeń zszedłby poniżej MIN_STEM_LENGTH", () => {
+    expect(MIN_STEM_LENGTH).toBe(3);
+    // „ale" → obcięcie „e" dałoby rdzeń 2-znakowy → zostaw nietknięte.
+    expect(stemToken("ale")).toBe("ale");
+    expect(stemToken("do")).toBe("do");
+    expect(stemToken("na")).toBe("na");
+  });
+
+  it("token bez końcówki z listy zostaje bez zmian", () => {
+    expect(stemToken("materac")).toBe("materac");
+    expect(stemToken("naroznik")).toBe("naroznik");
+    expect(stemToken("vegas")).toBe("vegas");
+  });
+
+  it("wymiary i liczby zostają nietknięte", () => {
+    expect(stemToken("160x200")).toBe("160x200");
+    expect(stemToken("3")).toBe("3");
+  });
+
+  it("pusty token zostaje pusty", () => {
+    expect(stemToken("")).toBe("");
   });
 });
