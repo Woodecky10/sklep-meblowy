@@ -57,6 +57,14 @@
 
 - [ ] **Krok 1: Napisz plik słownika**
 
+> ⚠️ **DOPISANE PO WDROŻENIU (2026-08-13): KOD PONIŻEJ MA DZIURĘ — NIE KOPIOWAĆ ŻYWCEM.**
+> `Record` + `SEARCH_SYNONYMS[stem]` (i tak samo `NOT_CARRIED[stem]`) czyta z ŁAŃCUCHA PROTOTYPU.
+> Fraza `constructor` — osiągalna wprost z pola wyszukiwarki — zwraca funkcję `Object` zamiast
+> tablicy, więc `[stem, ...extra]` rzuca `TypeError: extra is not iterable` = **500 na `/sklep`
+> i na `/api/search/suggest`**. Deklaracja typów w „Interfejsach" powyżej też mówi `Record` i też
+> jest nieaktualna. W repo żyje wersja z `ReadonlyMap` + `.get()` (commit `67637f4a`) — szczegóły
+> w sekcji „STAN WYKONANIA" na końcu tego pliku.
+
 ```ts
 // Wiedza o tym, jak klient nazywa to, co sklep sprzedaje — i czego sklep nie
 // sprzedaje. Jedno miejsce, ręcznie utrzymywane.
@@ -913,19 +921,95 @@ Zwolnij port 3000.
 
 ---
 
-## STAN WYKONANIA
+## STAN WYKONANIA (zamknięte 2026-08-13)
 
-**Nic z tego planu nie jest jeszcze zaimplementowane.** Gałąź `feat/synonimy-i-zero-wynikow` zawiera na tę chwilę wyłącznie spec i ten plan.
+**Cały plan zaimplementowany** na gałęzi `feat/synonimy-i-zero-wynikow` (HEAD `a5a22668`, 11 commitów nad `97eade6c`). **Zero migracji** — słownik żyje w kodzie. W chwili pisania gałąź nie jest zmergowana ani na produkcji.
 
-### Kontekst do podjęcia pracy na innym komputerze
+Wykonane przez subagent-driven-development: 6 tasków, każdy z własną recenzją (Task 1 i Task 5 po jednej rundzie poprawki), plus finalna recenzja całej gałęzi i fala poprawek po niej. Bramki na końcu: `npm test` 1328/1328, `npx tsc --noEmit` 0, `npm run lint` 0 błędów (4 ostrzeżenia sprzed gałęzi: `fabrics.test.ts` ×2, `bundles-server.ts`, `variants.ts`).
 
-- Spec zatwierdzony przez właściciela. Zakres i decyzje: słownik w kodzie (nie panel), wszystkie trzy etapy chciane, ale **materiały wypadły z zakresu po pomiarach** (brak danych) i są osobnym tematem.
-- Lista synonimów jest **do skreślania przez właściciela w każdej chwili** — jeden plik, jedna linia na wpis.
-- **PR #138 (`fix/panel-wyszukiwarka-odmiana`) jest OTWARTY I NIEZMERGOWANY.** Naprawia odmianę w wyszukiwarkach panelu i we wzorniku tkanin. Nie koliduje z tym planem (inne pliki), ale zdecyduj, w jakiej kolejności je mergować.
-- Poprzedni projekt (ogonki i odmiana) wdrożony: PR #136 + #137, migracje 73 i 74 na produkcji. Jego rozstrzygnięcia i follow-upy są w sekcji „STAN WYKONANIA" planu `2026-08-13-wyszukiwanie-dopasowanie.md`.
-- Push wymaga konta gh **Woodecky10** (domyślne `mwlo1403` dostaje 403). Jeśli `gh pr merge` odbije się od klasyfikatora w PowerShellu, spróbuj tego samego w Bashu — blokady różnią się per narzędzie.
+| commity | co |
+|---|---|
+| `c0f53b55`, `74b14665` | Task 1 — `search-vocabulary.ts`: słownik synonimów i rzeczy nieprowadzonych + bramka osiągalności kluczy **i wartości** dla tokenizera |
+| `fdd49a9f` | Task 2 — `searchKeyTokenGroups`: token → grupa alternatyw |
+| `d85c9459` | Task 3 — ranking: trafienie przez synonim liczy się jako rdzeń (poziom 2), nigdy jako dokładne |
+| `725234ed`, `e50cbaae` | Task 4 — trzej konsumenci (`products.ts`, `api/search/suggest`, `admin/produkty/actions.ts`) przez wspólny `applyTokenGroup` |
+| `29197efe`, `9459dabe` | Task 5 — `EmptySearchState`: „Nie prowadzimy X" + kafelki rodzin; gałąź 1 tylko wtedy, gdy fraza jest jedynym zawężeniem |
+| `67637f4a`, `37e713e8`, `a5a22668` | fala poprawek po finalnym review (1 Critical + 3 minory) |
+
+Task 6 był wyłącznie weryfikacyjny (bez commitów). `aa7571ec`, `c7c7328a`, `e7165be9` to spec, plan i tabela materiałów.
+
+### Wynik biznesowy, zmierzony na żywej bazie
+
+- **17/17 kluczy słownika daje dziś > 0 wyników; 13 z nich dawało wcześniej DOKŁADNIE 0.** Zakres: 9 (`fotelik`) … 208 (`tapczan`). Lista kluczy brana programowo ze stałej, nie przepisana z planu.
+- **Frazy kontrolne niezmienione** — i to potwierdzone mocniej niż zgodnością liczb: agent wyciągnął `search-filter.ts` sprzed gałęzi (`97eade6c`) i puścił oba potoki obok siebie na tej samej żywej bazie. Dla wszystkich pięciu fraz (`łóżko`, `lozko`, `sofy`, `materac`, `poso`) wyszedł **ten sam zbiór id i ta sama kolejność po rankingu**. To samo dla rozwijki podpowiedzi.
+- Panel widzi to samo co klient dla tej samej frazy: `kanapa` 41=41, `podnóżek` 10=10, `łóżko dziecięce` 25=25.
+- Trzy stany pustego wyniku potwierdzone HTTP-em, kafelki obejrzane na zrzutach — także przy szerokości 390 px.
+
+### Rozstrzygnięcia, które warto znać przy następnej zmianie
+
+- **Wildcardem w składni `.or()` jest `*`, nie `%`.** Największe ryzyko planu, rozstrzygnięte pomiarem: `.ilike("%kanap%")` → 0 wierszy, a `.or("…ilike.*kanap*,…ilike.*sof*")` → 41; operand z nieistniejącym rdzeniem (`*zzzznieistnieje*`) → 0, więc `*` nie jest brane literalnie. **Błąd w tej linii jest CICHY** — zła składnia nie rzuca wyjątku, tylko zwraca zero wierszy. Dlatego jej zmiana wymaga pomiaru na bazie, a nie samego zielonego testu.
+- Pokrewne, zmierzone przy okazji korekty komentarza: `*` jest wildcardem operatora `ilike` **także w zwykłej metodzie `.ilike()`** (`ilike.*sof*` = `ilike.%sof%` = 41 wierszy, przy `ilike.sof` → 0). `postgrest-js` nie przekształca wzorca — aliasowanie `*`→`%` robi PostgREST na poziomie operatora, nie składni `.or()`.
+- **Wiele `.or()` na jednym zapytaniu jest ANDowanych**, a nie „ostatnie wygrywa" (idą jako osobne parametry URL). Potwierdzone trzema niezależnymi drogami: kontrprzykładem pomiarowym (`kanapa dziecinne` = 0, nie 25), lekturą implementacji w `postgrest-js` i produkcyjnym świadkiem w `app/_lib/slides.ts:109-110`, gdzie dwa `.or()` od miesięcy zależą od AND.
+- **Do składni `.or()` trafiają wyłącznie stałe `[a-z0-9]+`.** Gałąź `.or()` jest osiągalna tylko dla tokenów będących dokładnie kluczami słownika (grupa jednoelementowa idzie zwykłym `.ilike()`), a kształt kluczy i wartości pilnuje test. Łańcuch antywstrzyknięciowy dalej kończy się w `sanitizeSearchTerm` (audyt MEDIUM 2026-06-11), nietknięty.
+- **Recall bezpieczny z konstrukcji, nie z pomiaru:** `synonymsFor` bez wpisu w słowniku zwraca `[stem]`, więc dla fraz spoza słownika potok redukuje się bit w bit do starego `.ilike()` — i tak samo w rankingu.
+- **Filtr do bazy dalej pyta rdzeniami.** Formy dokładne służą wyłącznie rankingowi (zasada z poprzedniej gałęzi, nienaruszona).
+
+### ⚠️ PUŁAPKA, KTÓRA MOGŁA WYWALIĆ SKLEP
+
+Słownik jako literał obiektowy plus odczyt `SEARCH_SYNONYMS[stem]` czytał z **łańcucha prototypu**. Fraza `constructor` — osiągalna wprost z pola wyszukiwarki, bo `stemToken` nie obcina `-r` — zwracała funkcję `Object`: prawdziwościowo prawdziwą i NIEiterowalną, więc `[stem, ...extra]` rzucało `TypeError: extra is not iterable`. Skutek: **500 na `/sklep?q=constructor` i na `/api/search/suggest`** (najgorętszy endpoint), a że w repo **nie ma żadnego `error.tsx` ani `global-error.tsx`**, klient dostałby domyślną stronę awarii Next zamiast sklepu. Ta sama dziura siedziała w `notCarriedLabel`. Nowość tej gałęzi: wcześniej żaden potok nie indeksował obiektu wartością pochodzącą od użytkownika.
+
+Złapało to dopiero **finalne review całej gałęzi — po pięciu czystych przeglądach pojedynczych tasków.** Diff każdego taska z osobna wyglądał poprawnie; widać to było dopiero na końcach potoku, uruchomionych naprawdę (`tsx` na realnych modułach).
+
+Naprawa (`67637f4a`): oba słowniki jako `ReadonlyMap`, odczyt przez `.get()`. Wybrane zamiast guarda `Object.hasOwn`, bo `.get()` zna wyłącznie własne klucze — **klasa błędu znika dla każdego przyszłego helpera w tym pliku**, a typ `… | undefined` wymusza obsługę braku. Przy `Record` TypeScript twierdził, że wartość ZAWSZE jest tablicą (`noUncheckedIndexedAccess` nie jest w tym repo włączone), czyli typy wprost kłamały i to one uśpiły autora. Dane, kolejność wpisów i komentarze zostały bit w bit. Do tego testy regresji na siedmiu nazwach z prototypu; z frazy klienta osiągalne okazały się `constructor`, `tostring`, `valueof` (`prototype`, `hasownproperty`, `proto` dopiero z doklejoną samogłoską, a `__proto__` w ogóle — sanityzacja wycina `_`).
+
+### ⚠️ POPRAWKI DO TEGO PLANU — plan mylił się w sześciu miejscach
+
+Wszystkie potwierdzone niezależnie przez recenzentów jako błędy PLANU, nie odstępstwa implementacji. Kto czyta ten plan po raz pierwszy, niech nie odziedziczy poniższych:
+
+- **(a) `łóżko` = 167, nie 177.** 177 pochodzi z kanału `service_role` (liczy też produkty nieaktywne); klient idzie przez `anon`/RLS i widzi 167. Obie liczby identyczne przed i po zmianie — to plan mieszał kanały pomiaru. Reszta tabeli oczekiwań zgodna: `sofy` 41, `materac` 157, `poso` 41 (POSO na miejscach 1-3), `narożnik` 40, DE `bett` 13, `matratze` 4, `sofa` 6.
+- **(b) Parametr filtra ceny to `?cena_od=`, nie `?priceMin=`.**
+- **(c) Słownik ma 17 kluczy, nie 15/16.** Brief Taska 6 kazał sprawdzić złą liczbę — lista musi być brana programowo ze stałej.
+- **(d) Czwarty przypadek testowy rankingu miał niespełnialną oczekiwaną kolejność.** Goły `.sort()` porządkuje po jednostkach UTF-16, więc „Sofa" (U+0053) < „Łóżko" (U+0141) — asercja z planu padałaby niezależnie od implementacji. Poprawiono literał (kolejność między celami synonimu jest wg briefu nieistotna), bez wnoszenia `localeCompare` i zależności od kolacji ICU.
+- **(e) Stała `POMIJANE_KAFELKI = {z-produkcji, meble}` wyzerowałaby kafelki.** Na najwyższym poziomie drzewa stoją tylko „Meble" (0 produktów, kryje 7 rodzin) i „Nasze realizacje" — pominięcie obu nie zostawia nic. Poprawnie: pomijać samo `z-produkcji`, a węzeł z dziećmi zastępować jego dziećmi → 7 rodzin.
+- **(f) Przepisany w tym planie kod `search-vocabulary.ts` (Task 1, krok 1) używa `Record` i `SEARCH_SYNONYMS[stem]` — kto go stąd skopiuje, odtworzy dziurę z sekcji o prototypie.** Ostrzeżenie stoi też przy samym bloku kodu. W repo obowiązuje wersja z `ReadonlyMap` + `.get()`. To samo dotyczy deklaracji typów w „Interfejsach" Taska 1.
+
+### Czego NIE sprawdzono
+
+- **Realnego klik-testu panelu.** `searchProductsForSizeGroup` siedzi za `requireAdmin()`, więc sesja admina = zapis na produkcji; sprawdzone przez proxy tymi samymi helperami, czyli **bez `.limit(10)` i bez progu długości frazy** na tym route.
+- **Ścieżki `/de` w przeglądarce** — tylko kodem, SQL-em i HTTP-em.
+- **E2E Playwrightem** — domyślny `E2E_BASE_URL` celuje w PRODUKCJĘ, więc nie uruchamiane.
+- **Prawdziwej odpowiedzi HTTP dla `/sklep?q=constructor` po naprawie** (zakaz buildu i `npm start` w briefie). Dowód jest na poziomie realnych modułów — dokładnie tam, gdzie powstawał wyjątek — ale render RSC nie został obejrzany. Warto dorzucić tę frazę do klik-testów; oczekiwane: normalny stan pustego wyniku plus kafelki.
+
+### Follow-upy
+
+Finalne review zatriażowało **wszystkie 16 odłożonych minorów jako „po mergu"** — jedyną pozycją „przed mergem" był Critical z prototypem, już naprawiony. Trzy najważniejsze:
+
+1. **`app/_lib/link-guest-orders.ts:19` escapuje `%`, `_` i `\`, ale NIE `*` — a `*` jest wildcardem operatora `ilike`.** Zweryfikowany email z gwiazdką zadziałałby więc jak wzorzec przy podpinaniu zamówień gościa do konta. To ta sama klasa problemu, którą audyt MEDIUM z 2026-06-11 zamykał dla `_`. Pre-existing i poza zakresem tej gałęzi, ale realny follow-up bezpieczeństwa. Uwaga przy naprawie: nie wiadomo, czy `\*` w ogóle daje literalną gwiazdkę (PostgREST mapuje `*`→`%` w całym wzorcu, więc `\*` prawdopodobnie staje się dosłownym procentem) — trzeba to najpierw zmierzyć, a nie zakładać.
+2. **Brak `error.tsx` / `global-error.tsx` w całym repo.** Dopóki go nie ma, każdy wyjątek w renderze wychodzi klientowi domyślną stroną awarii Next zamiast strony sklepu. Nie był findingiem tej gałęzi, ale to on zamieniał tamten `TypeError` w awarię widoczną dla klienta.
+3. **Inwariant okna `SUGGEST_CANDIDATES = 30`** (`app/api/search/suggest/route.ts:19-53`) był mierzony na POJEDYNCZYCH rdzeniach, a ta gałąź zmieniła populację okna na sumę alternatyw (`tapczan` → 208, `posłanie` → 167). Nie regres (te frazy dawały 0), ale komentarz z pomiarem nie pokrywa już kodu nad nim.
+
+Reszta, malejąco:
+
+- **Rozmiar odpowiedzi przy szerokich synonimach:** `products.ts:119` pobiera cały zbiór dopasowań przez `select("*")` bez range — `tapczan` materializuje teraz 208 z ~353 wierszy (opis HTML, zdjęcia, `variants` JSONB). Liczniki mierzono `head:true`, więc rozmiaru i opóźnienia NIKT nie zmierzył.
+- **`escapeIlike` w gałęzi `.or()` nie jest przypięty żadnym testem** (usunięcie zostawia zielony zestaw). Dziś no-op, ale to obrona z audytu MEDIUM w najnowszej ścieżce kodu. Sugerowany przypadek: `applyTokenGroup(q, "c", ["a%b", "sof"])` → `"c.ilike.*a\\%b*,c.ilike.*sof*"`.
+- **`POMIJANE_KAFELKI` sprawdzane tylko na pierwszym poziomie drzewa** — drzewo kategorii jest edytowalne dnd, więc po przeniesieniu `z-produkcji` pod „Meble" kafelek „Nasze realizacje" wróciłby. Fix jednolinijkowy: powtórzyć filtr po `flatMap`.
+- **Brak testu jednostkowego `rodzinyProduktow`** (filtr PRZED rozwinięciem, jeden poziom rozwinięcia, węzeł bez dzieci zostaje sobą) — broni go tylko zrzut ekranu; wymaga eksportu helpera.
+- **Brak limitu liczby kafelków** (30 podkategorii = 30 pigułek) i **brak skracania interpolowanej frazy** (200 znaków = ściana tekstu w font-display).
+- **`strona` (paginacja) nie wchodzi do `hasOtherFilters`**: `?q=szafa&strona=99` mogłoby pokazać „Nie prowadzimy", gdyby fraza miała trafienia na wcześniejszej stronie. Pre-existing, nieosiągalne przez UI (`Pagination` nie renderuje linku poza zakres).
+- **Drobiazgi z recenzji tasków:** brak komentarza uzasadniającego wpis `fotelik`→`fotel` (po polsku „fotelik" to zwykle fotelik samochodowy); mylące nazwa i komentarz drugiego przypadku testowego rankingu (mówią „poziom 1 zostaje pusty", choć nie zostaje — odziedziczone z planu); tautologiczna druga asercja w przypadku czwartym; `synonymsFor(f.stem)` liczone raz na wiersz × token (bez znaczenia przy 349 produktach); glify cudzysłowów `„…"` są polskie także na `/de` (niemiecki chce innych, ale to konwencja całego `page.tsx`).
+- **ZNALEZISKO POZA ZAKRESEM, potwierdzone na produkcji:** `/de/sklep` renderuje się PO POLSKU i szuka po kolumnie PL (samo `suggest?loc=de` działa poprawnie). Pre-existing, nietykane w tej gałęzi — osobny temat.
+
+### Do decyzji właściciela
+
+- **`łóżeczko` zwraca dziś WSZYSTKIE 167 łóżek, nie 41 dziecięcych.** Spec obiecywał to drugie, ranking tego nie prostuje (wszystkie trafienia siedzą na poziomie 2). Model „klucz → alternatywa" jest z założenia sumą, więc nie umie wyrazić celu koniunkcyjnego; nawet `lozk AND dzieciec` dałoby 25 z 41, czyli też połowicznie. Prawdziwe rozwiązanie to dopasowanie do etykiety kategorii — świadomie odłożone (ten plan go nie robi).
+- **Zdrobnienia rzeczy nieprowadzonych nie trafiają w `NOT_CARRIED`:** `szafka`→`szafk`, `stolik`→`stolik`, `krzesełko`→`krzeselk`, `lampka`→`lampk`, `dywanik`→`dywanik`. Skutek łagodny (ogólne „Nie znaleźliśmy nic dla…" zamiast „Nie prowadzimy szaf"), ale dopisanie tych kluczy to zmiana danych względem planu — stąd pytanie.
+- **Słownik PL działa też na `/de`:** `kanapa` → 6 niemieckich sof. Żadna fraza DE nie zmieniła wyniku (czysty nadzbiór), więc to zysk, nie regres. Jeśli jednak „zamrożone DE" ma znaczyć zero różnicy, słownik trzeba warunkować locale'em. Odwrotnie: gałąź „nie prowadzimy" na `/de` praktycznie się nie zapali, bo klucze `NOT_CARRIED` to polskie rdzenie.
+- **Niespójna wielkość liter etykiet kategorii:** MATERACE, PUFY, SOFY, ŁÓŻKA kapitalikami vs Fotele, Narożniki, Schodki dla pupila. Widać to i w nowych kafelkach, i w stopce. Do poprawy w panelu, nie w kodzie.
+
+### Pułapki procesowe
+
+- **`origin/feat/synonimy-i-zero-wynikow` jest ROZJECHANY z gałęzią lokalną.** Zdalna gałąź (`507b14d7`) to trzy commity dokumentów z drugiej maszyny, sprzed merge'a PR #138 i o innych SHA; lokalna została przebazowana na `97eade6c` i ma całą implementację. Push będzie wymagał `--force-with-lease` — i sprawdzenia, że zdalna wersja niczego nie zawiera ponad dokumenty (dziś nie zawiera: różnica to wyłącznie pliki z PR #138).
 - **Przed każdym mergem sprawdź `git log origin/<branch>..<branch>`.** Przy PR #136 zmergowano wersję bez trzech commitów poprawki, bo gałąź pushnięto przed ich powstaniem.
-
-### Największe ryzyko tego planu
-
-Składnia wildcarda w `.or()` PostgREST (Task 4). Błąd tam **nie wywala wyjątku — cicho zwraca zero wyników**. Dlatego Task 4 ma osobną bramkę pomiarową na żywej bazie i nie wolno go uznać za zrobiony bez niej.
+- **Push wymaga konta gh `Woodecky10`** (domyślne `mwlo1403` dostaje 403). Jeśli `gh pr merge` odbije się od klasyfikatora w PowerShellu, spróbuj tego samego w Bashu — blokady różnią się per narzędzie.
+- **Recenzja pojedynczego taska nie zastępuje recenzji całej gałęzi.** Krytyczny błąd z sekcji o prototypie przeszedł przez pięć czystych przeglądów, bo w granicach jednego diffa był niewidoczny.
+- Kontekst historyczny: poprzedni projekt (ogonki i odmiana) jest na produkcji — PR #136 + #137, migracje 73 i 74. Jego rozstrzygnięcia i follow-upy: sekcja „STAN WYKONANIA" w `2026-08-13-wyszukiwanie-dopasowanie.md`. PR #138 (odmiana w wyszukiwarkach panelu), o którym plan pisał jako otwartym, jest już zmergowany — to na nim stoi ta gałąź.
