@@ -920,3 +920,44 @@ Push wymaga konta gh **Woodecky10** (domyślne `mwlo1403` dostaje 403). Jeśli `
 - **Logowania fraz**, więc synonimy dalej trzeba by dobierać na wyczucie.
 - **Deduplikacji rodzin produktów w podpowiedziach** — fraza „alva" zwraca sześć niemal identycznych wariantów.
 - **Sprzątania starych kolumn** `search_key` / `search_key_de` i ich indeksów.
+
+---
+
+## STAN WYKONANIA (zamknięte 2026-08-13)
+
+**Wdrożone na produkcję.** PR #136 (`baf9117`) + PR #137 (`ae31565`). Migracje `73_search_key_fold` (`20260813093401`) i `74_search_key_fold_pl_de_znaki` (`20260813111203`) zaaplikowane ręcznie przez MCP.
+
+Wykonane przez subagent-driven-development: 8 tasków, każdy z własną recenzją, plus finalna recenzja całej gałęzi, poprawka i recenzja poprawki.
+
+### Potwierdzone na produkcji po deployu
+
+`poso` → trzy narożniki POSO na pozycjach 1–3 na `/sklep`, dwa pierwsze w podpowiedziach. `liva` → Liva przed Livią. `lozko`, `łóżko`, `sofy`, `narozniki` → pełna strona wyników, zero regresji. Przed zmianą `lozko`, `sofy` i `narożniki` dawały **zero wyników**.
+
+### Rozstrzygnięcia, które warto znać przy następnej zmianie w wyszukiwaniu
+
+- **Ranking ma trzy poziomy, nie dwa:** nazwa z dokładnym tokenem złożonym → nazwa z samym rdzeniem → trafienie z opisu. Dwa poziomy nie wystarczały: rdzeń 3-znakowy z 4-literowej nazwy własnej łapie popularne słowa (`poso`→`pos` łapie `pościel` w 21 nazwach), a taki hałas też jest trafieniem *w nazwie*, więc siedział w tej samej grupie i wygrywał datą. Spec założył, że ranking to wypchnie — dane tego nie potwierdziły.
+- **Poziom 1 wymaga dokładnego trafienia WSZYSTKICH tokenów** (`every`, nie `some`). Przy `some` fraza `poso łóżko` awansowałaby łóżka „…na pościel", czyli hałas wracałby schowany za drugim tokenem.
+- **Recall jest bezpieczny z konstrukcji, nie z pomiaru:** warunek wejścia na poziom „opis" jest dosłowną negacją starego warunku „trafienie w nazwie", więc poziom 1 ∪ poziom 2 to bit w bit stary zbiór. Rdzeń jest zawsze prefiksem formy złożonej, więc poziom 1 ⊆ poziom 2.
+- **Filtr do bazy zostaje na rdzeniach.** Formy dokładne służą WYŁĄCZNIE rankingowi. Przełączenie filtra na formy dokładne zawaliłoby recall.
+- **Migracja tylko dodająca była kluczowa.** Dzięki temu migracja mogła wejść przed deployem kodu, bez okna „zero wyników na wszystko" na żywym sklepie.
+- **Okno 30 kandydatów w podpowiedziach:** dla każdego rdzenia z >30 dopasowaniami okno zawiera co najmniej 13 trafień w nazwie przy 6 potrzebnych (zmierzone na całym katalogu, 1070 rdzeni). NIE podnosić tej liczby na oślep, gdy zacznie się zbliżać do 6 — przenieść ranking do SQL (widok/RPC z CASE), bo tylko to rankuje cały katalog. Pełne wyszukiwanie na `/sklep` tego okna nie ma.
+
+### Czego NIE sprawdzono na żywo
+
+- Zrzutów Playwrightem po naprawie rankingu — weryfikacja szła przez HTTP i SQL, nie przez kliknięte UI.
+- Pomiaru „1070 rdzeni / minimum 13" nikt nie odtworzył niezależnie (wymaga przepisania stemmingu JS na SQL); recenzent zrobił zgodne spot-checki.
+- Ścieżki DE w przeglądarce — `/de` jest zamrożone flagą, sprawdzone tylko kodem i SQL-em.
+
+### Follow-upy
+
+- **Trzecia tkanina POSO nie wchodzi do podpowiedzi.** Jest 41. najnowszym dopasowaniem rdzenia `pos`, więc wypada za okno 30. Rankingiem nienaprawialne. Na `/sklep` widać wszystkie trzy.
+- **Druga wyszukiwarka w repo nie rozumie odmiany.** `app/_lib/search-normalize.ts` (`searchMatches`) składa diakrytyki i radzi sobie z NFD, ale nie stemuje. Używana w `ProductsList`, `CollectionsEditor`, `BundlesEditor`, `FabricsEditor`, `VariantsEditor`, `BlockForms` i `sample-catalog.ts`. Skutek: admin wpisujący „sofy" na liście produktów dostaje 0, klient na `/sklep` 41. Dotyczy też wyszukiwarki próbek tkanin dla klienta.
+- **Martwe indeksy do sprzątnięcia razem z kolumnami:** `products_search_key_trgm` (376 kB) i `products_search_key_de_trgm` (224 kB) — razem ~14% rozmiaru tabeli i narzut na każdy zapis. Potwierdzone: 0 widoków, 0 matviews, 0 polityk RLS, 0 odwołań w kodzie aplikacji.
+- **`stemToken` bierze PIERWSZĄ pasującą końcówkę, nie najdłuższą** — poprawność zależy od ręcznego posortowania `STEM_SUFFIXES` od najdłuższej. Dopisanie 3-znakowej końcówki na końcu listy cicho zmieni zachowanie (skutek: mniej stemowania, nigdy strata trafień). Wymuszenie sortowania w kodzie zamieniłoby dyscyplinę na inwariant.
+- **Pozycja porządkowa `search_key_fold`** przeskoczyła na koniec tabeli po DROP+ADD w migracji 74. Kod czyta kolumny po nazwie, więc bez znaczenia — ale eksport oparty o kolejność kolumn by się przewrócił.
+
+### Pułapka procesowa, która kosztowała jeden zły deploy
+
+PR #136 został zmergowany **bez trzech commitów poprawki**: gałąź pushnięto przed dispatchem poprawki (żeby zrównoleglić z finalną recenzją), a implementer poprawki miał zakaz pushowania. Na produkcję poszła wersja, którą finalna recenzja odrzuciła. Wykryło to dopiero `git branch -d`, odmawiając usunięcia gałęzi („not fully merged").
+
+**Przed każdym mergem sprawdzić `git log origin/<branch>..<branch>`.** Jeśli cokolwiek zwróci, PR nie zawiera całej pracy.
