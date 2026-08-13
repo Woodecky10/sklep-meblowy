@@ -266,9 +266,19 @@ export function searchKeyTokenGroups(raw: string): string[][] {
 // (sanitizeSearchTerm: litery, cyfry, spacja, myślnik) plus test kształtu
 // słownika [a-z0-9]+ — nie ten helper. Kto poluzuje tamtą allowlistę (realny
 // scenariusz: „klient musi móc wpisać `&` w nazwie tkaniny"), musi zadbać
-// o `*` tutaj, LOKALNIE. Do globalnego escapeIlike gwiazdki nie dopisywać:
-// w metodzie .ilike() (m.in. linkGuestOrders) `*` wildcardem nie jest, więc
-// escape zepsułby tam dosłowne dopasowanie.
+// o `*` tutaj, LOKALNIE. Do globalnego escapeIlike gwiazdki mimo to nie
+// dopisywać — ale NIE dlatego, że w metodzie .ilike() (m.in. linkGuestOrders)
+// `*` wildcardem nie jest. JEST nim w obu składniach: pomiar 2026-08-13 na
+// prostym filtrze, bez .or(), dał `search_key_fold=ilike.*sof*` → 41 wierszy,
+// dokładnie tyle co `ilike.%sof%`, przy `ilike.sof` → 0 i `ilike.*zzzsofzzz*`
+// → 0. Metoda .ilike() nie przekształca wzorca (postgrest-js emituje dosłownie
+// `col=ilike.<wzorzec>`), więc `*` aliasuje sam PostgREST na poziomie operatora
+// ilike — niezależnie od tego, czy operand siedzi w .or(), czy nie.
+// Powód zakazu jest inny: backslash najpewniej NIE robi z gwiazdki literału
+// (skoro PostgREST mapuje `*`→`%` w całym wzorcu, `\*` wychodzi jako `\%`,
+// czyli dosłowny procent) — i tego NIKT nie zmierzył. Gwiazdkę odsiewa się
+// więc WYCINANIEM w sanitizeSearchTerm, nie escapowaniem; escapeIlike i tak by
+// tu nie pomógł, a globalnie ruszany być nie musi.
 export function applyTokenGroup<Q extends {
   ilike: (col: string, pattern: string) => Q;
   or: (filters: string) => Q;
