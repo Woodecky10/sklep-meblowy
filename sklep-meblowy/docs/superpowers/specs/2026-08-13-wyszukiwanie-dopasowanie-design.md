@@ -63,6 +63,9 @@ podpowiedzi.** Decyzja właściciela z 2026-08-13.
 
 Świadomie **poza zakresem** (osobne rundy):
 
+- migracja sprzątająca stare kolumny `search_key` / `search_key_de` i ich
+  indeksy — dopiero po potwierdzeniu nowych na produkcji;
+
 - słownik synonimów (`kanapa` → `sofa`) — wymaga decyzji, kto go utrzymuje:
   kod czy pole „słowa kluczowe" w panelu;
 - wyjście ze stanu „zero wyników" (dziś ślepy zaułek: „Brak produktów.
@@ -177,25 +180,42 @@ z tym, co robi kolumna w bazie.
 
 ## Migracja
 
-Wyrażenia kolumny generowanej **nie da się podmienić** przez `ALTER` — trzeba
-kolumnę usunąć i dodać na nowo. Zależności sprawdzone na produkcji 2026-08-13:
+### Kolumny dodatkowe, nie podmiana (korekta z 2026-08-13, etap planowania)
 
-| Typ | Obiekt |
-|---|---|
-| indeks | `products_search_key_trgm` (GIN, `gin_trgm_ops`) |
-| indeks | `products_search_key_de_trgm` (GIN, `gin_trgm_ops`) |
+Migracja **dodaje** `search_key_fold` i `search_key_fold_de` obok istniejących
+`search_key` / `search_key_de`, zamiast podmieniać te drugie.
 
-**Zero widoków, zero polityk RLS** odwołujących się do tych kolumn. Poza
-indeksami nic nie zależy, więc odtworzenie jest bezpieczne.
+Powód jest wdrożeniowy, nie estetyczny. Dopasowanie wymaga złożenia znaków po
+**obu** stronach. Gdyby istniejąca kolumna zmieniła znaczenie pod działającym
+kodem, powstałoby okno, w którym jedna strona jest złożona, a druga nie —
+a wtedy **każde** zapytanie zwraca zero wyników, nie tylko te bez ogonków.
+Kolejność deployu nie ratuje: kod przed migracją to złożone tokeny kontra
+niezłożona kolumna, migracja przed kodem to sytuacja odwrotna. Migracje na tym
+projekcie idą ręcznie, więc okno liczyłoby się w minutach żywego sklepu.
 
-Kształt migracji, w jednej transakcji:
+Wariant dodatkowy jest **neutralny dla starego kodu** — stara kolumna dalej
+działa, dopóki nie przełączymy zapytań. Migracja może pójść przed deployem,
+w dowolnym momencie, bez okna awarii. Jest to też warunek testowania lokalnie:
+`npm start` łączy się z **tą samą bazą produkcyjną**, więc bez kolumny w bazie
+nie da się sprawdzić zmiany przed merge.
 
-1. `drop index if exists` oba indeksy trgm,
-2. `alter table products drop column if exists search_key`, to samo dla
-   `search_key_de`,
-3. dodać kolumny na nowo jako `generated always as (...) stored`, owinięte
-   składaniem znaków,
-4. `create index if not exists` oba indeksy trgm.
+Koszt: dwie dodatkowe kolumny generowane i dwa indeksy GIN na 357 wierszach —
+nieistotny. Stare kolumny zostają jako martwe do osobnej migracji sprzątającej,
+**po** potwierdzeniu, że nowe działają na produkcji.
+
+Zależności sprawdzone na produkcji 2026-08-13 — poza dwoma indeksami trgm
+(`products_search_key_trgm`, `products_search_key_de_trgm`) **zero widoków
+i zero polityk RLS** odwołuje się do tych kolumn. Ustalenie zostaje
+udokumentowane, bo będzie potrzebne przy migracji sprzątającej.
+
+Kształt migracji:
+
+1. `add column if not exists search_key_fold` jako
+   `generated always as (...) stored` ze składaniem znaków,
+2. to samo dla `search_key_fold_de`,
+3. `create index if not exists` dwa indeksy GIN trgm na nowych kolumnach.
+
+W pełni idempotentna, bez `drop`.
 
 Wyrażenie PL:
 
