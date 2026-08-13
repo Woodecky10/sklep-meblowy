@@ -253,7 +253,11 @@ export function searchKeyTokenGroups(raw: string): string[][] {
 //
 // Bezpieczeństwo: tokeny przeszły już sanitizeSearchTerm (usuwa `, . ( )` oraz
 // wildcardy), a wartości słownika są ograniczone testem do [a-z0-9]+. Do tego
-// escapeIlike na każdym operandzie.
+// escapeIlike na każdym operandzie — mimo że po tej sanityzacji jest no-opem,
+// bo nie ma już czego escapować. Jego backslash escapuje TAK SAMO wewnątrz
+// .or(), jak w metodzie .ilike() (pomiar 2026-08-13: `*\_*` → 0 wierszy przy
+// `*_*` → 353, a `*s\of*` → 41 jak `*sof*`), więc gdyby kiedyś operand jednak
+// zawierał wildcard, składnia .or() go nie przepuści ani nie zepsuje.
 export function applyTokenGroup<Q extends {
   ilike: (col: string, pattern: string) => Q;
   or: (filters: string) => Q;
