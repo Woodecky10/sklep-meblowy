@@ -7,7 +7,7 @@ import RichTextEditor from "@/app/admin/_shared/RichTextEditor";
 import { createFabric, updateFabric, deleteFabric, type ActionResult } from "./actions";
 import { uploadProductImage } from "@/app/admin/produkty/actions";
 import { compressIfNeeded } from "@/app/_lib/image-compress";
-import { searchMatches } from "@/app/_lib/search-normalize";
+import { filterBySearch } from "@/app/_lib/search-normalize";
 import { MAX_FEATURED_PRODUCTS } from "@/app/_lib/fabric-featured-products";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import FabricGroupsPanel from "./FabricGroupsPanel";
@@ -256,7 +256,7 @@ function FabricForm({
     [pickerProducts]
   );
   const filteredProducts = useMemo(
-    () => pickerProducts.filter((p) => searchMatches(p.name, productQuery)),
+    () => filterBySearch(pickerProducts, productQuery, (p) => [p.name]),
     [pickerProducts, productQuery]
   );
   function toggleProduct(id: string) {

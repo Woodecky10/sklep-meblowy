@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { searchMatches } from "@/app/_lib/search-normalize";
+import { filterBySearch } from "@/app/_lib/search-normalize";
 import DeleteProductButton from "./DeleteProductButton";
 import ToggleProductActiveButton from "./ToggleProductActiveButton";
 
@@ -33,9 +33,7 @@ function productsWord(n: number): string {
 export default function ProductsList({ products }: { products: AdminProductRow[] }) {
   const [query, setQuery] = useState("");
   const visible = query.trim()
-    ? products.filter(
-        (p) => searchMatches(p.name, query) || searchMatches(p.category, query)
-      )
+    ? filterBySearch(products, query, (p) => [p.name, p.category])
     : products;
 
   return (

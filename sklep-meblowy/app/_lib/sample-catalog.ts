@@ -5,7 +5,7 @@
 // muszą działać w przeglądarce. I/O tkanin siedzi w fabrics.ts, wycena
 // w sample-pricing.ts — tutaj wyłącznie kształtowanie listy i wybór.
 
-import { searchMatches } from "./search-normalize";
+import { filterBySearch } from "./search-normalize";
 import type { SampleSelection } from "./sample-pricing";
 import type { Fabric, FabricPriceGroup } from "./types";
 
@@ -81,9 +81,10 @@ export function buildSampleCatalog(
   groups: SampleGroup[],
   query: string
 ): SampleCatalogSection[] {
-  // searchMatches na pustej frazie zwraca true, więc filtr nie zawęża listy,
-  // dopóki klient nic nie wpisze.
-  const matching = fabrics.filter((f) => searchMatches(f.name, query));
+  // filterBySearch na pustej frazie zwraca całą listę, więc wzornik nie zawęża
+  // się, dopóki klient nic nie wpisze. Odmiana obsłużona fallbackiem: „welury"
+  // znajdzie „Welur", ale dopiero gdy dokładne dopasowanie nie da nic.
+  const matching = filterBySearch(fabrics, query, (f) => [f.name]);
 
   const byGroup = new Map<string, SampleFabric[]>();
   for (const f of matching) {
