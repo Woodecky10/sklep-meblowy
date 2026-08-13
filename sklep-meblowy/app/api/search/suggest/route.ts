@@ -17,23 +17,35 @@ export type SearchSuggestion = {
 // odsiewa trafienia w nazwie, zanim zdążą wygrać. 30 przy katalogu ~357
 // pozycji to koszt pomijalny.
 //
-// UWAGA, 30 to okno po created_at desc, więc TEORETYCZNIE trafienie w nazwie
-// może wypaść za okno i nigdy się nie pokazać. Warunek szkody jest podwójny:
-// w oknie musi siedzieć trafienie tylko-z-opisu ORAZ poza oknem trafienie
-// w nazwie. Zmierzone na produkcji (2026-08-13, 360 pozycji, 18 realnych
-// fraz): te dwa warunki nie zachodzą jednocześnie ANI RAZU — frazy z >30
-// dopasowaniami to słowa z NAZW (lozk 177, materac 157, naroznik 41: okno
-// w 100% z nazw), a frazy żyjące w opisach mają <30 dopasowań łącznie
-// (drewn 9, sprezyn 12, tkanin 19), więc poza oknem nie ma nic do stracenia.
-// Utracone wyniki: 0. Podnoszenie tej liczby nic dziś nie kupuje, a bije
-// w najgorętszy endpoint sklepu (zapytanie na każde wpisane słowo).
+// UWAGA, 30 to okno po created_at desc, więc trafienie w nazwie MOŻE wypaść za
+// okno i nigdy się nie pokazać — to się dzieje już dziś (fraza „poso": trzecia
+// tkanina POSO jest 41. najnowszym dopasowaniem rdzenia „pos", więc do rozwijki
+// wchodzą dwie z trzech). Sześć slotów jednak nie marnuje się na trafienia
+// z samego OPISU, i to jest właściwy inwariant:
 //
-// Kiedy to przestanie być prawdą: gdy opisy się wypełnią (dziś ~93% pozycji
-// jest bez opisu) i pojawi się fraza z >30 dopasowaniami, w której najnowsze
-// pozycje łapią się tylko opisem. Wtedy NIE podnosić na oślep — przenieść
-// ranking do SQL (widok/RPC z CASE), bo tylko to rankuje cały katalog.
-// Pełne wyszukiwanie na /sklep tej dziury nie ma: products.ts pobiera cały
-// zestaw dopasowań i paginuje w JS.
+//   dla KAŻDEGO rdzenia z >30 dopasowaniami okno 30 zawiera co najmniej
+//   13 trafień w NAZWIE, przy 6 potrzebnych do zapełnienia rozwijki.
+//
+// Zmierzone 2026-08-13 na całym katalogu produkcyjnym (349 aktywnych pozycji,
+// słownik 1070 rdzeni ze wszystkich słów nazw i opisów, 71 rdzeni z >30
+// dopasowaniami): minimum to 13 (rdzeń „raz" — i to artefakt sklejenia słów
+// w kluczu, „…Lara z materacem" → „laraz"), dla rdzeni od 4 znaków minimum
+// to 16. Rdzeni z mniej niż 6 trafieniami w nazwie w oknie: ZERO. Marginesu
+// jest więc ponad dwukrotność. Podnoszenie tej liczby nic dziś nie kupuje,
+// a bije w najgorętszy endpoint sklepu (zapytanie na każde wpisane słowo).
+//
+// (Wcześniejsza wersja tego komentarza uzasadniała 30 tezą „frazy z >30
+// dopasowaniami to słowa z NAZW, okno w 100% z nazw". Teza jest za mocna —
+// rdzeń „im" ma 83 dopasowania przy 15/30 z nazwy, „kcj" 37 przy 23/30.
+// Wniosek się broni, powód nie, dlatego pilnujemy liczby wyżej.)
+//
+// Czego to NIE gwarantuje: że najtrafniejsze pozycje są w oknie. Ranking
+// (trzy poziomy: nazwa dokładnie → nazwa rdzeniem → opis) sortuje tylko to,
+// co okno przyniosło. Kiedy 13 zacznie się zbliżać do 6 — gdy opisy się
+// wypełnią (dziś ~93% pozycji jest bez opisu) — NIE podnosić na oślep:
+// przenieść ranking do SQL (widok/RPC z CASE), bo tylko to rankuje cały
+// katalog. Pełne wyszukiwanie na /sklep tej dziury nie ma: products.ts
+// pobiera cały zestaw dopasowań i paginuje w JS.
 const SUGGEST_CANDIDATES = 30;
 const SUGGEST_LIMIT = 6;
 
