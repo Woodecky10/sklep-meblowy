@@ -8,6 +8,7 @@ import {
   stemToken,
   MIN_STEM_LENGTH,
   searchKeyTokens,
+  searchKeyTokenForms,
 } from "@/app/_lib/search-filter";
 
 describe("sanitizeSearchTerm — ochrona przed injection w .or() (audyt MED)", () => {
@@ -171,6 +172,88 @@ describe("rankByNameMatch — dopasowanie nazwy po złożeniu znaków", () => {
   });
 });
 
+describe("rankByNameMatch — dokładne trafienie bije rdzeń (POSO / pościel)", () => {
+  const get = (r: { name: string }) => r.name;
+
+  it("nazwa z dokładnym tokenem przed nazwą złapaną tylko rdzeniem", () => {
+    // Pomiar na produkcji 2026-08-13: „poso" → rdzeń „pos" daje 41 dopasowań,
+    // z czego 21 to „…na pościel" w NAZWIE, a tylko 3 to tkanina POSO. Wiersze
+    // z pościelą są nowsze, więc przy jednej grupie „nazwa" wygrywały datą.
+    const rows = [
+      { name: "Łóżko tapicerowane Lino z pojemnikiem na pościel 120x200" },
+      { name: "Sofa Soren z funkcją spania i pojemnikiem na pościel" },
+      { name: "Narożnik Vegas L w POSO 100 Sztruks" },
+      { name: "Narożnik Vegas Mini w POSO piękny Sztruks" },
+      { name: "Narożnik Vegas Rivia z funkcją spania" }, // tylko z opisu
+    ];
+    expect(rankByNameMatch(rows, "poso", get)).toEqual([
+      { name: "Narożnik Vegas L w POSO 100 Sztruks" },
+      { name: "Narożnik Vegas Mini w POSO piękny Sztruks" },
+      { name: "Łóżko tapicerowane Lino z pojemnikiem na pościel 120x200" },
+      { name: "Sofa Soren z funkcją spania i pojemnikiem na pościel" },
+      { name: "Narożnik Vegas Rivia z funkcją spania" },
+    ]);
+  });
+
+  it("dokładne trafienie liczy się po złożeniu znaków, nie po pisowni", () => {
+    // „Livia" łapie rdzeń „liv", ale dokładnego „liva" nie ma — kolekcja Liva
+    // musi być wyżej, mimo że wiersze Livia są w wejściu pierwsze.
+    const rows = [
+      { name: "Narożnik Livia rozkładany" },
+      { name: "Łóżko kontynentalne Liva 90x200" },
+    ];
+    expect(rankByNameMatch(rows, "Liva", get)[0]).toEqual({
+      name: "Łóżko kontynentalne Liva 90x200",
+    });
+  });
+
+  it("fraza bez ani jednego dokładnego trafienia → kolejność jak dotąd", () => {
+    // Główny przypadek użycia: „sofy" (rdzeń „sof"). Żadna nazwa nie zawiera
+    // „sofy", więc wszystko wpada na poziom rdzenia — poziom 1 jest pusty
+    // i grupowanie jest identyczne jak przed rozbiciem na trzy poziomy.
+    const rows = [
+      { name: "Sofa Modena szara" },
+      { name: "Narożnik Vegas" }, // tylko z opisu
+      { name: "Sofa Alva Mini" },
+    ];
+    expect(rankByNameMatch(rows, "sofy", get)).toEqual([
+      { name: "Sofa Modena szara" },
+      { name: "Sofa Alva Mini" },
+      { name: "Narożnik Vegas" },
+    ]);
+  });
+
+  it("fraza MIESZANA (jeden token dokładnie, drugi rdzeniem) → poziom rdzenia", () => {
+    // Decyzja: poziom 1 wymaga dokładnego trafienia KAŻDEGO tokenu. Inaczej
+    // łóżko „…na pościel" (dokładne „lozko" + rdzeń „pos") awansowałoby obok
+    // prawdziwego POSO i hałas wracałby na szczyt.
+    const rows = [
+      { name: "Łóżko tapicerowane Lino z pojemnikiem na pościel" }, // lozko + pos
+      { name: "Łóżko Vegas w POSO Sztruks" }, // lozko + poso
+    ];
+    expect(rankByNameMatch(rows, "poso łóżko", get)).toEqual([
+      { name: "Łóżko Vegas w POSO Sztruks" },
+      { name: "Łóżko tapicerowane Lino z pojemnikiem na pościel" },
+    ]);
+  });
+
+  it("poziom rdzenia nie gubi nic, co było trafieniem w nazwie (recall)", () => {
+    // Suma poziomów 1 i 2 musi być tym samym zbiorem, co dawna grupa „nazwa":
+    // każdy wiersz z rdzeniem w nazwie zostaje nad trafieniami z opisu.
+    const rows = [
+      { name: "Bez rdzenia w nazwie" },
+      { name: "Narożnik Fado" }, // tylko rdzeń „naroznik"
+      { name: "Narożniki Alva" }, // dokładne „narozniki"
+    ];
+    const ranked = rankByNameMatch(rows, "narożniki", get);
+    expect(ranked.map((r) => r.name)).toEqual([
+      "Narożniki Alva",
+      "Narożnik Fado",
+      "Bez rdzenia w nazwie",
+    ]);
+  });
+});
+
 describe("escapeIlike — escape wildcardów (linkGuestOrders, audyt MED)", () => {
   it("escapuje _ i % i backslash", () => {
     expect(escapeIlike("a_b")).toBe("a\\_b");
@@ -296,5 +379,57 @@ describe("searchKeyTokens — potok: sanityzacja → składanie → stem", () =>
   it("respektuje limit MAX_SEARCH_TOKENS (10 unikalnych rdzeni)", () => {
     const raw = Array.from({ length: 15 }, (_, i) => `wyraz${i}`).join(" ");
     expect(searchKeyTokens(raw).length).toBeLessThanOrEqual(10);
+  });
+});
+
+describe("searchKeyTokenForms — obie formy tokenu (tylko dla rankingu)", () => {
+  it("zwraca formę złożoną BEZ stemu obok formy po stemie", () => {
+    expect(searchKeyTokenForms("łóżko")).toEqual([
+      { fold: "lozko", stem: "lozk" },
+    ]);
+    expect(searchKeyTokenForms("POSO")).toEqual([
+      { fold: "poso", stem: "pos" },
+    ]);
+  });
+
+  it("token bez końcówki z listy ma obie formy identyczne", () => {
+    expect(searchKeyTokenForms("materac")).toEqual([
+      { fold: "materac", stem: "materac" },
+    ]);
+  });
+
+  it("wiele słów → wiele par, kolejność zachowana", () => {
+    expect(searchKeyTokenForms("narożnik szary")).toEqual([
+      { fold: "naroznik", stem: "naroznik" },
+      { fold: "szary", stem: "szar" },
+    ]);
+  });
+
+  it("deduplikacja PO RDZENIU — zostaje forma pierwszego wystąpienia", () => {
+    expect(searchKeyTokenForms("sofa sofy")).toEqual([
+      { fold: "sofa", stem: "sof" },
+    ]);
+  });
+
+  it("rdzenie są DOKŁADNIE tym, co zwraca searchKeyTokens (jeden inwariant)", () => {
+    for (const raw of [
+      "łóżko",
+      "sofa sofy",
+      "narożnik szary",
+      "poso",
+      "x,price.gt.0",
+      ",.()",
+      "",
+      Array.from({ length: 15 }, (_, i) => `wyraz${i}`).join(" "),
+    ]) {
+      expect(searchKeyTokenForms(raw).map((f) => f.stem)).toEqual(
+        searchKeyTokens(raw)
+      );
+    }
+  });
+
+  it("sama interpunkcja / pusta fraza → []", () => {
+    expect(searchKeyTokenForms(",.()")).toEqual([]);
+    expect(searchKeyTokenForms("")).toEqual([]);
   });
 });
