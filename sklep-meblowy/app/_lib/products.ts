@@ -3,7 +3,11 @@ import { createClient as createBareAnonClient } from "@supabase/supabase-js";
 import { createClient, createAdminClient } from "./supabase/server";
 import { getAllCategories } from "./categories";
 import { resolveCategoryFilter, expandCrossSellTargets } from "./category-tree";
-import { searchKeyTokens, rankByNameMatch, escapeIlike } from "./search-filter";
+import {
+  searchKeyTokenGroups,
+  rankByNameMatch,
+  applyTokenGroup,
+} from "./search-filter";
 import { sizeLabelOf } from "./size-groups";
 import { localizeProduct } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
@@ -155,12 +159,16 @@ export async function getProducts(filters: ProductFilters = {}) {
   // (odspacjowana, bez tagów, znaki złożone) przez ILIKE — wiele .ilike() na
   // tej samej kolumnie PostgREST ANDuje, więc każde słowo musi wystąpić,
   // niezależnie od kolejności. DE → search_key_fold_de.
-  const searchTerms = searchKeyTokens(search ?? "");
-  const searchActive = searchTerms.length > 0;
+  //
+  // Token ze słownika synonimów (search-vocabulary.ts) dostaje zamiast jednego
+  // .ilike() alternatywę .or(): „kanapa" szuka „kanap" LUB „sof". Grupy dalej
+  // są ANDowane, więc każde słowo frazy musi wystąpić w którejkolwiek postaci.
+  const searchGroups = searchKeyTokenGroups(search ?? "");
+  const searchActive = searchGroups.length > 0;
   if (searchActive) {
     const keyCol = locale === "de" ? "search_key_fold_de" : "search_key_fold";
-    for (const token of searchTerms) {
-      query = query.ilike(keyCol, `%${escapeIlike(token)}%`);
+    for (const group of searchGroups) {
+      query = applyTokenGroup(query, keyCol, group);
     }
   }
   // Aktywne wyszukiwanie zmienia tryb paginacji: ranking (nazwa > opis)

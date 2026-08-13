@@ -234,3 +234,34 @@ export function searchKeyTokens(raw: string): string[] {
 export function searchKeyTokenGroups(raw: string): string[][] {
   return searchKeyTokens(raw).map((token) => synonymsFor(token));
 }
+
+// Warunek dla jednej grupy alternatyw, wspólny dla trzech konsumentów — żeby
+// składnia PostgREST siedziała w jednym miejscu, a nie w trzech kopiach.
+//
+// Grupa jednoelementowa idzie zwykłym .ilike() (czytelniejsze i tańsze).
+// Grupa z synonimami idzie .or(), gdzie wildcardem jest `*`, NIE `%` — to inna
+// składnia niż w metodzie .ilike(). Wiele .or() na zapytaniu jest ANDowanych,
+// tak samo jak wiele .ilike().
+//
+// Zmierzone na produkcji 2026-08-13 (klucz anon, te same RLS co storefront):
+// `.ilike("search_key_fold", "%kanap%")` → 0 wierszy, a
+// `.or("search_key_fold.ilike.*kanap*,search_key_fold.ilike.*sof*")` → 41,
+// czyli dokładnie tyle, ile samo „sof". Gwiazdka JEST wildcardem: ten sam
+// operand z nieistniejącym rdzeniem daje 0, więc nie jest brana literalnie.
+// (`%` w tej pozycji też działa, ale `*` to składnia dokumentowana.) Dwa .or()
+// na jednym zapytaniu dały 25 — tyle samo, co dwa .ilike() na rdzeniach.
+//
+// Bezpieczeństwo: tokeny przeszły już sanitizeSearchTerm (usuwa `, . ( )` oraz
+// wildcardy), a wartości słownika są ograniczone testem do [a-z0-9]+. Do tego
+// escapeIlike na każdym operandzie.
+export function applyTokenGroup<Q extends {
+  ilike: (col: string, pattern: string) => Q;
+  or: (filters: string) => Q;
+}>(query: Q, keyCol: string, group: string[]): Q {
+  if (group.length === 1) {
+    return query.ilike(keyCol, `%${escapeIlike(group[0])}%`);
+  }
+  return query.or(
+    group.map((alt) => `${keyCol}.ilike.*${escapeIlike(alt)}*`).join(",")
+  );
+}

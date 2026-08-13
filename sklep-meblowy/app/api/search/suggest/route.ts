@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/app/_lib/supabase/server";
-import { searchKeyTokens, escapeIlike, rankByNameMatch } from "@/app/_lib/search-filter";
+import {
+  searchKeyTokenGroups,
+  applyTokenGroup,
+  rankByNameMatch,
+} from "@/app/_lib/search-filter";
 import { pickLocalized, isLocale, DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
 import { getCategories } from "@/app/_lib/categories";
 
@@ -73,8 +77,12 @@ export async function GET(request: NextRequest) {
   // kolumny search_key_fold przez ILIKE — wiele .ilike() na tej samej kolumnie
   // PostgREST ANDuje (każde słowo musi wystąpić). Brak tokenów (sama
   // interpunkcja) → brak podpowiedzi.
-  const tokens = searchKeyTokens(q);
-  if (tokens.length === 0) {
+  //
+  // Token ze słownika synonimów (search-vocabulary.ts) dostaje zamiast jednego
+  // .ilike() alternatywę .or(): „kanapa" szuka „kanap" LUB „sof". Grupy dalej
+  // są ANDowane, więc każde słowo frazy musi wystąpić w którejkolwiek postaci.
+  const groups = searchKeyTokenGroups(q);
+  if (groups.length === 0) {
     return NextResponse.json<SearchSuggestion[]>([]);
   }
 
@@ -85,8 +93,8 @@ export async function GET(request: NextRequest) {
     .order("created_at", { ascending: false })
     .limit(SUGGEST_CANDIDATES);
   const keyCol = locale === "de" ? "search_key_fold_de" : "search_key_fold";
-  for (const token of tokens) {
-    query = query.ilike(keyCol, `%${escapeIlike(token)}%`);
+  for (const group of groups) {
+    query = applyTokenGroup(query, keyCol, group);
   }
   const { data, error } = await query;
 

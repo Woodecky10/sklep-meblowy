@@ -10,6 +10,7 @@ import {
   searchKeyTokens,
   searchKeyTokenForms,
   searchKeyTokenGroups,
+  applyTokenGroup,
 } from "@/app/_lib/search-filter";
 
 describe("sanitizeSearchTerm — ochrona przed injection w .or() (audyt MED)", () => {
@@ -522,5 +523,49 @@ describe("searchKeyTokenGroups — alternatywy do filtra", () => {
 
   it("pusta fraza → brak grup", () => {
     expect(searchKeyTokenGroups("   ")).toEqual([]);
+  });
+});
+
+// Dwie składnie wildcarda ILIKE w jednym helperze: `%` w metodzie .ilike(),
+// `*` w łańcuchu podawanym do .or(). Pomyłka nie wywala wyjątku — cicho zwraca
+// zero wierszy, więc pilnujemy dosłownego kształtu warunku. Atrapa zapytania
+// (dwie metody z typu generycznego) zamiast mockowania supabase-js.
+describe("applyTokenGroup — warunek dla grupy alternatyw", () => {
+  type StubQuery = {
+    calls: { ilike: [string, string][]; or: string[] };
+    ilike: (col: string, pattern: string) => StubQuery;
+    or: (filters: string) => StubQuery;
+  };
+
+  function stubQuery(): StubQuery {
+    const calls: StubQuery["calls"] = { ilike: [], or: [] };
+    const q: StubQuery = {
+      calls,
+      ilike(col, pattern) {
+        calls.ilike.push([col, pattern]);
+        return q;
+      },
+      or(filters) {
+        calls.or.push(filters);
+        return q;
+      },
+    };
+    return q;
+  }
+
+  it("grupa jednoelementowa → jedno .ilike() z wildcardem %, zero .or()", () => {
+    const q = stubQuery();
+    expect(applyTokenGroup(q, "search_key_fold", ["materac"])).toBe(q);
+    expect(q.calls.ilike).toEqual([["search_key_fold", "%materac%"]]);
+    expect(q.calls.or).toEqual([]);
+  });
+
+  it("grupa z synonimami → jedno .or() z wildcardem *, zero .ilike()", () => {
+    const q = stubQuery();
+    applyTokenGroup(q, "search_key_fold", ["kanap", "sof"]);
+    expect(q.calls.or).toEqual([
+      "search_key_fold.ilike.*kanap*,search_key_fold.ilike.*sof*",
+    ]);
+    expect(q.calls.ilike).toEqual([]);
   });
 });

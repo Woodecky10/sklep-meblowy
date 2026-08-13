@@ -20,7 +20,10 @@ import { recordPriceHistory } from "@/app/_lib/price-history";
 import { applySaleSchedule } from "@/app/_lib/sale-schedule-server";
 import { sanitizeSectionsHtml, sanitizeProductHtml } from "@/app/_lib/product-html";
 import { buildGroupKey, pickGroupKey } from "@/app/_lib/size-groups";
-import { searchKeyTokens, escapeIlike } from "@/app/_lib/search-filter";
+import {
+  searchKeyTokenGroups,
+  applyTokenGroup,
+} from "@/app/_lib/search-filter";
 import { normalizeDeliveryTime, normalizeWarranty } from "@/app/_lib/spec-format";
 import { parseFeatureRows } from "@/app/_lib/product-features";
 import { normalizeVariantInfoInput } from "@/app/_lib/variant-info";
@@ -753,15 +756,24 @@ export async function searchProductsForSizeGroup(
   query: string
 ): Promise<ActionResult> {
   await requireAdmin();
-  const tokens = searchKeyTokens(query);
-  if (tokens.join("").length < 2) return { ok: true, data: { results: [] } };
+  const groups = searchKeyTokenGroups(query);
+  // Próg liczony na RDZENIACH, nie na alternatywach — synonimy nie mają
+  // podnosić długości frazy i przepuszczać zapytań jednoznakowych.
+  if (groups.map((g) => g[0]).join("").length < 2) {
+    return { ok: true, data: { results: [] } };
+  }
   const supabase = await createAdminClient();
   let q = supabase
     .from("products")
     .select("id, name, size_group, size_label")
     .neq("id", sanitize(currentId));
-  for (const token of tokens) {
-    q = q.ilike("search_key_fold", `%${escapeIlike(token)}%`);
+  // Token ze słownika synonimów (search-vocabulary.ts) dostaje zamiast jednego
+  // .ilike() alternatywę .or(): „kanapa" szuka „kanap" LUB „sof". Grupy dalej
+  // są ANDowane, więc każde słowo frazy musi wystąpić w którejkolwiek postaci.
+  // Ten sam helper co storefront i rozwijka — panel i klient widzą ten sam
+  // katalog (poza `active`, które admin client świadomie pomija).
+  for (const group of groups) {
+    q = applyTokenGroup(q, "search_key_fold", group);
   }
   const { data, error } = await q.limit(10);
   if (error) return { ok: false, error: error.message };
