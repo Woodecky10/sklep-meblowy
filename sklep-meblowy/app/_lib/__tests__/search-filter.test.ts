@@ -568,4 +568,14 @@ describe("applyTokenGroup — warunek dla grupy alternatyw", () => {
     ]);
     expect(q.calls.ilike).toEqual([]);
   });
+
+  it("pusta grupa → zapytanie bez zmian, zero .or(\"\")", () => {
+    // Trzej konsumenci nigdy nie podadzą pustej grupy (synonymsFor zwraca co
+    // najmniej sam rdzeń), ale helper jest eksportowany: `.or("")` to
+    // zniekształcony warunek wysłany po cichu, brak warunku jest uczciwszy.
+    const q = stubQuery();
+    expect(applyTokenGroup(q, "search_key_fold", [])).toBe(q);
+    expect(q.calls.or).toEqual([]);
+    expect(q.calls.ilike).toEqual([]);
+  });
 });

@@ -256,12 +256,29 @@ export function searchKeyTokenGroups(raw: string): string[][] {
 // escapeIlike na każdym operandzie — mimo że po tej sanityzacji jest no-opem,
 // bo nie ma już czego escapować. Jego backslash escapuje TAK SAMO wewnątrz
 // .or(), jak w metodzie .ilike() (pomiar 2026-08-13: `*\_*` → 0 wierszy przy
-// `*_*` → 353, a `*s\of*` → 41 jak `*sof*`), więc gdyby kiedyś operand jednak
-// zawierał wildcard, składnia .or() go nie przepuści ani nie zepsuje.
+// `*_*` → 353, a `*s\of*` → 41 jak `*sof*`), więc dla `%`, `_` i `\` ta
+// warstwa trzyma w obu składniach.
+//
+// ⚠️ ZAKRES escapeIlike TO DOKŁADNIE `%`, `_` i `\` — NIE `*`. A `*` jest
+// wildcardem w wartości podawanej do .or() (na tym stoi cały ten helper), więc
+// operand z gwiazdką przeszedłby przez escapeIlike nietknięty i po cichu
+// rozszerzył dopasowanie. `*` odsiewa dopiero sanityzacja FRAZY
+// (sanitizeSearchTerm: litery, cyfry, spacja, myślnik) plus test kształtu
+// słownika [a-z0-9]+ — nie ten helper. Kto poluzuje tamtą allowlistę (realny
+// scenariusz: „klient musi móc wpisać `&` w nazwie tkaniny"), musi zadbać
+// o `*` tutaj, LOKALNIE. Do globalnego escapeIlike gwiazdki nie dopisywać:
+// w metodzie .ilike() (m.in. linkGuestOrders) `*` wildcardem nie jest, więc
+// escape zepsułby tam dosłowne dopasowanie.
 export function applyTokenGroup<Q extends {
   ilike: (col: string, pattern: string) => Q;
   or: (filters: string) => Q;
 }>(query: Q, keyCol: string, group: string[]): Q {
+  // Pusta grupa → zapytanie bez zmian, zamiast `.or("")`. Trzej konsumenci tu
+  // nie trafią (synonymsFor zwraca zawsze co najmniej sam rdzeń), ale helper
+  // jest eksportowany i generyczny, a `.or("")` wysłałoby do PostgREST pusty
+  // warunek: zniekształcony filtr, którego nikt nie chciał, i to bez śladu
+  // w logach. Skoro grupa nie stawia żadnego wymagania, niech to będzie widać.
+  if (group.length === 0) return query;
   if (group.length === 1) {
     return query.ilike(keyCol, `%${escapeIlike(group[0])}%`);
   }
