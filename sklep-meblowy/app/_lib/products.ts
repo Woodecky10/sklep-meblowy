@@ -154,15 +154,17 @@ export async function getProducts(filters: ProductFilters = {}) {
   }
 
   // Wyszukiwanie odporne na spacje/kolejność ORAZ na ogonki i odmianę: frazę
-  // tniemy na słowa, każde składamy do ASCII i obcinamy końcówkę
-  // (searchKeyTokens), a potem dopasowujemy do kolumny search_key_fold
-  // (odspacjowana, bez tagów, znaki złożone) przez ILIKE — wiele .ilike() na
-  // tej samej kolumnie PostgREST ANDuje, więc każde słowo musi wystąpić,
-  // niezależnie od kolejności. DE → search_key_fold_de.
+  // tniemy na słowa, każde składamy do ASCII i obcinamy końcówkę, a na koniec
+  // rozszerzamy o synonimy ze słownika — jedno słowo daje więc GRUPĘ
+  // alternatywnych rdzeni (searchKeyTokenGroups; „kanapa" → „kanap" LUB „sof",
+  // patrz search-vocabulary.ts). Każda grupa idzie do zapytania przez
+  // applyTokenGroup i dopasowuje się do kolumny search_key_fold (odspacjowana,
+  // bez tagów, znaki złożone); DE → search_key_fold_de.
   //
-  // Token ze słownika synonimów (search-vocabulary.ts) dostaje zamiast jednego
-  // .ilike() alternatywę .or(): „kanapa" szuka „kanap" LUB „sof". Grupy dalej
-  // są ANDowane, więc każde słowo frazy musi wystąpić w którejkolwiek postaci.
+  // Grupy są ANDowane między sobą (każde słowo frazy musi wystąpić, niezależnie
+  // od kolejności), a alternatywy wewnątrz grupy ORowane (słowo może wystąpić
+  // w którejkolwiek postaci). Składnia siedzi w applyTokenGroup: grupa
+  // jednoelementowa to zwykłe .ilike(), grupa z synonimami .or().
   const searchGroups = searchKeyTokenGroups(search ?? "");
   const searchActive = searchGroups.length > 0;
   if (searchActive) {

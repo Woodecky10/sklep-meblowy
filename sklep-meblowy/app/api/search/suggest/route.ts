@@ -73,14 +73,15 @@ export async function GET(request: NextRequest) {
   }
 
   // Wyszukiwanie odporne na spacje/kolejność, ogonki i odmianę: frazę tniemy na
-  // słowa, każde składamy do ASCII i obcinamy końcówkę, a potem dopasowujemy do
-  // kolumny search_key_fold przez ILIKE — wiele .ilike() na tej samej kolumnie
-  // PostgREST ANDuje (każde słowo musi wystąpić). Brak tokenów (sama
-  // interpunkcja) → brak podpowiedzi.
+  // słowa, każde składamy do ASCII i obcinamy końcówkę, a na koniec rozszerzamy
+  // o synonimy ze słownika — jedno słowo daje więc GRUPĘ alternatywnych rdzeni
+  // (searchKeyTokenGroups; „kanapa" → „kanap" LUB „sof", patrz
+  // search-vocabulary.ts). Każda grupa idzie do zapytania przez applyTokenGroup
+  // i dopasowuje się do kolumny search_key_fold (DE → search_key_fold_de).
   //
-  // Token ze słownika synonimów (search-vocabulary.ts) dostaje zamiast jednego
-  // .ilike() alternatywę .or(): „kanapa" szuka „kanap" LUB „sof". Grupy dalej
-  // są ANDowane, więc każde słowo frazy musi wystąpić w którejkolwiek postaci.
+  // Grupy są ANDowane między sobą (każde słowo frazy musi wystąpić), a
+  // alternatywy wewnątrz grupy ORowane (w którejkolwiek postaci). Brak grup
+  // (sama interpunkcja) → brak podpowiedzi.
   const groups = searchKeyTokenGroups(q);
   if (groups.length === 0) {
     return NextResponse.json<SearchSuggestion[]>([]);
