@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/app/_lib/supabase/server";
-import { searchKeyTokens, escapeIlike } from "@/app/_lib/search-filter";
+import { searchKeyTokens, escapeIlike, rankByNameMatch } from "@/app/_lib/search-filter";
 import { pickLocalized, isLocale, DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
 import { getCategories } from "@/app/_lib/categories";
 
@@ -9,6 +9,22 @@ export type SearchSuggestion = {
   name: string;
   price: number;
   image: string | null;
+  category: string;
+};
+
+// Kandydaci pobierani z bazy przed rankingiem. Ranking „nazwa przed opisem"
+// potrzebuje szerszego zestawu niż 6, bo inaczej sortowanie po created_at
+// odsiewa trafienia w nazwie, zanim zdążą wygrać. 30 przy katalogu ~357
+// pozycji to koszt pomijalny.
+const SUGGEST_CANDIDATES = 30;
+const SUGGEST_LIMIT = 6;
+
+type SuggestRow = {
+  id: string;
+  name: string;
+  name_de: string | null;
+  price: number;
+  images: string[] | null;
   category: string;
 };
 
@@ -37,7 +53,7 @@ export async function GET(request: NextRequest) {
     .from("products")
     .select("id, name, name_de, price, images, category")
     .order("created_at", { ascending: false })
-    .limit(6);
+    .limit(SUGGEST_CANDIDATES);
   const keyCol = locale === "de" ? "search_key_fold_de" : "search_key_fold";
   for (const token of tokens) {
     query = query.ilike(keyCol, `%${escapeIlike(token)}%`);
@@ -48,27 +64,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json<SearchSuggestion[]>([], { status: 200 });
   }
 
+  // Trafienia w NAZWIE przed trafieniami tylko z opisu, potem obcięcie do 6.
+  // rankByNameMatch jest stabilny, więc kolejność z bazy (created_at desc)
+  // zostaje jako rozstrzygnięcie remisów wewnątrz każdej grupy.
+  const ranked = rankByNameMatch(
+    (data ?? []) as SuggestRow[],
+    q,
+    (row) => (locale === "de" ? row.name_de ?? "" : row.name)
+  ).slice(0, SUGGEST_LIMIT);
+
   // Etykieta kategorii zlokalizowana wg locale (deCat → DE z fallbackiem PL),
   // zamiast surowego sluga. Nazwa produktu przez kolumnę _de.
   const cats = await getCategories(locale);
   const labelBySlug = new Map(cats.map((c) => [c.slug, c.label]));
 
-  const suggestions: SearchSuggestion[] = (data ?? []).map(
-    (p: {
-      id: string;
-      name: string;
-      name_de: string | null;
-      price: number;
-      images: string[] | null;
-      category: string;
-    }) => ({
-      id: p.id,
-      name: pickLocalized(p.name, p.name_de, locale),
-      price: Number(p.price),
-      image: p.images?.[0] ?? null,
-      category: labelBySlug.get(p.category) ?? p.category,
-    })
-  );
+  const suggestions: SearchSuggestion[] = ranked.map((p: SuggestRow) => ({
+    id: p.id,
+    name: pickLocalized(p.name, p.name_de, locale),
+    price: Number(p.price),
+    image: p.images?.[0] ?? null,
+    category: labelBySlug.get(p.category) ?? p.category,
+  }));
 
   return NextResponse.json(suggestions);
 }
