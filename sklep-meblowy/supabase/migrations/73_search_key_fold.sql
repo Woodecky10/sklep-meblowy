@@ -14,8 +14,14 @@
 -- potwierdzeniu nowych na produkcji.
 --
 -- ⚠️ MAPOWANIE ZNAKÓW MUSI ODPOWIADAĆ funkcji foldDiacritics()
--- w app/_lib/search-filter.ts. Rozjazd nie wywala błędu — cicho zeruje
--- wyszukiwanie. Zmieniasz tu → zmieniasz tam.
+-- w app/_lib/search-filter.ts (12 znaków + ß→ss). Rozjazd nie wywala błędu —
+-- cicho zeruje wyszukiwanie. Zmieniasz tu → zmieniasz tam.
+--
+-- UWAGA HISTORYCZNA: kolumna PL poniżej NIE spełniała tego warunku — składała
+-- tylko 9 polskich znaków, bez ä ö ü ß, mimo że komentarz twierdził inaczej.
+-- Naprawia to migracja 74_search_key_fold_pl_de_znaki.sql (DROP + ADD, bo
+-- wyrażenia generującego nie da się zmienić). Definicja PL obowiązująca dziś
+-- jest w 74, nie tutaj. Kolumna DE była poprawna od początku.
 --
 -- translate() i replace() są IMMUTABLE, więc wolno ich użyć w kolumnie
 -- generowanej. unaccent() NIE jest immutable i dlatego nie wchodzi w grę bez
@@ -26,6 +32,7 @@
 create extension if not exists pg_trgm;
 
 -- PL: ą ć ę ł ń ó ś ź ż → a c e l n o s z z
+-- (NIEPEŁNE — brakuje ä ö ü ß; pełny zestaw dopina migracja 74.)
 alter table public.products
   add column if not exists search_key_fold text
   generated always as (

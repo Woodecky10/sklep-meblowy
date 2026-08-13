@@ -271,7 +271,7 @@ describe("escapeIlike — escape wildcardów (linkGuestOrders, audyt MED)", () =
   });
 });
 
-describe("foldDiacritics — składanie znaków na ASCII (musi = translate() w migracji 73)", () => {
+describe("foldDiacritics — składanie znaków na ASCII (musi = translate() w migracji 74 dla PL i 73 dla DE)", () => {
   it("składa wszystkie dziewięć polskich znaków", () => {
     expect(foldDiacritics("ąćęłńóśźż")).toBe("acelnoszz");
   });

@@ -96,11 +96,20 @@ export function rankByNameMatch<T>(
   return [...exactHits, ...stemHits, ...rest];
 }
 
-// Składanie znaków diakrytycznych na ASCII.
+// Składanie znaków diakrytycznych na ASCII: 12 znaków w mapie + ß→ss.
 //
-// ⚠️ TA LISTA MUSI ODPOWIADAĆ wyrażeniu translate()/replace() w migracji
-// 73_search_key_fold.sql. Rozjazd nie wywala błędu — cicho zeruje wyszukiwanie,
-// bo token przestaje trafiać w klucz. Zmieniasz tu → zmieniasz tam.
+// ⚠️ TEN ZESTAW MUSI ODPOWIADAĆ wyrażeniom translate()/replace() w OBU
+// kolumnach generowanych: search_key_fold (migracja
+// 74_search_key_fold_pl_de_znaki.sql — do 74 kolumna PL składała tylko
+// 9 polskich znaków i ten komentarz kłamał) oraz search_key_fold_de
+// (migracja 73_search_key_fold.sql). Rozjazd nie wywala błędu — cicho zeruje
+// wyszukiwanie, bo token przestaje trafiać w klucz. Zmieniasz tu → zmieniasz
+// w obu migracjach.
+//
+// ä ö ü są tu, mimo że dziś ŻADEN produkt nie ma ich w polach PL (pomiar
+// 2026-08-13: 0 na 361). Pola DE już je mają, bo dostawca tak nazywa tkaniny,
+// więc „Fotel Björn" jest kwestią czasu — a bez tego byłby nieznajdywalny
+// KAŻDĄ pisownią.
 //
 // ß jest dwuznakiem (→ ss), więc idzie osobnym replace, a nie mapą 1:1.
 const FOLD_MAP: Record<string, string> = {
