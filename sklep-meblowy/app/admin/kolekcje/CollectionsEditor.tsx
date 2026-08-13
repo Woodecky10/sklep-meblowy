@@ -31,7 +31,7 @@ import {
   type ActionResult,
 } from "./actions";
 import { useConfirm } from "@/app/_context/ConfirmContext";
-import { searchMatches } from "@/app/_lib/search-normalize";
+import { filterBySearch } from "@/app/_lib/search-normalize";
 // Czyste helpery — z collection-tiles, NIE z collections.ts: ten drugi ma
 // `import "server-only"` i ciągnie next/cache, więc import stąd ("use client")
 // wysypałby build.
@@ -415,7 +415,7 @@ function CollectionForm({
   }
 
   const filtered = search.trim()
-    ? allProducts.filter((p) => searchMatches(p.name, search))
+    ? filterBySearch(allProducts, search, (p) => [p.name])
     : allProducts;
 
   return (

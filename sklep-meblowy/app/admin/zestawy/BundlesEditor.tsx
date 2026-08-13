@@ -6,7 +6,7 @@ import { Card, EmptyState, Field, ToastView, inputCls, type Toast } from "@/app/
 import RichTextEditor from "@/app/admin/_shared/RichTextEditor";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { Bundle } from "@/app/_lib/types";
-import { searchMatches } from "@/app/_lib/search-normalize";
+import { filterBySearch } from "@/app/_lib/search-normalize";
 import { effectivePrice } from "@/app/_lib/pricing";
 import { computeBundleDiscount, type BundleDiscountType } from "@/app/_lib/bundles";
 import { formatPrice } from "@/app/_lib/format";
@@ -152,7 +152,7 @@ function BundleForm({
 
   // Wyszukiwarka jak w /admin/produkty — filtr kliencki po znormalizowanym tekście.
   const filtered = useMemo(
-    () => products.filter((p) => searchMatches(p.name, query)),
+    () => filterBySearch(products, query, (p) => [p.name]),
     [products, query]
   );
 
