@@ -7,6 +7,7 @@ import {
   foldDiacritics,
   stemToken,
   MIN_STEM_LENGTH,
+  searchKeyTokens,
 } from "@/app/_lib/search-filter";
 
 describe("sanitizeSearchTerm — ochrona przed injection w .or() (audyt MED)", () => {
@@ -224,5 +225,40 @@ describe("stemToken — obcięcie jednej końcówki fleksyjnej", () => {
 
   it("pusty token zostaje pusty", () => {
     expect(stemToken("")).toBe("");
+  });
+});
+
+describe("searchKeyTokens — potok: sanityzacja → składanie → stem", () => {
+  it("fraza bez ogonków trafia w ten sam rdzeń co z ogonkami", () => {
+    expect(searchKeyTokens("łóżko")).toEqual(["lozk"]);
+    expect(searchKeyTokens("lozko")).toEqual(["lozk"]);
+  });
+
+  it("liczba mnoga i pojedyncza dają ten sam rdzeń", () => {
+    expect(searchKeyTokens("narożniki")).toEqual(["naroznik"]);
+    expect(searchKeyTokens("narożnik")).toEqual(["naroznik"]);
+  });
+
+  it("wiele słów → wiele tokenów, kolejność zachowana", () => {
+    expect(searchKeyTokens("narożnik szary")).toEqual(["naroznik", "szar"]);
+  });
+
+  it("odfiltrowuje duplikaty powstałe po stemowaniu", () => {
+    // „sofa" i „sofy" dają oba rdzeń „sof" — jeden warunek ILIKE, nie dwa.
+    expect(searchKeyTokens("sofa sofy")).toEqual(["sof"]);
+  });
+
+  it("dziedziczy sanityzację po searchTokens (injection w .or())", () => {
+    expect(searchKeyTokens("x,price.gt.0")).toEqual(["xpricegt0"]);
+  });
+
+  it("sama interpunkcja / pusta fraza → []", () => {
+    expect(searchKeyTokens(",.()")).toEqual([]);
+    expect(searchKeyTokens("")).toEqual([]);
+  });
+
+  it("respektuje limit MAX_SEARCH_TOKENS (10 unikalnych rdzeni)", () => {
+    const raw = Array.from({ length: 15 }, (_, i) => `wyraz${i}`).join(" ");
+    expect(searchKeyTokens(raw).length).toBeLessThanOrEqual(10);
   });
 });

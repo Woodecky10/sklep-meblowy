@@ -131,3 +131,16 @@ export function stemToken(token: string): string {
   }
   return token;
 }
+
+// Tokeny gotowe do dopasowania przeciwko kolumnie search_key_fold: sanityzacja
+// (jak searchTokens — w tym ochrona przed injection w .or()) → złożenie znaków
+// → obcięcie końcówki.
+//
+// Duplikaty po stemowaniu są odfiltrowane: „sofa sofy" daje dwa razy „sof",
+// a dwa identyczne warunki ILIKE to zbędna praca dla bazy.
+export function searchKeyTokens(raw: string): string[] {
+  const stemmed = searchTokens(raw).map((token) =>
+    stemToken(foldDiacritics(token))
+  );
+  return [...new Set(stemmed)].filter(Boolean);
+}
