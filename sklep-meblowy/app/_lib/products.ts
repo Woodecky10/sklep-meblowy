@@ -243,7 +243,8 @@ export async function getProducts(filters: ProductFilters = {}) {
     const ranked = rankByNameMatch(
       (data ?? []) as Product[],
       search!,
-      // DE dopasowuje name_de bez fallbacku do PL — spójnie z search_key_de.
+      // DE dopasowuje name_de bez fallbacku do PL — spójnie z filtrem wyżej,
+      // który przy locale „de" pyta o kolumnę search_key_fold_de.
       (p) =>
         locale === "de"
           ? (p as { name_de?: string | null }).name_de ?? ""

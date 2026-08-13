@@ -16,6 +16,24 @@ export type SearchSuggestion = {
 // potrzebuje szerszego zestawu niż 6, bo inaczej sortowanie po created_at
 // odsiewa trafienia w nazwie, zanim zdążą wygrać. 30 przy katalogu ~357
 // pozycji to koszt pomijalny.
+//
+// UWAGA, 30 to okno po created_at desc, więc TEORETYCZNIE trafienie w nazwie
+// może wypaść za okno i nigdy się nie pokazać. Warunek szkody jest podwójny:
+// w oknie musi siedzieć trafienie tylko-z-opisu ORAZ poza oknem trafienie
+// w nazwie. Zmierzone na produkcji (2026-08-13, 360 pozycji, 18 realnych
+// fraz): te dwa warunki nie zachodzą jednocześnie ANI RAZU — frazy z >30
+// dopasowaniami to słowa z NAZW (lozk 177, materac 157, naroznik 41: okno
+// w 100% z nazw), a frazy żyjące w opisach mają <30 dopasowań łącznie
+// (drewn 9, sprezyn 12, tkanin 19), więc poza oknem nie ma nic do stracenia.
+// Utracone wyniki: 0. Podnoszenie tej liczby nic dziś nie kupuje, a bije
+// w najgorętszy endpoint sklepu (zapytanie na każde wpisane słowo).
+//
+// Kiedy to przestanie być prawdą: gdy opisy się wypełnią (dziś ~93% pozycji
+// jest bez opisu) i pojawi się fraza z >30 dopasowaniami, w której najnowsze
+// pozycje łapią się tylko opisem. Wtedy NIE podnosić na oślep — przenieść
+// ranking do SQL (widok/RPC z CASE), bo tylko to rankuje cały katalog.
+// Pełne wyszukiwanie na /sklep tej dziury nie ma: products.ts pobiera cały
+// zestaw dopasowań i paginuje w JS.
 const SUGGEST_CANDIDATES = 30;
 const SUGGEST_LIMIT = 6;
 
