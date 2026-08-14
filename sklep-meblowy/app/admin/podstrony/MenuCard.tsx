@@ -3,7 +3,7 @@
 // Karta „Menu" (krok D): pozycje Navbara i stopki — linki do podstron.
 // Wzorce strzałek/switchy/rollbacków 1:1 z PagesList/BlocksEditor.
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   addMenuItem,
@@ -270,14 +270,31 @@ function AddItemForm({
   const [label, setLabel] = useState("");
   const [adding, startTransition] = useTransition();
 
+  // Czy bieżąca wartość pola etykiety pochodzi z NASZEJ podpowiedzi, a nie od
+  // administratorki. Ref, nie state — pochodzenie nie wpływa na render.
+  //
+  // ⚠️ Wcześniej pochodzenie było ZGADYWANE: warunek sprawdzał, czy wartość
+  // etykiety znajduje się na liście MENU_ROUTES. To przybliżenie po cichu
+  // kasowało ręcznie wpisany tekst, który przypadkiem zgadzał się z jedną
+  // z kanonicznych nazw (np. wpisane „Kontakt" przy innej wybranej trasie).
+  const labelFromSuggestion = useRef(false);
+
   // Wybór trasy podpowiada etykietę, ale tylko dopóki administratorka nie
   // wpisze własnej — nadpisywanie jej tekstu byłoby wrogie.
   function chooseRoute(value: string) {
     setHref(value);
     const known = MENU_ROUTES.find((r) => r.href === value);
-    if (known && (label === "" || MENU_ROUTES.some((r) => r.label === label))) {
+    if (known && (label === "" || labelFromSuggestion.current)) {
       setLabel(known.label);
+      labelFromSuggestion.current = true;
     }
+  }
+
+  // Każda ręczna edycja unieważnia podpowiedź: od tej chwili tekst należy do
+  // administratorki i kolejna zmiana trasy nie ma prawa go ruszyć.
+  function editLabel(value: string) {
+    setLabel(value);
+    labelFromSuggestion.current = false;
   }
 
   function submit(e: React.FormEvent) {
@@ -294,10 +311,18 @@ function AddItemForm({
       fd.set("label", label.trim());
     }
     startTransition(async () => {
-      onResult(await addMenuItem(fd));
-      setPageId("");
-      setHref("");
-      setLabel("");
+      const res = await addMenuItem(fd);
+      onResult(res);
+      // Czyścimy dopiero po sukcesie — inaczej odbita próba (np. „Ten link już
+      // jest w tym menu") kasuje wpisane dane i trzeba je wystukać od nowa.
+      if (res.ok) {
+        setPageId("");
+        setHref("");
+        setLabel("");
+        // Puste pole to nie „etykieta od administratorki" — następny wybór
+        // trasy ma znów podpowiedzieć.
+        labelFromSuggestion.current = false;
+      }
     });
   }
 
@@ -365,7 +390,7 @@ function AddItemForm({
           <Field label="Etykieta w menu" className="flex-1 min-w-[160px]">
             <input
               value={label}
-              onChange={(e) => setLabel(e.target.value)}
+              onChange={(e) => editLabel(e.target.value)}
               maxLength={100}
               className={inputCls}
             />
