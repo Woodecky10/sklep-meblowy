@@ -47,6 +47,19 @@ const GA_ADS = [
 const META_CONNECT = ["https://www.facebook.com", "https://connect.facebook.net"];
 const META_IMG = ["https://www.facebook.com"];
 
+// ⚠️ form-action i frame-src to NIE nadmiarowa ostrożność — bez nich pixel gubi
+// zdarzenia na produkcji. Gdy ładunek zdarzenia nie mieści się w adresie GET
+// (na kartach produktu Meta dokłada mikrodane strony: tytuł, opis, słowa
+// kluczowe), fbevents.js przechodzi na POST FORMULARZEM do /tr/, wysyłany
+// w ukrytej ramce. Przy 'form-action self' i 'frame-src none' przeglądarka
+// blokuje jedno i drugie, a zdarzenie ginie bez żadnego żądania w sieci —
+// właśnie tak przepadał ViewContent (regresja z 2026-08-14).
+//
+// Koszt bezpieczeństwa jest znikomy: connect-src i tak już wpuszcza ten host,
+// więc form-action nie otwiera kanału, którego by nie było.
+const META_FORM_ACTION = ["https://www.facebook.com"];
+const META_FRAME = ["https://www.facebook.com"];
+
 export function buildCsp(
   nonce: string,
   { isDev, supabaseOrigin, gaEnabled = false, metaEnabled = false }: CspOpts
@@ -57,6 +70,8 @@ export function buildCsp(
   const gaImg = gaEnabled ? [...GA_IMG, ...GA_ADS] : [];
   const metaConnect = metaEnabled ? META_CONNECT : [];
   const metaImg = metaEnabled ? META_IMG : [];
+  const metaFormAction = metaEnabled ? META_FORM_ACTION : [];
+  const metaFrame = metaEnabled ? META_FRAME : [];
 
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
@@ -81,9 +96,10 @@ export function buildCsp(
     "worker-src": ["'self'", "blob:"],
     "object-src": ["'none'"],
     "base-uri": ["'self'"],
-    "form-action": ["'self'"],
+    "form-action": ["'self'", ...metaFormAction],
     "frame-ancestors": ["'none'"],
-    "frame-src": ["'none'"],
+    // 'none' gdy pixel wyłączony — patrz komentarz przy META_FRAME.
+    "frame-src": metaFrame.length > 0 ? metaFrame : ["'none'"],
   };
 
   const parts = Object.entries(directives).map(([name, vals]) => `${name} ${vals.join(" ")}`);

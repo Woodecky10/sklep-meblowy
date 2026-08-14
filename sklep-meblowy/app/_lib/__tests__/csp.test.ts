@@ -110,11 +110,30 @@ describe("buildCsp", () => {
     expect(ga).not.toContain("facebook");
   });
 
+  it("z pixelem: form-action i frame-src wpuszczają Facebooka", () => {
+    // ⚠️ REGRESJA Z PRODUKCJI (2026-08-14). Przy dużym ładunku zdarzenia
+    // fbevents.js porzuca GET i wysyła POST FORMULARZEM do /tr/, w ukrytej
+    // ramce. Bez tych dwóch dyrektyw przeglądarka blokuje wysyłkę i zdarzenie
+    // ginie BEZ ŚLADU w sieci — objawiło się na kartach produktu (długie opisy
+    // w mikrodanych), gdzie ViewContent nie leciał w ogóle.
+    const d = parse(buildCsp("n", { isDev: false, supabaseOrigin: SB, metaEnabled: true }));
+    expect(d["form-action"]).toContain("https://www.facebook.com");
+    expect(d["form-action"]).toContain("'self'");
+    expect(d["frame-src"]).toContain("https://www.facebook.com");
+  });
+
+  it("bez pixela form-action i frame-src zostają zamknięte", () => {
+    const d = parse(buildCsp("n", { isDev: false, supabaseOrigin: SB }));
+    expect(d["form-action"]).toEqual(["'self'"]);
+    expect(d["frame-src"]).toEqual(["'none'"]);
+  });
+
   it("pixel Meta nie rozluźnia dyrektyw, które go nie dotyczą", () => {
     const d = parse(buildCsp("n", { isDev: false, supabaseOrigin: SB, metaEnabled: true }));
-    expect(d["frame-src"]).toEqual(["'none'"]);
     expect(d["default-src"]).toEqual(["'self'"]);
-    expect(d["form-action"]).toEqual(["'self'"]);
+    expect(d["object-src"]).toEqual(["'none'"]);
+    expect(d["base-uri"]).toEqual(["'self'"]);
+    expect(d["frame-ancestors"]).toEqual(["'none'"]);
   });
 
   it("GA nie rozluźnia dyrektyw, które go nie dotyczą", () => {
