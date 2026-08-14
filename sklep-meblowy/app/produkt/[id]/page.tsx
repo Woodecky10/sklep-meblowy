@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import ViewContentEvent from "@/app/_components/analytics/ViewContentEvent";
 import { headers } from "next/headers";
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import type { Metadata } from "next";
@@ -283,6 +284,9 @@ export default async function ProduktPage({ params }: Props) {
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
+      {/* Pixel Meta: cena ta sama co w JSON-LD (po przecenie), żeby wartość
+          zdarzenia zgadzała się z tym, co widzi klient i co czyta Google. */}
+      <ViewContentEvent productId={product.id} price={jsonLdPrice} />
       <script
         type="application/ld+json"
         nonce={nonce}

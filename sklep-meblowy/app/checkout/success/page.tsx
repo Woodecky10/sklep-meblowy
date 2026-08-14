@@ -3,6 +3,12 @@ import { getOrderById } from "@/app/_lib/orders";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { localizeHref } from "@/app/_lib/i18n";
 import { formatOrderAmount } from "@/app/_lib/money";
+import {
+  buildPurchasePayload,
+  shouldTrackPurchase,
+  type PurchasePayload,
+} from "@/app/_lib/meta-pixel";
+import PixelEventOnce from "@/app/_components/analytics/PixelEventOnce";
 import ClearCart from "./ClearCart";
 
 export default async function SuccessPage({
@@ -56,6 +62,7 @@ export default async function SuccessPage({
   let orderCurrency: "pln" | "eur" = "pln";
   let isPaid = false;
   let isCod = false;
+  let purchase: PurchasePayload | null = null;
 
   if (orderParam) {
     try {
@@ -66,6 +73,21 @@ export default async function SuccessPage({
       email = order.guest_email; // null dla zalogowanych — wiersz się nie wyrenderuje
       isCod = order.payment_method === "cod";
       isPaid = order.status !== "pending";
+
+      // Parametry zakupu dla pixela Meta liczy serwer, bo tylko on widzi
+      // pozycje zamówienia. Warunek jest WĘŻSZY niż `isPaid` powyżej: ten
+      // steruje tylko nagłówkiem strony i przepuszcza anulowane.
+      if (shouldTrackPurchase(order.status, order.payment_method)) {
+        purchase = buildPurchasePayload({
+          total: Number(order.total),
+          currency: order.currency,
+          items: (order.items ?? []).map((item) => ({
+            productId: item.product_id ?? "",
+            quantity: item.quantity,
+            price: Number(item.price),
+          })),
+        });
+      }
     } catch {
       // brak zamówienia — pokaż ogólny komunikat bez szczegółów
     }
@@ -79,6 +101,9 @@ export default async function SuccessPage({
   return (
     <div className="max-w-2xl mx-auto px-6 py-24 text-center">
       <ClearCart />
+      {purchase && orderId && (
+        <PixelEventOnce event="Purchase" payload={purchase} eventId={orderId} />
+      )}
 
       <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 dark:bg-green-950 text-green-600 mb-8">
         <svg
