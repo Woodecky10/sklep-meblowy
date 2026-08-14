@@ -901,13 +901,36 @@ Sekcja przenosi stan między komputerami i sesjami — `.superpowers/sdd/` jest 
 - Zasiew idzie w migracji, nie ręcznym klikaniem, a stary kod filtruje zasiane wiersze
   (`page: null`), więc produkcja nie pokazywała ich przed deployem.
 
-## DO POPRAWY — zaległość świadomie zmergowana
+## DO POPRAWY — ✅ ZROBIONE 2026-08-14
+
+> **Obie usterki naprawione, weryfikacja wizualna domknięta.** Opis poniżej zostaje jako
+> zapis tego, co było zepsute i dlaczego — nie ma tu już nic do zrobienia.
+>
+> **Usterka 1** — czyścimy pola dopiero po `res.ok` (`MenuCard.tsx`, `AddItemForm.submit`).
+> **Usterka 2** — pochodzenie etykiety śledzi `useRef` (`labelFromSuggestion`) ustawiany przy
+> podpowiedzi i zerowany w `editLabel` przy każdej ręcznej edycji; warunek NIE porównuje już
+> wartości z `MENU_ROUTES`. Po udanym dodaniu flaga wraca do `false`, żeby kolejny wpis dostał
+> świeżą podpowiedź.
+>
+> **Testy:** `e2e/menu-add-form.spec.ts` — trzy przypadki, w tym kontrolny „podpowiedź nadal
+> działa przy pustym polu". Udowodnione czerwono-zielono: na cofniętej poprawce testy 1 i 2
+> padają (`oczekiwano "/kontakt", otrzymano ""` i `oczekiwano "Kontakt", otrzymano "Sklep"`),
+> po przywróceniu przechodzą 3/3. Test kontrolny przechodzi w OBU wersjach.
+>
+> ⚠️ Oba testy są **niezapisujące** — pierwszy dodaje duplikat odrzucany przed zapisem, drugi
+> nie wychodzi poza formularz. To warunek ich istnienia: baza jest jedna dla wszystkich
+> środowisk, więc test dodający pozycję zmieniłby menu ŻYWEGO sklepu. Ścieżka udanego dodania
+> świadomie NIE jest testowana.
+>
+> **Weryfikacja wizualna (Playwright, build produkcyjny):** obawa, że gałąź `pageLinks`
+> w `NavStrip.tsx` nigdy nie renderowała się z danymi, była **nieuzasadniona** — na 1440 px
+> pasek pokazuje `TKANINY · O NAS · KONTAKT` obok megamenu kategorii, bez zawijania.
+> Na 390 px pasek jest ukryty zgodnie z `hidden lg:block`, a te same pozycje są dostępne
+> w menu hamburgera; brak poziomego przewijania.
 
 Zmergowane do `main` 2026-08-07 z tymi dwiema usterkami w środku. Obie dotyczą **wygody
 pracy w panelu**, nie tego, co widzi klient w sklepie — dlatego nie blokowały wdrożenia.
 Obie są odziedziczone z kodu podanego w tym planie, nie z pomyłki wykonawcy.
-
-Wszystko poniżej jest samowystarczalne — do zrobienia bez wracania do tej rozmowy.
 
 ### 1. Formularz czyści pola także po NIEUDANEJ próbie dodania
 
@@ -959,7 +982,10 @@ trasy w selekcie. Prawdopodobieństwo niskie, ale to realna utrata danych wejśc
 ustawiana przy podpowiedzi i kasowana przy każdej ręcznej edycji pola etykiety. Nadpisujemy
 tylko wtedy, gdy flaga mówi, że bieżąca wartość pochodzi z podpowiedzi.
 
-### Czego dodatkowo NIE zweryfikowano (patrz sekcja wyżej)
+### Czego dodatkowo NIE zweryfikowano — ✅ zweryfikowane 2026-08-14
+
+**Wynik: gałąź `pageLinks` renderuje się poprawnie, obawa była nieuzasadniona.** Szczegóły
+w notatce na początku tej sekcji. Poniżej oryginalny zapis zaległości.
 
 Przy poprawianiu powyższych warto przy okazji domknąć pominiętą weryfikację wizualną —
 zwłaszcza to, że gałąź `pageLinks` w `NavStrip.tsx` nigdy nie renderowała się z danymi.
