@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useMemo, useReducer, useCallback, useState, useEffect } from "react";
 import type { CartItemBundle, BundleDiscountType } from "@/app/_lib/bundles";
+import { buildCartEventPayload } from "@/app/_lib/meta-pixel";
+import { trackPixel } from "@/app/_lib/meta-pixel-client";
 
 export type CartItem = {
   id: string;
@@ -330,9 +332,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, [appliedPromo, hydrated]);
 
+  // AddToCart siedzi tu, a nie w przyciskach: dodać do koszyka da się z karty
+  // produktu, z listingu i z cross-sellu w koszyku. Jedno miejsce = brak
+  // ryzyka, że któraś ścieżka po cichu przestanie raportować.
+  // Bez zgody marketingowej trackPixel nie robi nic.
   const add = useCallback((item: CartItem) => {
     dispatch({ type: "ADD", item });
     setNotification({ item, ts: Date.now() });
+    trackPixel(
+      "AddToCart",
+      buildCartEventPayload([
+        { productId: item.id, quantity: item.quantity, price: item.price },
+      ])
+    );
   }, []);
   const remove = useCallback(
     (id: string, variantValues?: Record<string, string>) =>
@@ -356,6 +368,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const addBundle = useCallback((items: CartItem[]) => {
     dispatch({ type: "ADD_BUNDLE", items });
     if (items[0]) setNotification({ item: items[0], ts: Date.now() });
+    // Zestaw to jedno AddToCart z kompletem pozycji — nie N osobnych zdarzeń,
+    // bo w raporcie wyglądałyby jak N niezależnych dodań do koszyka.
+    trackPixel(
+      "AddToCart",
+      buildCartEventPayload(
+        items.map((item) => ({
+          productId: item.id,
+          quantity: item.quantity,
+          price: item.price,
+        }))
+      )
+    );
   }, []);
   const removeBundle = useCallback(
     (unitKey: string) => dispatch({ type: "REMOVE_BUNDLE", unitKey }),

@@ -5,6 +5,8 @@ import { getSampleOrderById } from "@/app/_lib/samples";
 import { getContactInfo } from "@/app/_lib/contact-server";
 import { formatPrice } from "@/app/_lib/format";
 import { shortSampleOrderRef } from "@/app/_lib/sample-pricing";
+import { CATALOG_CURRENCY, roundMoney } from "@/app/_lib/meta-pixel";
+import PixelEventOnce from "@/app/_components/analytics/PixelEventOnce";
 
 // Strona powrotu po zamówieniu próbek (urlReturn z app/_lib/sample-p24.ts).
 // PL-only jak całe /probki: /de jest zamrożone flagą DE_ENABLED.
@@ -110,6 +112,23 @@ export default async function SampleSuccessPage({
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-20">
+      {/* ⚠️ Zamówienie próbek idzie do Meta jako `Lead`, NIE `Purchase`. Próbka
+          kosztuje kilka złotych albo jest gratis — gdyby szła jako zakup,
+          algorytm reklamowy nauczyłby się szukać ludzi zamawiających darmowe
+          próbki zamiast kupujących meble. Jako Lead sygnał (a to mocny sygnał
+          zakupowy) zostaje wykorzystany, a statystyki sprzedaży są czyste.
+          Nie wysyłamy przy `pending` — wtedy nie wiadomo, czy płatność w ogóle
+          doszła do skutku. */}
+      {!pending && (
+        <PixelEventOnce
+          event="Lead"
+          payload={{
+            value: roundMoney(Number(order.amount_total)),
+            currency: CATALOG_CURRENCY,
+          }}
+          eventId={order.id}
+        />
+      )}
       <div className="text-center">
         <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-3">
           {pending ? "Zamówienie przyjęte" : "Dziękujemy"}

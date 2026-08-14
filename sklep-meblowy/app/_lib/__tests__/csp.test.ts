@@ -81,6 +81,42 @@ describe("buildCsp", () => {
     expect(csp).not.toContain("doubleclick");
   });
 
+  it("bez pixela Meta polityka zostaje wąska (żadnego hosta Facebooka)", () => {
+    const csp = buildCsp("n", { isDev: false, supabaseOrigin: SB });
+    expect(csp).not.toContain("facebook");
+  });
+
+  it("z pixelem: kanały wysyłki w connect-src/img-src, ale NIE w script-src", () => {
+    const d = parse(buildCsp("n", { isDev: false, supabaseOrigin: SB, metaEnabled: true }));
+    // fbevents.js strzela zdarzeniami pod /tr — raz fetchem, raz obrazkiem
+    // 1x1 (fallback bez sendBeacon), więc host musi być w obu dyrektywach.
+    expect(d["connect-src"]).toContain("https://www.facebook.com");
+    expect(d["connect-src"]).toContain("https://connect.facebook.net");
+    expect(d["img-src"]).toContain("https://www.facebook.com");
+    // 'strict-dynamic' i tak unieważnia listę hostów w script-src — fbevents.js
+    // przechodzi jako skrypt wstawiony przez zaufany bundel.
+    expect(d["script-src"].join(" ")).not.toContain("facebook");
+    expect(d["script-src"]).toContain("'strict-dynamic'");
+  });
+
+  it("pixel Meta i GA są od siebie niezależne", () => {
+    // Dwa osobne przełączniki: wyłączone GA nie może wyciąć hostów Meta.
+    const meta = buildCsp("n", { isDev: false, supabaseOrigin: SB, metaEnabled: true });
+    expect(meta).toContain("facebook");
+    expect(meta).not.toContain("google");
+
+    const ga = buildCsp("n", { isDev: false, supabaseOrigin: SB, gaEnabled: true });
+    expect(ga).toContain("google");
+    expect(ga).not.toContain("facebook");
+  });
+
+  it("pixel Meta nie rozluźnia dyrektyw, które go nie dotyczą", () => {
+    const d = parse(buildCsp("n", { isDev: false, supabaseOrigin: SB, metaEnabled: true }));
+    expect(d["frame-src"]).toEqual(["'none'"]);
+    expect(d["default-src"]).toEqual(["'self'"]);
+    expect(d["form-action"]).toEqual(["'self'"]);
+  });
+
   it("GA nie rozluźnia dyrektyw, które go nie dotyczą", () => {
     const d = parse(buildCsp("n", { isDev: false, supabaseOrigin: SB, gaEnabled: true }));
     expect(d["frame-src"]).toEqual(["'none'"]);

@@ -9,6 +9,9 @@ export type CspOpts = {
   supabaseOrigin: string | null;
   // Domyślnie false: bez skonfigurowanego GA polityka zostaje wąska.
   gaEnabled?: boolean;
+  // j.w. dla pixela Meta — osobny przełącznik, bo to osobna zmienna środowiskowa
+  // i sklep może mieć włączone jedno bez drugiego.
+  metaEnabled?: boolean;
 };
 
 // Hosty Google Analytics 4. Do script-src NIE trafiają celowo: 'strict-dynamic'
@@ -33,14 +36,27 @@ const GA_ADS = [
   "https://www.google.com",
 ];
 
+// Pixel Meta. Do script-src NIE trafiają z tego samego powodu co hosty Google:
+// 'strict-dynamic' unieważnia listę hostów, a fbevents.js jest wstrzykiwany
+// przez zaufany skrypt bundla. Potrzebne są tylko kanały wysyłki: fbevents.js
+// strzela zdarzeniami pod https://www.facebook.com/tr — raz fetchem, raz
+// obrazkiem 1x1 (fallback, gdy sendBeacon jest niedostępny), więc host musi być
+// i w connect-src, i w img-src. Wpuszczane razem z pixelem, bo CSP to nagłówek
+// odpowiedzi — nie da się go uzależnić od zgody konkretnego użytkownika; o samą
+// zgodę dba MetaPixel.tsx, więc bez zgody marketingowej nic tu nie poleci.
+const META_CONNECT = ["https://www.facebook.com", "https://connect.facebook.net"];
+const META_IMG = ["https://www.facebook.com"];
+
 export function buildCsp(
   nonce: string,
-  { isDev, supabaseOrigin, gaEnabled = false }: CspOpts
+  { isDev, supabaseOrigin, gaEnabled = false, metaEnabled = false }: CspOpts
 ): string {
   const sbHttps = supabaseOrigin ? [supabaseOrigin] : [];
   const sbWss = supabaseOrigin ? [supabaseOrigin.replace(/^https:/, "wss:")] : [];
   const gaConnect = gaEnabled ? [...GA_CONNECT, ...GA_ADS] : [];
   const gaImg = gaEnabled ? [...GA_IMG, ...GA_ADS] : [];
+  const metaConnect = metaEnabled ? META_CONNECT : [];
+  const metaImg = metaEnabled ? META_IMG : [];
 
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
@@ -58,9 +74,10 @@ export function buildCsp(
       ...sbHttps,
       "https://images.unsplash.com",
       ...gaImg,
+      ...metaImg,
     ],
     "font-src": ["'self'"],
-    "connect-src": ["'self'", ...sbHttps, ...sbWss, ...gaConnect],
+    "connect-src": ["'self'", ...sbHttps, ...sbWss, ...gaConnect, ...metaConnect],
     "worker-src": ["'self'", "blob:"],
     "object-src": ["'none'"],
     "base-uri": ["'self'"],

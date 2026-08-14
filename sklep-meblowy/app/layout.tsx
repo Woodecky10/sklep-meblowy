@@ -16,6 +16,7 @@ import Navbar from "./_components/layout/Navbar";
 import Footer from "./_components/layout/Footer";
 import CookieBanner from "./_components/layout/CookieBanner";
 import GoogleAnalytics from "./_components/analytics/GoogleAnalytics";
+import MetaPixel from "./_components/analytics/MetaPixel";
 import CartToast from "./_components/layout/CartToast";
 import BackToTop from "./_components/layout/BackToTop";
 import HideOnAdmin from "./_components/layout/HideOnAdmin";
@@ -183,6 +184,7 @@ export default async function RootLayout({
                       {/* Wewnątrz HideOnAdmin celowo: panel admina nie ma
                           zaśmiecać statystyk sklepu własnym ruchem. */}
                       <GoogleAnalytics />
+                      <MetaPixel />
                       <BackToTop />
                     </HideOnAdmin>
                     <CartToast />

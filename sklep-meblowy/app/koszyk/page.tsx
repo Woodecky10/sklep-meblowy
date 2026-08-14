@@ -16,6 +16,8 @@ import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { formatMoney } from "@/app/_lib/money";
 import { useEurRate } from "@/app/_lib/rate-context";
+import { buildCartEventPayload } from "@/app/_lib/meta-pixel";
+import { trackPixel } from "@/app/_lib/meta-pixel-client";
 import { useFabricLabels } from "@/app/_lib/fabric-context";
 import type { Product } from "@/app/_lib/types";
 
@@ -466,6 +468,24 @@ export default function KoszykPage() {
 
             <LocalizedLink
               href="/checkout"
+              onClick={() => {
+                // InitiateCheckout dla pixela Meta — najcenniejsza grupa
+                // remarketingowa: byli o krok od zakupu. Kwota to `grandTotal`,
+                // czyli PO rabacie; suma cen katalogowych zawyżałaby wartość
+                // koszyka przy każdym kuponie.
+                // Bez zgody marketingowej trackPixel nie robi nic.
+                trackPixel(
+                  "InitiateCheckout",
+                  buildCartEventPayload(
+                    items.map((item) => ({
+                      productId: item.id,
+                      quantity: item.quantity,
+                      price: item.price,
+                    })),
+                    grandTotal
+                  )
+                );
+              }}
               className="w-full py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors text-center"
             >
               {t.cart.checkout} →

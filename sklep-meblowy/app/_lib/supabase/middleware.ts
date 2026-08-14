@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { frozenDeRedirectPath, localizePath, stripLocale } from "../i18n";
 import { buildCsp } from "../csp";
 import { GA_MEASUREMENT_ID } from "../analytics";
+import { META_PIXEL_ID } from "../meta-pixel";
 
 export async function updateSession(request: NextRequest) {
   // Rozbij ścieżkę na locale + ścieżkę bez prefiksu '/de'.
@@ -51,6 +52,7 @@ export async function updateSession(request: NextRequest) {
     supabaseOrigin,
     // Ten sam warunek co w komponencie GA: bez poprawnego id nie luzujemy CSP.
     gaEnabled: GA_MEASUREMENT_ID !== "",
+    metaEnabled: META_PIXEL_ID !== "",
   });
   requestHeaders.set("Content-Security-Policy", csp);
 

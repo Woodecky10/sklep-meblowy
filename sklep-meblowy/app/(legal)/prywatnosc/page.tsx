@@ -120,6 +120,8 @@ export default async function PrywatnoscPage() {
           "Sie können Cookies in den Einstellungen Ihres Browsers sowie über das Cookie-Banner verwalten, das beim ersten Besuch des Shops angezeigt wird.",
         s6_4:
           "Zur Verkehrsanalyse nutzen wir Google Analytics 4 (Anbieter: Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland). Das Skript wird erst geladen, nachdem Sie in analytische Cookies eingewilligt haben – ohne diese Einwilligung werden keine Daten an Google übermittelt. Google Analytics speichert u. a. die Cookies _ga und _ga_*, die eine wiederkehrende Sitzung unterscheiden. Dabei können Daten außerhalb des EWR übermittelt werden, auf Grundlage der von der Europäischen Kommission genehmigten Standardvertragsklauseln.",
+        s6_5:
+          "Für die Durchführung und Abrechnung von Werbemaßnahmen auf Facebook und Instagram nutzen wir das Meta-Pixel (Anbieter: Meta Platforms Ireland Limited, Merrion Road, Dublin 4, Irland). Das Skript wird erst geladen, nachdem Sie in Marketing-Cookies eingewilligt haben – ohne diese Einwilligung werden keine Daten an Meta übermittelt. Das Pixel speichert die Cookies _fbp und _fbc und übermittelt an Meta Informationen über Ihre Aktivität im Shop: besuchte Unterseiten, angesehene Produkte, Warenkorb-Hinzufügungen sowie begonnene und abgeschlossene Bestellungen samt deren Wert. Hinsichtlich der Erhebung dieser Daten und ihrer Übermittlung an Meta sind wir gemeinsam mit Meta Platforms Ireland Limited Verantwortliche. Daten können außerhalb des EWR übermittelt werden, auf Grundlage der von der Europäischen Kommission genehmigten Standardvertragsklauseln. Ihre Einwilligung können Sie jederzeit in den Cookie-Einstellungen im Footer des Shops widerrufen.",
 
         s7: "§ 7. Ihre Rechte",
         s7Intro:
@@ -255,6 +257,8 @@ export default async function PrywatnoscPage() {
           "Możesz zarządzać cookies w ustawieniach przeglądarki oraz poprzez baner cookies wyświetlany przy pierwszej wizycie w Sklepie.",
         s6_4:
           "Do analizy ruchu korzystamy z Google Analytics 4 (dostawca: Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irlandia). Skrypt ładuje się dopiero po wyrażeniu przez Ciebie zgody na cookies analityczne – bez tej zgody żadne dane nie trafiają do Google. Google Analytics zapisuje m.in. cookies _ga oraz _ga_*, które pozwalają odróżnić powracającą sesję. Dane mogą być przy tym przekazywane poza EOG, na podstawie standardowych klauzul umownych zatwierdzonych przez Komisję Europejską.",
+        s6_5:
+          "Do prowadzenia i rozliczania działań reklamowych na Facebooku i Instagramie korzystamy z piksela Meta (dostawca: Meta Platforms Ireland Limited, Merrion Road, Dublin 4, Irlandia). Skrypt ładuje się dopiero po wyrażeniu przez Ciebie zgody na cookies marketingowe – bez tej zgody żadne dane nie trafiają do Meta. Piksel zapisuje cookies _fbp oraz _fbc i przekazuje Meta informacje o Twojej aktywności w Sklepie: odwiedzone podstrony, obejrzane produkty, dodania do koszyka, rozpoczęte i złożone zamówienia wraz z ich wartością. W zakresie zbierania tych danych i przekazywania ich do Meta jesteśmy z Meta Platforms Ireland Limited współadministratorami danych. Dane mogą być przekazywane poza EOG, na podstawie standardowych klauzul umownych zatwierdzonych przez Komisję Europejską. Zgodę możesz wycofać w każdej chwili w ustawieniach cookies w stopce Sklepu.",
 
         s7: "§ 7. Twoje prawa",
         s7Intro:
@@ -429,6 +433,7 @@ export default async function PrywatnoscPage() {
         </li>
         <li>{c.s6_3}</li>
         <li>{c.s6_4}</li>
+        <li>{c.s6_5}</li>
       </ol>
 
       <h2>{c.s7}</h2>
