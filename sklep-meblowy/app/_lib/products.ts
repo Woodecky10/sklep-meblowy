@@ -8,6 +8,8 @@ import {
   rankByNameMatch,
   applyTokenGroup,
 } from "./search-filter";
+import { applyTypoCorrection } from "./search-correction";
+import { getCatalogVocabulary } from "./search-vocabulary-server";
 import { sizeLabelOf } from "./size-groups";
 import { FACETS_CACHE_TAG } from "./cache-tags";
 import { localizeProduct } from "./localize";
@@ -92,9 +94,32 @@ export type ProductFilters = {
   // sekcje) wracają zlokalizowane (z fallbackiem PL), a wyszukiwanie szuka po
   // kolumnach _de. Domyślnie PL (admin/cron/legacy callerzy działają bez zmian).
   locale?: Locale;
+  // ⚠️ POLE WEWNĘTRZNE — nie ustawiać z zewnątrz. Blokuje fallback korekty
+  // literówek na POWTÓRZONYM zapytaniu: getProducts woła samo siebie
+  // z poprawioną frazą, a bez tej flagi poprawiona fraza mogłaby zostać
+  // poprawiona ponownie, i tak w kółko, na PUBLICZNYM /sklep. Głębokość
+  // rekurencji: dokładnie 1.
+  skipTypoCorrection?: boolean;
 };
 
-export async function getProducts(filters: ProductFilters = {}) {
+// Strona wyników wyszukiwania/listingu. Pola korekty są OPCJONALNE, żeby nie
+// łamać konsumentów, którzy o niej nic nie wiedzą.
+export type ProductsPage = {
+  products: Product[];
+  total: number;
+  pages: number;
+  // Fraza KLIENTA — obecna ⇔ jego fraza dała zero, a poprawiona coś znalazła.
+  correctedFrom?: string;
+  // ⚠️ Fraza użyta w zapytaniu, ale obecna TYLKO wtedy, gdy wolno ją pokazać
+  // klientowi — patrz canShowCorrection w search-correction.ts. Brak tego pola
+  // przy obecnym `correctedFrom` znaczy: korekta zaszła, ale zdanie ma jej
+  // nie cytować (nigdy nie pokazujemy rdzenia typu „lozk").
+  correctedTo?: string;
+};
+
+export async function getProducts(
+  filters: ProductFilters = {}
+): Promise<ProductsPage> {
   const supabase = await createClient();
   const {
     category,
@@ -111,6 +136,7 @@ export async function getProducts(filters: ProductFilters = {}) {
     collectionSlug,
     sectionSlug,
     locale = DEFAULT_LOCALE,
+    skipTypoCorrection,
   } = filters;
 
   // Normalizacja paginacji — chroni przed NaN/0/ujemnymi (patrz clampPage).
@@ -262,13 +288,34 @@ export async function getProducts(filters: ProductFilters = {}) {
           : p.name
     );
     const start = (safePage - 1) * safeLimit;
-    return {
+    const found = {
       products: ranked
         .slice(start, start + safeLimit)
         .map((p) => localizeProduct(p, locale)),
       total: ranked.length,
       pages: Math.ceil(ranked.length / safeLimit),
     };
+    // Powtórzone zapytanie kończy się tutaj — druga korekta byłaby drugim
+    // poziomem rekurencji (patrz skipTypoCorrection).
+    if (skipTypoCorrection) return found;
+
+    // Fallback literówkowy. ⚠️ Odpala się WYŁĄCZNIE przy zerowym wyniku —
+    // pilnuje tego applyTypoCorrection, któremu podajemy `total === 0`, a NIE
+    // `products.length === 0`: na stronie 2. wyszukiwania lista bywa pusta,
+    // choć fraza coś znalazła, i korekta nie ma prawa się wtedy odpalić.
+    const { result, correctedFrom, correctedTo } = await applyTypoCorrection({
+      search: search!,
+      initial: found,
+      isEmpty: (r) => r.total === 0,
+      // Rzuca przy błędzie bazy — łapie to applyTypoCorrection i zachowuje się
+      // dokładnie jak dziś, czyli bez korekty.
+      loadVocabulary: () => getCatalogVocabulary(locale),
+      rerun: (phrase) =>
+        getProducts({ ...filters, search: phrase, skipTypoCorrection: true }),
+    });
+    // Bez korekty oddajemy dokładnie dzisiejszy kształt — bez pól korekty.
+    if (correctedFrom === undefined) return result;
+    return { ...result, correctedFrom, correctedTo };
   }
 
   const from = (safePage - 1) * safeLimit;
