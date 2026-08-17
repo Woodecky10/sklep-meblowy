@@ -86,9 +86,10 @@ export function editDistanceWithin(
         cur[j - 1] + 1, // wstawienie znaku z b
         prev[j - 1] + cost // substytucja (albo zgodność)
       );
-      // Transpozycja: dwa ostatnie znaki obu słów to ta sama para, zamieniona
-      // miejscami. Wiersz i-2 jest tu czytany po raz jedyny — przy i = 1 nie
-      // wchodzimy w tę gałąź, więc niezainicjowany bufor nigdy nie jest widziany.
+      // Transpozycja: dwa ostatnie porównywane znaki obu słów to ta sama para,
+      // zamieniona miejscami. To jedyne miejsce czytające wiersz i-2, i wchodzi
+      // się w nie dopiero przy i > 1 — czyli niezainicjowany bufor (przy i = 1
+      // prev2 jest jeszcze surowy) nie jest nigdy odczytywany.
       if (
         i > 1 &&
         j > 1 &&

@@ -101,9 +101,11 @@ describe("editDistanceWithin — podstawowe operacje kosztują 1", () => {
   });
 
   it("odległość jest symetryczna", () => {
-    expect(editDistanceWithin("fotel", "motek", 3)).toBe(
-      editDistanceWithin("motek", "fotel", 3)
-    );
+    // Wartość podana wprost, żeby test nie przeszedł na dwóch nullach.
+    expect(editDistanceWithin("fotel", "motek", 3)).toBe(2);
+    expect(editDistanceWithin("motek", "fotel", 3)).toBe(2);
+    expect(editDistanceWithin("materca", "materac", 3)).toBe(1);
+    expect(editDistanceWithin("materac", "materca", 3)).toBe(1);
   });
 });
 
@@ -165,6 +167,22 @@ describe("pickCorrection — kiedy NIE poprawiać", () => {
   it("słowo bez żadnego kandydata w progu → null", () => {
     expect(pickCorrection("xyzabc", KATALOG)).toBeNull();
     expect(pickCorrection("zzzzzzzz", KATALOG)).toBeNull();
+  });
+});
+
+describe("pickCorrection — próg zależy od długości TOKENU", () => {
+  it("od 7 znaków przechodzi kandydat oddalony o dwa błędy", () => {
+    // Dwa nadmiarowe znaki („mmaterrac"), czyli odległość 2 — dla dziewięciu
+    // liter to wciąż w progu. Bez tego testu nic by nie dowodziło, że drugi
+    // stopień progu jest w ogóle osiągalny.
+    expect(pickCorrection("mmaterrac", KATALOG)).toBe("materac");
+  });
+
+  it("do 6 znaków ten sam rodzaj błędu jest już poza progiem", () => {
+    // „sofkaa" to od „sofa" te same dwa nadmiarowe znaki, ale sześć liter daje
+    // próg 1 — i tu poprawki nie ma. Próg liczy się z DŁUGOŚCI TOKENU KLIENTA,
+    // nie kandydata: krótkie słowo ma za gęstych sąsiadów.
+    expect(pickCorrection("sofkaa", new Map([["sofa", 41]]))).toBeNull();
   });
 });
 
