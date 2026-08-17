@@ -1,14 +1,17 @@
 import "server-only";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createClient as createBareAnonClient } from "@supabase/supabase-js";
-import { FACETS_CACHE_TAG } from "./products";
+// Tagi z modułu-liścia, NIE z products.ts: po sam string nie warto wciągać
+// 600 linii ciągnących supabase/server, categories, category-tree i localize —
+// a ten moduł trafia docelowo do /api/search/suggest.
+import { FACETS_CACHE_TAG, SEARCH_VOCABULARY_CACHE_TAG } from "./cache-tags";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import {
   buildCatalogVocabulary,
-  VOCABULARY_EXTRA_WORDS,
+  vocabularyExtraWordsFor,
 } from "./search-vocabulary";
 
-export const SEARCH_VOCABULARY_CACHE_TAG = "search-vocabulary";
+export { SEARCH_VOCABULARY_CACHE_TAG };
 
 // Nazwy produktów widziane przez GOŚCIA, cachowane. Wzorzec dokładnie jak
 // getFacetSource w products.ts i fetchContact w contact-server.ts:
@@ -53,7 +56,11 @@ const fetchVocabularySource = unstable_cache(
       .map((row) => (row as Record<string, string | null>)[column] ?? "")
       .filter((name) => name.trim() !== "");
 
-    return [...buildCatalogVocabulary(names, VOCABULARY_EXTRA_WORDS)];
+    // Słowa ze słowników ręcznych dokłada się TYLKO po polsku — patrz
+    // vocabularyExtraWordsFor(). Po niemiecku byłoby to 33 polskie rdzenie na
+    // 71 słów (46%) i korekta odsyłałaby niemieckie frazy na polskie rdzenie,
+    // których zapytanie po search_key_fold_de nie ma jak trafić.
+    return [...buildCatalogVocabulary(names, vocabularyExtraWordsFor(locale))];
   },
   ["search-vocabulary-v1"],
   {
@@ -79,8 +86,11 @@ const fetchVocabularySource = unstable_cache(
 // error.tsx).
 //
 // ⚠️ Na /de słownik jest dziś SZCZĄTKOWY: name_de ma wypełnione 15 z 353
-// aktywnych produktów (pomiar 2026-08-17), więc korekta po niemiecku prawie
-// nie ma na czym pracować. To nie jest usterka tego modułu — to stan danych.
+// aktywnych produktów (pomiar 2026-08-17) i wychodzi z nich 38 słów, bez ani
+// jednego dodatku ze słowników ręcznych (te są po polsku — patrz
+// vocabularyExtraWordsFor). Korekta po niemiecku prawie nie ma więc na czym
+// pracować. To nie jest usterka tego modułu — to stan danych, i lepszy niż
+// podpowiadanie po niemiecku polskich rdzeni.
 export async function getCatalogVocabulary(
   locale: Locale = DEFAULT_LOCALE
 ): Promise<ReadonlyMap<string, number>> {

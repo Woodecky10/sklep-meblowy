@@ -9,6 +9,7 @@ import {
   applyTokenGroup,
 } from "./search-filter";
 import { sizeLabelOf } from "./size-groups";
+import { FACETS_CACHE_TAG } from "./cache-tags";
 import { localizeProduct } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import { pickSizeMatched, type SizeCandidate } from "./sleep-size";
@@ -499,7 +500,11 @@ export async function getSizeGroupMembersAdmin(
   );
 }
 
-export const FACETS_CACHE_TAG = "facets";
+// Stała mieszka w module-liściu cache-tags.ts (zero importów), żeby moduł
+// potrzebujący samego stringa nie musiał wciągać całego products.ts. Re-eksport
+// zostaje tutaj, żeby ścieżka importu `@/app/_lib/products` nadal działała
+// i żeby nie ruszać żadnego z 15 miejsc wołających invalidateFacetsCache.
+export { FACETS_CACHE_TAG };
 
 // Inwalidacja cache facetów — wołana w akcjach admina mutujących produkty
 // (kolor/materiał/warianty/aktywność) i katalog tkanin. Wzorzec jak

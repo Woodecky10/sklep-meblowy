@@ -6,6 +6,7 @@ import {
   notCarriedLabel,
   buildCatalogVocabulary,
   VOCABULARY_EXTRA_WORDS,
+  vocabularyExtraWordsFor,
   MIN_VOCABULARY_WORD_LENGTH,
 } from "@/app/_lib/search-vocabulary";
 import {
@@ -376,6 +377,70 @@ describe("buildCatalogVocabulary — słowa ze słowników ręcznych", () => {
   });
 });
 
+// Nazwy DE skopiowane z produkcji 2026-08-17. Jest ich w bazie 15 na 353
+// aktywne pozycje i dają 38 słów — cały niemiecki słownik.
+const NAZWY_DE_Z_PRODUKCJI = [
+  "Boxspringbett Marbella POSO grober Cord 120x200",
+  "Boxspringbett Tiki Arena Bouclé Teddy 140x200",
+  "Ecksofa FADO L mit verstellbaren Kopfstützen | Ecksofa mit großer Schlaffunktion",
+  "Ecksofa VEGAS MINI in POSO wunderschöner Cord",
+  "Gepolstertes Kinderbett 90x200 Sisi Manila",
+  "Modernes Ecksofa LUNA Teddy mit Schlaffunktion wunderschön Hit Woolly",
+];
+
+describe("vocabularyExtraWordsFor — słowa ręczne WYŁĄCZNIE po polsku", () => {
+  // ⚠️ DEFEKT, NIE OPTYMALIZACJA. Oba słowniki ręczne opisują polszczyznę
+  // klienta („kanapa", „szafa", „podnóżek"). Dokładane bezwarunkowo dawały
+  // słownik niemiecki, w którym 33 z 71 słów (46%) jest po polsku — bo nazw DE
+  // ma dziś 15 produktów z 353 i wychodzi z nich tylko 38 słów. Korekta
+  // zaczynała na te rdzenie trafiać (zmierzone na produkcji: 5 z 46
+  // realistycznych fraz niemieckich), a Task 3 wstawiłby polski rdzeń do
+  // zapytania po kolumnie search_key_fold_de, gdzie nie ma on czego złapać:
+  // klient dostawałby ZERO WYNIKÓW PLUS napis „pokazujemy wyniki dla «lozk»",
+  // czyli gorzej niż dzisiejsze zero bez podpowiedzi.
+  it("pl dostaje wszystkie słowa ręczne, de nie dostaje żadnego", () => {
+    expect(vocabularyExtraWordsFor("pl")).toEqual(VOCABULARY_EXTRA_WORDS);
+    expect(vocabularyExtraWordsFor("de")).toEqual([]);
+  });
+
+  it("słownik niemiecki to DOKŁADNIE słowa z nazw niemieckich", () => {
+    const zDodatkami = buildCatalogVocabulary(
+      NAZWY_DE_Z_PRODUKCJI,
+      vocabularyExtraWordsFor("de")
+    );
+    const samNazwy = buildCatalogVocabulary(NAZWY_DE_Z_PRODUKCJI, []);
+    expect([...zDodatkami.keys()]).toEqual([...samNazwy.keys()]);
+  });
+
+  it.each(["sof", "lamp", "komod", "regal", "lozk", "szaf", "naroznik"])(
+    "polski rdzeń „%s\" nie wchodzi do słownika niemieckiego",
+    (rdzen) => {
+      const vocabDe = buildCatalogVocabulary(
+        NAZWY_DE_Z_PRODUKCJI,
+        vocabularyExtraWordsFor("de")
+      );
+      expect(vocabDe.has(rdzen)).toBe(false);
+    }
+  );
+
+  it("niemieckie frazy nie są poprawiane na polskie rdzenie", () => {
+    // Zmierzone na pełnym słowniku DE (38 słów + 33 polskie rdzenie):
+    // `sofa` → `sof`, `lampe` → `lamp`, `kommode` → `komod`, `regale` → `regal`.
+    // Po zmianie żadna z nich nie ma na co trafić — i tak ma być.
+    const vocabDe = buildCatalogVocabulary(
+      NAZWY_DE_Z_PRODUKCJI,
+      vocabularyExtraWordsFor("de")
+    );
+    expect(pickCorrection("sofa", vocabDe)).toBeNull();
+    expect(pickCorrection("lampe", vocabDe)).toBeNull();
+    expect(pickCorrection("kommode", vocabDe)).toBeNull();
+    expect(pickCorrection("regale", vocabDe)).toBeNull();
+    // Niemiecka literówka dalej działa — na niemieckim słowie z nazwy.
+    expect(pickCorrection("kinderbet", vocabDe)).toBe("kinderbett");
+    expect(pickCorrection("schlaffunkton", vocabDe)).toBe("schlaffunktion");
+  });
+});
+
 describe("buildCatalogVocabulary — klucze z łańcucha prototypu", () => {
   // TEN SAM REGRES CO WYŻEJ, tyle że po stronie słownika katalogowego. Klucz
   // odpytuje pickCorrection tokenem WPROST od klienta, a odczyt z literału
@@ -473,8 +538,10 @@ describe("słownik z prawdziwych nazw — kształt", () => {
 describe("słownik z prawdziwych nazw + pickCorrection", () => {
   // Domknięcie Taska 1: tam słownik był atrapą z testu, tu jest wyprowadzony
   // z prawdziwych nazw. Wszystkie wyniki poniżej zostały ZMIERZONE na pełnym
-  // słowniku produkcyjnym (267 słów: 238 z 353 nazw + 33 dodatkowe) i dają na
-  // tej próbce to samo.
+  // słowniku produkcyjnym i dają na tej próbce to samo. Ten słownik ma
+  // **267 słów**: 238 z 353 nazw plus 33 dodatkowe MINUS 4 przecięcie
+  // (`naroznik`, `materac`, `fotel`, `boxspring` są i w nazwach, i w słownikach
+  // ręcznych, więc liczą się raz — z wagą katalogową, nie z 1).
   const vocab = buildCatalogVocabulary(NAZWY_Z_PRODUKCJI, VOCABULARY_EXTRA_WORDS);
 
   it.each([
@@ -546,9 +613,16 @@ describe("słowa 3-literowe — czy kradną poprawki", () => {
     expect(pickCorrection("pufy", vocab)).toBe("pufa");
   });
 
-  it("słowo 3-literowe nie jest poprawiane samo z siebie", () => {
-    expect(pickCorrection("rog", vocab)).toBeNull();
-    expect(pickCorrection("bxo", vocab)).toBeNull();
+  it("do słowa 3-literowego dochodzi TYLKO token 4-znakowy", () => {
+    // Granica całej obawy, i test naprawdę zależny od zawartości słownika:
+    // `rog` w słowniku JEST (waga 3, z „Róg Lova P"), a mimo to token
+    // 5-znakowy go nie dosięga — próg dla 5 znaków to 1, a różnica długości
+    // do słowa 3-znakowego to już 2, więc editDistanceWithin ucina parę bez
+    // liczenia. Gdyby ktoś kiedyś podniósł próg w maxTypos, ten test upadnie
+    // i pokaże, że obawa wróciła w większej skali.
+    expect(vocab.get("rog")).toBe(1);
+    expect(pickCorrection("rogii", vocab)).toBeNull();
+    expect(pickCorrection("rogi", vocab)).toBe("rog");
   });
 });
 

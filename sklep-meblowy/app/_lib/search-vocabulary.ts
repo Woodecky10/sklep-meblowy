@@ -34,14 +34,26 @@
 // pilnuje test „klucze z łańcucha prototypu" w __tests__.
 
 // ⚠️ Ten jeden import zamyka CYKL: search-filter.ts importuje stąd synonymsFor.
-// Cykl jest bezpieczny i taki ma zostać, bo ŻADEN z tych dwóch modułów nie woła
-// niczego z drugiego na poziomie modułu — oba sięgają po import dopiero w ciele
-// funkcji, a deklaracje funkcji są hoistowane. Oba porządki inicjalizacji są
-// realnie przechodzone przez testy (search-filter.test.ts ładuje najpierw filtr,
-// search-vocabulary.test.ts najpierw ten plik). Alternatywą byłoby przepisanie
-// składania znaków tutaj, czyli DRUGIE źródło prawdy o foldowaniu obok FOLD_MAP
-// i obu kolumn generowanych w bazie — a rozjazd takich kopii nie wywala błędu,
-// tylko po cichu zeruje trafienia (ten sam argument stoi przy FOLD_MAP).
+// Cykl jest dziś bezpieczny, bo ŻADEN z tych dwóch modułów nie woła niczego
+// z drugiego na poziomie modułu — oba sięgają po import dopiero w ciele funkcji,
+// a deklaracje funkcji są hoistowane. Oba porządki inicjalizacji są realnie
+// przechodzone przez testy (search-filter.test.ts ładuje najpierw filtr,
+// search-vocabulary.test.ts najpierw ten plik).
+//
+// ⚠️ NIKT TEGO NIE PILNUJE AUTOMATYCZNIE: eslint w tym repo to samo
+// eslint-config-next (core-web-vitals + typescript), bez reguły
+// `import/no-cycle`. Jeśli ktoś kiedyś doda tu albo w search-filter.ts kod
+// wykonywany NA POZIOMIE MODUŁU i zależny od drugiego pliku, dostanie TDZ przy
+// jednym z dwóch porządków ładowania — i dowie się o tym z produkcji.
+//
+// Czego NIE robić w ramach „naprawy": przepisania składania znaków tutaj. To
+// byłoby DRUGIE źródło prawdy o foldowaniu obok FOLD_MAP i obu kolumn
+// generowanych w bazie, a rozjazd takich kopii nie wywala błędu — po cichu
+// zeruje trafienia (ten sam argument stoi przy FOLD_MAP). Wyjściem bez cyklu
+// i bez kopii jest przeniesienie samego `foldDiacritics` + `FOLD_MAP` do
+// modułu-liścia i re-eksport z search-filter.ts (tak jak zrobiono ze stałymi
+// tagów w cache-tags.ts) — świadomie nie zrobione, bo dotyka pliku spoza
+// zakresu tego zadania.
 import { foldDiacritics } from "./search-filter";
 
 export const SEARCH_SYNONYMS: ReadonlyMap<string, readonly string[]> = new Map([
@@ -230,3 +242,25 @@ export const VOCABULARY_EXTRA_WORDS: readonly string[] = [
     ...NOT_CARRIED.keys(),
   ]),
 ];
+
+// Słowa dodatkowe dla JĘZYKA — po polsku wszystkie, po niemiecku ŻADNE.
+//
+// ⚠️ To nie jest oszczędność, tylko naprawa defektu. Oba słowniki ręczne tego
+// pliku opisują polszczyznę klienta („kanapa", „szafa", „podnóżek"), a nazwy
+// niemieckie ma dziś 15 produktów z 353 (pomiar 2026-08-17) — z których wychodzi
+// 38 słów. Doklejenie 33 polskich rdzeni dałoby słownik niemiecki, w którym
+// 46% słów jest po polsku, i korekta zaczęłaby na nie trafiać: zmierzone
+// `sofa` → `sof`, `lampe` → `lamp`, `kommode` → `komod`, `regale` → `regal`
+// (5 z 46 realistycznych fraz niemieckich). Taka poprawka trafia potem do
+// zapytania po kolumnie search_key_fold_de, gdzie polski rdzeń niczego nie
+// łapie — klient dostaje ZERO WYNIKÓW PLUS napis „pokazujemy wyniki dla «lozk»",
+// czyli gorzej niż dzisiejsze zero bez podpowiedzi.
+//
+// ⚠️ Cena tej decyzji, świadomie zapłacona: 4 z tych 5 trafień to klucze
+// NOT_CARRIED, które przez notCarriedLabel(…, "de") dałyby poprawny komunikat
+// „Wir führen keine Kommoden". To jednak przypadek, nie projekt — właściwym
+// rozwiązaniem dla /de są NIEMIECKIE klucze w NOT_CARRIED, a nie polskie rdzenie
+// w niemieckim słowniku.
+export function vocabularyExtraWordsFor(locale: "pl" | "de"): readonly string[] {
+  return locale === "de" ? [] : VOCABULARY_EXTRA_WORDS;
+}
