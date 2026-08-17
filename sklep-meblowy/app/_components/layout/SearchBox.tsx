@@ -9,7 +9,10 @@ import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary, type Dictionary } from "@/app/_lib/dictionaries";
 import { formatMoney } from "@/app/_lib/money";
 import { useEurRate } from "@/app/_lib/rate-context";
-import type { SearchSuggestion } from "@/app/api/search/suggest/route";
+import {
+  normalizeSuggestResponse,
+  type SearchSuggestion,
+} from "@/app/_lib/search-suggest";
 
 type Variant = "icon" | "inline";
 
@@ -29,6 +32,14 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(searchParams.get("q") ?? "");
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
+  // Korekta literówki z API — niepusta ⇔ fraza klienta nie znalazła NICZEGO,
+  // a poprawiona coś znalazła. `to` jest obecne tylko wtedy, gdy poprawkę wolno
+  // zacytować klientowi; o tym decyduje serwer (canShowCorrection
+  // w search-correction.ts), a nie ten komponent.
+  const [correction, setCorrection] = useState<{
+    from: string;
+    to?: string;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   // -1 = brak zaznaczonej, 0..n = zaznaczona sugestia (keyboard nav)
   const [highlighted, setHighlighted] = useState(-1);
@@ -80,6 +91,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
     if (trimmed.length < 1) {
       const handle = setTimeout(() => {
         setSuggestions([]);
+        setCorrection(null);
         setLoading(false);
         setHighlighted(-1);
       }, 200);
@@ -90,13 +102,26 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
       setLoading(true);
       fetch(`/api/search/suggest?q=${encodeURIComponent(trimmed)}&loc=${locale}`)
         .then((r) => (r.ok ? r.json() : []))
-        .then((data: SearchSuggestion[]) => {
+        .then((data: unknown) => {
           if (cancelled) return;
-          setSuggestions(Array.isArray(data) ? data : []);
+          // ⚠️ ŁAGODNE ZEJŚCIE ZE STAREGO KSZTAŁTU. Odpowiedź jest dziś
+          // obiektem `{ items, correctedFrom?, correctedTo? }`, ale karta
+          // otwarta przed deployem odpytuje nowe API starym kodem i odwrotnie
+          // (rollback, żądanie do starszego deploymentu) — normalizeSuggestResponse
+          // przyjmuje gołą tablicę tak samo jak obiekt i na niczym nie rzuca.
+          const { items, correctedFrom, correctedTo } =
+            normalizeSuggestResponse(data);
+          setSuggestions(items);
+          setCorrection(
+            correctedFrom ? { from: correctedFrom, to: correctedTo } : null
+          );
           setHighlighted(-1);
         })
         .catch(() => {
-          if (!cancelled) setSuggestions([]);
+          if (!cancelled) {
+            setSuggestions([]);
+            setCorrection(null);
+          }
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
@@ -204,6 +229,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
               onClick={() => {
                 setValue("");
                 setSuggestions([]);
+                setCorrection(null);
               }}
               aria-label={t.filter.clear}
               className="text-[var(--muted)] hover:text-[var(--fg)] text-xs shrink-0"
@@ -222,6 +248,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
         {showDropdown && (
           <SuggestionsList
             suggestions={suggestions}
+            correction={correction}
             loading={loading}
             highlighted={highlighted}
             onHover={setHighlighted}
@@ -281,6 +308,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
                   onClick={() => {
                     setValue("");
                     setSuggestions([]);
+                    setCorrection(null);
                   }}
                   aria-label={t.filter.clear}
                   className="text-[var(--muted)] hover:text-[var(--fg)]"
@@ -305,6 +333,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
             {showDropdown && (
               <SuggestionsList
                 suggestions={suggestions}
+                correction={correction}
                 loading={loading}
                 highlighted={highlighted}
                 onHover={setHighlighted}
@@ -328,6 +357,7 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
 
 function SuggestionsList({
   suggestions,
+  correction,
   loading,
   highlighted,
   onHover,
@@ -338,6 +368,7 @@ function SuggestionsList({
   className,
 }: {
   suggestions: SearchSuggestion[];
+  correction: { from: string; to?: string } | null;
   loading: boolean;
   highlighted: number;
   onHover: (i: number) => void;
@@ -357,57 +388,92 @@ function SuggestionsList({
   if (suggestions.length === 0) return null;
 
   return (
-    <ul
+    <div
       className={`bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-2xl overflow-hidden ${className ?? ""}`}
-      role="listbox"
     >
-      {suggestions.map((s, i) => {
-        const active = i === highlighted;
-        return (
-          <li key={s.id} role="option" aria-selected={active}>
-            <button
-              type="button"
-              // MouseDown zamiast onClick — onClick zostaje zablokowany
-              // gdy input traci focus przed wystąpieniem click. MouseDown
-              // odpala się przed blur.
-              onMouseDown={(e) => {
-                e.preventDefault();
-                onSelect(s.id);
-              }}
-              onMouseEnter={() => onHover(i)}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-                active ? "bg-[var(--bg)]" : "hover:bg-[var(--bg)]"
-              }`}
-            >
-              <div className="relative w-12 h-12 shrink-0 rounded-lg overflow-hidden bg-stone-100 dark:bg-stone-800">
-                {s.image ? (
-                  <Image
-                    src={s.image}
-                    alt=""
-                    fill
-                    sizes="48px"
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-[10px] text-[var(--muted)]">
-                    {t.search.noImageShort}
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-[var(--fg)] truncate">{s.name}</p>
-                <p className="text-xs text-[var(--muted)]">
-                  {s.category}
+      {/* Zdanie o korekcie literówki. Stoi NAD listą i POZA <ul role="listbox">:
+          `highlighted` indeksuje `suggestions`, więc gdyby ta linijka była
+          pozycją listy, strzałki i Enter trafiałyby o jeden produkt obok.
+
+          Dwa warianty, bo poprawką bywa RDZEŃ ze słownika ręcznego (`kanap`,
+          `lozk`) albo prawdziwe, ale 3-znakowe słowo (`flo`, `mio`).
+          ⚠️ O tym, który wariant, NIE decyduje ten komponent: `to` przychodzi
+          dokładnie wtedy, gdy poprawkę wolno zacytować. Powtórzenie tej reguły
+          tutaj dałoby dwa miejsca decydujące o tym samym.
+
+          Teksty ze słownika /sklep (t.shop.*) — świadomie te same, co
+          w zdaniu nad siatką produktów: klient, który z rozwijki przejdzie do
+          wyników, ma zobaczyć tę samą informację tymi samymi słowami.
+
+          break-words, bo w zdaniu siedzi fraza WPROST od klienta — jedno długie
+          słowo bez spacji rozpycha wąską rozwijkę (ten sam wzorzec co
+          w EmptySearchState.tsx i na /sklep). */}
+      {correction && (
+        <p className="px-4 pt-3 pb-2 text-xs text-[var(--muted)] break-words border-b border-[var(--border)]">
+          {correction.to ? (
+            <>
+              {t.shop.correctedShowing}{" "}
+              <span className="text-[var(--fg)] font-medium">
+                „{correction.to}”
+              </span>
+            </>
+          ) : (
+            <>
+              {t.shop.emptySearchTitle} „{correction.from}” —{" "}
+              {t.shop.correctedSimilar}
+            </>
+          )}
+        </p>
+      )}
+      <ul role="listbox">
+        {suggestions.map((s, i) => {
+          const active = i === highlighted;
+          return (
+            <li key={s.id} role="option" aria-selected={active}>
+              <button
+                type="button"
+                // MouseDown zamiast onClick — onClick zostaje zablokowany
+                // gdy input traci focus przed wystąpieniem click. MouseDown
+                // odpala się przed blur.
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onSelect(s.id);
+                }}
+                onMouseEnter={() => onHover(i)}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                  active ? "bg-[var(--bg)]" : "hover:bg-[var(--bg)]"
+                }`}
+              >
+                <div className="relative w-12 h-12 shrink-0 rounded-lg overflow-hidden bg-stone-100 dark:bg-stone-800">
+                  {s.image ? (
+                    <Image
+                      src={s.image}
+                      alt=""
+                      fill
+                      sizes="48px"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-[10px] text-[var(--muted)]">
+                      {t.search.noImageShort}
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-[var(--fg)] truncate">{s.name}</p>
+                  <p className="text-xs text-[var(--muted)]">
+                    {s.category}
+                  </p>
+                </div>
+                <p className="text-sm font-semibold text-[var(--fg)] shrink-0">
+                  {formatMoney(s.price, locale, rate)}
                 </p>
-              </div>
-              <p className="text-sm font-semibold text-[var(--fg)] shrink-0">
-                {formatMoney(s.price, locale, rate)}
-              </p>
-            </button>
-          </li>
-        );
-      })}
-    </ul>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
