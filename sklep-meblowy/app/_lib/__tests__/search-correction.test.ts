@@ -4,6 +4,7 @@ import {
   applyTypoCorrection,
   MIN_SHOWN_CORRECTION_LENGTH,
 } from "@/app/_lib/search-correction";
+import { VOCABULARY_EXTRA_WORDS } from "@/app/_lib/search-vocabulary";
 
 // Słownik w kształcie tego, co produkuje getCatalogVocabulary: klucz = słowo
 // złożone do ASCII, wartość = w ILU PRODUKTACH występuje. Liczby i skład
@@ -68,6 +69,18 @@ describe("planSearchCorrection — kiedy w ogóle jest co poprawiać", () => {
   it("pusty słownik → null (nie ma z czego wybierać)", () => {
     expect(planSearchCorrection("materca", new Map())).toBeNull();
   });
+
+  it("poprawiona fraza nie wpuszcza do zapytania niczego spoza allowlisty", () => {
+    // Poprawiona fraza wraca do getProducts i jeszcze raz przechodzi przez
+    // searchKeyTokenGroups, ale opierać się na tym byłoby lekkomyślne: ta
+    // funkcja ma NIE PRODUKOWAĆ znaków znaczących dla składni PostgREST .or()
+    // (`, . ( )`) ani wildcardów ILIKE (`% _ \`). Tokeny przechodzą przez
+    // searchTokens, a słowa słownika składają się z liter i cyfr — patrz
+    // WORD_SEPARATORS w search-vocabulary.ts.
+    const plan = planSearchCorrection("materca %,.()_\\*", KATALOG);
+    expect(plan?.phrase).toBe("materac");
+    expect(/^[\p{L}\p{N} -]+$/u.test(plan!.phrase)).toBe(true);
+  });
 });
 
 describe("planSearchCorrection — fraza wielosłowna", () => {
@@ -117,6 +130,23 @@ describe("planSearchCorrection — czy poprawkę wolno POKAZAĆ klientowi", () =
     const plan = planSearchCorrection("kanpa", KATALOG);
     expect(plan?.phrase).toBe("kanap");
     expect(plan?.showCorrection).toBe(false);
+  });
+
+  it("(a) decyduje WAGA, a nie sama przynależność do słownika ręcznego", () => {
+    // ⚠️ TO JEST SEDNO WARUNKU (a) I NAJŁATWIEJSZE MIEJSCE NA REGRES.
+    // `naroznik` jest wartością SEARCH_SYNONYMS, więc siedzi
+    // w VOCABULARY_EXTRA_WORDS — a jednocześnie jest prawdziwym słowem z 40
+    // nazw produktów. Gdyby o warunku (a) decydowała sama przynależność do tego
+    // zbioru, flagowe przypadki feature'u (`materca`, `naroznk`, `fotle`)
+    // nigdy nie pokazałyby poprawki. Rozstrzyga waga: buildCatalogVocabulary
+    // dokłada goły rdzeń z wagą dokładnie 1, a słowo z nazw zachowuje swoją.
+    expect(VOCABULARY_EXTRA_WORDS).toContain("naroznik");
+    expect(
+      planSearchCorrection("naroznk", new Map([["naroznik", 40]]))?.showCorrection
+    ).toBe(true);
+    expect(
+      planSearchCorrection("naroznk", new Map([["naroznik", 1]]))?.showCorrection
+    ).toBe(false);
   });
 
   it("(b) poprawka krótsza niż 4 znaki — poprawiamy, ale nie cytujemy", () => {

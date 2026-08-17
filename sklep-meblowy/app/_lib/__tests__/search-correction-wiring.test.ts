@@ -104,13 +104,25 @@ describe("getProducts — podpięcie fallbacku korekty literówek", () => {
 describe("/sklep — zdanie o korekcie nad siatką produktów", () => {
   it("zdanie pokazuje się tylko przy zaszłej korekcie i cytuje obie frazy", () => {
     expect(
-      /\{correctedFrom && \(/.test(SKLEP_PAGE),
+      /\{correctedFrom &&/.test(SKLEP_PAGE),
       "app/sklep/page.tsx nie renderuje już zdania o korekcie warunkowo na " +
         "`correctedFrom` — albo zdanie zniknęło, albo pokazuje się zawsze"
     ).toBe(true);
     expect(
       /\{correctedTo \?/.test(SKLEP_PAGE),
       "app/sklep/page.tsx nie rozróżnia już wariantu A od B po `correctedTo`"
+    ).toBe(true);
+  });
+
+  it("zdanie nie pokazuje się nad pustą siatką", () => {
+    // Korekta patrzy na `total`, więc przy `?q=sofq&strona=10` poprawiona fraza
+    // MA wyniki (41 sztuk), ale ta strona jest za końcem listy. Bez warunku na
+    // `products.length` klient zobaczyłby „Pokazujemy wyniki dla «sofa»" tuż
+    // nad „Nie znaleźliśmy nic dla «sofq»" — dwa zdania, które sobie przeczą.
+    expect(
+      /\{correctedFrom && products\.length > 0 &&/.test(SKLEP_PAGE),
+      "zdanie o korekcie straciło warunek `products.length > 0` — na stronie " +
+        "za końcem listy stanie nad przeczącym mu pustym stanem"
     ).toBe(true);
   });
 
@@ -132,7 +144,7 @@ describe("/sklep — zdanie o korekcie nad siatką produktów", () => {
     // Jedno długie słowo bez spacji (55 znaków w teście EmptySearchState)
     // wychodziło poza kontener na 390 px. Tu do UI trafia fraza WPROST od
     // klienta, więc ten sam wzorzec jest obowiązkowy.
-    const start = SKLEP_PAGE.indexOf("{correctedFrom && (");
+    const start = SKLEP_PAGE.indexOf("{correctedFrom &&");
     expect(start, "Nie znaleziono bloku korekty w app/sklep/page.tsx").toBeGreaterThan(-1);
     const blok = SKLEP_PAGE.slice(start, start + 400);
     expect(

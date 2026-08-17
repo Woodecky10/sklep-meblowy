@@ -309,8 +309,15 @@ export default async function SklepPage({
 
           break-words, bo w zdaniu siedzi fraza klienta: jedno długie słowo bez
           spacji (55 znaków w teście) wychodziło poza kontener na 390px — ten
-          sam wzorzec co w EmptySearchState.tsx. */}
-      {correctedFrom && (
+          sam wzorzec co w EmptySearchState.tsx.
+
+          ⚠️ Warunek na `products.length` nie jest nadmiarowy. Korekta patrzy na
+          `total`, więc przy adresie w rodzaju `?q=sofq&strona=10` poprawiona
+          fraza MA wyniki (41 sztuk), ale ta konkretna strona jest już za
+          końcem listy. Bez tego warunku klient zobaczyłby „Pokazujemy wyniki
+          dla «sofa»" tuż nad „Nie znaleźliśmy nic dla «sofq»" — dwa zdania,
+          które sobie przeczą. */}
+      {correctedFrom && products.length > 0 && (
         <p className="mb-6 text-sm text-[var(--muted)] break-words">
           {correctedTo ? (
             <>

@@ -8,10 +8,17 @@
 // wyłącznie ręcznie. Ten sam powód, dla którego search-filter.ts został kiedyś
 // wydzielony z products.ts.
 //
-// Po co to w ogóle: pomiar na produkcji 2026-08-17 (353 aktywne pozycje) —
-// `materca`, `sofq`, `naroznk`, `fotle` dawały DOKŁADNIE ZERO wyników, przy
-// poprawnej pisowni odpowiednio 83, 41, 40 i 9 produktów.
+// Po co to w ogóle: pomiar na produkcji 2026-08-17 (353 aktywne pozycje,
+// zapytanie po search_key_fold jak w getProducts) — rdzenie fraz `materca`,
+// `sofq`, `naroznk`, `fotle` dawały DOKŁADNIE ZERO wierszy, a poprawna pisownia
+// odpowiednio 157, 41, 40 i 9.
 
+// ⚠️ search-filter.ts i search-vocabulary.ts tworzą CYKL importów (opisany
+// w nagłówku search-vocabulary.ts). Ten moduł jest poza cyklem — importuje do
+// niego — więc `new Set(VOCABULARY_EXTRA_WORDS)` na poziomie modułu jest
+// bezpieczne przy każdym porządku ładowania: żaden z tych dwóch plików nie
+// wykonuje kodu zależnego od drugiego na poziomie modułu, więc oba kończą
+// inicjalizację, zanim ten plik zacznie swoją.
 import { foldDiacritics, searchTokens, stemToken } from "./search-filter";
 import { pickCorrection } from "./search-typos";
 import { VOCABULARY_EXTRA_WORDS } from "./search-vocabulary";
@@ -30,9 +37,12 @@ const RDZENIE_RECZNE: ReadonlySet<string> = new Set(VOCABULARY_EXTRA_WORDS);
 
 // Minimalna długość poprawki, którą wolno zacytować klientowi.
 //
-// Cztery znaki odsiewają zmierzone `flok`→`flo`, `miod`→`mio`, `beza`→`bez`:
-// to PRAWDZIWE słowa z nazw (kolekcje `flo` i `mio`, kolor `bez`), a mimo to
-// zdanie „Pokazujemy wyniki dla «mio»" wygląda dla klienta jak awaria sklepu.
+// Cztery znaki odsiewają poprawki zmierzone 2026-08-17: `flok`→`flo`
+// i `miod`→`mio`. To PRAWDZIWE słowa z nazw (obie to kolekcje), a mimo to
+// zdanie „Pokazujemy wyniki dla «mio»" wygląda dla klienta jak awaria sklepu —
+// czyli warunek (a) sam nie wystarcza, bo tu nie ma żadnego rdzenia. Katalog ma
+// dziś 15 takich trzyznakowych słów (`t25`, `dla`, `box`, `rog`, `leo`, `hit`,
+// `psa`, `bez`, `100`, `120`, `150`…), więc takich poprawek jest więcej.
 // Przepuszczają wszystkie realne przypadki, o które w tym feature chodzi:
 // `sofa`, `fotel`, `materac`, `naroznik`, `pufa`.
 export const MIN_SHOWN_CORRECTION_LENGTH = 4;
@@ -53,7 +63,13 @@ export const MIN_SHOWN_CORRECTION_LENGTH = 4;
 // więc goły rdzeń — taki, którego w żadnej nazwie nie ma — ma wagę dokładnie 1.
 // Pomiar 2026-08-17 potwierdza rozdział bez ani jednego wyjątku: wszystkie 29
 // gołych rdzeni (`kanap`, `lozk`, `sof`, `szaf`, `kontynentaln`…) mają wagę 1,
-// a wszystkie 4 realne słowa mają wagę 4-83.
+// a cztery realne słowa mają wagę 4, 9, 40 i 83 (to LICZBA NAZW, nie liczba
+// wyników wyszukiwania — samo `materac` zwraca 157 produktów, bo kolumna
+// search_key_fold obejmuje też opis).
+//
+// `<= 1`, nie `=== 1`: waga 0 nie ma prawa wystąpić (pickCorrection zwraca
+// wyłącznie klucze słownika), ale gdyby kiedyś wystąpiła, ma znaczyć „nie ma
+// tego w nazwach", czyli to samo co 1.
 //
 // Kierunek pomyłki jest bezpieczny: rdzeń ręczny, który trafi kiedyś do
 // DOKŁADNIE JEDNEJ nazwy produktu, dostanie wagę 1 i zostanie schowany mimo że
