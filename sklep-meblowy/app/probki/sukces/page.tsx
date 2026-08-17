@@ -5,8 +5,10 @@ import { getSampleOrderById } from "@/app/_lib/samples";
 import { getContactInfo } from "@/app/_lib/contact-server";
 import { formatPrice } from "@/app/_lib/format";
 import { shortSampleOrderRef } from "@/app/_lib/sample-pricing";
-import { CATALOG_CURRENCY, roundMoney } from "@/app/_lib/meta-pixel";
+import { CATALOG_CURRENCY, roundMoney } from "@/app/_lib/order-events";
+import { buildGaLeadPayload } from "@/app/_lib/ga-ecommerce";
 import PixelEventOnce from "@/app/_components/analytics/PixelEventOnce";
+import GaEventOnce from "@/app/_components/analytics/GaEventOnce";
 
 // Strona powrotu po zamówieniu próbek (urlReturn z app/_lib/sample-p24.ts).
 // PL-only jak całe /probki: /de jest zamrożone flagą DE_ENABLED.
@@ -127,6 +129,18 @@ export default async function SampleSuccessPage({
             currency: CATALOG_CURRENCY,
           }}
           eventId={order.id}
+        />
+      )}
+      {/* GA4 nazywa to samo `generate_lead` — z tego samego powodu co wyżej NIE
+          `purchase`: próbki nie mogą mieszać się do przychodu ze sprzedaży
+          mebli.
+          ⚠️ Świadome ograniczenie: GA4 nie ma odpowiednika `eventID` z Meta dla
+          zdarzeń innych niż zakup, więc odświeżenie tej strony doliczy kolejny
+          lead. Dotyczy wyłącznie licznika próbek — przychód jest nietknięty. */}
+      {!pending && (
+        <GaEventOnce
+          event="generate_lead"
+          payload={buildGaLeadPayload(Number(order.amount_total))}
         />
       )}
       <div className="text-center">

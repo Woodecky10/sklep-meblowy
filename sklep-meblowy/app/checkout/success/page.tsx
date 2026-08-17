@@ -3,12 +3,11 @@ import { getOrderById } from "@/app/_lib/orders";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { localizeHref } from "@/app/_lib/i18n";
 import { formatOrderAmount } from "@/app/_lib/money";
-import {
-  buildPurchasePayload,
-  shouldTrackPurchase,
-  type PurchasePayload,
-} from "@/app/_lib/meta-pixel";
+import { buildPurchasePayload, type PurchasePayload } from "@/app/_lib/meta-pixel";
+import { buildGaPurchasePayload, type GaPurchasePayload } from "@/app/_lib/ga-ecommerce";
+import { shouldTrackPurchase } from "@/app/_lib/order-events";
 import PixelEventOnce from "@/app/_components/analytics/PixelEventOnce";
+import GaEventOnce from "@/app/_components/analytics/GaEventOnce";
 import ClearCart from "./ClearCart";
 
 export default async function SuccessPage({
@@ -63,6 +62,7 @@ export default async function SuccessPage({
   let isPaid = false;
   let isCod = false;
   let purchase: PurchasePayload | null = null;
+  let gaPurchase: GaPurchasePayload | null = null;
 
   if (orderParam) {
     try {
@@ -74,18 +74,31 @@ export default async function SuccessPage({
       isCod = order.payment_method === "cod";
       isPaid = order.status !== "pending";
 
-      // Parametry zakupu dla pixela Meta liczy serwer, bo tylko on widzi
-      // pozycje zamówienia. Warunek jest WĘŻSZY niż `isPaid` powyżej: ten
-      // steruje tylko nagłówkiem strony i przepuszcza anulowane.
+      // Parametry zakupu dla Meta i GA4 liczy serwer, bo tylko on widzi pozycje
+      // zamówienia. Warunek jest WĘŻSZY niż `isPaid` powyżej: ten steruje tylko
+      // nagłówkiem strony i przepuszcza anulowane.
       if (shouldTrackPurchase(order.status, order.payment_method)) {
+        // Jedna lista pozycji dla obu systemów. GA4 potrzebuje nazwy, Meta ją
+        // ignoruje — dlatego wspólny kształt jest tym szerszym z dwóch.
+        // `product` to join z products: znika razem z produktem (FK SET NULL),
+        // więc nazwa bywa pusta na starych zamówieniach.
+        const lines = (order.items ?? []).map((item) => ({
+          productId: item.product_id ?? "",
+          name: item.product?.name ?? "",
+          quantity: item.quantity,
+          price: Number(item.price),
+        }));
+
         purchase = buildPurchasePayload({
           total: Number(order.total),
           currency: order.currency,
-          items: (order.items ?? []).map((item) => ({
-            productId: item.product_id ?? "",
-            quantity: item.quantity,
-            price: Number(item.price),
-          })),
+          items: lines,
+        });
+        gaPurchase = buildGaPurchasePayload({
+          orderId: order.id,
+          total: Number(order.total),
+          currency: order.currency,
+          items: lines,
         });
       }
     } catch {
@@ -104,6 +117,9 @@ export default async function SuccessPage({
       {purchase && orderId && (
         <PixelEventOnce event="Purchase" payload={purchase} eventId={orderId} />
       )}
+      {/* Klucz deduplikacji GA4 (`transaction_id`) siedzi w samym ładunku,
+          inaczej niż w Meta, gdzie jest osobnym argumentem. */}
+      {gaPurchase && <GaEventOnce event="purchase" payload={gaPurchase} />}
 
       <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 dark:bg-green-950 text-green-600 mb-8">
         <svg
