@@ -109,7 +109,7 @@ export default async function SklepPage({
   };
 
   const [
-    { products, total, pages },
+    { products, total, pages, correctedFrom, correctedTo },
     facets,
     visibleCategories,
     allCategories,
@@ -295,6 +295,46 @@ export default async function SklepPage({
       </Suspense>
 
       <CategoryChildren items={childNodes} />
+
+      {/* Korekta literówki (search-correction.ts). `correctedFrom` obecne ⇔
+          fraza klienta dała zero, a poprawiona coś znalazła.
+
+          Dwa warianty, bo poprawką bywa RDZEŃ ze słownika ręcznego (`kanap`,
+          `lozk`) albo prawdziwe, ale 3-znakowe słowo (`flo`, `mio`) — zdanie
+          „Pokazujemy wyniki dla «lozk»" wygląda dla klienta jak zepsuty sklep.
+          ⚠️ O tym, który wariant, NIE decyduje ta strona: `correctedTo` jest
+          obecne dokładnie wtedy, gdy poprawkę wolno zacytować. Gdyby regułę
+          powtórzyć tutaj, dwa miejsca decydowałyby o tym samym i cicho by się
+          rozjechały.
+
+          break-words, bo w zdaniu siedzi fraza klienta: jedno długie słowo bez
+          spacji (55 znaków w teście) wychodziło poza kontener na 390px — ten
+          sam wzorzec co w EmptySearchState.tsx.
+
+          ⚠️ Warunek na `products.length` nie jest nadmiarowy. Korekta patrzy na
+          `total`, więc przy adresie w rodzaju `?q=sofq&strona=10` poprawiona
+          fraza MA wyniki (41 sztuk), ale ta konkretna strona jest już za
+          końcem listy. Bez tego warunku klient zobaczyłby „Pokazujemy wyniki
+          dla «sofa»" tuż nad „Nie znaleźliśmy nic dla «sofq»" — dwa zdania,
+          które sobie przeczą. */}
+      {correctedFrom && products.length > 0 && (
+        <p className="mb-6 text-sm text-[var(--muted)] break-words">
+          {correctedTo ? (
+            <>
+              {t.shop.correctedShowing}{" "}
+              <span className="text-[var(--fg)] font-medium">
+                „{correctedTo}”
+              </span>{" "}
+              — {t.shop.correctedNotFound} „{correctedFrom}”
+            </>
+          ) : (
+            <>
+              {t.shop.emptySearchTitle} „{correctedFrom}” —{" "}
+              {t.shop.correctedSimilar}
+            </>
+          )}
+        </p>
+      )}
 
       {products.length === 0 ? (
         <EmptySearchState

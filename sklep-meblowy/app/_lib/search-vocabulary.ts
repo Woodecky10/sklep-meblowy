@@ -1,6 +1,10 @@
 // Wiedza o tym, jak klient nazywa to, co sklep sprzedaje — i czego sklep nie
 // sprzedaje. Jedno miejsce, ręcznie utrzymywane.
 //
+// Na dole pliku dochodzi druga, AUTOMATYCZNA część tej wiedzy:
+// buildCatalogVocabulary() wyprowadza słownik poprawnych słów wprost z nazw
+// produktów, dla poprawiania literówek (search-typos.ts).
+//
 // ⚠️ TA LISTA SIĘ ZESTARZEJE I NIC O TYM NIE PRZYPOMNI. Gdy sklep zacznie
 // sprzedawać nową rodzinę produktów, wpisy trzeba dopisać ręcznie. Świadome
 // ograniczenie: zbiór jest domknięty (siedem rodzin: łóżka, materace,
@@ -28,6 +32,30 @@
 // własne klucze, więc problem znika z całej KLASY błędów, a nie z jednego
 // wywołania: kolejny helper w tym pliku nie ma jak go wskrzesić. Regresję
 // pilnuje test „klucze z łańcucha prototypu" w __tests__.
+
+// ⚠️ Ten jeden import zamyka CYKL: search-filter.ts importuje stąd synonymsFor.
+// Cykl jest dziś bezpieczny, bo ŻADEN z tych dwóch modułów nie woła niczego
+// z drugiego na poziomie modułu — oba sięgają po import dopiero w ciele funkcji,
+// a deklaracje funkcji są hoistowane. Oba porządki inicjalizacji są realnie
+// przechodzone przez testy (search-filter.test.ts ładuje najpierw filtr,
+// search-vocabulary.test.ts najpierw ten plik).
+//
+// ⚠️ NIKT TEGO NIE PILNUJE AUTOMATYCZNIE: eslint w tym repo to samo
+// eslint-config-next (core-web-vitals + typescript), bez reguły
+// `import/no-cycle`. Jeśli ktoś kiedyś doda tu albo w search-filter.ts kod
+// wykonywany NA POZIOMIE MODUŁU i zależny od drugiego pliku, dostanie TDZ przy
+// jednym z dwóch porządków ładowania — i dowie się o tym z produkcji.
+//
+// Czego NIE robić w ramach „naprawy": przepisania składania znaków tutaj. To
+// byłoby DRUGIE źródło prawdy o foldowaniu obok FOLD_MAP i obu kolumn
+// generowanych w bazie, a rozjazd takich kopii nie wywala błędu — po cichu
+// zeruje trafienia (ten sam argument stoi przy FOLD_MAP). Wyjściem bez cyklu
+// i bez kopii jest przeniesienie samego `foldDiacritics` + `FOLD_MAP` do
+// modułu-liścia i re-eksport z search-filter.ts (tak jak zrobiono ze stałymi
+// tagów w cache-tags.ts) — świadomie nie zrobione, bo dotyka pliku spoza
+// zakresu tego zadania.
+import { foldDiacritics } from "./search-filter";
+
 export const SEARCH_SYNONYMS: ReadonlyMap<string, readonly string[]> = new Map([
   // → sofy (rdzeń „sof": 41)
   ["kanap", ["sof"]],
@@ -92,4 +120,147 @@ export function notCarriedLabel(
     if (entry) return entry[locale];
   }
   return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Słownik poprawnych słów dla korekty literówek (search-typos.ts).
+//
+// Źródłem są NAZWY produktów, nie opisy — i to nie jest ekonomia zapytania.
+// Nazwa jest tym, co klient przepisuje z pamięci albo z rozmowy, więc to w niej
+// robi literówkę. Opis to zdania marketingowe: wpuszczenie ich zamieniłoby wagę
+// „w ilu produktach to słowo jest w nazwie" w „jak często copywriter użył tego
+// słowa", a Task 1 rozstrzyga wagą REMISY — czyli dokładnie te przypadki, gdzie
+// dwa kandydaci są tak samo blisko i decyduje popularność. Pomiar na produkcji
+// 2026-08-17: opis ma WYPEŁNIONY 24 produkty z 353 (329 pustych), więc dziś
+// opisy wniosłyby garść słów z przypadkowych 7% katalogu — waga byłaby losowa,
+// nie rzadsza.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Minimalna długość słowa wpuszczanego do słownika.
+//
+// Trzy znaki, i to nie jest oszczędność pamięci: maxTypos() daje próg 0 dla
+// słów do trzech znaków i 1 dopiero od czterech, a editDistanceWithin ucina
+// parę, gdy sama różnica długości przekracza próg. Słowo 2-znakowe jest więc
+// nieosiągalne dla KAŻDEGO tokenu (4-znakowy ma budżet 1, a różnica to już 2),
+// czyli byłoby czystym balastem w pętli po całym słowniku — a ta pętla leci
+// z /api/search/suggest, najgorętszego endpointu sklepu.
+//
+// ⚠️ Słowa 3-znakowe zostają OSIĄGALNE, ale WYŁĄCZNIE dla tokenów 4-znakowych
+// (próg 1, różnica długości 1; przy 5 znakach różnica to już 2 i para odpada
+// bez liczenia). Pomiar na produkcji 2026-08-17: nazwy dają 13 takich słów
+// (`dla`:17 z „dla dzieci i młodzieży", `mio`:15 i `flo`:4 i `leo`:4 to nazwy
+// kolekcji, `t25`:9 to model materaca, `box`:8 z „łóżko kontynentalne box",
+// `rog`:3 z „Róg Lova P", plus `100`, `120`, `150`, `bez`, `hit`, `psa` po 1)
+// oraz dwa rdzenie ze słowników ręcznych (`sof`, `puf`). Zmierzone skutki są
+// w większości TRAFNE („boxy" → `box`, „rogi"/„rogu" → `rog`), a pomyłki nie są
+// specyficzne dla trzech znaków — patrz test „słowa 3-literowe — czy kradną
+// poprawki".
+export const MIN_VOCABULARY_WORD_LENGTH = 3;
+
+// Cięcie nazwy na słowa: wszystko, co nie jest literą ani cyfrą. Klasy
+// unicode (\p{L}\p{N}), NIE [a-z0-9] — cięcie idzie PRZED złożeniem znaków,
+// więc „Łóżko" musi zostać jednym słowem. Separatory zmierzone w nazwach na
+// produkcji 2026-08-17: spacja, `-`, `–`, `,`, `!`, `(`, `)`, `/`, `|`.
+// Cyfry zostają w słowie, bo „120x200" (41 produktów) to realna fraza.
+const WORD_SEPARATORS = /[^\p{L}\p{N}]+/u;
+
+// Słownik poprawnych słów: klucz = słowo złożone do ASCII, wartość = waga.
+//
+// ⚠️ WAGA TO LICZBA PRODUKTÓW, W KTÓRYCH SŁOWO WYSTĘPUJE — nie liczba
+// wystąpień. Nazwa „Sofa sofa Modena" wnosi do `sofa` dokładnie 1. Zliczanie
+// wystąpień promowałoby nazwy z powtórzeniem słowa zamiast słów naprawdę
+// rozpowszechnionych w katalogu, a waga rozstrzyga remisy w pickCorrection.
+//
+// ⚠️ ZWRACAMY `Map`, NIGDY LITERAŁ OBIEKTOWY — z tego samego powodu co oba
+// słowniki ręczne wyżej: pickCorrection odpytuje tę strukturę tokenem WPROST od
+// klienta. Przy literale `OBJ["constructor"]` zwróciłoby funkcję `Object`,
+// czyli korekta uznałaby frazę „constructor" za poprawne słowo katalogu i po
+// cichu przestała poprawiać (a w innych miejscach tego repo ta sama dziura dała
+// 500 z publicznego /sklep?q=constructor — w repo nie ma error.tsx).
+//
+// `extraWords` to słowa spoza katalogu, które i tak muszą być osiągalne jako
+// kandydaci — patrz VOCABULARY_EXTRA_WORDS niżej. Słowa, które są już
+// w katalogu, ZACHOWUJĄ swoją wagę: dołożenie nie może zaniżyć popularności
+// realnego słowa (`naroznik` jest i wartością synonimu, i słowem z 40 nazw).
+export function buildCatalogVocabulary(
+  names: readonly string[],
+  extraWords: readonly string[]
+): Map<string, number> {
+  const vocabulary = new Map<string, number>();
+
+  for (const name of names) {
+    if (!name) continue;
+    // Zbiór per PRODUKT — to on realizuje „waga liczy produkty".
+    const seen = new Set<string>();
+    for (const rawWord of name.split(WORD_SEPARATORS)) {
+      if (!rawWord) continue;
+      const word = foldDiacritics(rawWord);
+      // Długość mierzona PO złożeniu: ß rozwija się na „ss", więc surowa
+      // długość nie jest tą, którą wpisze klient.
+      if (word.length < MIN_VOCABULARY_WORD_LENGTH) continue;
+      if (seen.has(word)) continue;
+      seen.add(word);
+      vocabulary.set(word, (vocabulary.get(word) ?? 0) + 1);
+    }
+  }
+
+  for (const rawWord of extraWords) {
+    const word = foldDiacritics(rawWord);
+    if (word.length < MIN_VOCABULARY_WORD_LENGTH) continue;
+    // Waga 1 = „istnieje", najniższa możliwa. Świadomie NIE podbijamy jej
+    // wyżej: słowo, którego nie ma w ani jednej nazwie, nie ma prawa wygrywać
+    // remisów z realnym słowem katalogu. Konsekwencja jest zmierzona i przyjęta:
+    // „szfa" ma do `szaf` (waga 1) i do `sofa` (waga 38) tę samą odległość 1,
+    // więc wygrywa `sofa` — klient zamiast „Nie prowadzimy szaf" zobaczy sofy.
+    if (!vocabulary.has(word)) vocabulary.set(word, 1);
+  }
+
+  return vocabulary;
+}
+
+// Słowa ze słowników RĘCZNYCH tego pliku, do dołożenia przy budowie słownika.
+//
+// Bez nich korekta nie ma na co poprawiać dwóch całych klas literówek:
+//   `kanpa` → „kanapa": słowa „kanapa" NIE MA w żadnej z 353 nazw (sklep
+//     sprzedaje „sofy"), więc kandydatem może być tylko klucz SEARCH_SYNONYMS,
+//     który wyszukiwarka i tak rozwinie na `sof` (41 produktów);
+//   `szfa` → „szafa": sklep szaf nie prowadzi, ale NOT_CARRIED ma dla nich
+//     uczciwy komunikat „Nie prowadzimy szaf" — bez tych kluczy literówka
+//     odbiera klientowi tę odpowiedź.
+//
+// Wartości SEARCH_SYNONYMS (rdzenie katalogowe: `sof`, `lozk`, `naroznik`…) też
+// tu są: to formy najkrótsze, więc w nazwach występują tylko w odmianach
+// („sofa", „łóżko") i same z siebie do słownika by nie trafiły.
+//
+// Deduplikacja przez Set, bo `sof` jest wartością ośmiu różnych kluczy.
+// Razem daje to dziś 33 słowa (17 kluczy synonimów + 8 różnych wartości
+// + 8 kluczy NOT_CARRIED), z czego 4 są już w nazwach produktów.
+export const VOCABULARY_EXTRA_WORDS: readonly string[] = [
+  ...new Set([
+    ...SEARCH_SYNONYMS.keys(),
+    ...[...SEARCH_SYNONYMS.values()].flat(),
+    ...NOT_CARRIED.keys(),
+  ]),
+];
+
+// Słowa dodatkowe dla JĘZYKA — po polsku wszystkie, po niemiecku ŻADNE.
+//
+// ⚠️ To nie jest oszczędność, tylko naprawa defektu. Oba słowniki ręczne tego
+// pliku opisują polszczyznę klienta („kanapa", „szafa", „podnóżek"), a nazwy
+// niemieckie ma dziś 15 produktów z 353 (pomiar 2026-08-17) — z których wychodzi
+// 38 słów. Doklejenie 33 polskich rdzeni dałoby słownik niemiecki, w którym
+// 46% słów jest po polsku, i korekta zaczęłaby na nie trafiać: zmierzone
+// `sofa` → `sof`, `lampe` → `lamp`, `kommode` → `komod`, `regale` → `regal`
+// (5 z 46 realistycznych fraz niemieckich). Taka poprawka trafia potem do
+// zapytania po kolumnie search_key_fold_de, gdzie polski rdzeń niczego nie
+// łapie — klient dostaje ZERO WYNIKÓW PLUS napis „pokazujemy wyniki dla «lozk»",
+// czyli gorzej niż dzisiejsze zero bez podpowiedzi.
+//
+// ⚠️ Cena tej decyzji, świadomie zapłacona: 4 z tych 5 trafień to klucze
+// NOT_CARRIED, które przez notCarriedLabel(…, "de") dałyby poprawny komunikat
+// „Wir führen keine Kommoden". To jednak przypadek, nie projekt — właściwym
+// rozwiązaniem dla /de są NIEMIECKIE klucze w NOT_CARRIED, a nie polskie rdzenie
+// w niemieckim słowniku.
+export function vocabularyExtraWordsFor(locale: "pl" | "de"): readonly string[] {
+  return locale === "de" ? [] : VOCABULARY_EXTRA_WORDS;
 }

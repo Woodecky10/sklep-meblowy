@@ -216,6 +216,16 @@ export type PlShape = {
     emptyNotCarried: string;
     emptySearchTitle: string;
     emptyCategoriesHint: string;
+    // Zdanie nad siatką, gdy fraza klienta dała zero i poprawiliśmy literówkę
+    // (patrz search-correction.ts). Dwa warianty, bo poprawką bywa RDZEŃ
+    // (`kanap`, `lozk`) albo słowo 3-znakowe (`flo`, `mio`) — czegoś takiego
+    // klientowi nie cytujemy:
+    //   A: „Pokazujemy wyniki dla X — nic nie znaleźliśmy dla Y"
+    //   B: „Nie znaleźliśmy nic dla Y — pokazujemy podobne produkty"
+    // Wariant B składa się z emptySearchTitle + correctedSimilar.
+    correctedShowing: string;
+    correctedNotFound: string;
+    correctedSimilar: string;
     // Rozwijanie dłuższego opisu kolekcji nad filtrami (>1 akapit).
     descriptionMore: string;
     descriptionLess: string;
@@ -602,6 +612,9 @@ export const pl = {
     emptyNotCarried: "Nie prowadzimy",
     emptySearchTitle: "Nie znaleźliśmy nic dla",
     emptyCategoriesHint: "Sprawdź, co mamy:",
+    correctedShowing: "Pokazujemy wyniki dla",
+    correctedNotFound: "nic nie znaleźliśmy dla",
+    correctedSimilar: "pokazujemy podobne produkty",
     descriptionMore: "Czytaj więcej",
     descriptionLess: "Zwiń opis",
   },
