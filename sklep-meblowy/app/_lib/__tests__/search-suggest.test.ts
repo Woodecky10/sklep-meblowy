@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   normalizeSuggestResponse,
+  suggestResponseBody,
   type SearchSuggestion,
 } from "@/app/_lib/search-suggest";
 import { applyTypoCorrection } from "@/app/_lib/search-correction";
@@ -136,6 +137,107 @@ describe("normalizeSuggestResponse — śmieci zamiast odpowiedzi", () => {
   it.each(smieci)("«%s» → puste items, bez rzucania", (_opis, dane) => {
     expect(() => normalizeSuggestResponse(dane)).not.toThrow();
     expect(normalizeSuggestResponse(dane)).toEqual({ items: [] });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1b. Kształt, który route naprawdę WYSYŁA — negocjacja przez `v=2`.
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// ⚠️ To jest DRUGI kierunek zgodności wdrożeniowej, ten, którego
+// normalizeSuggestResponse nie załatwia. Tam nowy bundle radzi sobie ze starą
+// odpowiedzią; tutaj STARY BUNDLE (karta otwarta przez deploy — sklep trzyma
+// sesje godzinami) odpytuje NOWY endpoint. Stary kod robił
+// `Array.isArray(data) ? data : []`, więc obiekt widziałby jako `false`
+// i pokazywał PUSTĄ rozwijkę dla KAŻDEJ frazy, nie tylko dla literówki, aż do
+// przeładowania strony — po cichu, bez jednego wyjątku w konsoli.
+//
+// Lek: kto prosi o nowy kształt (`v=2`, czyli nasz SearchBox), dostaje obiekt;
+// kto nie prosi, dostaje gołą tablicę bit w bit jak przed gałęzią.
+//
+// Route ma trzy rodziny wyjść i KAŻDA idzie przez tę funkcję: z wynikami
+// (ewentualnie z korektą), pusta (krótka fraza / sama interpunkcja / brak
+// dopasowań) i błąd zapytania (pusto ze statusem 200). Że żadne wyjście jej nie
+// omija, pilnuje guard w search-suggest-wiring.test.ts — tu jest sama funkcja.
+
+const Z_KOREKTA = {
+  items: [
+    { ...PRZYKLAD, id: "a" },
+    { ...PRZYKLAD, id: "b" },
+  ],
+  correctedFrom: "materca",
+  correctedTo: "materac",
+};
+
+describe("suggestResponseBody — żądanie BEZ `v=2` (stary bundle, cudzy curl)", () => {
+  it("ścieżka z wynikami: goła tablica, kształt sprzed gałęzi", () => {
+    const items = [
+      { ...PRZYKLAD, id: "a" },
+      { ...PRZYKLAD, id: "b" },
+    ];
+    const body = suggestResponseBody({ items }, false);
+    expect(Array.isArray(body)).toBe(true);
+    expect(body).toEqual(items);
+    // Dokładnie to, co robił z odpowiedzią stary bundle. Ta linijka JEST tym
+    // testem: gdyby wróciło `{ items }`, dostałby pustą listę.
+    expect(Array.isArray(body) ? body : []).toHaveLength(2);
+  });
+
+  it("ścieżka z wynikami I KOREKTĄ: pola korekty przepadają, nie doklejają się", () => {
+    // Stary bundle nie ma czym pokazać zdania o korekcie, a kształt musi być
+    // taki, jaki zna — czyli tablica, nie tablica z doklejonymi polami.
+    const body = suggestResponseBody(Z_KOREKTA, false);
+    expect(Array.isArray(body)).toBe(true);
+    expect(body).toEqual(Z_KOREKTA.items);
+    expect((body as unknown as Record<string, unknown>).correctedFrom).toBeUndefined();
+    expect((body as unknown as Record<string, unknown>).correctedTo).toBeUndefined();
+  });
+
+  it("ścieżka pusta (krótka fraza, sama interpunkcja, brak dopasowań): []", () => {
+    expect(suggestResponseBody({ items: [] }, false)).toEqual([]);
+  });
+
+  it("ścieżka błędu zapytania (pusto ze statusem 200): też goła []", () => {
+    // Route oddaje tu `{ items: [] }` z 200 — ciało ma być tą samą pustą
+    // tablicą, którą stary bundle dostawał przy awarii bazy.
+    const body = suggestResponseBody({ items: [] }, false);
+    expect(Array.isArray(body)).toBe(true);
+    expect(body).toEqual([]);
+  });
+});
+
+describe("suggestResponseBody — żądanie Z `v=2` (nasz SearchBox)", () => {
+  it("ścieżka z wynikami: obiekt z items, bez pól korekty gdy jej nie było", () => {
+    const items = [PRZYKLAD];
+    const body = suggestResponseBody({ items }, true);
+    expect(Array.isArray(body)).toBe(false);
+    expect(body).toEqual({ items });
+    expect("correctedFrom" in (body as object)).toBe(false);
+  });
+
+  it("ścieżka z korektą: obiekt niesie OBA pola", () => {
+    const body = suggestResponseBody(Z_KOREKTA, true);
+    expect(body).toEqual(Z_KOREKTA);
+  });
+
+  it("ścieżka pusta i ścieżka błędu: obiekt z pustym items", () => {
+    expect(suggestResponseBody({ items: [] }, true)).toEqual({ items: [] });
+  });
+});
+
+describe("suggestResponseBody + normalizeSuggestResponse — obieg zamknięty", () => {
+  it("nasz klient (v=2) dostaje korektę, obcy (bez v) te same podpowiedzi bez zdania", () => {
+    // Jedna asercja na oba kierunki naraz: ta sama odpowiedź serwera, dwa ciała,
+    // oba czytelne dla przeglądarki i oba z TYMI SAMYMI podpowiedziami.
+    const nasz = normalizeSuggestResponse(suggestResponseBody(Z_KOREKTA, true));
+    const obcy = normalizeSuggestResponse(suggestResponseBody(Z_KOREKTA, false));
+
+    expect(nasz.items.map((s) => s.id)).toEqual(["a", "b"]);
+    expect(obcy.items.map((s) => s.id)).toEqual(["a", "b"]);
+    expect(nasz.correctedFrom).toBe("materca");
+    expect(nasz.correctedTo).toBe("materac");
+    expect(obcy.correctedFrom).toBeUndefined();
+    expect(obcy.correctedTo).toBeUndefined();
   });
 });
 

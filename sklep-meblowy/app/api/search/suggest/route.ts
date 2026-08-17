@@ -9,7 +9,11 @@ import { applyTypoCorrection } from "@/app/_lib/search-correction";
 import { getCatalogVocabulary } from "@/app/_lib/search-vocabulary-server";
 import { pickLocalized, isLocale, DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
 import { getCategories } from "@/app/_lib/categories";
-import type { SearchSuggestion, SuggestResponse } from "@/app/_lib/search-suggest";
+import {
+  suggestResponseBody,
+  type SearchSuggestion,
+  type SuggestResponse,
+} from "@/app/_lib/search-suggest";
 
 // Typy mieszkają w module-liściu app/_lib/search-suggest.ts (razem z funkcją
 // czytającą tę odpowiedź po stronie przeglądarki), bo ich drugim konsumentem
@@ -65,20 +69,28 @@ type SuggestRow = {
   category: string;
 };
 
-// GET /api/search/suggest?q=<term> → { items: top 6 produktów (id, name, price,
-// pierwsze zdjęcie, kategoria) }. Dla live-search w SearchBox.
+// GET /api/search/suggest?q=<term> → top 6 produktów (id, name, price, pierwsze
+// zdjęcie, kategoria). Dla live-search w SearchBox.
 //
 // Fraza, która nie znalazła NICZEGO, dostaje jedno ponowione zapytanie poprawioną
 // frazą (search-correction.ts) i wtedy — i tylko wtedy — w odpowiedzi są pola
-// `correctedFrom`/`correctedTo`. Kształt odpowiedzi jest OBIEKTEM, nie gołą
-// tablicą jak wcześniej; przeglądarka czyta go przez normalizeSuggestResponse,
-// który przyjmuje też stary kształt (patrz app/_lib/search-suggest.ts).
+// `correctedFrom`/`correctedTo`.
+//
+// ⚠️ KSZTAŁT ODPOWIEDZI JEST NEGOCJOWANY parametrem `v` i KAŻDE wyjście z tej
+// funkcji musi iść przez suggestResponseBody:
+//   • `v=2`  → obiekt `{ items, correctedFrom?, correctedTo? }` (o to prosi
+//              nasz SearchBox, i tylko on);
+//   • bez    → GOŁA TABLICA podpowiedzi, dokładnie jak przed dołożeniem korekty.
+// Powód (karta otwarta przez deploy pokazująca pustą rozwijkę dla KAŻDEJ frazy)
+// jest rozpisany nad suggestResponseBody w app/_lib/search-suggest.ts. Nie
+// usuwać `v=2` z fetcha w SearchBox — pilnuje tego search-suggest-wiring.test.ts.
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   const locParam = request.nextUrl.searchParams.get("loc");
   const locale: Locale = locParam && isLocale(locParam) ? locParam : DEFAULT_LOCALE;
+  const wantsObject = request.nextUrl.searchParams.get("v") === "2";
   if (q.length < 1) {
-    return NextResponse.json<SuggestResponse>({ items: [] });
+    return NextResponse.json(suggestResponseBody({ items: [] }, wantsObject));
   }
 
   // Fraza bez ani jednego tokenu (sama interpunkcja) → wyjście PRZED
@@ -88,7 +100,7 @@ export async function GET(request: NextRequest) {
   // jeszcze słownik katalogu — praca do wyrzucenia na najgorętszym endpoincie
   // sklepu.
   if (searchKeyTokenGroups(q).length === 0) {
-    return NextResponse.json<SuggestResponse>({ items: [] });
+    return NextResponse.json(suggestResponseBody({ items: [] }, wantsObject));
   }
 
   const supabase = await createClient();
@@ -150,7 +162,9 @@ export async function GET(request: NextRequest) {
     // ⚠️ I BEZ KOREKTY: awaria bazy to nie jest „fraza nic nie znalazła", a
     // dokładanie jej dwóch kolejnych zapytań (słownik + ponowienie) w momencie,
     // gdy właśnie oddała błąd, byłoby dolewaniem oliwy do ognia.
-    return NextResponse.json<SuggestResponse>({ items: [] }, { status: 200 });
+    return NextResponse.json(suggestResponseBody({ items: [] }, wantsObject), {
+      status: 200,
+    });
   }
 
   // Fallback literówkowy — ta sama funkcja, co na /sklep, tylko z innym `R`.
@@ -185,8 +199,7 @@ export async function GET(request: NextRequest) {
 
   // Bez korekty oddajemy sam `items` — pola korekty mają być NIEOBECNE, a nie
   // puste, bo to na ich obecności stoi decyzja UI o pokazaniu zdania.
-  if (correctedFrom === undefined) {
-    return NextResponse.json<SuggestResponse>({ items });
-  }
-  return NextResponse.json<SuggestResponse>({ items, correctedFrom, correctedTo });
+  const payload: SuggestResponse =
+    correctedFrom === undefined ? { items } : { items, correctedFrom, correctedTo };
+  return NextResponse.json(suggestResponseBody(payload, wantsObject));
 }

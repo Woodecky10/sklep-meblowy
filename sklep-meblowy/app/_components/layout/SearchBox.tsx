@@ -100,7 +100,17 @@ export default function SearchBox({ variant = "icon" }: { variant?: Variant }) {
     let cancelled = false;
     const handle = setTimeout(() => {
       setLoading(true);
-      fetch(`/api/search/suggest?q=${encodeURIComponent(trimmed)}&loc=${locale}`)
+      // ⚠️ `v=2` PROSI O NOWY KSZTAŁT ODPOWIEDZI (obiekt z polami korekty)
+      // i NIE JEST zbędne. Bez tego parametru endpoint oddaje gołą tablicę
+      // podpowiedzi — celowo, żeby karta otwarta przez deploy (ze STARYM
+      // bundlem, który wpuszczał do stanu wyłącznie tablicę, a obiekt zamieniał
+      // na pustkę) nie zgasła na pustej rozwijce dla KAŻDEJ frazy, nie tylko
+      // dla literówki. Pełne uzasadnienie stoi nad
+      // suggestResponseBody w app/_lib/search-suggest.ts. Usunięcie tego
+      // parametru = zdanie o korekcie znika, bo `correctedFrom` nie przychodzi.
+      fetch(
+        `/api/search/suggest?q=${encodeURIComponent(trimmed)}&loc=${locale}&v=2`
+      )
         .then((r) => (r.ok ? r.json() : []))
         .then((data: unknown) => {
           if (cancelled) return;

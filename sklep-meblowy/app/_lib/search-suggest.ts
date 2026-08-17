@@ -1,5 +1,6 @@
 // Kontrakt odpowiedzi rozwijki podpowiedzi (/api/search/suggest) — typy plus
-// jedna funkcja czytająca to, co przyszło z sieci.
+// obie strony drutu: funkcja BUDUJĄCA ciało odpowiedzi (route handler)
+// i funkcja CZYTAJĄCA to, co przyszło z sieci (przeglądarka).
 //
 // ⚠️ MODUŁ MA ZOSTAĆ LIŚCIEM: zero importów, zero `server-only`, zero dostępu do
 // bazy. Powód jest konkretny — importuje go KLIENCKI SearchBox (wisi w headerze
@@ -34,6 +35,37 @@ export type SuggestResponse = {
   // rozjechały.
   correctedTo?: string;
 };
+
+// Odpowiedź endpointu → ciało, które naprawdę idzie na drut. STRONA PISZĄCA
+// (route handler); czytającą jest normalizeSuggestResponse niżej. Obie stoją
+// w jednym pliku celowo — to jest jeden kontrakt i ma się zmieniać razem.
+//
+// ⚠️ PO CO TO ISTNIEJE, czyli po co w URL-u siedzi `v=2` (NIE USUWAĆ tego
+// parametru jako „zbędnego"):
+//
+// Deploy nie wymienia otwartych kart klientów, a sklep trzyma sesje godzinami.
+// Karta otwarta PRZED deployem odpytuje NOWY endpoint STARYM bundlem. Stary
+// bundle robił `Array.isArray(data) ? data : []` — dostając obiekt widzi
+// `false` i pokazuje PUSTĄ rozwijkę dla KAŻDEJ frazy, nie tylko dla literówki,
+// aż do przeładowania strony. Nic nie rzuca, więc nikt się o tym nie dowie.
+// Dotyczy to każdego deployu, nie tylko tego jednego.
+//
+// Dlatego kształt jest NEGOCJOWANY: kto prosi o nowy (`v=2` — czyli wyłącznie
+// nasz własny SearchBox), dostaje obiekt z polami korekty; kto nie prosi
+// (stary bundle, cache pośredni, czyjś curl), dostaje gołą tablicę dokładnie
+// jak przed dołożeniem korekty literówek.
+//
+// ⚠️ `v=2` NIE JEST publicznym API ani wersjonowaniem endpointu i nie ma być
+// tak dokumentowane. To uzgodnienie między NASZYM klientem a NASZYM serwerem,
+// oba deployowane razem — jedyne, co je rozjeżdża, to karta zostawiona otwarta.
+export function suggestResponseBody(
+  response: SuggestResponse,
+  wantsObject: boolean
+): SuggestResponse | SearchSuggestion[] {
+  // Bez `v=2` pola korekty przepadają — i tak ma być: stary bundle nie ma czym
+  // ich pokazać, a kształt musi być bit w bit tym, który zna.
+  return wantsObject ? response : response.items;
+}
 
 // Odpowiedź z sieci → kształt, na którym UI może polegać.
 //

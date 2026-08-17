@@ -86,7 +86,9 @@ describe("/api/search/suggest — podpięcie korekty literówek", () => {
         "jeszcze dwa zapytania na każde wpisane słowo"
     ).toBe(true);
     expect(
-      /\{ items: \[\] \}, \{ status: 200 \}/.test(ROUTE),
+      /suggestResponseBody\(\{ items: \[\] \}, wantsObject\),\s*\{\s*status: 200/.test(
+        ROUTE
+      ),
       "błąd zapytania nie odpowiada już pustką ze statusem 200 — rozwijka wisi " +
         "w headerze każdej strony i nie ma prawa jej wywalić"
     ).toBe(true);
@@ -140,11 +142,66 @@ describe("/api/search/suggest — podpięcie korekty literówek", () => {
     // Na obecności pól stoi decyzja UI o pokazaniu zdania — `correctedFrom: ""`
     // albo `null` zamiast braku pola to zdanie znikąd nad podpowiedziami.
     expect(
-      /if \(correctedFrom === undefined\)[\s\S]{0,120}?json<SuggestResponse>\(\{ items \}\)/.test(
+      /correctedFrom === undefined\s*\?\s*\{ items \}\s*:\s*\{ items, correctedFrom, correctedTo \}/.test(
         ROUTE
       ),
       "route nie odróżnia już odpowiedzi bez korekty — pola korekty mogą " +
         "wyciekać puste"
+    ).toBe(true);
+  });
+});
+
+describe("/api/search/suggest — negocjacja kształtu odpowiedzi (`v=2`)", () => {
+  // ⚠️ PO CO TEN BLOK. Gałąź zmieniła kształt odpowiedzi z gołej tablicy na
+  // obiekt. Karta otwarta PRZED deployem (sklep trzyma sesje godzinami)
+  // odpytuje NOWY endpoint STARYM bundlem, w którym stoi
+  // `Array.isArray(data) ? data : []` — obiekt daje `false`, więc rozwijka
+  // przestaje pokazywać cokolwiek dla KAŻDEJ frazy, nie tylko dla literówki,
+  // aż do przeładowania strony. Po cichu, bez wyjątku w konsoli.
+  //
+  // Dlatego nowy kształt jest WYPRASZANY: `v=2` w URL-u SearchBoxa. Ten opis
+  // istnieje po to, żeby następna osoba nie usunęła „zbędnego parametru".
+  // `v=2` NIE JEST publicznym API — to uzgodnienie naszego klienta z naszym
+  // serwerem, obu deployowanych razem.
+
+  it("route czyta parametr `v` i tylko wartość „2” włącza nowy kształt", () => {
+    expect(
+      /searchParams\.get\("v"\) === "2"/.test(ROUTE),
+      "route nie sprawdza już `v === \"2\"` — albo wszyscy dostają obiekt " +
+        "(stare karty gasną na pustej rozwijce), albo nikt (znika zdanie o korekcie)"
+    ).toBe(true);
+  });
+
+  it("KAŻDE wyjście z route'a idzie przez suggestResponseBody", () => {
+    // Wyjść jest kilka (krótka fraza, sama interpunkcja, błąd zapytania,
+    // wynik z korektą i bez) i wystarczy JEDNO ominięcie negocjacji, żeby
+    // stara karta dostała obiekt. Dlatego guard patrzy na wszystkie naraz,
+    // a nie na wyliczoną z góry listę.
+    const ciala = [
+      ...ROUTE.matchAll(/NextResponse\.json\(\s*([A-Za-z_$][\w$]*)/g),
+    ].map((m) => m[1]);
+    expect(
+      ciala.length,
+      "guard nie znalazł w route ani jednego wywołania NextResponse.json — " +
+        "wzorzec przestał pasować do kodu i niczego już nie pilnuje"
+    ).toBeGreaterThanOrEqual(4);
+    expect(
+      ciala.filter((n) => n !== "suggestResponseBody"),
+      "któreś wyjście z route'a oddaje ciało z pominięciem suggestResponseBody — " +
+        "żądanie bez `v=2` dostanie obiekt zamiast gołej tablicy i rozwijka " +
+        "w kartach otwartych przez deploy zgaśnie dla każdej frazy"
+    ).toEqual([]);
+  });
+
+  it("SearchBox naprawdę wysyła `v=2` — bez tego zdanie o korekcie nie ma prawa się pokazać", () => {
+    // Parametru nie widać w zachowaniu testów jednostkowych (route woła
+    // supabase, komponent jest .tsx w środowisku node), a jego usunięcie NIE
+    // wywala niczego głośno: rozwijka dalej działa, tylko korekta cicho znika.
+    expect(
+      /`\/api\/search\/suggest\?[^`]*[&?]v=2/.test(SEARCHBOX),
+      "SearchBox nie prosi już o nowy kształt odpowiedzi (`v=2` zniknęło z URL-a " +
+        "fetcha) — endpoint odda gołą tablicę, więc `correctedFrom` nie dojdzie " +
+        "i zdanie o korekcie przestanie się pokazywać"
     ).toBe(true);
   });
 });
