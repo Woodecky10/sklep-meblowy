@@ -115,6 +115,14 @@ export async function generateMetadata(): Promise<Metadata> {
     // muszą używać baseOpenGraph, a nie dokładać pojedynczych pól.
     // Obrazek: /og (PNG 1200×630), nie /logo.svg — FB/LinkedIn nie renderują SVG.
     openGraph: baseOpenGraph(locale),
+    // Weryfikacja własności w Google Search Console metodą „tag HTML".
+    // To DRUGA metoda obok podstawowej: usługa jest potwierdzona rekordem TXT
+    // w DNS (home.pl), i to on jest kotwicą własności właściciela sklepu —
+    // ten tag dokłada kolejnego, niezależnego zweryfikowanego właściciela.
+    // Usunięcie tagu = odebranie tamtego dostępu; DNS zostaje nienaruszony.
+    verification: {
+      google: "mnLaTuBcRDBEKSvjwthCGOyT_iSEURuu5V-Iq_65W7I",
+    },
     twitter: {
       card: "summary_large_image",
       title,
