@@ -9,6 +9,8 @@ import {
   MIN_STEM_LENGTH,
   searchKeyTokens,
   searchKeyTokenForms,
+  searchKeyTokenGroups,
+  applyTokenGroup,
 } from "@/app/_lib/search-filter";
 
 describe("sanitizeSearchTerm — ochrona przed injection w .or() (audyt MED)", () => {
@@ -254,6 +256,65 @@ describe("rankByNameMatch — dokładne trafienie bije rdzeń (POSO / pościel)"
   });
 });
 
+describe("rankByNameMatch — trafienie po synonimie", () => {
+  const nazwy = (rows: { name: string }[]) => rows.map((r) => r.name);
+  const pobierz = (r: { name: string }) => r.name;
+
+  it("synonim wyciąga produkt z poziomu „tylko opis” na poziom rdzenia", () => {
+    // „kanapa" nie występuje w ŻADNEJ nazwie sofy, więc bez świadomości
+    // synonimów wszystkie sofy wpadałyby na poziom 3 i mieszały się z szumem
+    // opisowym.
+    const rows = [
+      { name: "Łóżko Lino z pojemnikiem" },
+      { name: "Sofa Modena rozkładana" },
+    ];
+    expect(nazwy(rankByNameMatch(rows, "kanapa", pobierz))).toEqual([
+      "Sofa Modena rozkładana",
+      "Łóżko Lino z pojemnikiem",
+    ]);
+  });
+
+  it("synonim NIE jest trafieniem dokładnym — poziom 1 zostaje pusty", () => {
+    // Gdyby synonim wchodził na poziom 1, fraza „kanapa sofa" ustawiłaby sofy
+    // z „kanapą" w nazwie równo z pozostałymi. Poziom 1 liczy wyłącznie formę
+    // wpisaną przez użytkownika.
+    const rows = [
+      { name: "Sofa Modena" },
+      { name: "Kanapa Modena" }, // hipotetyczna: dokładne trafienie frazy
+    ];
+    expect(nazwy(rankByNameMatch(rows, "kanapa", pobierz))).toEqual([
+      "Kanapa Modena",
+      "Sofa Modena",
+    ]);
+  });
+
+  it("fraza bez synonimów zachowuje się dokładnie jak dotąd", () => {
+    const rows = [
+      { name: "Łóżko Lino na pościel" },
+      { name: "Narożnik Vegas w POSO" },
+    ];
+    expect(nazwy(rankByNameMatch(rows, "poso", pobierz))).toEqual([
+      "Narożnik Vegas w POSO",
+      "Łóżko Lino na pościel",
+    ]);
+  });
+
+  it("synonim wielocelowy działa dla każdego celu", () => {
+    const rows = [
+      { name: "Fotel Uszak" },
+      { name: "Łóżko Sawana" },
+      { name: "Sofa Modena" },
+    ];
+    // „tapczan" → sof ORAZ lozk; fotel zostaje na końcu
+    const wynik = nazwy(rankByNameMatch(rows, "tapczan", pobierz));
+    expect(wynik[2]).toBe("Fotel Uszak");
+    // Kolejność między dwoma celami synonimu jest nieistotna, więc sortujemy.
+    // Goły .sort() porządkuje po jednostkach UTF-16, nie po alfabecie polskim:
+    // „S" (U+0053) < „Ł" (U+0141) — dlatego Sofa jest tu pierwsza.
+    expect(wynik.slice(0, 2).sort()).toEqual(["Sofa Modena", "Łóżko Sawana"]);
+  });
+});
+
 describe("escapeIlike — escape wildcardów (linkGuestOrders, audyt MED)", () => {
   it("escapuje _ i % i backslash", () => {
     expect(escapeIlike("a_b")).toBe("a\\_b");
@@ -431,5 +492,90 @@ describe("searchKeyTokenForms — obie formy tokenu (tylko dla rankingu)", () =>
   it("sama interpunkcja / pusta fraza → []", () => {
     expect(searchKeyTokenForms(",.()")).toEqual([]);
     expect(searchKeyTokenForms("")).toEqual([]);
+  });
+});
+
+describe("searchKeyTokenGroups — alternatywy do filtra", () => {
+  it("token bez synonimów daje grupę jednoelementową", () => {
+    expect(searchKeyTokenGroups("materace")).toEqual([["materac"]]);
+  });
+
+  it("token ze słownika daje siebie plus synonimy", () => {
+    expect(searchKeyTokenGroups("kanapa")).toEqual([["kanap", "sof"]]);
+  });
+
+  it("fraza wielosłowna daje jedną grupę na słowo, w kolejności", () => {
+    expect(searchKeyTokenGroups("kanapa welur")).toEqual([
+      ["kanap", "sof"],
+      ["welur"],
+    ]);
+  });
+
+  it("liczba grup zawsze równa liczbie tokenów z searchKeyTokens", () => {
+    // Wiążące: filtr ANDuje grupy, więc rozjazd znaczyłby inny zbiór wymagań
+    // niż ten, którego pilnuje ranking.
+    for (const fraza of ["kanapa", "sofa sofy", "łóżeczko dziecinne", ""]) {
+      expect(searchKeyTokenGroups(fraza)).toHaveLength(
+        searchKeyTokens(fraza).length
+      );
+    }
+  });
+
+  it("pusta fraza → brak grup", () => {
+    expect(searchKeyTokenGroups("   ")).toEqual([]);
+  });
+});
+
+// Dwie składnie wildcarda ILIKE w jednym helperze: `%` w metodzie .ilike(),
+// `*` w łańcuchu podawanym do .or(). Pomyłka nie wywala wyjątku — cicho zwraca
+// zero wierszy, więc pilnujemy dosłownego kształtu warunku. Atrapa zapytania
+// (dwie metody z typu generycznego) zamiast mockowania supabase-js.
+describe("applyTokenGroup — warunek dla grupy alternatyw", () => {
+  type StubQuery = {
+    calls: { ilike: [string, string][]; or: string[] };
+    ilike: (col: string, pattern: string) => StubQuery;
+    or: (filters: string) => StubQuery;
+  };
+
+  function stubQuery(): StubQuery {
+    const calls: StubQuery["calls"] = { ilike: [], or: [] };
+    const q: StubQuery = {
+      calls,
+      ilike(col, pattern) {
+        calls.ilike.push([col, pattern]);
+        return q;
+      },
+      or(filters) {
+        calls.or.push(filters);
+        return q;
+      },
+    };
+    return q;
+  }
+
+  it("grupa jednoelementowa → jedno .ilike() z wildcardem %, zero .or()", () => {
+    const q = stubQuery();
+    expect(applyTokenGroup(q, "search_key_fold", ["materac"])).toBe(q);
+    expect(q.calls.ilike).toEqual([["search_key_fold", "%materac%"]]);
+    expect(q.calls.or).toEqual([]);
+  });
+
+  it("grupa z synonimami → jedno .or() z wildcardem *, zero .ilike()", () => {
+    const q = stubQuery();
+    applyTokenGroup(q, "search_key_fold", ["kanap", "sof"]);
+    expect(q.calls.or).toEqual([
+      "search_key_fold.ilike.*kanap*,search_key_fold.ilike.*sof*",
+    ]);
+    expect(q.calls.ilike).toEqual([]);
+  });
+
+  it("pusta grupa → zapytanie bez zmian, zero .or(\"\")", () => {
+    // Trzej konsumenci nigdy nie podadzą pustej grupy (synonymsFor zwraca co
+    // najmniej sam rdzeń), ale helper jest eksportowany: `.or("")` to
+    // zniekształcony warunek wysłany po cichu, brak warunku jest uczciwszy.
+    const q = stubQuery();
+    expect(applyTokenGroup(q, "search_key_fold", [])).toBe(q);
+    expect(q.calls.or).toEqual([]);
+    expect(q.calls.ilike).toEqual([]);
   });
 });

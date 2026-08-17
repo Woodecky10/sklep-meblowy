@@ -2,6 +2,8 @@
 // inputu. Wydzielone z products.ts, żeby były testowalne bez mockowania
 // supabase (jak safe-redirect).
 
+import { synonymsFor } from "./search-vocabulary";
+
 // Escape znaków specjalnych ILIKE (% _ \) w wartości dopasowania — bez tego
 // user mógłby użyć wildcardów. Zachowuje dosłowną treść (np. email z "_").
 export function escapeIlike(value: string): string {
@@ -67,6 +69,11 @@ export function searchTokens(raw: string): string[] {
 // trafienia (np. „sofy" — żadna nazwa nie ma „sofy") daje pusty poziom 1
 // i kolejność bit w bit jak wcześniej.
 //
+// Synonimy (search-vocabulary.ts) liczą się na poziomie 2, nigdy na 1. „kanapa"
+// nie występuje w żadnej nazwie sofy, więc bez tego wszystkie sofy wpadałyby na
+// poziom 3 i mieszały się z szumem opisowym. Poziom 1 dalej znaczy „nic nie
+// musiałem rozszerzać" — ani stemem, ani słownikiem.
+//
 // Kolejność wewnątrz każdego poziomu jest zachowana (stabilna), więc sort z DB
 // (alfabetyczny/cena/nowość) rozstrzyga remisy. Fraza pusta po sanityzacji →
 // wejście bez zmian.
@@ -85,7 +92,7 @@ export function rankByNameMatch<T>(
     // złożone znaki, małe litery, bez spacji. Tokeny są już złożone, więc
     // żadnego toLowerCase() na nich nie potrzeba.
     const key = foldDiacritics(getName(row) ?? "").replace(/\s+/g, "");
-    if (!forms.every((f) => key.includes(f.stem))) {
+    if (!forms.every((f) => synonymsFor(f.stem).some((alt) => key.includes(alt)))) {
       rest.push(row);
     } else if (forms.every((f) => key.includes(f.fold))) {
       exactHits.push(row);
@@ -212,4 +219,80 @@ export function searchKeyTokenForms(raw: string): SearchTokenForms[] {
 // daje jedno „sof", bo dwa identyczne warunki ILIKE to zbędna praca dla bazy.
 export function searchKeyTokens(raw: string): string[] {
   return searchKeyTokenForms(raw).map((forms) => forms.stem);
+}
+
+// Grupy alternatyw dla filtra do bazy: każdy token frazy zamienia się w listę
+// „on sam plus jego synonimy" (patrz search-vocabulary.ts).
+//
+// Filtr ANDuje grupy między sobą (każde słowo frazy musi wystąpić) i ORuje
+// alternatywy wewnątrz grupy (w którejkolwiek postaci). Liczba grup jest
+// zawsze równa liczbie tokenów z searchKeyTokens — inaczej filtr wymagałby
+// czego innego niż ranking.
+//
+// Ranking NIE używa tej funkcji: on potrzebuje wiedzieć, którą formą token
+// trafił, i woła searchKeyTokenForms + synonymsFor osobno.
+export function searchKeyTokenGroups(raw: string): string[][] {
+  return searchKeyTokens(raw).map((token) => synonymsFor(token));
+}
+
+// Warunek dla jednej grupy alternatyw, wspólny dla trzech konsumentów — żeby
+// składnia PostgREST siedziała w jednym miejscu, a nie w trzech kopiach.
+//
+// Grupa jednoelementowa idzie zwykłym .ilike() (czytelniejsze i tańsze).
+// Grupa z synonimami idzie .or(), gdzie wildcardem jest `*`, NIE `%` — to inna
+// składnia niż w metodzie .ilike(). Wiele .or() na zapytaniu jest ANDowanych,
+// tak samo jak wiele .ilike().
+//
+// Zmierzone na produkcji 2026-08-13 (klucz anon, te same RLS co storefront):
+// `.ilike("search_key_fold", "%kanap%")` → 0 wierszy, a
+// `.or("search_key_fold.ilike.*kanap*,search_key_fold.ilike.*sof*")` → 41,
+// czyli dokładnie tyle, ile samo „sof". Gwiazdka JEST wildcardem: ten sam
+// operand z nieistniejącym rdzeniem daje 0, więc nie jest brana literalnie.
+// (`%` w tej pozycji też działa, ale `*` to składnia dokumentowana.) Dwa .or()
+// na jednym zapytaniu dały 25 — tyle samo, co dwa .ilike() na rdzeniach.
+//
+// Bezpieczeństwo: tokeny przeszły już sanitizeSearchTerm (usuwa `, . ( )` oraz
+// wildcardy), a wartości słownika są ograniczone testem do [a-z0-9]+. Do tego
+// escapeIlike na każdym operandzie — mimo że po tej sanityzacji jest no-opem,
+// bo nie ma już czego escapować. Jego backslash escapuje TAK SAMO wewnątrz
+// .or(), jak w metodzie .ilike() (pomiar 2026-08-13: `*\_*` → 0 wierszy przy
+// `*_*` → 353, a `*s\of*` → 41 jak `*sof*`), więc dla `%`, `_` i `\` ta
+// warstwa trzyma w obu składniach.
+//
+// ⚠️ ZAKRES escapeIlike TO DOKŁADNIE `%`, `_` i `\` — NIE `*`. A `*` jest
+// wildcardem w wartości podawanej do .or() (na tym stoi cały ten helper), więc
+// operand z gwiazdką przeszedłby przez escapeIlike nietknięty i po cichu
+// rozszerzył dopasowanie. `*` odsiewa dopiero sanityzacja FRAZY
+// (sanitizeSearchTerm: litery, cyfry, spacja, myślnik) plus test kształtu
+// słownika [a-z0-9]+ — nie ten helper. Kto poluzuje tamtą allowlistę (realny
+// scenariusz: „klient musi móc wpisać `&` w nazwie tkaniny"), musi zadbać
+// o `*` tutaj, LOKALNIE. Do globalnego escapeIlike gwiazdki mimo to nie
+// dopisywać — ale NIE dlatego, że w metodzie .ilike() (m.in. linkGuestOrders)
+// `*` wildcardem nie jest. JEST nim w obu składniach: pomiar 2026-08-13 na
+// prostym filtrze, bez .or(), dał `search_key_fold=ilike.*sof*` → 41 wierszy,
+// dokładnie tyle co `ilike.%sof%`, przy `ilike.sof` → 0 i `ilike.*zzzsofzzz*`
+// → 0. Metoda .ilike() nie przekształca wzorca (postgrest-js emituje dosłownie
+// `col=ilike.<wzorzec>`), więc `*` aliasuje sam PostgREST na poziomie operatora
+// ilike — niezależnie od tego, czy operand siedzi w .or(), czy nie.
+// Powód zakazu jest inny: backslash najpewniej NIE robi z gwiazdki literału
+// (skoro PostgREST mapuje `*`→`%` w całym wzorcu, `\*` wychodzi jako `\%`,
+// czyli dosłowny procent) — i tego NIKT nie zmierzył. Gwiazdkę odsiewa się
+// więc WYCINANIEM w sanitizeSearchTerm, nie escapowaniem; escapeIlike i tak by
+// tu nie pomógł, a globalnie ruszany być nie musi.
+export function applyTokenGroup<Q extends {
+  ilike: (col: string, pattern: string) => Q;
+  or: (filters: string) => Q;
+}>(query: Q, keyCol: string, group: string[]): Q {
+  // Pusta grupa → zapytanie bez zmian, zamiast `.or("")`. Trzej konsumenci tu
+  // nie trafią (synonymsFor zwraca zawsze co najmniej sam rdzeń), ale helper
+  // jest eksportowany i generyczny, a `.or("")` wysłałoby do PostgREST pusty
+  // warunek: zniekształcony filtr, którego nikt nie chciał, i to bez śladu
+  // w logach. Skoro grupa nie stawia żadnego wymagania, niech to będzie widać.
+  if (group.length === 0) return query;
+  if (group.length === 1) {
+    return query.ilike(keyCol, `%${escapeIlike(group[0])}%`);
+  }
+  return query.or(
+    group.map((alt) => `${keyCol}.ilike.*${escapeIlike(alt)}*`).join(",")
+  );
 }

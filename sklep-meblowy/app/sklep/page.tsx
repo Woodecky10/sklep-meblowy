@@ -21,6 +21,7 @@ import FilterBar from "@/app/_components/ui/FilterBar";
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import CollectionIntro from "./CollectionIntro";
 import CategoryChildren from "./CategoryChildren";
+import EmptySearchState from "./EmptySearchState";
 import Pagination from "@/app/_components/ui/Pagination";
 
 // /sklep jest w pełni przetłumaczone przez słownik UI → DE zawsze (hasDe: true).
@@ -186,6 +187,19 @@ export default async function SklepPage({
       rawParams[k] = val;
   }
 
+  // Czy poza frazą zawęża wynik cokolwiek jeszcze (kategoria, cena, kolekcja,
+  // wymiary, facety opcji/cech). Liczy się z rawParams, bo ten zbiera już
+  // WSZYSTKIE aktywne parametry — wystarczy odjąć te, które wyniku nie zawężają.
+  // Potrzebne stanowi pustego wyniku: komunikat „Nie prowadzimy X" wolno
+  // pokazać tylko wtedy, gdy fraza jest jedynym zawężeniem (patrz
+  // EmptySearchState). Liczy zachowawczo — parametr obecny, ale niepoprawny
+  // (np. `cena_od=abc`) też uznaje za zawężenie, a to spycha komunikat do
+  // wariantu, który niczego nie obiecuje.
+  const NIEZAWEZAJACE_PARAMY = new Set(["q", "sortuj"]);
+  const hasOtherFilters = Object.keys(rawParams).some(
+    (k) => !NIEZAWEZAJACE_PARAMY.has(k)
+  );
+
   // Najbardziej szczegółowy filtr wygrywa: kolekcja > wyszukiwanie > kategoria
   // (dowolny poziom drzewa) > domyślny tytuł.
   function resolveHeading(): string {
@@ -283,10 +297,19 @@ export default async function SklepPage({
       <CategoryChildren items={childNodes} />
 
       {products.length === 0 ? (
-        <div className="text-center py-24 text-[var(--muted)]">
-          <p className="font-display text-2xl mb-2">{t.shop.emptyTitle}</p>
-          <p className="text-sm">{t.shop.emptyHint}</p>
-        </div>
+        <EmptySearchState
+          query={search}
+          categories={filterNodes}
+          hasOtherFilters={hasOtherFilters}
+          locale={locale}
+          labels={{
+            emptyTitle: t.shop.emptyTitle,
+            emptyHint: t.shop.emptyHint,
+            emptyNotCarried: t.shop.emptyNotCarried,
+            emptySearchTitle: t.shop.emptySearchTitle,
+            emptyCategoriesHint: t.shop.emptyCategoriesHint,
+          }}
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {products.map((product) => (
