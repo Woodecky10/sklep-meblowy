@@ -322,6 +322,49 @@ Dwie rzeczy do pilnowania:
    Organization JSON-LD; dziś tego pola **nie ma**. To jedyna realna zmiana w kodzie
    wynikająca z tej listy.
 
+## 🔎 Wygląd wyników w Google — audyt i plan (2026-08-10)
+
+Właściciel chce, żeby wynik wyszukiwania wyglądał „jak każda normalna strona" —
+konkretnie jak `useme.com`, czyli **z linkami dodatkowymi (sitelinks)**: listą podstron
+z własnymi opisami pod głównym wynikiem.
+
+⚠️ **Sitelinków NIE da się włączyć.** Nie ma znacznika, ustawienia ani pliku, którym
+się je deklaruje — Google generuje je algorytmicznie, gdy uzna, że rozumie strukturę
+witryny i że marka jest jednoznaczna. Google wycofał nawet dawne narzędzie do ukrywania
+pojedynczych sitelinków. Dochodzą do tego czynniki, których kodem się nie przyspieszy:
+wiek w indeksie (mollien.pl jest tam od końca kwietnia 2026) i liczba wyszukiwań marki
+z nazwy. **Nie obiecywać terminu ani gwarancji.**
+
+Da się natomiast usunąć to, co dziś realnie stoi na przeszkodzie. Audyt produkcji
+z 2026-08-10 wykazał cztery rzeczy — pierwsza jest błędem, nie kosmetyką:
+
+1. 🔴 **Rozdwojenie apex/www.** `COMPANY.domain` = `mollien.pl`, więc canonical strony
+   głównej i **cała sitemapa** (`app/sitemap.ts`, `const BASE`) deklarują apex, podczas
+   gdy serwer odsyła 308 na `www.mollien.pl`. Z punktu widzenia Google to dwa adresy tej
+   samej strony i sygnały rozkładają się na dwa hosty. Do zrobienia **osobnym
+   podprojektem, ze specem** — `COMPANY.domain` jest jednocześnie tekstem marki
+   (renderowanym w UI), więc potrzebna jest osobna stała na origin; razem z nią muszą
+   ruszyć `NEXT_PUBLIC_APP_URL` i link w feedzie do Merchant Center. Przy ~409
+   zindeksowanych stronach tego nie improwizować.
+2. **Brak `WebSite` w JSON-LD** — `app/_lib/seo-jsonld.ts` ma `Organization`,
+   `PostalAddress`, `ContactPoint` i `BreadcrumbList`, ale nie `WebSite`. Google nie ma
+   skąd wziąć nazwy witryny, więc w wyniku pokazuje samą domenę zamiast „Mollien".
+3. **Brak canonical na podstronach** — np. `app/(legal)/kontakt/page.tsx` zwraca
+   z `generateMetadata` tylko `title` i `description`, bez `alternates.canonical`.
+4. **Opisy podstron zbyt ogólne** — `/kontakt` ma *„Skontaktuj się z nami – e-mail,
+   telefon, adres."*; Google zignorował go i wziął zeskrobany tekst ze stopki. Sitelinki
+   biorą podpisy właśnie z tytułów i opisów podstron, więc bezużyteczny opis = brak
+   materiału na podpis.
+
+Punkty 2–4 są szybkie i bezpieczne, punkt 1 wymaga planu. Po wdrożeniu: poprosić
+o zindeksowanie w Search Console.
+
+✅ **PR #133** (tag `google-site-verification` w `app/layout.tsx`) — **zmergowany
+2026-08-17**, czyli tag jest na produkcji. Weryfikacja tą metodą jest DRUGA obok
+podstawowej: usługa stoi na rekordzie TXT w DNS (home.pl) i to on jest kotwicą
+własności właściciela — usunięcie tagu odbiera tamten dostęp, DNS zostaje.
+Zostaje ręczny krok w Search Console: kliknąć „Zweryfikuj".
+
 ## Drobne follow-upy (nieblokujące)
 - `schema.sql` jest niekompletnym baseline'em (pre-existing) — fresh-DB bootstrap z samego pliku byłby niepełny; źródłem prawdy są **migracje**.
 - Stary `.env.local` (gitignored, nie przychodzi z klonem) może mieć nieużywane już zmienne po dawnej integracji magazynowej — można wyczyścić ręcznie, aplikacja ich nie czyta.
