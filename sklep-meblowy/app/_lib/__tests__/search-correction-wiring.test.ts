@@ -15,7 +15,7 @@ import path from "node:path";
 //     a repo świadomie nie mockuje bazy w testach jednostkowych;
 //   • app/sklep/page.tsx — serwerowy komponent .tsx, a vitest chodzi tu
 //     w środowisku "node", bez jsdom i bez @testing-library/react (patrz
-//     vitest.config.ts: include obejmuje wyłącznie .test.ts).
+//     vitest.config.mts: include obejmuje wyłącznie .test.ts).
 // To są dokładnie te dwa miejsca, w których da się zepsuć feature bez
 // oblania jednego testu — stąd ten guard.
 
