@@ -18,6 +18,8 @@ import { formatMoney } from "@/app/_lib/money";
 import { useEurRate } from "@/app/_lib/rate-context";
 import { buildCartEventPayload } from "@/app/_lib/meta-pixel";
 import { trackPixel } from "@/app/_lib/meta-pixel-client";
+import { buildGaCartPayload } from "@/app/_lib/ga-ecommerce";
+import { trackGaEvent } from "@/app/_lib/ga-client";
 import { useFabricLabels } from "@/app/_lib/fabric-context";
 import type { Product } from "@/app/_lib/types";
 
@@ -469,16 +471,28 @@ export default function KoszykPage() {
             <LocalizedLink
               href="/checkout"
               onClick={() => {
-                // InitiateCheckout dla pixela Meta — najcenniejsza grupa
-                // remarketingowa: byli o krok od zakupu. Kwota to `grandTotal`,
-                // czyli PO rabacie; suma cen katalogowych zawyżałaby wartość
-                // koszyka przy każdym kuponie.
-                // Bez zgody marketingowej trackPixel nie robi nic.
+                // Wejście w checkout — najcenniejsza grupa remarketingowa: byli
+                // o krok od zakupu. Kwota to `grandTotal`, czyli PO rabacie;
+                // suma cen katalogowych zawyżałaby wartość koszyka przy każdym
+                // kuponie.
+                // Bez zgody trackPixel/trackGaEvent nie robią nic.
                 trackPixel(
                   "InitiateCheckout",
                   buildCartEventPayload(
                     items.map((item) => ({
                       productId: item.id,
+                      quantity: item.quantity,
+                      price: item.price,
+                    })),
+                    grandTotal
+                  )
+                );
+                trackGaEvent(
+                  "begin_checkout",
+                  buildGaCartPayload(
+                    items.map((item) => ({
+                      productId: item.id,
+                      name: item.name,
                       quantity: item.quantity,
                       price: item.price,
                     })),

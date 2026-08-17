@@ -10,6 +10,20 @@
 // ⚠️ Pixel to narzędzie REMARKETINGOWE, nie analityczne. W banerze cookies wisi
 // na zgodzie "marketing" (patrz MetaPixel.tsx), nigdy na "analytics".
 
+import {
+  roundMoney,
+  toIsoCurrency,
+  CATALOG_CURRENCY,
+  shouldTrackPurchase,
+} from "@/app/_lib/order-events";
+
+// Reguły, które są regułami SKLEPU, a nie Meta (zaokrąglanie kwot, waluta
+// katalogu, „czy to już sprzedaż"), mieszkają w order-events.ts i dzieli je
+// z GA4 — patrz app/_lib/ga-ecommerce.ts. Reeksport, żeby istniejące importy
+// „z meta-pixel" działały bez zmian i żeby nie powstało drugie źródło prawdy.
+export { roundMoney, CATALOG_CURRENCY, shouldTrackPurchase };
+export { toIsoCurrency as toPixelCurrency };
+
 // Identyfikatory pixela to 15–16 cyfr. Zakres celowo wąski: ma odrzucić
 // identyfikator GA wklejony do złej zmiennej, a nie „cokolwiek cyfrowego".
 const META_PIXEL_ID_RE = /^\d{15,16}$/;
@@ -24,17 +38,6 @@ const RAW_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID ?? "";
 // Świadomie nie rzucamy: brak pixela nie może wywalić sklepu, a nieodfiltrowana
 // literówka oznaczałaby ładowanie fbevents.js z bezsensownym id.
 export const META_PIXEL_ID = isValidMetaPixelId(RAW_PIXEL_ID) ? RAW_PIXEL_ID : "";
-
-// Kwoty w groszach po stronie Meta nie istnieją — wszystko idzie w jednostkach
-// głównych waluty. Zaokrąglenie broni przed 33.329999999999995 w JSON-ie.
-export function roundMoney(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
-// W bazie waluta leży małymi literami ("pln"), Meta oczekuje ISO-4217 ("PLN").
-export function toPixelCurrency(currency: string): string {
-  return currency.toUpperCase();
-}
 
 export type PixelLineItem = {
   productId: string;
@@ -87,13 +90,6 @@ export function buildContents(items: PixelLineItem[]): PixelContents {
   };
 }
 
-// Waluta zdarzeń przedzakupowych (ViewContent/AddToCart/InitiateCheckout).
-//
-// Ceny w bazie i w koszyku są ZAWSZE w PLN — EUR powstaje dopiero przy
-// wyświetlaniu i przy rejestracji płatności (app/_lib/money.ts). Purchase jest
-// inny: tam bierzemy walutę zapisaną w zamówieniu, bo ta jest już przeliczona.
-export const CATALOG_CURRENCY = "PLN";
-
 export type CartEventPayload = PixelContents & {
   value: number;
   currency: string;
@@ -114,25 +110,6 @@ export function buildCartEventPayload(
   return { ...contents, value: roundMoney(resolved), currency: CATALOG_CURRENCY };
 }
 
-// Czy zamówienie w tym stanie ma pójść do Meta jako zakup.
-//
-// ⚠️ NIE używać tu `status !== "pending"` (tak wygląda warunek nagłówka na
-// stronie podziękowania) — ten warunek przepuszcza „cancelled", więc anulowane
-// zamówienie liczyłoby się jako sprzedaż w Menedżerze reklam.
-//
-// Online: dopiero potwierdzona notyfikacja z P24 przestawia status z „pending",
-// więc czekamy — inaczej każda porzucona i nieudana płatność zawyżałaby wynik
-// kampanii. Pobranie: zamówienie jest przyjęte do realizacji z chwilą złożenia,
-// pieniądze przyjdą od kuriera, więc liczy się od razu mimo statusu „pending".
-export function shouldTrackPurchase(
-  status: "pending" | "paid" | "processing" | "shipped" | "delivered" | "cancelled",
-  paymentMethod: "online" | "cod"
-): boolean {
-  if (status === "cancelled") return false;
-  if (paymentMethod === "cod") return true;
-  return status !== "pending";
-}
-
 export type PurchasePayload = PixelContents & {
   value: number;
   currency: string;
@@ -149,6 +126,6 @@ export function buildPurchasePayload(order: {
   return {
     ...buildContents(order.items),
     value: roundMoney(order.total),
-    currency: toPixelCurrency(order.currency),
+    currency: toIsoCurrency(order.currency),
   };
 }

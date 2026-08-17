@@ -4,6 +4,8 @@ import { createContext, useContext, useMemo, useReducer, useCallback, useState, 
 import type { CartItemBundle, BundleDiscountType } from "@/app/_lib/bundles";
 import { buildCartEventPayload } from "@/app/_lib/meta-pixel";
 import { trackPixel } from "@/app/_lib/meta-pixel-client";
+import { buildGaCartPayload } from "@/app/_lib/ga-ecommerce";
+import { trackGaEvent } from "@/app/_lib/ga-client";
 
 export type CartItem = {
   id: string;
@@ -332,10 +334,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, [appliedPromo, hydrated]);
 
-  // AddToCart siedzi tu, a nie w przyciskach: dodać do koszyka da się z karty
-  // produktu, z listingu i z cross-sellu w koszyku. Jedno miejsce = brak
+  // Dodanie do koszyka siedzi tu, a nie w przyciskach: dodać do koszyka da się
+  // z karty produktu, z listingu i z cross-sellu w koszyku. Jedno miejsce = brak
   // ryzyka, że któraś ścieżka po cichu przestanie raportować.
-  // Bez zgody marketingowej trackPixel nie robi nic.
+  // Bez zgody trackPixel/trackGaEvent nie robią nic — każde ma własną bramkę.
   const add = useCallback((item: CartItem) => {
     dispatch({ type: "ADD", item });
     setNotification({ item, ts: Date.now() });
@@ -343,6 +345,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       "AddToCart",
       buildCartEventPayload([
         { productId: item.id, quantity: item.quantity, price: item.price },
+      ])
+    );
+    trackGaEvent(
+      "add_to_cart",
+      buildGaCartPayload([
+        { productId: item.id, name: item.name, quantity: item.quantity, price: item.price },
       ])
     );
   }, []);
@@ -368,13 +376,24 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const addBundle = useCallback((items: CartItem[]) => {
     dispatch({ type: "ADD_BUNDLE", items });
     if (items[0]) setNotification({ item: items[0], ts: Date.now() });
-    // Zestaw to jedno AddToCart z kompletem pozycji — nie N osobnych zdarzeń,
-    // bo w raporcie wyglądałyby jak N niezależnych dodań do koszyka.
+    // Zestaw to JEDNO zdarzenie z kompletem pozycji — nie N osobnych, bo
+    // w raporcie wyglądałyby jak N niezależnych dodań do koszyka.
     trackPixel(
       "AddToCart",
       buildCartEventPayload(
         items.map((item) => ({
           productId: item.id,
+          quantity: item.quantity,
+          price: item.price,
+        }))
+      )
+    );
+    trackGaEvent(
+      "add_to_cart",
+      buildGaCartPayload(
+        items.map((item) => ({
+          productId: item.id,
+          name: item.name,
           quantity: item.quantity,
           price: item.price,
         }))
