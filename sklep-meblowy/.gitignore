@@ -53,3 +53,6 @@ next-env.d.ts
 
 # Konfiguracja MCP zawiera token dostepowy Supabase - NIGDY do repo
 .mcp.json
+
+# Stan lokalnego `supabase link` (ref projektu, id organizacji) - smiec CLI
+supabase/.temp/
