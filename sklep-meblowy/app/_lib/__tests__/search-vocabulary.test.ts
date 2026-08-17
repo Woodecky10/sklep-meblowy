@@ -358,10 +358,15 @@ describe("buildCatalogVocabulary — słowa ze słowników ręcznych", () => {
   });
 
   it("słowo dodatkowe NIE zaniża wagi słowa z katalogu", () => {
-    // „puf" jest i wartością synonimu, i częścią nazw. Gdyby dokładanie
-    // nadpisywało wagę, słowo z katalogu przegrywałoby remisy z byle czym.
-    const vocab = buildCatalogVocabulary(["Puf Bali", "Puf Nube"], ["puf"]);
-    expect(vocab.get("puf")).toBe(2);
+    // Cztery słowa są jednocześnie w słownikach ręcznych i w nazwach
+    // produktów (pomiar 2026-08-17: `naroznik` 40, `materac` 83, `fotel` 9,
+    // `boxspring` 4). Gdyby dokładanie nadpisywało wagę, przegrywałyby remisy
+    // z byle czym. Nazwy poniżej są syntetyczne — chodzi o samą arytmetykę.
+    const vocab = buildCatalogVocabulary(
+      ["Fotel Alva", "Fotel Aurea"],
+      ["fotel"]
+    );
+    expect(vocab.get("fotel")).toBe(2);
   });
 
   it("pusta lista nazw daje poprawny słownik z samymi dodatkami", () => {
@@ -488,6 +493,16 @@ describe("słownik z prawdziwych nazw + pickCorrection", () => {
     expect(pickCorrection("kanpa", buildCatalogVocabulary(NAZWY_Z_PRODUKCJI, []))).toBeNull();
   });
 
+  it("„dywna\" trafia w klucz NOT_CARRIED, czyli w komunikat o braku", () => {
+    // Sklep dywanów nie prowadzi, ale ma dla nich uczciwą odpowiedź
+    // („Nie prowadzimy dywanów"). Bez klucza `dywan` w słowniku literówka
+    // odbierałaby klientowi tę odpowiedź i zostawiała same zero wyników.
+    expect(pickCorrection("dywna", vocab)).toBe("dywan");
+    expect(
+      pickCorrection("dywna", buildCatalogVocabulary(NAZWY_Z_PRODUKCJI, []))
+    ).toBeNull();
+  });
+
   it("słowo dodatkowe nie wygrywa remisu ze słowem z katalogu", () => {
     // „kontynentalny" leży o 1 od `kontynentalne` (waga 4, z nazw) i o 1 od
     // `kontynentaln` (waga 1, rdzeń ze słownika ręcznego). Waga rozstrzyga —
@@ -548,8 +563,9 @@ describe("zmierzone niespodzianki — pinowane świadomie", () => {
     // Klient dostanie sofy zamiast „Nie prowadzimy szaf" — świadomie przyjęte:
     // pokazanie realnych produktów nie jest gorsze od komunikatu o braku, a
     // podbicie wagi dodatków po to, żeby wygrywały, zepsułoby wszystkie inne
-    // remisy. Klucze NOT_CARRIED zostają, bo dla fraz bez bliskiego sąsiada
-    // z katalogu (np. „komda" → `komod` przy dłuższej liście nazw) działają.
+    // remisy. Klucze NOT_CARRIED zarabiają na siebie tam, gdzie katalog nie ma
+    // bliskiego sąsiada — zmierzone na produkcji: „dywna" → `dywan`,
+    // „regla" → `regal`, „lamap" → `lamp`, „krzeso" → `krzesl`.
     expect(pickCorrection("szfa", vocab)).toBe("sofa");
   });
 
