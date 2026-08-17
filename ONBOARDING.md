@@ -359,9 +359,11 @@ z 2026-08-10 wykazał cztery rzeczy — pierwsza jest błędem, nie kosmetyką:
 Punkty 2–4 są szybkie i bezpieczne, punkt 1 wymaga planu. Po wdrożeniu: poprosić
 o zindeksowanie w Search Console.
 
-⏳ **PR #133** (tag `google-site-verification` w `app/layout.tsx`) był **otwarty
-i niezmergowany** na koniec sesji 2026-08-10 — dopóki nie trafi na produkcję, Google nie
-potwierdzi tą metodą własności.
+✅ **PR #133** (tag `google-site-verification` w `app/layout.tsx`) — **zmergowany
+2026-08-17**, czyli tag jest na produkcji. Weryfikacja tą metodą jest DRUGA obok
+podstawowej: usługa stoi na rekordzie TXT w DNS (home.pl) i to on jest kotwicą
+własności właściciela — usunięcie tagu odbiera tamten dostęp, DNS zostaje.
+Zostaje ręczny krok w Search Console: kliknąć „Zweryfikuj".
 
 ## Drobne follow-upy (nieblokujące)
 - `schema.sql` jest niekompletnym baseline'em (pre-existing) — fresh-DB bootstrap z samego pliku byłby niepełny; źródłem prawdy są **migracje**.
