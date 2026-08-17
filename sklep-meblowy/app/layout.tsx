@@ -120,8 +120,17 @@ export async function generateMetadata(): Promise<Metadata> {
     // w DNS (home.pl), i to on jest kotwicą własności właściciela sklepu —
     // ten tag dokłada kolejnego, niezależnego zweryfikowanego właściciela.
     // Usunięcie tagu = odebranie tamtego dostępu; DNS zostaje nienaruszony.
+    // Pinterest (konto firmowe @mollienjulia, sekcja Katalogi) potwierdza
+    // własność domeny tym samym trybem co Google — wklejonym tagiem w <head>.
+    // `other` bierze dowolną nazwę meta, bo Next zna z nazwy tylko google/
+    // yandex/yahoo; `p:domain_verify` nie ma tam własnego pola.
+    // Tag musi ZOSTAĆ na stałe — Pinterest sprawdza go ponownie, a zniknięcie
+    // cofa weryfikację (i razem z nią atrybucję Pinów oraz katalog produktów).
     verification: {
       google: "mnLaTuBcRDBEKSvjwthCGOyT_iSEURuu5V-Iq_65W7I",
+      other: {
+        "p:domain_verify": "55534f2d1891185a79a96a5b2a2ae2d8",
+      },
     },
     twitter: {
       card: "summary_large_image",
