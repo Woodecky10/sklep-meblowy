@@ -11,7 +11,18 @@ import { getDictionary } from "@/app/_lib/dictionaries";
 // Mechanika na embla-carousel (już w zależnościach, patrz HomeHeroSlider):
 // przeciąganie na mobile i gotowe canScrollPrev/Next zamiast własnych
 // listenerów scrolla.
-export default function ProductCarousel({ children }: { children: ReactNode }) {
+export default function ProductCarousel({
+  children,
+  prevLabel,
+  nextLabel,
+}: {
+  children: ReactNode;
+  // Karuzela wozi też opinie (sekcja customer_reviews na home) — czytnik
+  // ekranu nie może wtedy mówić „poprzednie produkty". Domyślne wartości
+  // zostają dzisiejsze, więc karuzela produktów zachowuje się identycznie.
+  prevLabel?: string;
+  nextLabel?: string;
+}) {
   const t = getDictionary(useClientLocale());
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: "start",
@@ -64,7 +75,7 @@ export default function ProductCarousel({ children }: { children: ReactNode }) {
         type="button"
         onClick={scrollPrev}
         disabled={!canPrev}
-        aria-label={t.a11y.prevProducts}
+        aria-label={prevLabel ?? t.a11y.prevProducts}
         className={`${arrowCls} -left-3 lg:-left-5`}
       >
         <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -75,7 +86,7 @@ export default function ProductCarousel({ children }: { children: ReactNode }) {
         type="button"
         onClick={scrollNext}
         disabled={!canNext}
-        aria-label={t.a11y.nextProducts}
+        aria-label={nextLabel ?? t.a11y.nextProducts}
         className={`${arrowCls} -right-3 lg:-right-5`}
       >
         <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">

@@ -57,6 +57,9 @@ export const de: DeepPartial<PlShape> = {
     productFew: "Produkte",
     productMany: "Produkte",
     featuredEmpty: "Derzeit keine empfohlenen Produkte.",
+    reviewsEyebrow: "Kundenmeinungen",
+    reviewsHeading: "Was unsere Kunden sagen",
+    reviewsSeeAll: "Alle Bewertungen ansehen",
   },
   product: {
     addToCart: "In den Warenkorb",
@@ -305,6 +308,8 @@ export const de: DeepPartial<PlShape> = {
     nextSlide: "Nächster Slide",
     prevProducts: "Vorherige Produkte",
     nextProducts: "Nächste Produkte",
+    prevReviews: "Vorherige Bewertungen",
+    nextReviews: "Nächste Bewertungen",
     goToSlide: "Zu Slide",
     zoomImage: "Bild vergrößern",
     showImage: "Bild anzeigen",

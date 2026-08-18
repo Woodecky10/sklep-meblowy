@@ -76,6 +76,13 @@ const SYSTEM_META: Record<
     contentCta: "Edytuj kolekcje",
     hasHeadings: true,
   },
+  customer_reviews: {
+    name: "Opinie klientów",
+    desc: "Slider z zatwierdzonymi opiniami (ocena 4-5, dłuższe wypowiedzi). Treść bierze się z opinii klientów — pojedynczą opinię wykluczasz w „Opinie”.",
+    contentHref: "/admin/opinie",
+    contentCta: "Przejdź do opinii",
+    hasHeadings: true,
+  },
 };
 
 export default function BlocksEditor({

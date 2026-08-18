@@ -46,11 +46,13 @@ describe("type guards i rejestr", () => {
 });
 
 describe("DEFAULT_HOME_BLOCKS", () => {
-  it("5 bloków systemowych w kolejności hero,tiles,featured,trust_bar,collections", () => {
+  it("każdy blok systemowy ma default, w kolejności SYSTEM_BLOCK_TYPES i z ciągłym sort_order", () => {
     expect(DEFAULT_HOME_BLOCKS.map((b) => b.block_type)).toEqual([
       ...SYSTEM_BLOCK_TYPES,
     ]);
-    expect(DEFAULT_HOME_BLOCKS.map((b) => b.sort_order)).toEqual([0, 1, 2, 3, 4]);
+    expect(DEFAULT_HOME_BLOCKS.map((b) => b.sort_order)).toEqual(
+      SYSTEM_BLOCK_TYPES.map((_, i) => i)
+    );
   });
   it("defaulty nagłówków = dzisiejszy wygląd (słowniki)", () => {
     const tiles = DEFAULT_HOME_BLOCKS.find((b) => b.block_type === "tiles")!;
@@ -59,6 +61,28 @@ describe("DEFAULT_HOME_BLOCKS", () => {
     expect(tiles.content.subheading).toBe("Kolekcje");
     const hero = DEFAULT_HOME_BLOCKS.find((b) => b.block_type === "hero")!;
     expect(hero.content.heading ?? null).toBeNull();
+  });
+  it("sekcja opinii jest blokiem systemowym z nagłówkami PL i DE", () => {
+    expect(isSystemBlockType("customer_reviews")).toBe(true);
+    const reviews = DEFAULT_HOME_BLOCKS.find(
+      (b) => b.block_type === "customer_reviews"
+    )!;
+    expect(reviews.content.heading).toBe("Co mówią klienci");
+    expect(reviews.content.heading_de).toBe("Was unsere Kunden sagen");
+    expect(reviews.content.subheading).toBe("Opinie klientów");
+    expect(reviews.content.subheading_de).toBe("Kundenmeinungen");
+  });
+  it("localizeBlock traktuje customer_reviews generycznie (nagłówek + podnagłówek)", () => {
+    const r = row({
+      block_type: "customer_reviews",
+      content: { heading: "Co mówią klienci", heading_de: "Was unsere Kunden sagen" },
+    });
+    expect(localizeBlock(r, "pl")).toMatchObject({
+      type: "customer_reviews",
+      heading: "Co mówią klienci",
+      subheading: null,
+    });
+    expect(localizeBlock(r, "de")).toMatchObject({ heading: "Was unsere Kunden sagen" });
   });
 });
 

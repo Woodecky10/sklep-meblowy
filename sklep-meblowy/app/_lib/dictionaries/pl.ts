@@ -36,6 +36,11 @@ export type PlShape = {
     productFew: string;
     productMany: string;
     featuredEmpty: string;
+    // Sekcja opinii klientów na home (blok systemowy customer_reviews).
+    // reviewsSeeAll prowadzi na /opinie — pełną listę bez filtra oceny.
+    reviewsEyebrow: string;
+    reviewsHeading: string;
+    reviewsSeeAll: string;
     // Opis sklepu na stronie głównej — patrz AboutStore.tsx.
     // Eyebrow i nagłówek używane TYLKO w wariancie samodzielnym (gdy pasek
     // zaufania jest wyłączony); normalnie nagłówek daje pasek.
@@ -303,6 +308,10 @@ export type PlShape = {
     nextSlide: string;
     prevProducts: string;
     nextProducts: string;
+    // Ta sama karuzela wozi opinie na home — czytnik ekranu nie może wtedy
+    // mówić „poprzednie produkty".
+    prevReviews: string;
+    nextReviews: string;
     goToSlide: string;
     zoomImage: string;
     showImage: string;
@@ -429,6 +438,9 @@ export const pl = {
     productFew: "produkty",
     productMany: "produktów",
     featuredEmpty: "Brak polecanych produktów.",
+    reviewsEyebrow: "Opinie klientów",
+    reviewsHeading: "Co mówią klienci",
+    reviewsSeeAll: "Zobacz wszystkie opinie",
     aboutEyebrow: "O sklepie",
     aboutHeading: "Meble tapicerowane prosto od producenta",
     aboutDefaultHtml: [
@@ -693,6 +705,8 @@ export const pl = {
     nextSlide: "Następny slajd",
     prevProducts: "Poprzednie produkty",
     nextProducts: "Następne produkty",
+    prevReviews: "Poprzednie opinie",
+    nextReviews: "Następne opinie",
     goToSlide: "Przejdź do slajdu",
     zoomImage: "Powiększ zdjęcie",
     showImage: "Pokaż zdjęcie",
