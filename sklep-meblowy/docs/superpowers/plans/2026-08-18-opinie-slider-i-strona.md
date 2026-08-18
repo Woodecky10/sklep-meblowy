@@ -78,7 +78,7 @@ publicznie". Plan 1/2 (zbieranie i moderacja) jest scalony:
 | `app/admin/strona-glowna/BlocksEditor.tsx` (modyfikacja) | Wpis w `SYSTEM_META` (wymuszony typem `Record<SystemBlockType, …>`). |
 | `app/opinie/page.tsx` (NOWY) | Strona ze wszystkimi zatwierdzonymi opiniami + zdanie o weryfikacji. |
 | `app/sitemap.ts` (modyfikacja) | `/opinie` w trasach statycznych (PL-only, jak `/o-nas`). |
-| `app/_lib/dictionaries/pl.ts`, `de.ts` (modyfikacja) | Nowe klucze `home.reviews*`, sekcja `reviewsPage`, `meta.reviews*`. |
+| `app/_lib/dictionaries/pl.ts`, `de.ts` (modyfikacja) | Nowe klucze `home.reviews*`, `a11y.*Reviews`, sekcja `reviewsPage`. Sekcja `meta` bez zmian. |
 | `supabase/migrations/77_page_blocks_customer_reviews.sql` (NOWY) | Wiersz bloku systemowego w `page_blocks`, żeby sekcja była edytowalna z panelu. Idempotentny. |
 | `e2e/opinie-widok.spec.ts` (NOWY) | Nieniszczące sprawdzenie: brak pustej sekcji na home, `/opinie` odpowiada 200. |
 
@@ -116,7 +116,20 @@ import {
 
 // Fabryka wiersza opinii — domyślnie taka, która NA HOME WCHODZI.
 // Każdy test psuje dokładnie jedno pole, więc widać, co go odrzuca.
-function opinia(over: Partial<Parameters<typeof selectHomepageReviews>[0][number]> = {}) {
+//
+// Typ jawny, NIE `Partial<Parameters<typeof selectHomepageReviews>[0][number]>`:
+// tamten rozwija się do Partial<HomepageSelectable>, a więc odrzuca `id`,
+// którego HomepageSelectable nie zawiera (a testy kolejności go używają).
+type Row = {
+  id: string;
+  rating: 1 | 2 | 3 | 4 | 5;
+  comment: string | null;
+  status: "pending" | "approved" | "rejected";
+  homepage_excluded: boolean;
+  created_at: string;
+};
+
+function opinia(over: Partial<Row> = {}): Row {
   return {
     id: "r1",
     rating: 5 as const,
@@ -743,9 +756,16 @@ git commit -m "feat(opinie): slider opinii jako sekcja strony glownej"
     eyebrow: string;
     heading: string;
     intro: string;
+    metaDescription: string;
     empty: string;
   };
 ```
+
+Wzorzec metadanych bierzemy z `/tkaniny`: `title` i `description` idą z sekcji
+słownika należącej DO TEJ STRONY, nie z `meta.*` (tam siedzą tylko `homeTitle`,
+`shopTitle`, `wishlistTitle`). `metaDescription` jest osobnym, krótkim kluczem —
+`intro` ma ~350 znaków i jako `<meta description>` zostałoby ucięte w wynikach
+wyszukiwania.
 
 Wartości w `export const pl`:
 
@@ -759,6 +779,8 @@ Wartości w `export const pl`:
     // gość przez jednorazowy link przypisany do pozycji zamówienia).
     intro:
       "Publikujemy tylko opinie osób, które kupiły u nas mebel — zaproszenie do wystawienia opinii wysyłamy po dostawie, na adres z zamówienia. Każda opinia przechodzi moderację, która odsiewa spam i wypowiedzi obraźliwe; nie usuwamy opinii krytycznych i nie zmieniamy ich treści.",
+    metaDescription:
+      "Opinie klientów o meblach Mollien — wystawiane po dostawie przez osoby, które kupiły mebel. Publikujemy także oceny krytyczne.",
     empty: "Nie mamy jeszcze opinii do pokazania. Pojawią się tutaj, gdy pierwsi klienci ocenią swoje meble.",
   },
 ```
@@ -771,12 +793,14 @@ Wartości w `export const pl`:
     heading: "Was Kunden über unsere Möbel sagen",
     intro:
       "Wir veröffentlichen ausschließlich Bewertungen von Personen, die bei uns ein Möbelstück gekauft haben — die Einladung zur Bewertung senden wir nach der Lieferung an die E-Mail-Adresse aus der Bestellung. Jede Bewertung wird moderiert, um Spam und beleidigende Inhalte auszusortieren; kritische Bewertungen löschen wir nicht und ihren Inhalt ändern wir nicht.",
+    metaDescription:
+      "Kundenbewertungen zu Mollien-Möbeln — abgegeben nach der Lieferung von Personen, die ein Möbelstück gekauft haben. Auch kritische Bewertungen veröffentlichen wir.",
     empty: "Wir haben noch keine Bewertungen. Sie erscheinen hier, sobald die ersten Kunden ihre Möbel bewerten.",
   },
 ```
 
-Dodaj też `meta.reviewsTitle` / `meta.reviewsDescription` w obu plikach —
-sprawdź w `pl.ts` nazewnictwo istniejących kluczy sekcji `meta` i trzymaj się go.
+Sekcja `meta` w słowniku **zostaje bez zmian** — nie dodawaj tam `reviewsTitle`
+ani `reviewsDescription`.
 
 - [ ] **Krok 2: Napisz stronę**
 
@@ -796,8 +820,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
   const t = getDictionary(locale);
   return {
-    title: t.meta.reviewsTitle,
-    description: t.meta.reviewsDescription,
+    title: t.reviewsPage.heading,
+    description: t.reviewsPage.metaDescription,
     alternates: {
       canonical: localizePath("/opinie", locale),
       languages: alternatesFor("/opinie", { hasDe: true }).languages,
