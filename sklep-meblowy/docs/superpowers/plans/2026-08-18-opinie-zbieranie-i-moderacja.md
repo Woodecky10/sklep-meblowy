@@ -28,6 +28,44 @@ Playwright.
 Punkt 7 — slider na stronie głównej i `/opinie` — to **plan 2/2**, pisany
 osobno, po scaleniu tego.
 
+## ⏭️ CO ZOSTAŁO — zacznij tutaj
+
+Plan 1/2 jest **scalony i na produkcji** (PR #160, `f164251`, 16 commitów).
+Sklep działa, ale **funkcja jest UŚPIONA**: bez migracji nie ma kolumny `status`
+ani tabeli `review_invites`, więc odczyty zwracają pustkę, a zaproszenia się nie
+zakładają. To jest bezpieczne i celowe.
+
+Pięć kroków, w tej kolejności:
+
+1. **Policz opinie, POTEM zaaplikuj migrację 76** przez MCP `apply_migration` —
+   auto-apply w tym repo nie działa (57, 58, 75).
+   Sprawdzone 2026-08-18: **0 opinii**, więc backfill zbędny. Gdyby ktoś zdążył
+   wystawić opinię w międzyczasie — najpierw `update product_reviews set
+   status = 'approved'` dla wierszy sprzed migracji, bo `status` ma domyślnie
+   `pending` **bez backfillu** i schowałby je z widoku publicznego.
+   Weryfikacja po obiektach (nie po rejestrze migracji) — zapytania w sekcji
+   „Domknięcie" na końcu tego pliku.
+2. **Sprawdź `CRON_SECRET`** w Vercelu (Production). Bez niej trasa przypomnień
+   zwraca 500 i maile po cichu nie wychodzą. Cron promocji jej używa, więc
+   powinna być.
+3. **Odpal ponownie `e2e/opinia-token.spec.ts`.** Przed migracją przechodził
+   z **niewłaściwego powodu**: brak tabeli daje ten sam 404 co nieznany token.
+   Dopiero po migracji ten test cokolwiek dowodzi.
+4. **Przejdź ręcznie pełną ścieżkę** na prawdziwym zamówieniu: „Dostarczone" →
+   mail → wystaw opinię z linku → zatwierdź w `/admin/opinie` → sprawdź, że jest
+   na karcie produktu. Tego nie zastąpi test, bo baza jest wspólna z produkcją.
+   **Usuń tę opinię po sprawdzeniu**, jeśli była tylko na próbę.
+5. **Napisz plan 2/2** — slider opinii na stronie głównej + strona `/opinie`.
+   To jest część, którą właściciel WIDZI, i to jej brak zaskoczył go po
+   scaleniu tego planu.
+
+⚠️ **Zamówienie już oznaczone `delivered` (1 z 10) nie dostanie zaproszenia** —
+mail wychodzi na PRZEJŚCIU statusu, a ten jest terminalny. Pozostałe 9 zadziała
+samo. Jeśli ten klient ma dostać prośbę, wpis w `review_invites` trzeba założyć
+ręcznie.
+
+---
+
 ## STAN WYKONANIA
 
 `.superpowers/sdd/` jest gitignorowany, więc dziennik wykonania nie przechodzi
