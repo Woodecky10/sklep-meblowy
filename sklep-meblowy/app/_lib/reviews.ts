@@ -2,6 +2,11 @@ import { createClient, createAdminClient } from "./supabase/server";
 import { localizeReview } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { ProductRating, ProductReview } from "./types";
+import {
+  selectHomepageReviews,
+  HOMEPAGE_REVIEW_MIN_RATING,
+  HOMEPAGE_REVIEWS_LIMIT,
+} from "./reviews-display";
 
 // Imię pod opinią. Dla konta pochodzi z profiles.full_name, dla gościa
 // z pola, które sam wpisał — te dwa źródła nigdy nie występują naraz
@@ -181,4 +186,96 @@ export async function getReviewStatus(productId: string): Promise<{
     canReview: true,
     existingReview: (existing as ProductReview | null) ?? undefined,
   };
+}
+
+// Opinia pokazywana publicznie poza kartą produktu (home, /opinie) — musi
+// nieść nazwę ocenianego produktu, żeby dało się do niego wrócić.
+// ⚠️ Bez `slug`: tabela products NIE MA takiej kolumny — link to /produkt/<id>.
+export type PublicReview = ProductReview & { product_name: string | null };
+
+// Ile opinii wchodzi na /opinie. Przy dzisiejszej skali (0 opinii, 10 zamówień)
+// to sufit bezpieczeństwa, nie stronicowanie — stronicowanie dopiszemy, gdy
+// będzie co stronicować.
+export const REVIEWS_PAGE_LIMIT = 200;
+
+// Dociąga imiona autorów i tłumaczy treść. Profile czytamy klientem
+// administracyjnym: profiles ma RLS using(auth.uid() = id), więc zwykły klient
+// widziałby WYŁĄCZNIE własny profil i każda cudza opinia gubiłaby podpis.
+// Eksponujemy tylko full_name (autor zgadza się na podpis pod opinią).
+async function withAuthorsAndProduct(
+  rows: (ProductReview & { products?: { name: string | null } | null })[],
+  locale: Locale
+): Promise<PublicReview[]> {
+  const userIds = Array.from(
+    new Set(rows.map((r) => r.user_id).filter((id): id is string => id !== null))
+  );
+  const nameMap = new Map<string, string | null>();
+  if (userIds.length > 0) {
+    const admin = await createAdminClient();
+    const { data: profiles } = await admin
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", userIds);
+    for (const p of (profiles ?? []) as { id: string; full_name: string | null }[]) {
+      nameMap.set(p.id, p.full_name);
+    }
+  }
+  return rows.map((r) => ({
+    ...localizeReview(r, locale),
+    author_name: authorNameOf(r, nameMap.get(r.user_id ?? "")),
+    product_name: r.products?.name ?? null,
+  }));
+}
+
+// Opinie na slider strony głównej. Zapytanie odsiewa zgrubnie (status, ocena,
+// wykluczenie), ostateczna bramka to selectHomepageReviews — długości treści
+// nie da się wyrazić filtrem PostgREST.
+//
+// Nadpobranie ×3: zapytanie nie wie o progu 30 znaków, więc gdyby wzięło
+// dokładnie 12 wierszy, każda krótka opinia zmniejszałaby slider poniżej
+// limitu, mimo że w bazie stoją dobre opinie tuż za nią.
+//
+// ⚠️ FAIL-SOFT jest tu wymogiem, nie ostrożnością: dopóki migracja 76 nie jest
+// zaaplikowana, kolumny `status` i `homepage_excluded` NIE ISTNIEJĄ i PostgREST
+// zwraca błąd. Pusta tablica = sekcja się nie renderuje = strona główna
+// wygląda jak dziś. Rzucenie stąd wyjątkiem wywala CAŁĄ stronę główną.
+export async function getHomepageReviews(
+  locale: Locale = DEFAULT_LOCALE
+): Promise<PublicReview[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("product_reviews")
+    .select("*, products(name)")
+    .eq("status", "approved")
+    .eq("homepage_excluded", false)
+    .gte("rating", HOMEPAGE_REVIEW_MIN_RATING)
+    .order("created_at", { ascending: false })
+    .limit(HOMEPAGE_REVIEWS_LIMIT * 3);
+  if (error || !data) return [];
+
+  const rows = data as unknown as (ProductReview & {
+    products: { name: string | null } | null;
+  })[];
+  return withAuthorsAndProduct(selectHomepageReviews(rows), locale);
+}
+
+// Wszystkie zatwierdzone opinie na /opinie — BEZ filtra oceny i BEZ progu
+// długości. Dyrektywa Omnibus zabrania publikowania wyłącznie opinii
+// pozytywnych, więc jedyny filtr to moderacja (spam i obelgi).
+export async function getAllApprovedReviews(
+  locale: Locale = DEFAULT_LOCALE
+): Promise<PublicReview[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("product_reviews")
+    .select("*, products(name)")
+    .eq("status", "approved")
+    .order("created_at", { ascending: false })
+    .limit(REVIEWS_PAGE_LIMIT);
+  if (error || !data) return [];
+
+  const rows = data as unknown as (ProductReview & {
+    products: { name: string | null } | null;
+  })[];
+  return withAuthorsAndProduct(rows, locale);
 }
