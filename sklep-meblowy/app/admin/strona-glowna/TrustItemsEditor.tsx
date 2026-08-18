@@ -188,7 +188,7 @@ function TrustItemForm({
 
   return (
     <form action={submit} className="mt-4 pt-4 border-t border-[var(--border)] flex flex-col gap-4" data-guard-section>
-      <Field label="Ikona" required>
+      <Field label="Ikona" required composite>
         <div className="grid grid-cols-5 gap-2">
           {TRUST_ICON_KEYS.map((k) => (
             <button

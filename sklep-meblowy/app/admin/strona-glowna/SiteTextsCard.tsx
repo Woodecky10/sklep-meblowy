@@ -57,7 +57,7 @@ export default function SiteTextsCard({
           <p className="text-sm text-[var(--muted)] mb-4">
             {"Opis sklepu wyświetlany na stronie głównej, w sekcji „Dlaczego warto kupować u nas?” — nad ikonami. Nagłówki i akapity formatujesz poniżej."}
           </p>
-          <Field label="Opis sklepu na stronie głównej">
+          <Field label="Opis sklepu na stronie głównej" composite>
             <input type="hidden" name="home_about" value={about} />
             <RichTextEditor
               value={about}
@@ -69,7 +69,7 @@ export default function SiteTextsCard({
         </div>
 
         <div className="sm:col-span-2">
-          <Field label="Opis sklepu na stronie głównej DE">
+          <Field label="Opis sklepu na stronie głównej DE" composite>
             <input type="hidden" name="home_about_de" value={aboutDe} />
             <RichTextEditor
               value={aboutDe}

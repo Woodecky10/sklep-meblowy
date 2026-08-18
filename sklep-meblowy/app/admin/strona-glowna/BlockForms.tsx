@@ -97,15 +97,15 @@ export function BannerForm({ block, onResult }: BlockFormProps) {
         <Field label="Nagłówek (DE)">
           <input value={headingDe} onChange={(e) => setHeadingDe(e.target.value)} maxLength={200} className={inputCls} />
         </Field>
-        <Field label="Tekst">
+        <Field label="Tekst" composite>
           <RichTextEditor value={body} onChange={setBody} ariaLabel="Tekst banera (PL)" placeholder="Treść banera…" />
         </Field>
-        <Field label="Tekst (DE)">
+        <Field label="Tekst (DE)" composite>
           <RichTextEditor value={bodyDe} onChange={setBodyDe} ariaLabel="Tekst banera (DE)" />
         </Field>
       </div>
 
-      <Field label="Układ">
+      <Field label="Układ" composite>
         <div className="flex flex-wrap gap-2">
           {(
             [
@@ -239,7 +239,7 @@ export function GalleryForm({ block, onResult }: BlockFormProps) {
         </Field>
       </div>
 
-      <Field label="Podpisy">
+      <Field label="Podpisy" composite>
         <div className="flex flex-wrap gap-2">
           {(
             [
@@ -265,7 +265,7 @@ export function GalleryForm({ block, onResult }: BlockFormProps) {
         </div>
       </Field>
 
-      <Field label="Kolumny">
+      <Field label="Kolumny" composite>
         <div className="flex flex-wrap gap-2">
           {(
             [
@@ -580,7 +580,7 @@ export function ProductsForm({
         </Field>
       </div>
 
-      <Field label="Skąd brać produkty?">
+      <Field label="Skąd brać produkty?" composite>
         <div className="flex flex-wrap gap-2">
           {(
             [
@@ -690,10 +690,10 @@ export function TextForm({ block, onResult }: BlockFormProps) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <Field label="Treść" required>
+      <Field label="Treść" required composite>
         <RichTextEditor value={body} onChange={setBody} ariaLabel="Treść (PL)" placeholder="Napisz treść…" />
       </Field>
-      <Field label="Treść (DE)">
+      <Field label="Treść (DE)" composite>
         <RichTextEditor value={bodyDe} onChange={setBodyDe} ariaLabel="Treść (DE)" placeholder="Text auf Deutsch…" />
       </Field>
       <SaveButton saving={saving} />
