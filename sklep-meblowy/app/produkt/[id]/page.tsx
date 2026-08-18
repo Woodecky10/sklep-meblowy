@@ -47,6 +47,20 @@ import { productPlainText } from "@/app/_lib/product-text";
 import { baseOpenGraph } from "@/app/_lib/seo-og";
 import { buildBreadcrumbJsonLd, serializeJsonLd } from "@/app/_lib/seo-jsonld";
 
+// Uchwyt dla e2e (kolekcja-slider-produkt.spec.ts). Bez niego test musiałby
+// celować w klasy Tailwinda z ProductCarousel — te same, których używa
+// karuzela produktów polecanych kilka sekcji wyżej, więc zieleniłby się na
+// złym elemencie.
+const COLLECTION_SLIDER_ID = "product-collection-slider";
+
+// Ile rodzeństwa z kolekcji trafia do slidera. Wcześniej było 8 przy siatce
+// 4 w rzędzie (dwa równe rzędy). Slider przewija, więc obcinanie kolekcji
+// straciło sens — a od migracji 75 to właściciel ustawia kolejność, więc
+// obcięcie ukrywałoby akurat te pozycje, które świadomie dał na koniec.
+// Sufit zostaje, żeby jedna wielka kolekcja nie ściągnęła setek wierszy:
+// dziś najliczniejsza ma 15 produktów.
+const COLLECTION_SLIDER_LIMIT = 50;
+
 type Props = { params: Promise<{ id: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -152,7 +166,12 @@ export default async function ProduktPage({ params }: Props) {
   const [collection, collectionSiblings] = product.collection_id
     ? await Promise.all([
         getCollection(product.collection_id, locale),
-        getCollectionSiblings(product.collection_id, product.id, 8, locale),
+        getCollectionSiblings(
+          product.collection_id,
+          product.id,
+          COLLECTION_SLIDER_LIMIT,
+          locale
+        ),
       ])
     : [null, []];
 
@@ -428,10 +447,18 @@ export default async function ProduktPage({ params }: Props) {
               </p>
             )}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {collectionSiblings.map((p) => (
-              <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} locale={locale} rate={rate} />
-            ))}
+          {/* Slider, nie siatka — zgłoszenie właścicielki 2026-08-18: „jak
+              wejdziesz w produkt z jakiejś kolekcji, to ja chciałam ten slider
+              tam". Siatka spychała opinie o dwa rzędy w dół przy większych
+              kolekcjach, a od migracji 75 kolejność ustawia właściciel, więc
+              PIERWSZE pozycje są tu tymi, które chciała pokazać najpierw.
+              Ten sam ProductCarousel co w produktach polecanych wyżej. */}
+          <div id={COLLECTION_SLIDER_ID}>
+            <ProductCarousel>
+              {collectionSiblings.map((p) => (
+                <ProductCard key={p.id} product={p} categoryLabel={categoryLabels.get(p.category)} isInWishlist={wishlistIds.has(p.id)} locale={locale} rate={rate} />
+              ))}
+            </ProductCarousel>
           </div>
         </section>
       )}

@@ -231,7 +231,6 @@ export const de: DeepPartial<PlShape> = {
     correctedSimilar: "wir zeigen ähnliche Produkte",
     descriptionMore: "Mehr lesen",
     descriptionLess: "Beschreibung einklappen",
-    collectionShowList: "Alle als Liste anzeigen",
   },
   filter: {
     sortAlpha: "Alphabetisch A-Z",

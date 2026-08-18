@@ -7,11 +7,7 @@
 // sortowanie albo wpisze frazę. Zawężenie kategorią czy ceną prośbą o inne
 // uporządkowanie NIE jest: to nadal ta sama kolekcja, tylko krótsza.
 //
-// Czysty moduł, bez I/O. Osobny od shop-view.ts celowo: tamten decyduje
-// o KSZTAŁCIE widoku (slider czy siatka), ten o KOLEJNOŚCI w nim. Zlanie ich
-// w jedno zmusiłoby do zmiany reguły widoku przy każdej zmianie reguły
-// sortowania — a te dwie rzeczy nie muszą iść w parze i już nie idą: lista
-// po przycisku ma inny kształt niż slider, ale tę samą kolejność.
+// Czysty moduł, bez I/O — testowalny bez bazy i bez przeglądarki.
 
 // Parametry, które SĄ prośbą klienta o inne uporządkowanie.
 const ORDERING_PARAMS = ["sortuj", "q"] as const;
@@ -25,6 +21,6 @@ export function usesCollectionOrder(
 ): boolean {
   if (!first(searchParams.kolekcja)?.trim()) return false;
   // Pusta wartość zostaje po wyczyszczeniu formularza filtrów i nie jest
-  // prośbą o nic — patrz ten sam wzorzec w shop-view.ts.
+  // prośbą o nic.
   return !ORDERING_PARAMS.some((k) => first(searchParams[k])?.trim());
 }

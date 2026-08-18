@@ -229,8 +229,6 @@ export type PlShape = {
     // Rozwijanie dłuższego opisu kolekcji nad filtrami (>1 akapit).
     descriptionMore: string;
     descriptionLess: string;
-    // Wyjście ze slidera kolekcji do dzisiejszej siatki z filtrami.
-    collectionShowList: string;
   };
   filter: {
     sortAlpha: string;
@@ -619,7 +617,6 @@ export const pl = {
     correctedSimilar: "pokazujemy podobne produkty",
     descriptionMore: "Czytaj więcej",
     descriptionLess: "Zwiń opis",
-    collectionShowList: "Pokaż wszystkie jako listę",
   },
   filter: {
     sortAlpha: "Alfabetycznie A-Z",
