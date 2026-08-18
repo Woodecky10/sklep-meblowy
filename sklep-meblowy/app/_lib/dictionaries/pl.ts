@@ -80,6 +80,8 @@ export type PlShape = {
     crossSellSizeHeading: string;
     crossSellSizeIn: string;
     fullCollectionEyebrow: string;
+    // Wyjście ze slidera kolekcji na kartę produktu → strona kolekcji.
+    seeFullCollection: string;
     specWidth: string;
     specWeight: string;
     specMaterial: string;
@@ -474,6 +476,7 @@ export const pl = {
     crossSellSizeHeading: "Materace w rozmiarze",
     crossSellSizeIn: "w rozmiarze",
     fullCollectionEyebrow: "Pełna kolekcja",
+    seeFullCollection: "Zobacz całą kolekcję",
     specWidth: "Wymiary",
     specWeight: "Waga",
     specMaterial: "Materiał",
