@@ -1127,4 +1127,64 @@ ręcznego bloku cytatów `reviews` (spec wprost tego nie chce).
 
 ## Stan wykonania
 
-_(wypełniane w trakcie realizacji)_
+**Wszystkie 7 zadań zamknięte 2026-08-18** na gałęzi `feat/opinie-slider-home`
+(9 commitów kodu + 2 dokumentacyjne). Każde zadanie przeszło recenzję; szeroki
+przegląd całej gałęzi wypadł na TAK, bez findingów Critical i bez
+nierozwiązanych Important.
+
+| Zadanie | Commit | Wynik |
+| --- | --- | --- |
+| 1. Czysta logika prezentacji | `7181c700` | 17 testów, refaktor `ReviewList` na wspólne helpery |
+| 2. Odczyty z bazy | `b1c22dad` + `a0b35aed` | recenzja wymusiła usunięcie `guest_email` z `PublicReview` |
+| 3. Karta + sekcja na home | `9e775ef0` + `800ba221` | blok systemowy `customer_reviews`, uchwyty e2e |
+| 4. Strona `/opinie` | `abb341c6` | + `RESERVED_SLUGS`, + sitemap |
+| 5. Guard e2e | `f362d16b` | 2 testy nieniszczące |
+| 6. Migracja 77 | `6e3cf26c` | idempotentna, jeden `insert` |
+| 7. Aplikacja migracji | — | 76 i 77 NA PRODUKCJI, zweryfikowane po obiektach |
+
+**Stan produkcyjnej bazy po migracjach** (sprawdzone po obiektach, nie po
+rejestrze migracji): `status` ✅, `homepage_excluded` ✅, `guest_name` +
+`guest_email` ✅, `user_id` nullable ✅, `review_invites` ✅ z **zerem polityk**
+(dostęp wyłącznie serwerowy), 5 polityk na `product_reviews`, 3 nowe indeksy,
+warunek `product_reviews_autor_jeden` ✅. Wiersz sekcji na home:
+`sort_order = 7`, `visible = true`, nagłówek „Co mówią klienci".
+Opinii w bazie: **0** — policzone dwa razy, drugi raz tuż przed DDL, więc
+backfill `status` był zbędny.
+
+**Weryfikacja po migracjach:** `npm run build` przechodzi (63/63 strony
+statyczne), Playwright `opinia-token` + `opinie-widok` = **3 passed** na
+lokalnym buildzie. `e2e/opinia-token.spec.ts` dowodzi wreszcie czegokolwiek:
+do migracji 76 jego 404 brał się z braku tabeli `review_invites`, nie z
+odrzucenia tokenu. `CRON_SECRET` jest ustawiony w Production — trasa
+przypomnień odpowiada 401 (brak autoryzacji), nie 500 (brak sekretu).
+
+**Produkcja w trakcie tego okna pozostała nietknięta:** `main` nie zna typu
+`customer_reviews`, więc `mergeHomeBlocks` po cichu odsiewa wstawiony wiersz
+(fail-open na nieznany typ). Home odpowiada 200 z wszystkimi dotychczasowymi
+sekcjami; `/opinie` daje 404, bo kod tej gałęzi nie jest jeszcze wdrożony.
+
+### Co ZOSTAŁO — wymaga człowieka
+
+1. **Merge gałęzi = deploy na produkcję.** Dopiero wtedy `/opinie` odpowiada
+   i sekcja na home ma prawo się pokazać.
+2. **Sekcja na home NIE POKAŻE SIĘ, dopóki nie ma ani jednej zatwierdzonej
+   opinii** z oceną ≥ 4 i treścią dłuższą niż 30 znaków. To zachowanie ze
+   specyfikacji, nie usterka — ale łatwo je pomylić z „nie zadziałało".
+3. **Pełna ścieżka na prawdziwym zamówieniu:** „Dostarczone" → mail →
+   wystaw opinię z linku → zatwierdź w `/admin/opinie` → sprawdź kartę
+   produktu, `/opinie` i slider na home. **Usuń opinię testową po
+   sprawdzeniu.** Żaden test automatyczny tego nie zastąpi, bo baza jest
+   wspólna z produkcją.
+4. **Klik-test panelu:** w `/admin/strona-glowna` sekcja „Opinie klientów
+   (automatyczne)" — ukryj/pokaż, zmień nagłówek, przeciągnij wyżej.
+5. **17 findingów Minor** odłożonych świadomie — pełna lista z rozstrzygnięciami
+   była w ledgerze wykonania; przegląd całej gałęzi zakwalifikował wszystkie
+   jako „może zostać". Najbardziej warte uwagi na przyszłość: brak logu przy
+   fail-soft odczytów (dziś `[]` z awarii RLS jest w logach nieodróżnialne od
+   `[]` z braku danych) i zduplikowany literał „Zweryfikowany zakup"
+   w `ReviewCard` oraz `ReviewList`.
+6. **Uwaga na okno przed deployem:** w `/admin/strona-glowna` na starym kodzie
+   sekcji nie ma; po deployu jest już sterowalna, bo wiersz w `page_blocks`
+   istnieje. Komunikat „Sekcja nie ma jeszcze wpisu w bazie (migracja 52…)"
+   nie ma prawa się już pojawić dla tej sekcji — a gdyby się pojawił, wskazuje
+   mylną migrację (pre-existing tekst w `app/admin/strona-glowna/actions.ts`).
