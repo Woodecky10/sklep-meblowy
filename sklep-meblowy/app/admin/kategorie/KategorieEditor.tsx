@@ -20,6 +20,8 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useConfirm } from "@/app/_context/ConfirmContext";
+// Czysty moduł (bez server-only), więc wolno go importować z "use client".
+import { warnsAboutMissingGpc } from "@/app/_lib/gpc";
 // Czyste helpery — z category-tree, NIE z categories.ts: ten drugi ciągnie
 // next/cache, więc import stąd ("use client") wysypałby build.
 import {
@@ -303,6 +305,12 @@ function TreeRow({
 
   const c = counts[node.slug] ?? { own: 0, subtree: 0 };
 
+  // Produkty tej kategorii wychodzą do katalogu (Google/Pinterest) bez pola
+  // `google_product_category`. Ostrzeżenie stoi TUTAJ, a nie tylko w logach
+  // serwera, bo to właścicielka zakłada kategorie — a dowiadywała się
+  // o problemie dopiero z panelu katalogu, dobę później.
+  const bezKategoriiGoogle = warnsAboutMissingGpc(allCategories, node.slug, c.own);
+
   return (
     <div>
       <div
@@ -333,6 +341,14 @@ function TreeRow({
               {!node.active && (
                 <span className="ml-2 text-xs font-normal text-[var(--muted)]">
                   (ukryta)
+                </span>
+              )}
+              {bezKategoriiGoogle && (
+                <span
+                  title="Produkty z tej kategorii trafiają do Google i Pinteresta bez kategorii produktowej, co ogranicza ich widoczność. Przenieś kategorię pod istniejącą gałąź (np. Sofy, Łóżka, Materace) albo poproś o dopisanie jej odpowiednika."
+                  className="ml-2 align-middle inline-block px-2 py-0.5 rounded-full text-[10px] font-sans font-normal uppercase tracking-widest bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                >
+                  bez kategorii Google
                 </span>
               )}
             </p>
