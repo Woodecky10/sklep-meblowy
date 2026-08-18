@@ -7,10 +7,16 @@ Sklep meblowy **Mollien** (meble na zamówienie). **Next.js 16** (App Router, Se
 
 > ⚠️ To NIE jest Next.js z treningu — wersja 16 ma breaking changes. Przed kodem Server Component/Action sprawdź `node_modules/next/dist/docs/`. `params`/`searchParams` to Promise. (Patrz `sklep-meblowy/AGENTS.md`.)
 
-## Stan repo (2026-07-31)
-`origin/main` = `11ebcc0`, **na produkcji** (Vercel auto-deployuje z `main`). Bramki na `main`: `tsc` 0 · `lint` 0 błędów (4 znane warningi) · **877 testów** (vitest, 74 pliki) · `build` przechodzi (Turbopack).
+## Stan repo (2026-08-18)
+`origin/main` = `e326439`, **na produkcji** (Vercel auto-deployuje z `main`). Bramki odpalone na tym commicie 2026-08-18: `npx tsc --noEmit` **0 błędów** · `npm run lint` **0 błędów** (4 znane ostrzeżenia o nieużywanych zmiennych) · `npm test` **1586 testów w 101 plikach, wszystkie zielone** (~8 s) · `npm run build` **przechodzi** (Turbopack). Do tego **15 plików e2e** (Playwright, odpalane ręcznie — patrz „Bramki jakości"). Migracji w repo: **70 plików**, ostatnia `75_products_collection_order.sql`. **Kolejka PR-ów jest pusta** (0 otwartych), gałęzi poza `main` brak.
 
-Wieczorem 2026-07-29 domknięta cała kolejka PR-ów: **#110** (pakiet techniczny SEO — `/og`, `/feed.xml`, JSON-LD Organization + breadcrumby), **#78** (BackToTop w adminie + wyszukiwanie odporne na spacje i kolejność słów), **#100** (licznik nowych zamówień w panelu), **#92** (filtry z parametrów produktu zamiast koloru/tkaniny), **#111** (sprzątanie migracji po BL). Zamknięte bez merge jako zdublowane dzisiejszą pracą: **#99** (ONBOARDING, zastąpiony przez #109) i **#62** (skrypt rehost, usunięty w #105/#106). **#48 (Przelewy24) — SCALONY 2026-07-31** (`0c4085f`), po testach w sandboxie i weryfikacji kluczy produkcyjnych. Szczegóły w sekcji „Płatności" niżej. **Kolejka PR-ów jest pusta.**
+Od poprzedniego stanu (2026-07-31, `11ebcc0`, 877 testów) scalone **#118–#156**; pełna lista: `gh pr list --state merged`. Wątki, nie chronologia:
+- **Analityka i katalogi zewnętrzne** — GA4 dopiero po zgodzie (#129) + zdarzenia e-commerce (#144), pixel Meta za zgodą marketingową (#140, #141), tagi weryfikacyjne Google Search Console (#133) i Pinteresta (#143), `google_product_category` w feedzie dla wszystkich 353 ofert (#154) plus ostrzeżenie w panelu, gdy kategoria nie ma odpowiednika (#155).
+- **Wyszukiwarka** — odporność na ogonki i odmianę (#136–#138), synonimy i wyjście ze stanu „zero wyników" (#139), odporność na literówki (#146).
+- **Kolekcje** — slider stoi na **karcie produktu** (sekcja „Pełna kolekcja") z linkiem do całej kolekcji (#148, #152, #153); kolejność produktów wewnątrz kolekcji ustawiana przeciąganiem w panelu (#149, #150). ⚠️ **Migracja 75 została zaaplikowana ręcznie na produkcji** — patrz „Baza — migracje".
+- **Panel** — drzewo kategorii bez limitu głębokości (#121–#123), menu z linkami własnymi edytowalne z panelu (#128, #142), klik w etykietę pola nie formatuje już tekstu w edytorze (#151).
+- **SEO i treść** — audyt wyglądu wyników w Google (#134), poprawki home pod weryfikację marki Google (#130–#132, #145), projekt naprawy rozdwojenia apex/www (#147 — ⚠️ **sam spec, implementacji ZERO**).
+- **Płatności i i18n** — domknięcie sprzątania po Stripe (#119), zamrożenie `/de` flagą `DE_ENABLED` (#120).
 
 ### Maile transakcyjne — UZBROJONE i przetestowane na produkcji (2026-07-29)
 Kod był gotowy od 2026-07-28, brakowało konfiguracji — zrobione i sprawdzone realnym zamówieniem na mollien.pl. Działa: potwierdzenie zamówienia, „Nowe zamówienie" do właścicielki, „w drodze" (z przewoźnikiem i trackingiem), „anulowane". Maile wychodzą TYLKO przy statusach `shipped` i `cancelled` (`NOTIFY_STATUSES` w `app/_lib/mail/status-notify.ts`) — „Dostarczone"/„W realizacji"/„Opłacone" świadomie nie mailują.
@@ -203,7 +209,8 @@ curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $SUPABASE_ACCES
 **Jak agent może dziś sięgnąć do bazy** (gdy MCP `supabase` nie działa): tokenem z `.mcp.json` (plik jest gitignorowany, patrz `sklep-meblowy/.gitignore`) przez Management API — `POST https://api.supabase.com/v1/projects/tlvgsddpiikolgdwuwmc/database/query` z ciałem `{"query":"..."}` i nagłówkiem `Authorization: Bearer <token>`. Tą drogą da się wykonać dowolny SQL, w tym DDL migracji, bez czekania na restart narzędzia. Uwaga: zmiana `.mcp.json` wymaga **pełnego restartu** Claude Code — `/mcp → Reconnect` podnosi serwer ze konfiguracją wczytaną przy starcie, więc nowego tokena nie zobaczy.
 
 ## Bramki jakości (uruchamiać z `sklep-meblowy/`)
-`npx tsc --noEmit` (0 błędów) · `npm run lint` (0) · `npm test` (vitest — **877 zielonych w 74 plikach**, stan 2026-07-31) · `npm run build` (Turbopack przechodzi).
+`npx tsc --noEmit` (0 błędów) · `npm run lint` (0 błędów; 4 znane ostrzeżenia o nieużywanych zmiennych) · `npm test` (vitest — **1586 zielonych w 101 plikach**, stan 2026-08-18) · `npm run build` (Turbopack przechodzi) · `npm run test:e2e` (Playwright, **15 plików**, odpalane ręcznie — wymaga sesji admina, patrz `e2e/.auth`).
+> ⚠️ **Vitest chodzi w `environment: "node"` — nie ma jsdom i nie ma ani jednego `.test.tsx`.** Usterek stanu UI **nie da się** złapać testem jednostkowym; weryfikuj je spec-em Playwrighta **na buildzie** (`npm run build` + `npm start`, nie na `next dev`) i udowodnij czerwono-zielono przez `git stash`. Spec MUSI być niezapisujący — baza jest wspólna z produkcją.
 > Po przełączeniu gałęzi build/tsc potrafi pokazać „phantom" błędy ze stale cache `.next` (referencje do nieistniejących już tras). Jeśli tak — `rm -rf .next` i ponów.
 > ⚠️ **Nie odpalaj `npm run build`, gdy w tle chodzi `next dev`** — build psuje `.next` dev-serwera i localhost zaczyna serwować stary render (wygląda to jak „poprawka nie zadziałała"). Wtedy: ubij proces na porcie `:3000`, `rm -rf .next`, restart.
 
