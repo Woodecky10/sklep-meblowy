@@ -54,6 +54,17 @@ export type PlShape = {
     // Treść domyślna, gdy w panelu (site_texts → home_about) nic nie wpisano.
     aboutDefaultHtml: string;
   };
+  // Strona /opinie — pełna lista zatwierdzonych opinii, bez filtra oceny
+  // (w przeciwieństwie do sekcji na home). Osobna sekcja, bo `meta.*` niesie
+  // tylko homeTitle/shopTitle/wishlistTitle, a `intro` (~350 znaków) jest za
+  // długi jak na <meta description> — stąd osobny, krótki `metaDescription`.
+  reviewsPage: {
+    eyebrow: string;
+    heading: string;
+    intro: string;
+    metaDescription: string;
+    empty: string;
+  };
   product: {
     addToCart: string;
     selectVariant: string;
@@ -456,6 +467,19 @@ export const pl = {
       "<p>Konto w sklepie, zakładane adresem e-mail lub przez Google, służy do śledzenia zamówienia, historii zakupów i zapisywania ulubionych modeli; do przeglądania oferty nie jest potrzebne.</p>",
       "<p><strong>Mollien — polskie meble stworzone z myślą o Twoim wnętrzu.</strong></p>",
     ].join(""),
+  },
+  reviewsPage: {
+    eyebrow: "Opinie klientów",
+    heading: "Co mówią o naszych meblach",
+    // Wymóg dyrektywy Omnibus: sklep musi napisać, czy i JAK weryfikuje, że
+    // opinie pochodzą od osób, które kupiły. To zdanie jest prawdziwe — obie
+    // ścieżki wystawienia opinii wymagają zakupu (konto przez regułę bazy,
+    // gość przez jednorazowy link przypisany do pozycji zamówienia).
+    intro:
+      "Publikujemy tylko opinie osób, które kupiły u nas mebel — zaproszenie do wystawienia opinii wysyłamy po dostawie, na adres z zamówienia. Każda opinia przechodzi moderację, która odsiewa spam i wypowiedzi obraźliwe; nie usuwamy opinii krytycznych i nie zmieniamy ich treści.",
+    metaDescription:
+      "Opinie klientów o meblach Mollien — wystawiane po dostawie przez osoby, które kupiły mebel. Publikujemy także oceny krytyczne.",
+    empty: "Nie mamy jeszcze opinii do pokazania. Pojawią się tutaj, gdy pierwsi klienci ocenią swoje meble.",
   },
   product: {
     addToCart: "Dodaj do koszyka",

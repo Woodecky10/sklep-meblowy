@@ -44,6 +44,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...deEntry({ url: `${BASE}/de/tkaniny`, lastModified: now, changeFrequency: "weekly", priority: 0.7, alternates: { languages: tkaninyAlts } }),
     { url: `${BASE}/o-nas`,       lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${BASE}/kontakt`,     lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${BASE}/opinie`,      lastModified: now, changeFrequency: "weekly",  priority: 0.5 },
     { url: `${BASE}/dostawa`,     lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${BASE}/zwroty`,      lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${BASE}/regulamin`,   lastModified: now, changeFrequency: "yearly",  priority: 0.3 },
