@@ -28,6 +28,41 @@ Playwright.
 Punkt 7 — slider na stronie głównej i `/opinie` — to **plan 2/2**, pisany
 osobno, po scaleniu tego.
 
+## STAN WYKONANIA
+
+`.superpowers/sdd/` jest gitignorowany, więc dziennik wykonania nie przechodzi
+między komputerami — **ta sekcja jest jedynym nośnikiem stanu w repo.**
+Aktualizowana po każdym zadaniu.
+
+- Gałąź: `feat/opinie-zbieranie-i-moderacja`, start `0675c6f`.
+- **Skan przedwykonawczy znalazł jedną usterkę planu:** kod zadania 3 pytał
+  o `products(name, slug)`, a tabela `products` **nie ma kolumny `slug`**
+  (ma `id`, `name`, `images`). Zapytanie zostałoby odrzucone, funkcja połknęłaby
+  błąd i zwróciła pustą listę — panel moderacji byłby pusty bez śladu przyczyny.
+  Poprawione przed rozpoczęciem: linkujemy po `id`.
+- **Migracja 76 celowo NIE jest aplikowana w trakcie** (zmiana schematu żywej
+  bazy to decyzja właściciela). Skutek uboczny do zapamiętania: spec e2e
+  z zadania 5 przechodzi przed migracją **z niewłaściwego powodu** — brak tabeli
+  daje ten sam 404 co zły token. **Po zaaplikowaniu migracji odpal go ponownie.**
+- Zadania: ✅ 1 · ✅ 2 · ✅ 3 · ✅ 4 · ✅ 5 · ✅ 6 — **WSZYSTKIE ZAMKNIĘTE**
+- Szeroka recenzja całej gałęzi: wykonana, poprawki naniesione, werdykt **gotowe do scalenia**.
+- Bramki na gotowej gałęzi: `tsc` 0 · `lint` 0 błędów (4 znane ostrzeżenia) · **1607 testów w 104 plikach** · `build` przechodzi.
+
+### Co szeroka recenzja znalazła — obie usterki krytyczne pochodziły z TEJ SPECYFIKACJI, nie z wykonania
+
+1. **Migracja rozbrajała `upsert` w ścieżce zalogowanego.** Specyfikacja kazała zastąpić `UNIQUE (product_id, user_id)` indeksem **częściowym**. Trasa `/api/reviews` robi `upsert` z `onConflict: "product_id,user_id"`, a PostgREST nie potrafi podać predykatu, więc Postgres nie wywnioskuje indeksu częściowego → błąd `42P10` pokazywany klientowi jako *„Nie możesz dodać opinii — weryfikujemy zakupy klientów"* przy w pełni sprawnym zakupie. Uzasadnienie w specyfikacji („stare unique przestaje działać") było **nietrafne** — od gości chroni `uniq_review_guest`. Naprawione: stare ograniczenie zostaje, `uniq_review_user` nie powstaje.
+2. **Moderację dało się ominąć bezpośrednim wywołaniem REST.** Migracja zmieniała tylko polityki `SELECT`; polityki zapisu z migracji 06/46 nie wspominały o `status`, a klucz anon jest w pakiecie przeglądarki — zalogowany kupujący mógł wstawić własną opinię ze `status = 'approved'`. Zdanie z tego planu („moderacja egzekwowana regułą RLS, nie tylko warstwą aplikacji") było do tej chwili **nieprawdziwe**. Naprawione: obie polityki zapisu wymuszają `status = 'pending'`, z warunkiem weryfikacji zakupu przepisanym dosłownie z migracji 46.
+
+Do tego trzy ważne: przypomnienie unieważniało stary link przy nieudanej wysyłce, adres e-mail gościa trafiał do logu, a token z adresu strony szedł do GA4 i Meta Pixela.
+
+### Świadomie odłożone (nie są długiem do spłaty „przy okazji")
+
+`escapeIlike` nie escapuje `*` (współdzielony helper spoza tej gałęzi), brak sprawdzania istniejącej opinii w `requestReviews`, dodatkowe zapytanie o nazwę produktu w pętli, zduplikowane `customerEmailOf`, tekst „Twoja ocena będzie widoczna publicznie" w `ReviewForm`, brak sprawdzania błędu w `markInviteUsed`, brak filtra wieku po `sent_at`, brak `.is("reminded_at", null)` w finalnym `UPDATE`, test `shouldRemind` bez granicy dokładnie siedmiu dób, nazwa indeksu `idx_review_invites_do_przypomnienia`.
+
+⚠️ **Ten sam człowiek może mieć dwie opinie o jednym produkcie** — jedną jako gość, drugą jako posiadacz konta. Warunek `product_reviews_autor_jeden` pilnuje, że *wiersz* ma jednego autora, nie że *człowiek* ma jeden wiersz. To świadoma konsekwencja wariantu B, nie usterka.
+
+⚠️ **Jedyne zamówienie ze statusem `delivered` (1 z 10) NIGDY nie dostanie zaproszenia** — `requestReviews` odpala się na PRZEJŚCIU statusu, a ten jest już terminalny. Pozostałe 9 zadziała samo.
+
 ## Ograniczenia globalne
 
 Dotyczą **każdego** zadania, nie powtarzam ich przy każdym:
@@ -467,9 +502,10 @@ import { createAdminClient } from "./supabase/server";
 import { authorNameOf } from "./reviews";
 import type { ProductReview, ReviewStatus } from "./types";
 
+// ⚠️ Bez `slug` — tabela `products` NIE MA takiej kolumny (sprawdzone na
+// produkcji 2026-08-18). Produkty linkuje się po id: /produkt/<id>.
 export type ReviewForModeration = ProductReview & {
   product_name: string | null;
-  product_slug: string | null;
 };
 
 // Panel czyta klientem administracyjnym, bo reguła publicznego odczytu
@@ -481,7 +517,7 @@ export async function getReviewsForModeration(
   const admin = await createAdminClient();
   const { data, error } = await admin
     .from("product_reviews")
-    .select("*, products(name, slug)")
+    .select("*, products(name)")
     // Najstarsze pierwsze: kolejka moderacji, nie tablica ogłoszeń —
     // najdłużej czekający klient ma być obsłużony pierwszy.
     .order("created_at", { ascending: true })
@@ -489,7 +525,7 @@ export async function getReviewsForModeration(
   if (error || !data) return [];
 
   const rows = data as unknown as (ProductReview & {
-    products: { name: string | null; slug: string | null } | null;
+    products: { name: string | null } | null;
   })[];
 
   const userIds = Array.from(
@@ -510,7 +546,6 @@ export async function getReviewsForModeration(
     ...r,
     author_name: authorNameOf(r, nameMap.get(r.user_id ?? "")),
     product_name: r.products?.name ?? null,
-    product_slug: r.products?.slug ?? null,
   }));
 }
 
@@ -2005,6 +2040,20 @@ Oczekiwane: 0, 0, wszystko zielone, build przechodzi.
 
 - [ ] **PR i scalenie** — opis ma zawierać wynik bramek i wyraźne zdanie, że
   migracja 76 **nie jest jeszcze zaaplikowana**.
+
+- [ ] ⚠️ **TUŻ PRZED aplikacją migracji policz istniejące opinie:**
+
+```sql
+select count(*) as opinie, count(*) filter (where status is null) as bez_statusu
+from product_reviews;
+```
+
+  Kolumna `status` dostaje `default 'pending'` **bez backfillu**. Jest to
+  bezpieczne wyłącznie dlatego, że tabela jest dziś pusta (sprawdzone
+  2026-08-18: 0 wierszy). **Gdyby w międzyczasie ktoś wystawił opinię, ta
+  migracja schowa ją z widoku publicznego** do czasu ręcznego zatwierdzenia
+  w panelu — wtedy dopisz `update product_reviews set status = 'approved'`
+  dla wierszy sprzed migracji, ZANIM ją zastosujesz.
 
 - [ ] **Zaaplikuj migrację 76 ręcznie** przez Supabase MCP (`apply_migration`),
   bo auto-apply nie działa (57, 58, 75). Potem **sprawdź po obiektach, nie po

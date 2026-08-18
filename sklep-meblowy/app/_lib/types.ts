@@ -332,16 +332,38 @@ export type OrderItem = {
   product?: Product;
 };
 
+export type ReviewStatus = "pending" | "approved" | "rejected";
+
 export type ProductReview = {
   id: string;
   product_id: string;
-  user_id: string;
+  // null dla opinii gościa — patrz migracja 76 i warunek
+  // product_reviews_autor_jeden: wypełnione jest ALBO user_id, ALBO para
+  // guest_name+guest_email.
+  user_id: string | null;
+  guest_name: string | null;
+  guest_email: string | null;
   rating: 1 | 2 | 3 | 4 | 5;
   comment: string | null;
+  status: ReviewStatus;
+  homepage_excluded: boolean;
   created_at: string;
   updated_at: string;
-  // Dołączane przez getReviewsForProduct — imię autora z profiles.full_name.
+  // Dołączane przez getReviewsForProduct: dla konta z profiles.full_name,
+  // dla gościa wprost z guest_name.
   author_name?: string | null;
+};
+
+export type ReviewInvite = {
+  id: string;
+  order_id: string;
+  product_id: string;
+  email: string;
+  token_hash: string;
+  sent_at: string;
+  reminded_at: string | null;
+  used_at: string | null;
+  expires_at: string;
 };
 
 export type ProductRating = {

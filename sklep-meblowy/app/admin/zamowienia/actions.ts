@@ -7,6 +7,7 @@ import { createAdminClient } from "@/app/_lib/supabase/server";
 import { canTransition } from "@/app/_lib/order-status";
 import type { OrderStatus } from "@/app/_lib/types";
 import { notifyStatusChange } from "@/app/_lib/mail/notify-order";
+import { requestReviews } from "@/app/_lib/mail/review-request";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -82,6 +83,13 @@ export async function updateOrderStatus(
   // Server Components, Server Functions, Route Handlers i Proxy — ten plik
   // ma "use server" na poziomie modulu, wiec to jest Server Function.
   after(() => notifyStatusChange(orderId, to, from));
+
+  // Prośba o opinię to osobna wiadomość, nie powiadomienie o statusie —
+  // dlatego stoi obok, a nie w NOTIFY_STATUSES. Też przez after(): wysyłka
+  // nie może opóźnić ani zepsuć akcji admina.
+  if (to === "delivered") {
+    after(() => requestReviews(orderId));
+  }
 
   revalidatePath(`/admin/zamowienia/${orderId}`);
   revalidatePath("/admin/zamowienia");

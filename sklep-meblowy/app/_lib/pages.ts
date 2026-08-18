@@ -24,6 +24,9 @@ export const RESERVED_SLUGS: Set<string> = new Set([
   "o-nas",
   // Brandowy obrazek og:image 1200×630 (app/og/route.tsx).
   "og",
+  // Strona wystawienia opinii z linku w mailu, dla gościa bez konta
+  // (app/opinia/[token]/) — trasa klienta, nie podstrona CMS.
+  "opinia",
   // Zamawianie próbek tkanin (app/probki/) — trasa klienta, nie podstrona CMS.
   "probki",
   "produkt",

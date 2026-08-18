@@ -24,13 +24,14 @@ const NAV_ITEMS = [
   { href: "/admin/zapytania", label: "Zapytania", icon: InboxIcon },
   { href: "/admin/probki", label: "Próbki", icon: SwatchIcon },
   { href: "/admin/reklamacje", label: "Reklamacje", icon: ComplaintsIcon },
+  { href: "/admin/opinie", label: "Opinie", icon: ReviewsIcon },
 ];
 
 // Licznik przy pozycji nawigacji — jedna reguła dla wszystkich badge'y.
 // `label` idzie w aria-label, bo sama cyfra nic czytnikowi ekranu nie mówi.
 function navBadge(
   href: string,
-  counts: { newIssues: number; newOrders: number; newSamples: number }
+  counts: { newIssues: number; newOrders: number; newSamples: number; newReviews: number }
 ): { count: number; label: string } | null {
   if (href === "/admin/reklamacje" && counts.newIssues > 0) {
     return { count: counts.newIssues, label: "nowe zgłoszenia" };
@@ -47,6 +48,9 @@ function navBadge(
   if (href === "/admin/probki" && counts.newSamples > 0) {
     return { count: counts.newSamples, label: "zamówienia próbek do obsłużenia" };
   }
+  if (href === "/admin/opinie" && counts.newReviews > 0) {
+    return { count: counts.newReviews, label: "opinie do sprawdzenia" };
+  }
   return null;
 }
 
@@ -55,12 +59,14 @@ export default function AdminShell({
   newIssues,
   newOrders,
   newSamples,
+  newReviews,
   children,
 }: {
   userEmail: string | null;
   newIssues: number;
   newOrders: number;
   newSamples: number;
+  newReviews: number;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -137,7 +143,7 @@ export default function AdminShell({
 
         <nav className="flex-1 py-4 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
-            const badge = navBadge(item.href, { newIssues, newOrders, newSamples });
+            const badge = navBadge(item.href, { newIssues, newOrders, newSamples, newReviews });
             return (
               <Link
                 key={item.href}
@@ -307,6 +313,15 @@ function SwatchIcon() {
       <rect x="3" y="4" width="10" height="14" rx="1.5" />
       <path d="M15.5 5.5l3.8 1.4a1.5 1.5 0 0 1 .9 1.9l-4 11" />
       <circle cx="8" cy="15" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function ReviewsIcon() {
+  return (
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 0 1 13 4a8 8 0 0 1 8 8z" />
+      <path d="M12 8.5l1.2 2.4 2.6.4-1.9 1.8.4 2.6-2.3-1.2-2.3 1.2.4-2.6-1.9-1.8 2.6-.4z" />
     </svg>
   );
 }

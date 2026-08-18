@@ -21,6 +21,7 @@ export default function robots(): MetadataRoute.Robots {
           "/rejestracja",
           "/reset-hasla",
           "/zapomnialem-hasla",
+          "/opinia/",      // link z jednorazowym tokenem z maila
           "/api/",         // endpointy JSON
         ],
       },

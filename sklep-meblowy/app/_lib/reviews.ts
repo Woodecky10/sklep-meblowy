@@ -3,6 +3,17 @@ import { localizeReview } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { ProductRating, ProductReview } from "./types";
 
+// Imię pod opinią. Dla konta pochodzi z profiles.full_name, dla gościa
+// z pola, które sam wpisał — te dwa źródła nigdy nie występują naraz
+// (warunek product_reviews_autor_jeden w migracji 76).
+export function authorNameOf(
+  review: Pick<ProductReview, "user_id" | "guest_name">,
+  profileName: string | null | undefined
+): string | null {
+  if (review.user_id === null) return review.guest_name ?? null;
+  return profileName ?? null;
+}
+
 // Pobiera recenzje dla produktu (najnowsze pierwsze) razem z imieniem autora.
 // locale==='de' → treść (comment) z comment_de z fallbackiem PL. Imię autora
 // nie jest tłumaczone.
@@ -16,6 +27,7 @@ export async function getReviewsForProduct(
     .from("product_reviews")
     .select("*")
     .eq("product_id", productId)
+    .eq("status", "approved")
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -25,9 +37,18 @@ export async function getReviewsForProduct(
   // using(auth.uid()=id), więc zwykły klient widziałby TYLKO profil aktualnego
   // usera i każda CUDZA opinia gubiła imię (fallback "Klient"). Eksponujemy
   // WYŁĄCZNIE full_name (autor zgadza się pokazać je jako podpis pod opinią).
-  const userIds = Array.from(new Set((data as ProductReview[]).map((r) => r.user_id)));
+  const userIds = Array.from(
+    new Set(
+      (data as ProductReview[])
+        .map((r) => r.user_id)
+        .filter((id): id is string => id !== null)
+    )
+  );
   if (userIds.length === 0) {
-    return (data as ProductReview[]).map((r) => localizeReview(r, locale));
+    return (data as ProductReview[]).map((r) => ({
+      ...localizeReview(r, locale),
+      author_name: authorNameOf(r, null),
+    }));
   }
 
   const admin = await createAdminClient();
@@ -45,7 +66,7 @@ export async function getReviewsForProduct(
 
   return (data as ProductReview[]).map((r) => ({
     ...localizeReview(r, locale),
-    author_name: nameMap.get(r.user_id) ?? null,
+    author_name: authorNameOf(r, nameMap.get(r.user_id ?? "")),
   }));
 }
 
@@ -54,7 +75,8 @@ export async function getProductRating(productId: string): Promise<ProductRating
   const { data, error } = await supabase
     .from("product_reviews")
     .select("rating")
-    .eq("product_id", productId);
+    .eq("product_id", productId)
+    .eq("status", "approved");
 
   if (error || !data || data.length === 0) {
     return { average: 0, count: 0 };
@@ -79,7 +101,8 @@ export async function getRatingsForProducts(
   const { data } = await supabase
     .from("product_reviews")
     .select("product_id, rating")
-    .in("product_id", productIds);
+    .in("product_id", productIds)
+    .eq("status", "approved");
 
   const rows = (data ?? []) as { product_id: string; rating: number }[];
   const grouped = new Map<string, number[]>();
