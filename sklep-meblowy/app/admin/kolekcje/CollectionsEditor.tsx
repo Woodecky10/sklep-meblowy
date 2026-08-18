@@ -399,11 +399,44 @@ function CollectionForm({
 }) {
   const [pending, startTransition] = useTransition();
   // Produkty obecnie należące do tej kolekcji (z DB) lub puste przy create.
+  // Kolejność MUSI wyjść z bazy (collection_sort_order, migracja 75), nie
+  // z przypadkowej kolejności `allProducts` — inaczej samo otwarcie formularza
+  // i zapis bez żadnej zmiany przestawiłyby produkty w sklepie.
   const initialSelected = initial
-    ? allProducts.filter((p) => p.collection_id === initial.id).map((p) => p.id)
+    ? allProducts
+        .filter((p) => p.collection_id === initial.id)
+        .sort(
+          (a, b) =>
+            a.collection_sort_order - b.collection_sort_order ||
+            a.name.localeCompare(b.name, "pl")
+        )
+        .map((p) => p.id)
     : [];
   const [selected, setSelected] = useState<string[]>(initialSelected);
   const [search, setSearch] = useState("");
+
+  // Produkt zaznaczony ptaszkiem ląduje na KOŃCU kolejności (patrz `toggle`),
+  // więc ten indeks odwzorowuje to, co zobaczy klient.
+  const byId = new Map(allProducts.map((p) => [p.id, p]));
+  const selectedProducts = selected
+    .map((id) => byId.get(id))
+    .filter((p): p is Product => Boolean(p));
+
+  const orderSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  function onOrderDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setSelected((prev) => {
+      const from = prev.indexOf(String(active.id));
+      const to = prev.indexOf(String(over.id));
+      if (from === -1 || to === -1) return prev;
+      return arrayMove(prev, from, to);
+    });
+  }
 
   // Produkty już przypisane do INNEJ kolekcji — pokażemy je z badge "inna kolekcja"
   // żeby admin wiedział że zaznaczenie spowoduje "kradzież".
@@ -479,6 +512,48 @@ function CollectionForm({
         />
       </Field>
 
+      {/* Kolejność produktów w kolekcji. Osobna lista od listy z ptaszkami,
+          bo to dwie różne decyzje: ptaszek mówi KTÓRE produkty, przeciąganie
+          W JAKIEJ KOLEJNOŚCI. Zlanie ich w jedno oznaczałoby, że wyszukiwarka
+          produktów (pole „Szukaj produktu…") filtruje listę, po której admin
+          przeciąga — a przeciąganie w odfiltrowanym widoku ustawia kolejność
+          względem pozycji, których nie widać. */}
+      {selectedProducts.length > 1 && (
+        <div className="flex flex-col gap-2 pt-2 border-t border-[var(--border)]">
+          <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
+            Kolejność w kolekcji — przeciągnij
+          </span>
+          <p className="text-[11px] text-[var(--muted)]">
+            Tak produkty ustawią się w sliderze kolekcji, na liście, w sekcji
+            „Pełna kolekcja” na karcie produktu i w mozaice na stronie głównej
+            (pierwsze cztery zdjęcia). Klient, który sam wybierze sortowanie
+            albo coś wyszuka, zobaczy swoją kolejność.
+          </p>
+          <DndContext
+            id={`collection-products-dnd-${initial?.id ?? "new"}`}
+            sensors={orderSensors}
+            collisionDetection={closestCenter}
+            onDragEnd={onOrderDragEnd}
+          >
+            <SortableContext
+              items={selected}
+              strategy={verticalListSortingStrategy}
+            >
+              <ul className="max-h-80 overflow-y-auto border border-[var(--border)] rounded-xl divide-y divide-[var(--border)]">
+                {selectedProducts.map((p, i) => (
+                  <SortableSelectedProduct
+                    key={p.id}
+                    product={p}
+                    position={i + 1}
+                    onRemove={() => toggle(p.id)}
+                  />
+                ))}
+              </ul>
+            </SortableContext>
+          </DndContext>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2 pt-2 border-t border-[var(--border)]">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
@@ -549,6 +624,71 @@ function CollectionForm({
         </button>
       </div>
     </form>
+  );
+}
+
+// ============================================================
+// Wiersz listy kolejności — przeciągalny
+// ============================================================
+// Uchwyt do przeciągania jest OSOBNYM elementem, nie całym wierszem: wiersz
+// niesie też przycisk „usuń z kolekcji", a przeciąganie za całą powierzchnię
+// zjadałoby jego kliknięcia. Ten sam układ co przy wierszu kolekcji wyżej.
+function SortableSelectedProduct({
+  product,
+  position,
+  onRemove,
+}: {
+  product: Product;
+  position: number;
+  onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: product.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+
+  return (
+    <li ref={setNodeRef} style={style} className="flex items-center gap-3 p-2 bg-[var(--card-bg)]">
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        aria-label={`Przeciągnij żeby zmienić kolejność: ${product.name}`}
+        className="shrink-0 w-8 h-8 flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] cursor-grab active:cursor-grabbing"
+      >
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <circle cx="9" cy="6" r="1" fill="currentColor" />
+          <circle cx="9" cy="12" r="1" fill="currentColor" />
+          <circle cx="9" cy="18" r="1" fill="currentColor" />
+          <circle cx="15" cy="6" r="1" fill="currentColor" />
+          <circle cx="15" cy="12" r="1" fill="currentColor" />
+          <circle cx="15" cy="18" r="1" fill="currentColor" />
+        </svg>
+      </button>
+
+      <span className="shrink-0 w-6 text-xs tabular-nums text-[var(--muted)]">{position}.</span>
+
+      <div className="relative w-10 h-10 shrink-0 rounded-lg overflow-hidden bg-stone-100 dark:bg-stone-800">
+        {product.images?.[0] ? (
+          <Image src={product.images[0]} alt="" fill sizes="40px" className="object-cover" />
+        ) : null}
+      </div>
+
+      <p className="flex-1 min-w-0 text-sm text-[var(--fg)] truncate">{product.name}</p>
+
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Usuń z kolekcji: ${product.name}`}
+        className="shrink-0 px-2 py-1 text-[10px] font-sans uppercase tracking-widest text-[var(--muted)] hover:text-red-600 transition-colors"
+      >
+        Usuń
+      </button>
+    </li>
   );
 }
 

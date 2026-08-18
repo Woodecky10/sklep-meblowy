@@ -71,6 +71,10 @@ export async function getCollectionSiblings(
     .select("*")
     .eq("collection_id", collectionId)
     .neq("id", excludeProductId)
+    // Kolejność ustawiona przez admina (migracja 75). Tu NIE ma parametrów
+    // adresu, więc nie ma czego ustępować — sekcja „Pełna kolekcja" zawsze
+    // pokazuje kolekcję tak, jak ułożył ją właściciel.
+    .order("collection_sort_order", { ascending: true })
     .order("name", { ascending: true })
     .limit(limit);
   return ((data ?? []) as Product[]).map((p) => localizeProduct(p, locale));
@@ -100,6 +104,12 @@ export async function getCollectionTilesForHome(
     // używa. Nie usuwaj tego `.eq` myśląc, że jest zbędny — to tylko wydajność.
     .eq("is_active", true)
     .not("collection_id", "is", null)
+    // Kolejność admina (migracja 75) decyduje, KTÓRE cztery zdjęcia trafią do
+    // mozaiki kafelka — buildCollectionTiles bierze pierwsze cztery unikalne
+    // z tego, co dostanie. Wcześniej rozstrzygała o tym nazwa produktu, czyli
+    // przypadek. Sortowanie robi SQL, więc `collection_sort_order` NIE musi
+    // być w COLLECTION_TILE_COLUMNS.
+    .order("collection_sort_order", { ascending: true })
     .order("name", { ascending: true });
 
   // Dotąd błąd był ignorowany bez śladu: awaria bazy = sekcja znika ze strony
