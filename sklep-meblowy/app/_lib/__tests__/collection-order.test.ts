@@ -10,11 +10,11 @@ describe("usesCollectionOrder", () => {
     expect(usesCollectionOrder({ kolekcja: "kolekcja-nuvo" })).toBe(true);
   });
 
-  // Przycisk „Pokaż wszystkie jako listę" nie jest prośbą o inne
-  // uporządkowanie — to nadal ta sama kolekcja, tylko w siatce.
-  it("stosuje kolejność admina także w widoku listy", () => {
+  // Nieznany parametr nie jest prośbą o inne uporządkowanie — tylko `sortuj`
+  // i `q` nią są. Reszta adresu może wyglądać dowolnie.
+  it("nie daje się zmylić nieznanemu parametrowi", () => {
     expect(
-      usesCollectionOrder({ kolekcja: "kolekcja-nuvo", widok: "lista" })
+      usesCollectionOrder({ kolekcja: "kolekcja-nuvo", cokolwiek: "x" })
     ).toBe(true);
   });
 

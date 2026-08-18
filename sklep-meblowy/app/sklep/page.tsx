@@ -1,11 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import {
-  getProducts,
-  getFilterFacets,
-  PRODUCTS_PAGE_LIMIT_MAX,
-} from "@/app/_lib/products";
-import { resolveShopView } from "@/app/_lib/shop-view";
+import { getProducts, getFilterFacets } from "@/app/_lib/products";
 import { usesCollectionOrder } from "@/app/_lib/collection-order";
 import { parseOptionFilterParams } from "@/app/_lib/option-filter";
 import { parseFeatureFilterParams } from "@/app/_lib/feature-filter";
@@ -23,7 +18,6 @@ import { getDictionary } from "@/app/_lib/dictionaries";
 import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import { baseOpenGraph } from "@/app/_lib/seo-og";
 import ProductCard from "@/app/_components/ui/ProductCard";
-import ProductCarousel from "@/app/_components/ui/ProductCarousel";
 import FilterBar from "@/app/_components/ui/FilterBar";
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import CollectionIntro from "./CollectionIntro";
@@ -69,9 +63,6 @@ type SearchParams = Promise<
   } & Record<string, string | string[] | undefined>
 >;
 
-// Uchwyt slidera kolekcji — patrz komentarz przy użyciu niżej.
-const SLIDER_ID = "collection-slider";
-
 function parsePositiveNumber(value: string | undefined) {
   if (!value) return undefined;
   const n = Number(value);
@@ -107,10 +98,6 @@ export default async function SklepPage({
   const priceMax = parsePositiveNumber(sp.cena_do);
   const inStockOnly = sp.dostepne === "1";
   const collectionSlug = first(sp.kolekcja)?.trim() || undefined;
-  // Slider dla czystego wejścia w kolekcję, lista dla wszystkiego innego.
-  // Reguła mieszka w shop-view.ts, nie tutaj — inaczej nie dałoby się jej
-  // sprawdzić bez renderowania całej strony.
-  const view = resolveShopView(sp);
   const optionFilters = parseOptionFilterParams(sp);
   const featureFilters = parseFeatureFilterParams(sp);
   const dimensionRanges = {
@@ -149,13 +136,6 @@ export default async function SklepPage({
       useCollectionOrder: usesCollectionOrder(sp),
       sectionSlug,
       locale,
-      // Slider pokazuje CAŁĄ kolekcję, więc omija stronicowanie. Dziś
-      // najliczniejsza kolekcja ma 15 produktów przy suficie 100
-      // (PRODUCTS_PAGE_LIMIT_MAX). Gdyby kiedyś przerosła ten sufit, slider
-      // pokaże pierwszą setkę, a resztę wyda przycisk „Pokaż wszystkie jako
-      // listę" — i nie stanie się to po cichu, bo licznik pod nagłówkiem
-      // liczy `total`, czyli wszystkie.
-      limit: view === "slider" ? PRODUCTS_PAGE_LIMIT_MAX : undefined,
     }),
     getFilterFacets(locale),
     // Filtry i pasek dzieci pokazują tylko widoczne gałęzie…
@@ -389,31 +369,6 @@ export default async function SklepPage({
             emptyCategoriesHint: t.shop.emptyCategoriesHint,
           }}
         />
-      ) : view === "slider" ? (
-        <>
-          {/* Uchwyt dla e2e (kolekcja-slider.spec.ts). Bez niego test musiałby
-              celować w klasy Tailwinda z ProductCarousel — te same, których
-              używa karuzela „Pełna kolekcja" na karcie produktu, więc test
-              zieleniłby się na złym elemencie. */}
-          <div id={SLIDER_ID}>
-            <ProductCarousel>{cards}</ProductCarousel>
-          </div>
-
-          {/* Wyjście ze slidera to LINK, nie przycisk: ma działać bez
-              JavaScriptu, dać się otworzyć w nowej karcie i wracać przyciskiem
-              wstecz. Powrót do slidera robi ten sam adres BEZ `widok` — dlatego
-              nie ma tu drugiego parametru w rodzaju `widok=slider`. */}
-          <div className="flex justify-center mt-10">
-            <LocalizedLink
-              href={`/sklep?kolekcja=${encodeURIComponent(
-                collectionSlug ?? ""
-              )}&widok=lista`}
-              className="px-6 py-3 rounded-full border border-[var(--border)] text-sm font-sans uppercase tracking-widest text-[var(--color-gold)] hover:border-[var(--color-gold)] hover:bg-[var(--color-gold)]/5 transition-colors"
-            >
-              {t.shop.collectionShowList}
-            </LocalizedLink>
-          </div>
-        </>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {cards}
