@@ -218,7 +218,7 @@ export default function TranslationEditor({
           />
         </Field>
 
-        <Field label="Opis (DE)" className="md:col-span-2" hint="Pokazywany na /de tylko gdy produkt nie ma sekcji opisu DE.">
+        <Field label="Opis (DE)" className="md:col-span-2" hint="Pokazywany na /de tylko gdy produkt nie ma sekcji opisu DE." composite>
           <RichTextEditor
             value={descriptionDe}
             onChange={setDescriptionDe}
@@ -361,7 +361,7 @@ function TextSectionTranslator({
             className={inputClass}
           />
         </Field>
-        <Field label="Treść (DE)" hint="Formatuj paskiem — jak w polskiej treści.">
+        <Field label="Treść (DE)" hint="Formatuj paskiem — jak w polskiej treści." composite>
           <RichTextEditor
             value={de.body}
             onChange={onBodyChange}

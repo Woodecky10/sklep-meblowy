@@ -33,21 +33,33 @@ export function Field({
   children,
   required,
   className,
+  composite,
 }: {
   label: string;
   hint?: string;
   children: React.ReactNode;
   required?: boolean;
   className?: string;
+  // Patrz bliźniak w app/admin/_shared.tsx — ten sam prop i ten sam powód:
+  // `<label>` bez `for` aktywuje pierwszy etykietowalny element potomka, czyli
+  // przy RichTextEditorze przycisk „Pogrubienie". Klikniecie w napis etykiety
+  // pogrubiało zaznaczony tekst (zgłoszenie 2026-08-18).
+  //
+  // ⚠️ Ten `Field` jest DUPLIKATEM tego z app/admin/_shared.tsx — dokładnie tą
+  // rozbieżnością, przed którą ostrzega komentarz na górze tamtego pliku.
+  // Poprawka musiała wejść w OBA. Przy następnym dotknięciu tego modułu warto
+  // je scalić, zamiast utrzymywać dwie kopie tej samej pułapki.
+  composite?: boolean;
 }) {
+  const Wrapper = composite ? "div" : "label";
   return (
-    <label className={`flex flex-col gap-1.5 ${className ?? ""}`}>
+    <Wrapper className={`flex flex-col gap-1.5 ${className ?? ""}`}>
       <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
         {label} {required && <span className="text-red-500">*</span>}
       </span>
       {children}
       {hint && <span className="text-[11px] text-[var(--muted)]">{hint}</span>}
-    </label>
+    </Wrapper>
   );
 }
 

@@ -340,11 +340,11 @@ function FabricForm({
           </datalist>
         </Field>
       </div>
-      <Field label="Opis" hint="Pokazywany na stronie tkaniny (/tkaniny). Obsługuje formatowanie.">
+      <Field label="Opis" hint="Pokazywany na stronie tkaniny (/tkaniny). Obsługuje formatowanie." composite>
         <input type="hidden" name="description" value={description} />
         <RichTextEditor value={description} onChange={setDescription} ariaLabel="Opis tkaniny (PL)" placeholder="Opis tkaniny…" />
       </Field>
-      <Field label="Opis (DE)" hint="Puste → na /de pokaże się opis PL.">
+      <Field label="Opis (DE)" hint="Puste → na /de pokaże się opis PL." composite>
         <input type="hidden" name="description_de" value={descriptionDe} />
         <RichTextEditor value={descriptionDe} onChange={setDescriptionDe} ariaLabel="Opis tkaniny (DE)" />
       </Field>

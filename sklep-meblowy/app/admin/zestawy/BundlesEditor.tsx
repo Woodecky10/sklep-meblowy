@@ -196,11 +196,11 @@ function BundleForm({
           <input name="name_de" defaultValue={bundle?.name_de ?? ""} maxLength={200}
             className={inputCls} />
         </Field>
-        <Field label="Opis" hint="Opcjonalny. Obsługuje formatowanie." className="md:col-span-2">
+        <Field label="Opis" hint="Opcjonalny. Obsługuje formatowanie." className="md:col-span-2" composite>
           <input type="hidden" name="description" value={description} />
           <RichTextEditor value={description} onChange={setDescription} ariaLabel="Opis zestawu (PL)" placeholder="Opis zestawu…" />
         </Field>
-        <Field label="Opis (DE)" hint="Puste → na /de pokaże się opis PL." className="md:col-span-2">
+        <Field label="Opis (DE)" hint="Puste → na /de pokaże się opis PL." className="md:col-span-2" composite>
           <input type="hidden" name="description_de" value={descriptionDe} />
           <RichTextEditor value={descriptionDe} onChange={setDescriptionDe} ariaLabel="Opis zestawu (DE)" />
         </Field>

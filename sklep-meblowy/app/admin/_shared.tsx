@@ -15,23 +15,38 @@ export function Field({
   hint,
   required,
   className,
+  composite,
   children,
 }: {
   label: string;
   hint?: string;
   required?: boolean;
   className?: string;
+  // `true` = w środku siedzi WIDŻET ZŁOŻONY (pasek narzędzi + obszar edycji),
+  // a nie pojedyncza kontrolka. Wtedy opakowaniem jest <div>, nie <label>.
+  //
+  // ⚠️ TO NIE JEST KOSMETYKA. `<label>` bez `for` aktywuje PIERWSZY etykietowalny
+  // element potomka, a `<input type="hidden">` etykietowalny NIE jest. Przy
+  // RichTextEditorze pierwszym takim elementem jest przycisk „Pogrubienie" —
+  // więc klikniecie w napis etykiety, w podpowiedź pod spodem albo w odstęp
+  // POGRUBIAŁO zaznaczony tekst. Zgłoszenie właścicielki 2026-08-18:
+  // „kliknęłam poza obszar edytora i się pogrubiła".
+  //
+  // Dostępności to nie psuje: RichTextEditor nadaje obszarowi edycji własne
+  // `aria-label` (prop `ariaLabel`), więc nazwa dla czytników ekranu zostaje.
+  composite?: boolean;
   children: ReactNode;
 }) {
+  const Wrapper = composite ? "div" : "label";
   return (
-    <label className={`flex flex-col gap-1.5 ${className ?? ""}`}>
+    <Wrapper className={`flex flex-col gap-1.5 ${className ?? ""}`}>
       <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </span>
       {children}
       {hint && <span className="text-xs text-[var(--muted)] leading-snug">{hint}</span>}
-    </label>
+    </Wrapper>
   );
 }
 
