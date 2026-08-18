@@ -86,3 +86,24 @@ export function resolveGpc(
   }
   return null;
 }
+
+// Czy w /admin/kategorie pokazać przy tej kategorii ostrzeżenie o braku
+// odpowiednika Google.
+//
+// Warunek jest WĄSKI celowo — potrzebne są OBA człony:
+// - brak identyfikatora sam w sobie nic nie psuje, dopóki nie ma produktów
+//   (kategorie-pojemniki jak „Meble" nigdy nie trafiają do feedu),
+// - plakietka przy każdej gałęzi zamieniłaby ostrzeżenie w tło, które się
+//   ignoruje — a wtedy nie zadziała wtedy, gdy będzie naprawdę potrzebne.
+//
+// `ownProducts` to produkty przypisane BEZPOŚREDNIO do tej kategorii, bo tylko
+// one wychodzą do katalogu z jej ustawieniem. Licznik z poddrzewa dublowałby
+// ostrzeżenie na rodzicu, który sam nie ma z problemem nic wspólnego.
+export function warnsAboutMissingGpc(
+  categories: GpcCategory[],
+  slug: string,
+  ownProducts: number
+): boolean {
+  if (ownProducts <= 0) return false;
+  return resolveGpc(categories, slug) === null;
+}

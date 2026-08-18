@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { resolveGpc, GPC_BY_SLUG, type GpcCategory } from "@/app/_lib/gpc";
+import {
+  resolveGpc,
+  warnsAboutMissingGpc,
+  GPC_BY_SLUG,
+  type GpcCategory,
+} from "@/app/_lib/gpc";
 
 // Drzewo kategorii sklepu w kształcie, w jakim naprawdę stoi w bazie
 // (stan 2026-08-18). Trzymane tutaj jawnie, bo test ma pilnować REALNEGO
@@ -114,5 +119,30 @@ describe("resolveGpc", () => {
       pufy: 458,
       "schodki-dla-pupila": 6973,
     });
+  });
+});
+
+// Ostrzeżenie w /admin/kategorie. Warunek jest wąski celowo: alarm ma się
+// odezwać dokładnie wtedy, gdy realne oferty idą do katalogu bez kategorii.
+describe("warnsAboutMissingGpc", () => {
+  it("ostrzega, gdy kategoria ma produkty i nie ma odpowiednika Google", () => {
+    expect(warnsAboutMissingGpc(KATEGORIE, "z-produkcji", 4)).toBe(true);
+  });
+
+  // Kategoria-pojemnik bez produktów niczego nie psuje w feedzie, a plakietka
+  // przy każdej gałęzi zamieniłaby ostrzeżenie w tło, które się ignoruje.
+  it("milczy dla kategorii bez własnych produktów", () => {
+    expect(warnsAboutMissingGpc(KATEGORIE, "meble", 0)).toBe(false);
+    expect(warnsAboutMissingGpc(KATEGORIE, "z-produkcji", 0)).toBe(false);
+  });
+
+  it("milczy, gdy kategoria ma odpowiednik Google", () => {
+    expect(warnsAboutMissingGpc(KATEGORIE, "sofy", 12)).toBe(false);
+  });
+
+  // Najważniejszy przypadek: dziecko dziedziczy po rodzicu, więc plakietka
+  // NIE ma się pokazać, mimo że sam slug nie jest w mapie.
+  it("milczy dla podkategorii dziedziczącej po rodzicu", () => {
+    expect(warnsAboutMissingGpc(KATEGORIE, "sofa-3-osobowa", 13)).toBe(false);
   });
 });
