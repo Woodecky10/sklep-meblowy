@@ -1,28 +1,7 @@
 import StarRating from "./StarRating";
 import { getLocale } from "@/app/_lib/i18n-server";
+import { anonymizeAuthor, formatReviewDate } from "@/app/_lib/reviews-display";
 import type { ProductReview } from "@/app/_lib/types";
-
-function formatDate(iso: string, de: boolean): string {
-  try {
-    return new Date(iso).toLocaleDateString(de ? "de-DE" : "pl-PL", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  } catch {
-    return iso;
-  }
-}
-
-// Zastąp pełne imię i nazwisko formą "Anna K." — zgodne z RODO (minimalizacja danych).
-function anonymize(name: string | null | undefined, de: boolean): string {
-  if (!name) return de ? "Kunde" : "Klient";
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0];
-  const first = parts[0];
-  const lastInitial = parts[parts.length - 1][0] ?? "";
-  return `${first} ${lastInitial}.`;
-}
 
 export default async function ReviewList({ reviews }: { reviews: ProductReview[] }) {
   const locale = await getLocale();
@@ -56,7 +35,7 @@ export default async function ReviewList({ reviews }: { reviews: ProductReview[]
             <div className="flex items-center gap-3">
               <StarRating value={r.rating} size={14} />
               <p className="font-sans text-sm font-semibold text-[var(--fg)]">
-                {anonymize(r.author_name, de)}
+                {anonymizeAuthor(r.author_name, locale)}
               </p>
               <span className="inline-flex items-center gap-1 text-[10px] font-sans uppercase tracking-widest text-[var(--color-gold)]">
                 <svg
@@ -76,7 +55,7 @@ export default async function ReviewList({ reviews }: { reviews: ProductReview[]
               </span>
             </div>
             <p className="text-xs text-[var(--muted)]">
-              {formatDate(r.created_at, de)}
+              {formatReviewDate(r.created_at, locale)}
             </p>
           </div>
           {r.comment && (
