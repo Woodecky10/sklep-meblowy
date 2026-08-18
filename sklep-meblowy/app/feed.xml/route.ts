@@ -2,6 +2,7 @@ import { createAdminClient } from "@/app/_lib/supabase/server";
 import { getCategories } from "@/app/_lib/categories";
 import { productPlainText, type ProductTextSource } from "@/app/_lib/product-text";
 import { buildProductFeedXml, selectFeedItems, type FeedProduct } from "@/app/_lib/product-feed";
+import { resolveGpc } from "@/app/_lib/gpc";
 
 // Feed produktowy dla Google Merchant Center → /feed.xml
 //
@@ -76,9 +77,24 @@ export async function GET() {
       salePrice: p.sale_price,
       images: p.images,
       categoryLabel: p.category ? categoryLabels.get(p.category) ?? p.category : null,
+      googleProductCategory: resolveGpc(categories, p.category),
       sizeGroup: p.size_group,
     };
   });
+
+  // Oferty bez kategorii Google logujemy z tego samego powodu, co pominięte
+  // niżej: dokładnie ten brak katalog zgłosił 2026-08-18 dla wszystkich 353
+  // ofert, a zobaczyliśmy go dopiero na zrzucie z panelu. Nowa gałąź kategorii
+  // bez wpisu w gpc.ts ma się odezwać u nas, zanim odezwie się tam.
+  const bezKategorii = (rows ?? [])
+    .map((r) => (r as { category: string | null }).category)
+    .filter((slug) => resolveGpc(categories, slug) === null);
+  if (bezKategorii.length > 0) {
+    const slugi = [...new Set(bezKategorii)].map((s) => s ?? "(brak kategorii)");
+    console.warn(
+      `[feed.xml] ${bezKategorii.length} ofert bez google_product_category, kategorie: ${slugi.join(", ")} — uzupełnij mapę w _lib/gpc.ts`
+    );
+  }
 
   // Pominięte oferty logujemy, żeby braki w danych (produkt bez zdjęcia lub bez
   // ceny) były widoczne u nas, a nie dopiero jako błędy w panelu Google.

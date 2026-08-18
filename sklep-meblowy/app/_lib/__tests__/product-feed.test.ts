@@ -153,6 +153,29 @@ describe("buildProductFeedXml", () => {
     expect(xml).toContain("<g:product_type>Narożniki</g:product_type>");
   });
 
+  // Katalog zgłosił 2026-08-18 brak tego pola dla wszystkich 353 ofert.
+  test("emituje google_product_category jako identyfikator liczbowy", () => {
+    const xml = buildProductFeedXml([product({ googleProductCategory: 460 })], {
+      locale: "pl",
+      currency: "PLN",
+    });
+    expect(xml).toContain(
+      "<g:google_product_category>460</g:google_product_category>"
+    );
+  });
+
+  // Zgadnięty błędny identyfikator szkodzi bardziej niż jego brak — kategoria
+  // bez mapowania ma zostawić pole PUSTE, a nie wstawić cokolwiek.
+  test("bez mapowania nie emituje google_product_category", () => {
+    const xml = buildProductFeedXml([product({ googleProductCategory: null })], {
+      locale: "pl",
+      currency: "PLN",
+    });
+    expect(xml).not.toContain("google_product_category");
+    // ...ale product_type zostaje — jedno nie zastępuje drugiego.
+    expect(xml).toContain("<g:product_type>");
+  });
+
   test("obcina tytuł do 150 znaków (limit Merchant Center)", () => {
     const xml = buildProductFeedXml([product({ name: "A".repeat(200) })], {
       locale: "pl",

@@ -9,9 +9,14 @@ import { localizePath, type Locale } from "./i18n";
 // Świadome decyzje:
 // - `identifier_exists: no` — meble robione na zamówienie nie mają GTIN/EAN/MPN.
 //   Bez tego pola Merchant odrzuca oferty jako "brakujący identyfikator".
-// - `google_product_category` POMIJAMY — Google kategoryzuje automatycznie, a
-//   zgadnięty błędny identyfikator kategorii szkodzi bardziej niż jego brak.
-//   Podajemy własne `product_type` (etykieta kategorii ze sklepu).
+// - `google_product_category` WYSYŁAMY od 2026-08-18. Wcześniej było pomijane
+//   („Google kategoryzuje automatycznie"), ale katalog zgłosił ostrzeżenie dla
+//   wszystkich 353 ofert, że brak tego pola ogranicza widoczność. Zasada z tamtej
+//   decyzji zostaje: zgadnięty błędny identyfikator szkodzi bardziej niż brak —
+//   dlatego identyfikatory są ODCZYTANE z oficjalnej taksonomii Google i żyją
+//   w `gpc.ts`, a kategoria bez mapowania NIE dostaje pola zamiast dostać byle co.
+//   Obok idzie dalej własne `product_type` (etykieta ze sklepu) — Google używa
+//   obu do różnych rzeczy i jedno nie zastępuje drugiego.
 // - dostawa NIE jest w feedzie — konfiguruje się ją raz w panelu Merchant Center
 //   (stawki per kraj), zamiast powtarzać przy każdej ofercie.
 // - `availability: in_stock` — produkcja na zamówienie, zawsze dostępne (spójnie
@@ -34,6 +39,9 @@ export type FeedProduct = {
   salePrice?: number | null;
   images?: string[] | null;
   categoryLabel?: string | null;
+  // Identyfikator Google Product Category — wyliczany przez resolveGpc z gpc.ts
+  // (tam mapa i uzasadnienie). null/undefined = pole świadomie pominięte.
+  googleProductCategory?: number | null;
   // size_group ze sklepu = item_group_id w feedzie: Google grupuje rozmiary
   // tego samego modelu w jedną ofertę z wariantami zamiast dublować wyniki.
   sizeGroup?: string | null;
@@ -138,6 +146,13 @@ export function buildProductFeedXml(
     lines.push(tag("g:condition", "new"));
     lines.push(tag("g:identifier_exists", "no"));
 
+    // Identyfikator liczbowy, nie ścieżka tekstowa: ścieżka jest zależna od
+    // języka taksonomii, a numer znaczy to samo w każdym regionie.
+    if (typeof p.googleProductCategory === "number") {
+      lines.push(
+        tag("g:google_product_category", String(p.googleProductCategory))
+      );
+    }
     if (p.categoryLabel && p.categoryLabel.trim().length > 0) {
       lines.push(tag("g:product_type", p.categoryLabel.trim()));
     }
