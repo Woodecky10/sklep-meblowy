@@ -191,7 +191,11 @@ export async function getReviewStatus(productId: string): Promise<{
 // Opinia pokazywana publicznie poza kartą produktu (home, /opinie) — musi
 // nieść nazwę ocenianego produktu, żeby dało się do niego wrócić.
 // ⚠️ Bez `slug`: tabela products NIE MA takiej kolumny — link to /produkt/<id>.
-export type PublicReview = ProductReview & { product_name: string | null };
+// ⚠️ Bez `guest_email`: patrz komentarz w withAuthorsAndProduct — typ o nazwie
+// PublicReview nie może obiecywać adresu e-mail klienta.
+export type PublicReview = Omit<ProductReview, "guest_email"> & {
+  product_name: string | null;
+};
 
 // Ile opinii wchodzi na /opinie. Przy dzisiejszej skali (0 opinii, 10 zamówień)
 // to sufit bezpieczeństwa, nie stronicowanie — stronicowanie dopiszemy, gdy
@@ -220,10 +224,23 @@ async function withAuthorsAndProduct(
       nameMap.set(p.id, p.full_name);
     }
   }
-  return rows.map((r) => ({
-    ...localizeReview(r, locale),
-    author_name: authorNameOf(r, nameMap.get(r.user_id ?? "")),
-    product_name: r.products?.name ?? null,
+  // ⚠️ NIE rozsypuj tu całego wiersza (`...r`). Dwie właściwości wypadają
+  // celowo:
+  // - `guest_email` — `select("*")` je pobiera, a to jest kształt danych dla
+  //   home i /opinie. Slider na home jest interaktywny, więc gdyby PublicReview
+  //   trafiło do komponentu klienckiego, e-maile gości wylądowałyby w payloadzie
+  //   RSC, czyli w źródle strony. Pokazywanie pełnego e-maila obok podpisu
+  //   skróconego przez anonymizeAuthor do „Anna K." niweczyłoby tamten zabieg.
+  // - `products` — surowy obiekt joina; komponenty mają patrzeć wyłącznie na
+  //   `product_name`, a spread nie podlega kontroli nadmiarowych właściwości,
+  //   więc TS by tego nie złapał.
+  // `comment_de` zostaje w `rest` (przychodzi z `select("*")`) — localizeReview
+  // go potrzebuje, inaczej cicho gaśnie tłumaczenie treści opinii na DE.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- `_guestEmail` jest wiązane WYŁĄCZNIE po to, żeby wypadło z `rest` (reguła nie ma tu ignoreRestSiblings)
+  return rows.map(({ products, guest_email: _guestEmail, ...rest }) => ({
+    ...localizeReview(rest, locale),
+    author_name: authorNameOf(rest, nameMap.get(rest.user_id ?? "")),
+    product_name: products?.name ?? null,
   }));
 }
 
