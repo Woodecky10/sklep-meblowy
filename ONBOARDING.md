@@ -134,6 +134,26 @@ Opisy produktu edytuje się w panelu pełnym edytorem WYSIWYG (**TipTap**) — b
 
 **Bezpieczeństwo (WAŻNE):** render = `dangerouslySetInnerHTML` po `sanitizeProductHtml` (`app/_lib/product-html.ts`) — regexowy, dependency-free sanitizer. Whitelist tagów: `p,br,ul,ol,li,strong,em,b,i,u,s,a,h2,h3,h4,span,blockquote,mark,img`. Atrybut `style` dopuszczony **wąsko**: tylko `text-align` (na blokach) i `color` (na `span`), z walidacją (`sanitizeStyleAttr` — odrzuca `url()`/`expression()`/escapes); `img src` tylko http/https. Sanitize-on-save w akcjach zapisu. **Nie poszerzać whitelisty bez adwersarskich testów** w `app/_lib/__tests__/product-html.test.ts`.
 
+## Kolekcje w panelu — dwie kolejności (2026-08-18, PR #148 + #149)
+
+Obie ustawia się w **`/admin/kolekcje`**. Różnią się sposobem zapisu i to jedyna pułapka tej sekcji.
+
+**Kolejność kolekcji na stronie głównej.** Każda kolekcja to szeroki wiersz z uchwytem z kropek po lewej — przeciągasz wiersz w górę/dół. **Zapisuje się samo w momencie puszczenia** (`reorderCollections`), bez żadnego przycisku; przy błędzie wiersz wraca na miejsce i leci czerwony toast. Na stronie głównej widać pierwsze `HOME_COLLECTIONS_VISIBLE` (= 6), reszta chowa się pod przyciskiem — więc przeciąganie decyduje też o tym, co klient zobaczy od razu. Kolumny `sort_order` / `show_on_home` pochodzą z migracji 66.
+
+**Kolejność produktów wewnątrz kolekcji.** **EDYTUJ** przy kolekcji → sekcja **„Kolejność w kolekcji — przeciągnij"** pod opisami. Lista ponumerowana, z miniaturkami, przeciągana za kropki. Kolumna `products.collection_sort_order` z migracji 75.
+
+> ⚠️ **Tu trzeba kliknąć „Zapisz zmiany".** Inaczej niż przy kolekcjach: samo przeciągnięcie zmienia tylko stan formularza. „Anuluj", zamknięcie albo odświeżenie kasuje układ bez ostrzeżenia. Skrót do zapamiętania: **kolekcje — puść i gotowe; produkty — puść i zapisz.**
+
+Lista kolejności jest **oddzielna od listy z ptaszkami** celowo: ptaszek mówi KTÓRE produkty, przeciąganie W JAKIEJ KOLEJNOŚCI. Wspólna lista oznaczałaby przeciąganie po widoku przefiltrowanym wyszukiwarką produktów, czyli ustawianie kolejności względem pozycji, których nie widać.
+
+**Gdzie widać kolejność produktów:** slider kolekcji, lista `?kolekcja=`, sekcja „Pełna kolekcja" na karcie produktu **oraz mozaika 4 zdjęć na kafelku** — cztery pierwsze produkty dają cztery zdjęcia. Chcesz inne zdjęcie na stronie głównej: przesuń ten produkt na początek.
+
+**Co NIE jest usterką:** klient, który sam wybierze sortowanie albo wpisze frazę, zobaczy swoje uporządkowanie — kolejność z panelu jest domyślna, nie przymusowa (reguła w `_lib/collection-order.ts`).
+
+**Odświeżanie po zapisie jest natychmiastowe** i musi takie zostać. Każda akcja kolejności robi `invalidateCollectionsCache()` (tag `collections`, inaczej `revalidate: 300` trzymałby stare dane do 5 minut) plus `revalidatePath` dla **wszystkich** stron, które dana zmiana dotyka. ⚠️ Dokładając cokolwiek, co czyta kolejność, dopisz tę stronę do listy — `saveCollection`/`setCollectionProducts` odświeżały początkowo tylko `/admin/kolekcje` i `/sklep`, więc po wpięciu kolejności w mozaikę kafelka strona główna zostawała ze starymi zdjęciami i wyglądało to na „nie zapisało się" (naprawione 2026-08-18).
+
+**Slider kolekcji (PR #148):** czyste wejście `/sklep?kolekcja=...` pokazuje slider z całą kolekcją + link „Pokaż wszystkie jako listę". Każdy filtr, sortowanie, fraza lub numer strony oddaje sterowanie dzisiejszej liście — reguła w `_lib/shop-view.ts`, świadomie bez wyjątków, żeby nigdzie nie trzeba było trzymać stanu „user chciał listę". Parametry kampanii (`utm_*`, `fbclid`, `gclid`) widoku **nie** przełączają. Nowa kolekcja dostaje to wszystko automatycznie — warunek patrzy na kształt adresu, nie na listę kolekcji.
+
 ## Setup na nowym kompie
 ```bash
 git clone https://github.com/Woodecky10/sklep-meblowy.git

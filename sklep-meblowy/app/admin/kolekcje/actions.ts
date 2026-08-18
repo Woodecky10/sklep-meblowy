@@ -183,6 +183,11 @@ export async function setCollectionProducts(
   invalidateCollectionsCache();
   revalidatePath("/admin/kolekcje");
   revalidatePath("/sklep");
+  // Strona główna TEŻ, odkąd kolejność produktów decyduje o mozaice kafelka
+  // (migracja 75: cztery pierwsze produkty dają cztery zdjęcia). Bez tego
+  // przestawienie produktów odświeżało slider i listę, a kafelek na stronie
+  // głównej zostawał ze starymi zdjęciami — wyglądałoby to na „nie zapisało się".
+  revalidatePath("/");
   return { ok: true, message: `Przypisano ${productIds.length} produktów` };
 }
 
@@ -225,6 +230,11 @@ export async function saveCollection(
   invalidateCollectionsCache();
   revalidatePath("/admin/kolekcje");
   revalidatePath("/sklep");
+  // Strona główna TEŻ, odkąd kolejność produktów decyduje o mozaice kafelka
+  // (migracja 75: cztery pierwsze produkty dają cztery zdjęcia). Bez tego
+  // przestawienie produktów odświeżało slider i listę, a kafelek na stronie
+  // głównej zostawał ze starymi zdjęciami — wyglądałoby to na „nie zapisało się".
+  revalidatePath("/");
   return { ok: true, message: "Kolekcja zapisana" };
 }
 
