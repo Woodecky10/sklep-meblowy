@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import StarInput from "@/app/_components/ui/StarInput";
 import { submitGuestReview } from "./actions";
 
@@ -20,6 +20,17 @@ export default function GuestReviewForm({
   const [blad, setBlad] = useState<string | null>(null);
   const [wyslane, setWyslane] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  // GoogleAnalytics i MetaPixel siedzą w layoucie korzenia i obejmują też tę
+  // stronę — bez tego pełny link z jawnym tokenem trafiłby do page_location
+  // (GA4) i PageView (Meta) po zgodzie na analitykę. Token zostaje w ukrytym
+  // polu formularza (poniżej), więc czyszczenie adresu nie psuje wysyłki.
+  // replaceState (nie push) — to nie jest nawigacja, tylko sprzątanie paska
+  // adresu, więc nie ma nowego wpisu w historii.
+  useEffect(() => {
+    const bezTokenu = window.location.pathname.replace(/\/[^/]+\/?$/, "/");
+    window.history.replaceState(null, "", bezTokenu + window.location.search);
+  }, []);
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

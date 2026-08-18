@@ -42,7 +42,14 @@ export async function submitGuestReview(formData: FormData): Promise<ActionResul
   if (error) {
     // Najczęstszy przypadek: uniq_review_guest — ten adres już ocenił ten
     // produkt. Treść błędu z bazy nie idzie do klienta (wyciek schematu).
-    console.error("[opinie] zapis opinii gościa nieudany:", error);
+    // Logujemy WYŁĄCZNIE code+message — error.details od PostgREST dla tego
+    // konfliktu brzmi „Key (product_id, lower(guest_email))=(…, jan@x.pl)
+    // already exists.” i wsadziłby adres gościa do logów Vercela, mimo że
+    // adres ma służyć wyłącznie do odróżniania autorów.
+    console.error("[opinie] zapis opinii gościa nieudany:", {
+      code: error.code,
+      message: error.message,
+    });
     return { ok: false, error: "Nie udało się zapisać opinii. Możliwe, że już ją wystawiłeś." };
   }
 

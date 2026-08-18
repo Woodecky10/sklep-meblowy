@@ -161,17 +161,14 @@ export async function sendReviewReminders(): Promise<{ wyslane: number }> {
       const productName = (produkt as { name: string } | null)?.name ?? "Twój zakup";
 
       // ⚠️ Jawnego tokenu NIE MA w bazie (leży tylko skrót), więc przypomnienie
-      // dla gościa nie może odtworzyć starego linku. Wystawiamy NOWY token
-      // i podmieniamy skrót w tym samym wierszu — stary link przestaje działać,
-      // co jest pożądane: w obiegu ma być jeden ważny link.
+      // dla gościa nie może odtworzyć starego linku. Wystawiamy NOWY token —
+      // ale skrót w bazie podmieniamy DOPIERO po udanej wysyłce (niżej). Gdyby
+      // zapisać go od razu, nieudana wysyłka (Resend odrzucił, brak MAIL_FROM,
+      // limit) zostawiałaby gościa z linkiem z pierwszego maila, który właśnie
+      // przestał działać, i bez nowego w zamian.
       let nowyToken: string | null = null;
       if (!o.user_id) {
         nowyToken = generateInviteToken();
-        const { error: errToken } = await admin
-          .from("review_invites")
-          .update({ token_hash: hashInviteToken(nowyToken) } as never)
-          .eq("id", invite.id);
-        if (errToken) continue;
       }
       const reviewUrl = reviewUrlFor({
         base,
@@ -199,8 +196,18 @@ export async function sendReviewReminders(): Promise<{ wyslane: number }> {
             : `Przypomnienie: jak sprawdza się ${productName}?`,
         html,
       });
+      // Rotację tokenu utrwalamy WYŁĄCZNIE gdy mail rzeczywiście wyszedł —
+      // przy nieudanej wysyłce stary link (i jego skrót w bazie) mają zostać
+      // sprawne, bo to jedyny działający link, jaki gość kiedykolwiek dostał.
+      if (ok && nowyToken) {
+        await admin
+          .from("review_invites")
+          .update({ token_hash: hashInviteToken(nowyToken) } as never)
+          .eq("id", invite.id);
+      }
       // reminded_at ustawiamy nawet przy nieudanej wysyłce — inaczej trwała
       // awaria adresu oznaczałaby ponawianie w nieskończoność, raz na dobę.
+      // Przypominamy dokładnie raz, niezależnie od wyniku wysyłki.
       await admin
         .from("review_invites")
         .update({ reminded_at: new Date().toISOString() } as never)
