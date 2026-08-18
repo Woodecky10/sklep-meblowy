@@ -6,6 +6,7 @@ import {
   PRODUCTS_PAGE_LIMIT_MAX,
 } from "@/app/_lib/products";
 import { resolveShopView } from "@/app/_lib/shop-view";
+import { usesCollectionOrder } from "@/app/_lib/collection-order";
 import { parseOptionFilterParams } from "@/app/_lib/option-filter";
 import { parseFeatureFilterParams } from "@/app/_lib/feature-filter";
 import { getRatingsForProducts } from "@/app/_lib/reviews";
@@ -143,6 +144,9 @@ export default async function SklepPage({
       featureFilters,
       dimensionRanges,
       collectionSlug,
+      // Kolejność z panelu jest DOMYŚLNA dla widoku kolekcji i ustępuje, gdy
+      // klient wybierze sortowanie albo wpisze frazę — reguła w collection-order.ts.
+      useCollectionOrder: usesCollectionOrder(sp),
       sectionSlug,
       locale,
       // Slider pokazuje CAŁĄ kolekcję, więc omija stronicowanie. Dziś

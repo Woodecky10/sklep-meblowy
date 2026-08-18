@@ -139,6 +139,27 @@ export async function deleteCollection(formData: FormData): Promise<ActionResult
 // 2. Wszystkie INNE produkty obecnie należące do tej kolekcji (które nie są
 //    w nowej liście) — odpinają się (collection_id = null).
 // Atomowo na poziomie kolekcji.
+// Zapis kolejności produktów w kolekcji (migracja 75). Kolejność niesie sama
+// tablica `productIds` — panel oddaje ją w tej, którą admin ułożył przeciąganiem.
+//
+// ⚠️ To DRUGIE wywołanie RPC, nie część transakcji z przypisaniem. Świadomie:
+// pad między nimi zostawia przypisania zapisane, a kolejność starą — czyli
+// widok sprzed zmiany, który naprawia kolejny zapis. To jest jakościowo inna
+// sytuacja niż audyt LOW #14/#15 (tam rozjeżdżały się metadane z przypisaniami
+// i dane znikały klientowi z oczu). Gdyby kiedyś kolejność zaczęła znaczyć
+// więcej, wzorzec do naśladowania jest w save_collection: jedna funkcja SQL
+// robiąca oba UPDATE-y.
+async function persistCollectionProductOrder(
+  supabase: Awaited<ReturnType<typeof createAdminClient>>,
+  productIds: string[]
+): Promise<string | null> {
+  if (productIds.length === 0) return null;
+  const { error } = await supabase.rpc("reorder_collection_products", {
+    p_ids: productIds,
+  });
+  return error ? `Zapis kolejności: ${error.message}` : null;
+}
+
 export async function setCollectionProducts(
   collectionId: string,
   productIds: string[]
@@ -155,6 +176,9 @@ export async function setCollectionProducts(
     p_product_ids: productIds,
   });
   if (error) return { ok: false, error: `Zapis przypisań: ${error.message}` };
+
+  const orderError = await persistCollectionProductOrder(supabase, productIds);
+  if (orderError) return { ok: false, error: orderError };
 
   invalidateCollectionsCache();
   revalidatePath("/admin/kolekcje");
@@ -194,6 +218,9 @@ export async function saveCollection(
     p_product_ids: productIds,
   });
   if (error) return { ok: false, error: error.message };
+
+  const orderError = await persistCollectionProductOrder(supabase, productIds);
+  if (orderError) return { ok: false, error: orderError };
 
   invalidateCollectionsCache();
   revalidatePath("/admin/kolekcje");

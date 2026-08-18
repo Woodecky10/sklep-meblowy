@@ -85,6 +85,12 @@ export type ProductFilters = {
   // Slug kolekcji — filtruje produkty należące do konkretnej kolekcji
   // (np. ?kolekcja=lisbon w URL).
   collectionSlug?: string;
+  // Ustawia produkty w kolejności zadanej przez admina (collection_sort_order,
+  // migracja 75) zamiast sortowania z `sort`. O TYM, KIEDY to wolno włączyć,
+  // NIE decyduje ten moduł — decyduje `usesCollectionOrder` z collection-order.ts,
+  // wołane w app/sklep/page.tsx. Gdyby regułę powtórzyć tutaj, dwa miejsca
+  // orzekałyby o tym samym i cicho by się rozjechały.
+  useCollectionOrder?: boolean;
   // Legacy alias `?sekcja=` — od migracji 68 sekcje i kategorie to jedno drzewo,
   // więc ten parametr rozwiązuje się dokładnie tak samo jak `category`.
   // Zostaje dla zaindeksowanych i zabookmarkowanych linków. Gdy oba są
@@ -134,6 +140,7 @@ export async function getProducts(
     featureFilters,
     dimensionRanges,
     collectionSlug,
+    useCollectionOrder,
     sectionSlug,
     locale = DEFAULT_LOCALE,
     skipTypoCorrection,
@@ -249,7 +256,16 @@ export async function getProducts(
     query = query.in("id", ids);
   }
 
-  if (sort === "price_asc") {
+  if (useCollectionOrder) {
+    // Kolejność ułożona przeciąganiem w /admin/kolekcje. Stoi PRZED `sort`,
+    // bo jest domyślną kolejnością widoku kolekcji — wywołujący włącza ją
+    // wyłącznie wtedy, gdy klient nie poprosił o inne uporządkowanie
+    // (patrz usesCollectionOrder). Nazwa jako rozstrzygnięcie remisów: świeżo
+    // dodany produkt ma 0, jak pierwszy w kolekcji, dopóki admin nie przeciągnie.
+    query = query
+      .order("collection_sort_order", { ascending: true })
+      .order("name", { ascending: true });
+  } else if (sort === "price_asc") {
     query = query.order("price", { ascending: true });
   } else if (sort === "price_desc") {
     query = query.order("price", { ascending: false });

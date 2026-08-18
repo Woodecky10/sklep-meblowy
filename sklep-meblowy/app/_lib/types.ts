@@ -126,6 +126,12 @@ export type Product = {
   description_sections: ProductDescriptionSection[];
   variants: ProductVariants | null;
   collection_id: string | null;
+  // Pozycja produktu WEWNĄTRZ jego kolekcji (migracja 75). Mniejsze = wcześniej;
+  // przy równych rozstrzyga nazwa. Ustawiana przeciąganiem w /admin/kolekcje.
+  // Obowiązuje wszędzie, gdzie kolekcja występuje jako kolekcja (slider, lista,
+  // „Pełna kolekcja" na karcie produktu, mozaika na stronie głównej) — ustępuje
+  // dopiero, gdy klient sam wybierze sortowanie albo wpisze frazę.
+  collection_sort_order: number;
   // Grupa rozmiarów (migracja 35) — łączy osobne produkty tego samego mebla
   // w różnych rozmiarach. size_group: wspólny klucz; size_label: etykieta tego
   // rozmiaru ("140×200 cm"). Selektor rozmiaru na karcie produktu pokazuje
