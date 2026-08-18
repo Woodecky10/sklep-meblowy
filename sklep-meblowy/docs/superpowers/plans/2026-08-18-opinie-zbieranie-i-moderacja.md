@@ -44,7 +44,7 @@ Aktualizowana po każdym zadaniu.
   bazy to decyzja właściciela). Skutek uboczny do zapamiętania: spec e2e
   z zadania 5 przechodzi przed migracją **z niewłaściwego powodu** — brak tabeli
   daje ten sam 404 co zły token. **Po zaaplikowaniu migracji odpal go ponownie.**
-- Zadania: ⬜ 1 · ⬜ 2 · ⬜ 3 · ⬜ 4 · ⬜ 5 · ⬜ 6
+- Zadania: ✅ 1 · ⬜ 2 · ⬜ 3 · ⬜ 4 · ⬜ 5 · ⬜ 6
 
 ## Ograniczenia globalne
 
@@ -2023,6 +2023,20 @@ Oczekiwane: 0, 0, wszystko zielone, build przechodzi.
 
 - [ ] **PR i scalenie** — opis ma zawierać wynik bramek i wyraźne zdanie, że
   migracja 76 **nie jest jeszcze zaaplikowana**.
+
+- [ ] ⚠️ **TUŻ PRZED aplikacją migracji policz istniejące opinie:**
+
+```sql
+select count(*) as opinie, count(*) filter (where status is null) as bez_statusu
+from product_reviews;
+```
+
+  Kolumna `status` dostaje `default 'pending'` **bez backfillu**. Jest to
+  bezpieczne wyłącznie dlatego, że tabela jest dziś pusta (sprawdzone
+  2026-08-18: 0 wierszy). **Gdyby w międzyczasie ktoś wystawił opinię, ta
+  migracja schowa ją z widoku publicznego** do czasu ręcznego zatwierdzenia
+  w panelu — wtedy dopisz `update product_reviews set status = 'approved'`
+  dla wierszy sprzed migracji, ZANIM ją zastosujesz.
 
 - [ ] **Zaaplikuj migrację 76 ręcznie** przez Supabase MCP (`apply_migration`),
   bo auto-apply nie działa (57, 58, 75). Potem **sprawdź po obiektach, nie po
