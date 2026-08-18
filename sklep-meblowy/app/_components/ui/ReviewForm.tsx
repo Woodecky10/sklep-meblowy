@@ -36,6 +36,7 @@ export default function ReviewForm({
         saveError: "Bewertung konnte nicht gespeichert werden",
         deleteError: "Bewertung konnte nicht gelöscht werden",
         unknownError: "Unbekannter Fehler",
+        moderacja: "Vielen Dank. Die Bewertung erscheint nach der Prüfung durch den Shop.",
       }
     : {
         editTitle: "Edytuj swoją opinię",
@@ -53,11 +54,13 @@ export default function ReviewForm({
         saveError: "Nie udało się zapisać opinii",
         deleteError: "Nie udało się usunąć opinii",
         unknownError: "Nieznany błąd",
+        moderacja: "Dziękujemy. Opinia pojawi się po sprawdzeniu przez obsługę sklepu.",
       };
   const [rating, setRating] = useState<number>(existingReview?.rating ?? 0);
   const [comment, setComment] = useState<string>(existingReview?.comment ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
   const confirm = useConfirm();
 
   async function onSubmit(e: React.FormEvent) {
@@ -76,6 +79,7 @@ export default function ReviewForm({
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? c.saveError);
+      setSent(true);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : c.unknownError);
@@ -149,6 +153,12 @@ export default function ReviewForm({
       {error && (
         <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 rounded-xl px-4 py-3 text-sm">
           {error}
+        </div>
+      )}
+
+      {sent && (
+        <div className="bg-[var(--card-bg)] border border-[var(--border)] text-[var(--fg)] rounded-xl px-4 py-3 text-sm">
+          {c.moderacja}
         </div>
       )}
 

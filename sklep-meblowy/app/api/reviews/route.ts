@@ -80,6 +80,10 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         rating: ratingInt,
         comment: trimmedComment || null,
+        // Każdy zapis (nowa opinia I edycja) wraca do moderacji. Bez tego
+        // wystarczyłoby napisać coś neutralnego, doczekać zatwierdzenia
+        // i podmienić treść.
+        status: "pending",
       } as never,
       { onConflict: "product_id,user_id" }
     )
