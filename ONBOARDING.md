@@ -62,10 +62,10 @@ Decyzja właścicielki (2026-06-17): sklep prowadzi produkty, kategorie i zamów
 4 podprojekty tego programu:
 1. ✅ **Panel zarządzania zamówieniami** — na `main`.
 2. ✅ **Natywne tworzenie produktów** — na `main`.
-3. ⬜ **Faktury / VAT — przez KSeF** — TODO, czeka na odpowiedzi właścicielki. USTALENIE 2026-06-18: faktury **MUSZĄ być w KSeF** (obowiązkowy od 1.04.2026 dla „pozostałych przedsiębiorców"). **Rekomendacja: NIE budować bezpośredniej integracji KSeF** — sklep zbiera dane → API programu fakturowego (Fakturownia/wFirma/inFakt/Comarch), który robi KSeF+FA(3)+numerację+PDF+UPO. W kodzie ZERO podstaw (brak NIP/danych firmy/VAT/podziału netto-brutto). Najważniejsze pytanie: z jakiego programu fakturowego korzysta księgowa.
+3. ❌ **Faktury / VAT — przez KSeF — NIE ROBIMY.** Decyzja właścicielki **2026-07-28**: sklep nie będzie w żaden sposób obsługiwał faktur. Nie zaczynaj tego tematu bez wyraźnej nowej decyzji — nawet jeśli poniższy kontekst wygląda na zaproszenie.<br>Kontekst, gdyby temat kiedyś wrócił (rozpoznanie 2026-06-18): KSeF jest obowiązkowy od 1.04.2026 dla „pozostałych przedsiębiorców", a sklep meblowy nie łapie się na wyjątek dla najmniejszych firm (jeden mebel > 450 zł). Faktury wystawiane są więc **poza sklepem**, po stronie księgowości. Rekomendacja z rozpoznania: NIE budować bezpośredniej integracji KSeF, tylko oddać dane do API programu fakturowego (Fakturownia/wFirma/inFakt/Comarch), który robi KSeF+FA(3)+numerację+PDF+UPO. W kodzie jest ZERO podstaw (brak NIP, danych firmy, VAT, podziału netto/brutto) — to byłby projekt od zera, nie rozszerzenie.
 4. 🟡 **Wysyłka — transport firmą transportową (NIE kurier)** — slice 1 ZROBIONY (PR #38: klient widzi przewoźnika + tracking w `/konto/zamowienia/[id]`). ⬜ Reszta: planowany termin dostawy, dane dla firmy transportowej (piętro/winda/wniesienie/telefon), model kosztu. Gabarytów nie wozi kurier → bez integracji API kuriera, moduł ręczny.
 
-Pytania do właścicielki (faktury KSeF + wysyłka): `sklep-meblowy/docs/2026-06-18-rozpoznanie-faktury-wysylka.md`.
+Pytania do właścicielki (faktury KSeF + wysyłka): `sklep-meblowy/docs/2026-06-18-rozpoznanie-faktury-wysylka.md` — **część o fakturach jest już rozstrzygnięta**, patrz punkt 3 wyżej; aktualna została tylko wysyłka.
 
 ## Ceny EUR na /de (2026-06-24, PR #42)
 Klient na `/de` widzi i **płaci w EUR**; PL (`/`) bez zmian (PLN). Stały kurs PLN→EUR w tabeli `store_settings`, edytowalny w **`/admin/ustawienia`** (bez deploya). Konwersja `eur = ceil(pln × kurs)` tylko przy wyświetlaniu (`formatMoney`) i w checkoutcie; ceny w DB/koszyku zostają w PLN. Każde zamówienie zapisuje `orders.currency` + `fx_rate`; kwoty zamówień (konto/admin/sukces) formatowane wg **waluty zamówienia**, nie locale. Checkout DE: P24 `currency:"EUR"` (karta PL/DE), BLIK = PLN-only → wykluczony z DE. Klucz: `app/_lib/money.ts`, `getEurRate` (`store-settings.ts`, cache+fallback), `RateProvider`/`useEurRate` (seed w root layoucie), `ProductCard` z **wymaganym** propem `rate`.
@@ -191,8 +191,11 @@ curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $SUPABASE_ACCES
 
 ## Baza — migracje
 **WSZYSTKIE migracje z `main` są ODPALONE** na produkcyjnym Supabase — sprawdzone 2026-07-30 przez `list_migrations`. Z repo została **tylko `48` (P24)**. Uwaga na dwa mylące wpisy: migracja `65_products_search_key` figuruje w bazie pod starą nazwą `61_products_search_key` (plik przenumerowano w repo z powodu kolizji z `61_variant_info`; jest w całości wgrana — `search_key` i `search_key_de` + dwa indeksy GIN), a `47_p24_payment_ref` jest wgrana na prodzie, choć pliku nie ma na `main` (leży na tej gałęzi, PR #48). Wspólna baza → świeży klon nic nie re-uruchamia. Przyszłe migracje: kolejny numer w `sklep-meblowy/supabase/migrations/` (kanoniczny katalog); odpala człowiek w Supabase SQL Editorze albo agent przez Supabase MCP (model: pokaż SQL → potwierdź → wykonaj).
+
 > Migracja **47** (`47_p24_payment_ref.sql`) jest **addytywna (expand)** — dodaje `payment_ref` + `payment_provider` i backfilluje istniejące zamówienia jako `stripe`, **nie rusza `stripe_payment_intent`**. Dlatego była bezpieczna przy żywym kodzie Stripe i odpalono ją **PRZED** merge'em tej gałęzi (2026-07-29; preview dzieli bazę z produkcją).
 > Migracja **48** (`48_drop_stripe_payment_intent.sql`) — odpalać **po cutoverze**, bez 30-dniowego okna zwrotów (patrz punkt 5 w „Gdzie stanęliśmy": w bazie nie ma ani jednego zamówienia opłaconego Stripe'em). Po niej: usunąć `stripe_payment_intent` z `types.ts` i z fallbacku w panelu admina.
+
+⚠️ **Auto-apply po merge'u NIE działa.** Migracja scalona do `main` **nie wjeżdża sama** na bazę — potwierdzone na migracjach 57, 58 i 75. Po każdym merge'u PR-a z migracją sprawdź stan po obiektach (patrz akapit niżej) i zaaplikuj ręcznie przez Supabase MCP.
 
 ⚠️ **Rejestr migracji w bazie jest NIEPEŁNY i nie nadaje się do oceny stanu schematu.** Sprawdzone 2026-07-30: `supabase_migrations.schema_migrations` ma **23 wpisy**, a w repo jest **58 plików**. To NIE znaczy, że 35 brakuje — migracje `01`–`46` oraz `49`–`58` wgrywano ręcznie w SQL Editorze, a ten nie zapisuje się do rejestru. Dodatkowo nazwy w rejestrze nie zgadzają się z plikami: `62_fabric_short_info` figuruje jako `fabric_short_info`, a `65_products_search_key` jako `61_products_search_key`. Najnowsze wpisy: `47_p24_payment_ref` (2026-07-29) i grupa `fabric_*` (24–27.07).
 **Wniosek: stan bazy sprawdzaj po OBIEKTACH, nie po rejestrze** — czy kolumna/indeks/RPC istnieje (`information_schema`, `pg_indexes`), a nie czy plik widnieje na liście migracji. Inaczej wyjdzie fałszywy alarm „brakuje 35 migracji".
@@ -202,6 +205,7 @@ curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $SUPABASE_ACCES
 ## Bramki jakości (uruchamiać z `sklep-meblowy/`)
 `npx tsc --noEmit` (0 błędów) · `npm run lint` (0) · `npm test` (vitest — **877 zielonych w 74 plikach**, stan 2026-07-31) · `npm run build` (Turbopack przechodzi).
 > Po przełączeniu gałęzi build/tsc potrafi pokazać „phantom" błędy ze stale cache `.next` (referencje do nieistniejących już tras). Jeśli tak — `rm -rf .next` i ponów.
+> ⚠️ **Nie odpalaj `npm run build`, gdy w tle chodzi `next dev`** — build psuje `.next` dev-serwera i localhost zaczyna serwować stary render (wygląda to jak „poprawka nie zadziałała"). Wtedy: ubij proces na porcie `:3000`, `rm -rf .next`, restart.
 
 ## Push do origin
 Origin wymaga konta **Woodecky10** — `mwlo1403` NIE ma write (push → 403). Każdy push do `main` — za wyraźną zgodą właściciela.
@@ -245,8 +249,9 @@ Gotchy, które kosztowały czas i wrócą:
 **Na nowym komputerze:** `git pull` na `main` + `npm install`, a potem odtworzyć **`.env.local`** (gitignored, NIE przychodzi z klonem) — lista zmiennych w `docs/uruchomienie-dev.md`. Do zabawy lokalnie bierz klucze **sandboxowe** i `P24_BASE_URL=https://sandbox.przelewy24.pl`, inaczej każdy klik w checkoucie to prawdziwa płatność. Wartości sandbox: panel sandboxa → **MOJE DANE → Ustawienia** („Klucz do CRC" i „Klucz do raportów"), ID konta w nagłówku panelu.
 
 ## Następny krok
-1. **Podprojekt 3 (faktury KSeF)** — czeka na odpowiedź: z jakiego programu fakturowego korzysta księgowa (przesądza drogę); potem spec → plan → wdrożenie.
-3. **Reszta podprojektu 4 (wysyłka)** — termin dostawy, dane transportu, model kosztu.
+1. **Reszta podprojektu 4 (wysyłka)** — termin dostawy, dane transportu, model kosztu.
+
+> Podprojektu 3 (faktury / KSeF) **nie ma już na tej liście** — decyzja 2026-07-28 zamyka temat, patrz „4 podprojekty tego programu", punkt 3.
 
 ## 🔑 Przekazanie obsługi — checklista zasobów (2026-08-10)
 
