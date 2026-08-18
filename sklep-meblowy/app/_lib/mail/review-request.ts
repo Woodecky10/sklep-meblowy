@@ -1,8 +1,10 @@
 import { render } from "@react-email/components";
 import { getOrderById, getProfilesByIds } from "../orders";
 import { createInvite } from "../review-invites-server";
-import { reviewUrlFor } from "../review-tokens";
+import { shouldRemind } from "../review-reminders";
+import { generateInviteToken, hashInviteToken, reviewUrlFor } from "../review-tokens";
 import { createAdminClient } from "../supabase/server";
+import type { ReviewInvite } from "../types";
 import { getMailBranding } from "./branding-server";
 import { mailLocale } from "./locale";
 import { sendMail } from "./send";
@@ -98,4 +100,103 @@ export async function requestReviews(orderId: string): Promise<void> {
   } catch (err) {
     console.error("[mail] requestReviews nieudane:", err);
   }
+}
+
+// Przemiatanie przypomnień — wołane z crona. Idempotentne: `reminded_at`
+// ustawiane po wysłaniu sprawia, że powtórne odpalenie nic nie wysyła.
+export async function sendReviewReminders(): Promise<{ wyslane: number }> {
+  const admin = await createAdminClient();
+  const { data } = await admin
+    .from("review_invites")
+    .select("*")
+    .is("reminded_at", null)
+    .is("used_at", null);
+
+  const zaproszenia = (data ?? []) as ReviewInvite[];
+  const teraz = new Date();
+  let wyslane = 0;
+
+  for (const invite of zaproszenia) {
+    // Czy dla tej pary istnieje JAKAKOLWIEK opinia — po koncie właściciela
+    // zamówienia albo po adresie gościa.
+    const { data: zamowienie } = await admin
+      .from("orders")
+      .select("user_id, currency, order_number")
+      .eq("id", invite.order_id)
+      .maybeSingle();
+    const o = zamowienie as
+      | { user_id: string | null; currency: string; order_number: number }
+      | null;
+    if (!o) continue;
+
+    let zapytanie = admin
+      .from("product_reviews")
+      .select("id", { count: "exact", head: true })
+      .eq("product_id", invite.product_id);
+    zapytanie = o.user_id
+      ? zapytanie.eq("user_id", o.user_id)
+      : zapytanie.ilike("guest_email", invite.email);
+    const { count } = await zapytanie;
+
+    if (!shouldRemind(invite, (count ?? 0) > 0, teraz)) continue;
+
+    const branding = await getMailBranding();
+    const locale = mailLocale(o.currency);
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://mollien.pl";
+    const { data: produkt } = await admin
+      .from("products")
+      .select("name")
+      .eq("id", invite.product_id)
+      .maybeSingle();
+    const productName = (produkt as { name: string } | null)?.name ?? "Twój zakup";
+
+    // ⚠️ Jawnego tokenu NIE MA w bazie (leży tylko skrót), więc przypomnienie
+    // dla gościa nie może odtworzyć starego linku. Wystawiamy NOWY token
+    // i podmieniamy skrót w tym samym wierszu — stary link przestaje działać,
+    // co jest pożądane: w obiegu ma być jeden ważny link.
+    let nowyToken: string | null = null;
+    if (!o.user_id) {
+      nowyToken = generateInviteToken();
+      const { error: errToken } = await admin
+        .from("review_invites")
+        .update({ token_hash: hashInviteToken(nowyToken) } as never)
+        .eq("id", invite.id);
+      if (errToken) continue;
+    }
+    const reviewUrl = reviewUrlFor({
+      base,
+      locale,
+      maKonto: o.user_id !== null,
+      productId: invite.product_id,
+      token: nowyToken,
+    });
+
+    const html = await render(
+      ReviewRequest({
+        branding,
+        locale,
+        productName,
+        reviewUrl,
+        orderNumber: o.order_number,
+        przypomnienie: true,
+      })
+    );
+    const ok = await sendMail({
+      to: invite.email,
+      subject:
+        locale === "de"
+          ? `Erinnerung: Wie gefällt Ihnen ${productName}?`
+          : `Przypomnienie: jak sprawdza się ${productName}?`,
+      html,
+    });
+    // reminded_at ustawiamy nawet przy nieudanej wysyłce — inaczej trwała
+    // awaria adresu oznaczałaby ponawianie w nieskończoność, raz na dobę.
+    await admin
+      .from("review_invites")
+      .update({ reminded_at: new Date().toISOString() } as never)
+      .eq("id", invite.id);
+    if (ok) wyslane++;
+  }
+
+  return { wyslane };
 }
