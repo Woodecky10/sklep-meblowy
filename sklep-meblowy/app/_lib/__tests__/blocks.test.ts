@@ -72,6 +72,23 @@ describe("DEFAULT_HOME_BLOCKS", () => {
     expect(reviews.content.subheading).toBe("Opinie klientów");
     expect(reviews.content.subheading_de).toBe("Kundenmeinungen");
   });
+  it("wszystkie defaulty systemowe są widoczne, OPRÓCZ customer_reviews (jedyny wyjątek)", () => {
+    // Intencja od tego zadania: dopóki `page_blocks` nie ma realnego wiersza
+    // dla "customer_reviews", jego default musi startować jako niewidoczny —
+    // inaczej sekcja zapaliłaby się sama, a panel nie mógłby jej ukryć/
+    // przestawić (syntetyczne id "system:customer_reviews" nie przechodzi
+    // przez requireBlockId w actions.ts). Ten test twierdzi tyle samo, co
+    // przed zmianą (wszystkie defaulty widoczne) — tylko z jawnym, jednym
+    // wyjątkiem, żeby przyszła zmiana defaultu nie przeszła niezauważona.
+    const others = DEFAULT_HOME_BLOCKS.filter(
+      (b) => b.block_type !== "customer_reviews"
+    );
+    expect(others.every((b) => b.visible === true)).toBe(true);
+    const reviews = DEFAULT_HOME_BLOCKS.find(
+      (b) => b.block_type === "customer_reviews"
+    )!;
+    expect(reviews.visible).toBe(false);
+  });
   it("localizeBlock traktuje customer_reviews generycznie (nagłówek + podnagłówek)", () => {
     const r = row({
       block_type: "customer_reviews",

@@ -35,7 +35,15 @@ export default function ReviewCard({
         </span>
       </div>
 
-      <blockquote className="flex-1 whitespace-pre-wrap leading-relaxed text-[var(--fg)]">
+      {/* Opinia może mieć do 2000 znaków (limit w app/opinia/[token]/actions.ts),
+          a selectHomepageReviews (reviews-display.ts) filtruje tylko DOLNY
+          próg długości — górnego nie ma. Slajdy w ProductCarousel rozciągają
+          się do najwyższego elementu rzędu, a na lg kolumna ma
+          basis-[calc(25%-1.5rem)], więc jedna długa opinia zrobiłaby ze
+          wszystkich kart wąskie, bardzo wysokie słupy tekstu. line-clamp-6
+          obcina wizualnie na home — pełna treść jest zawsze dostępna na
+          /opinie, do której prowadzi przycisk pod sliderem. */}
+      <blockquote className="flex-1 whitespace-pre-wrap leading-relaxed text-[var(--fg)] line-clamp-6">
         {review.comment}
       </blockquote>
 

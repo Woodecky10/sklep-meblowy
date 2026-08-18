@@ -105,7 +105,19 @@ export const DEFAULT_HOME_BLOCKS: PageBlockRow[] = [
   { id: "system:collections", page_id: null, block_type: "collections", sort_order: 4, visible: true, content: { heading: pl.home.seriesHeading, heading_de: de.home?.seriesHeading ?? pl.home.seriesHeading, subheading: pl.home.seriesEyebrow, subheading_de: de.home?.seriesEyebrow ?? pl.home.seriesEyebrow } },
   // Defaulty działają WYŁĄCZNIE przy pustej/niedostępnej tabeli — na produkcji
   // page_blocks ma już swoje wiersze, a ten wstawia osobna migracja.
-  { id: "system:customer_reviews", page_id: null, block_type: "customer_reviews", sort_order: 5, visible: true, content: { heading: pl.home.reviewsHeading, heading_de: de.home?.reviewsHeading ?? pl.home.reviewsHeading, subheading: pl.home.reviewsEyebrow, subheading_de: de.home?.reviewsEyebrow ?? pl.home.reviewsEyebrow } },
+  //
+  // ⚠️ visible: false — JEDYNY default w tej tablicy, który tak startuje.
+  // Dopóki `page_blocks` nie ma realnego wiersza dla "customer_reviews",
+  // mergeHomeBlocks() dokłada ten default z syntetycznym id
+  // "system:customer_reviews", a requireBlockId() w actions.ts przepuszcza
+  // wyłącznie uuid — każda akcja panelu (toggle, zmiana nagłówków) na tym
+  // syntetycznym id odbije się błędem „Sekcja nie ma jeszcze wpisu w bazie".
+  // Gdyby ten default startował jako visible: true, sekcja zapaliłaby się
+  // sama po pierwszej zatwierdzonej opinii i nie dałoby się jej ukryć,
+  // przestawić ani zmienić nagłówków z panelu. visible: false trzyma ją
+  // zgaszoną, aż osobna migracja wstawi realny wiersz (z visible: true) —
+  // od tego momentu sekcja jest już sterowalna z panelu jak każda inna.
+  { id: "system:customer_reviews", page_id: null, block_type: "customer_reviews", sort_order: 5, visible: false, content: { heading: pl.home.reviewsHeading, heading_de: de.home?.reviewsHeading ?? pl.home.reviewsHeading, subheading: pl.home.reviewsEyebrow, subheading_de: de.home?.reviewsEyebrow ?? pl.home.reviewsEyebrow } },
 ];
 
 // Scala wiersze z DB z gwarancjami: null (błąd) → defaulty; nieznane typy
