@@ -44,7 +44,7 @@ Aktualizowana po każdym zadaniu.
   bazy to decyzja właściciela). Skutek uboczny do zapamiętania: spec e2e
   z zadania 5 przechodzi przed migracją **z niewłaściwego powodu** — brak tabeli
   daje ten sam 404 co zły token. **Po zaaplikowaniu migracji odpal go ponownie.**
-- Zadania: ✅ 1 · ⬜ 2 · ⬜ 3 · ⬜ 4 · ⬜ 5 · ⬜ 6
+- Zadania: ✅ 1 · ✅ 2 · ✅ 3 · ⬜ 4 · ⬜ 5 · ⬜ 6
 
 ## Ograniczenia globalne
 
