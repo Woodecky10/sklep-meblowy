@@ -28,6 +28,24 @@ Playwright.
 Punkt 7 — slider na stronie głównej i `/opinie` — to **plan 2/2**, pisany
 osobno, po scaleniu tego.
 
+## STAN WYKONANIA
+
+`.superpowers/sdd/` jest gitignorowany, więc dziennik wykonania nie przechodzi
+między komputerami — **ta sekcja jest jedynym nośnikiem stanu w repo.**
+Aktualizowana po każdym zadaniu.
+
+- Gałąź: `feat/opinie-zbieranie-i-moderacja`, start `0675c6f`.
+- **Skan przedwykonawczy znalazł jedną usterkę planu:** kod zadania 3 pytał
+  o `products(name, slug)`, a tabela `products` **nie ma kolumny `slug`**
+  (ma `id`, `name`, `images`). Zapytanie zostałoby odrzucone, funkcja połknęłaby
+  błąd i zwróciła pustą listę — panel moderacji byłby pusty bez śladu przyczyny.
+  Poprawione przed rozpoczęciem: linkujemy po `id`.
+- **Migracja 76 celowo NIE jest aplikowana w trakcie** (zmiana schematu żywej
+  bazy to decyzja właściciela). Skutek uboczny do zapamiętania: spec e2e
+  z zadania 5 przechodzi przed migracją **z niewłaściwego powodu** — brak tabeli
+  daje ten sam 404 co zły token. **Po zaaplikowaniu migracji odpal go ponownie.**
+- Zadania: ⬜ 1 · ⬜ 2 · ⬜ 3 · ⬜ 4 · ⬜ 5 · ⬜ 6
+
 ## Ograniczenia globalne
 
 Dotyczą **każdego** zadania, nie powtarzam ich przy każdym:
@@ -467,9 +485,10 @@ import { createAdminClient } from "./supabase/server";
 import { authorNameOf } from "./reviews";
 import type { ProductReview, ReviewStatus } from "./types";
 
+// ⚠️ Bez `slug` — tabela `products` NIE MA takiej kolumny (sprawdzone na
+// produkcji 2026-08-18). Produkty linkuje się po id: /produkt/<id>.
 export type ReviewForModeration = ProductReview & {
   product_name: string | null;
-  product_slug: string | null;
 };
 
 // Panel czyta klientem administracyjnym, bo reguła publicznego odczytu
@@ -481,7 +500,7 @@ export async function getReviewsForModeration(
   const admin = await createAdminClient();
   const { data, error } = await admin
     .from("product_reviews")
-    .select("*, products(name, slug)")
+    .select("*, products(name)")
     // Najstarsze pierwsze: kolejka moderacji, nie tablica ogłoszeń —
     // najdłużej czekający klient ma być obsłużony pierwszy.
     .order("created_at", { ascending: true })
@@ -489,7 +508,7 @@ export async function getReviewsForModeration(
   if (error || !data) return [];
 
   const rows = data as unknown as (ProductReview & {
-    products: { name: string | null; slug: string | null } | null;
+    products: { name: string | null } | null;
   })[];
 
   const userIds = Array.from(
@@ -510,7 +529,6 @@ export async function getReviewsForModeration(
     ...r,
     author_name: authorNameOf(r, nameMap.get(r.user_id ?? "")),
     product_name: r.products?.name ?? null,
-    product_slug: r.products?.slug ?? null,
   }));
 }
 
