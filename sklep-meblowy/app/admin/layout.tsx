@@ -3,6 +3,7 @@ import { requireAdmin } from "@/app/_lib/admin";
 import { getNewOrderIssuesCount } from "@/app/_lib/order-issues-data";
 import { getNewOrdersCount } from "@/app/_lib/orders";
 import { getNewSampleOrdersCount } from "@/app/_lib/samples";
+import { getPendingReviewsCount } from "@/app/_lib/reviews-admin";
 import AdminShell from "./AdminShell";
 
 export const metadata: Metadata = {
@@ -16,12 +17,13 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const user = await requireAdmin();
-  // Trzy niezależne liczniki — równolegle, żeby nie dokładać trzech round-tripów
+  // Cztery niezależne liczniki — równolegle, żeby nie dokładać round-tripów
   // do każdej podstrony panelu.
-  const [newIssues, newOrders, newSamples] = await Promise.all([
+  const [newIssues, newOrders, newSamples, newReviews] = await Promise.all([
     getNewOrderIssuesCount(),
     getNewOrdersCount(),
     getNewSampleOrdersCount(),
+    getPendingReviewsCount(),
   ]);
 
   return (
@@ -30,6 +32,7 @@ export default async function AdminLayout({
       newIssues={newIssues}
       newOrders={newOrders}
       newSamples={newSamples}
+      newReviews={newReviews}
     >
       {children}
     </AdminShell>
