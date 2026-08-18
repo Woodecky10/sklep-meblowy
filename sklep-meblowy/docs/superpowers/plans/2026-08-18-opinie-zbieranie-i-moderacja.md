@@ -44,7 +44,24 @@ Aktualizowana po każdym zadaniu.
   bazy to decyzja właściciela). Skutek uboczny do zapamiętania: spec e2e
   z zadania 5 przechodzi przed migracją **z niewłaściwego powodu** — brak tabeli
   daje ten sam 404 co zły token. **Po zaaplikowaniu migracji odpal go ponownie.**
-- Zadania: ✅ 1 · ✅ 2 · ✅ 3 · ✅ 4 · ✅ 5 · ✅ 6
+- Zadania: ✅ 1 · ✅ 2 · ✅ 3 · ✅ 4 · ✅ 5 · ✅ 6 — **WSZYSTKIE ZAMKNIĘTE**
+- Szeroka recenzja całej gałęzi: wykonana, poprawki naniesione, werdykt **gotowe do scalenia**.
+- Bramki na gotowej gałęzi: `tsc` 0 · `lint` 0 błędów (4 znane ostrzeżenia) · **1607 testów w 104 plikach** · `build` przechodzi.
+
+### Co szeroka recenzja znalazła — obie usterki krytyczne pochodziły z TEJ SPECYFIKACJI, nie z wykonania
+
+1. **Migracja rozbrajała `upsert` w ścieżce zalogowanego.** Specyfikacja kazała zastąpić `UNIQUE (product_id, user_id)` indeksem **częściowym**. Trasa `/api/reviews` robi `upsert` z `onConflict: "product_id,user_id"`, a PostgREST nie potrafi podać predykatu, więc Postgres nie wywnioskuje indeksu częściowego → błąd `42P10` pokazywany klientowi jako *„Nie możesz dodać opinii — weryfikujemy zakupy klientów"* przy w pełni sprawnym zakupie. Uzasadnienie w specyfikacji („stare unique przestaje działać") było **nietrafne** — od gości chroni `uniq_review_guest`. Naprawione: stare ograniczenie zostaje, `uniq_review_user` nie powstaje.
+2. **Moderację dało się ominąć bezpośrednim wywołaniem REST.** Migracja zmieniała tylko polityki `SELECT`; polityki zapisu z migracji 06/46 nie wspominały o `status`, a klucz anon jest w pakiecie przeglądarki — zalogowany kupujący mógł wstawić własną opinię ze `status = 'approved'`. Zdanie z tego planu („moderacja egzekwowana regułą RLS, nie tylko warstwą aplikacji") było do tej chwili **nieprawdziwe**. Naprawione: obie polityki zapisu wymuszają `status = 'pending'`, z warunkiem weryfikacji zakupu przepisanym dosłownie z migracji 46.
+
+Do tego trzy ważne: przypomnienie unieważniało stary link przy nieudanej wysyłce, adres e-mail gościa trafiał do logu, a token z adresu strony szedł do GA4 i Meta Pixela.
+
+### Świadomie odłożone (nie są długiem do spłaty „przy okazji")
+
+`escapeIlike` nie escapuje `*` (współdzielony helper spoza tej gałęzi), brak sprawdzania istniejącej opinii w `requestReviews`, dodatkowe zapytanie o nazwę produktu w pętli, zduplikowane `customerEmailOf`, tekst „Twoja ocena będzie widoczna publicznie" w `ReviewForm`, brak sprawdzania błędu w `markInviteUsed`, brak filtra wieku po `sent_at`, brak `.is("reminded_at", null)` w finalnym `UPDATE`, test `shouldRemind` bez granicy dokładnie siedmiu dób, nazwa indeksu `idx_review_invites_do_przypomnienia`.
+
+⚠️ **Ten sam człowiek może mieć dwie opinie o jednym produkcie** — jedną jako gość, drugą jako posiadacz konta. Warunek `product_reviews_autor_jeden` pilnuje, że *wiersz* ma jednego autora, nie że *człowiek* ma jeden wiersz. To świadoma konsekwencja wariantu B, nie usterka.
+
+⚠️ **Jedyne zamówienie ze statusem `delivered` (1 z 10) NIGDY nie dostanie zaproszenia** — `requestReviews` odpala się na PRZEJŚCIU statusu, a ten jest już terminalny. Pozostałe 9 zadziała samo.
 
 ## Ograniczenia globalne
 
