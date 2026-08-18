@@ -2,10 +2,22 @@ import { createAdminClient } from "./supabase/server";
 import { expiresAtFrom, generateInviteToken, hashInviteToken } from "./review-tokens";
 import type { ReviewInvite } from "./types";
 
+// Kod błędu Postgres dla naruszenia unikalności (unique_violation).
+const PG_UNIQUE_VIOLATION = "23505";
+
 // Zakłada zaproszenie i zwraca JAWNY token do wstawienia w link w mailu.
 // Zwraca null, gdy zaproszenie dla tej pary już istnieje (unique
 // order_id+product_id) — to jest właśnie zabezpieczenie idempotencji:
 // ponowne przestawienie statusu nie wyśle drugiego maila.
+//
+// Rozróżniamy naruszenie unikalności (poprawne, oczekiwane pominięcie —
+// nie logujemy) od KAŻDEGO innego błędu insertu: naruszenia unique(token_hash),
+// naruszenia klucza obcego, braku tabeli, braku uprawnień. Bez tego
+// rozróżnienia awaria wyglądałaby identycznie jak poprawne pominięcie
+// duplikatu — requestReviews przeszedłby przez wszystkie produkty zamówienia,
+// nic by nie wysłał i nie zostawił ani jednego śladu w logach. Reszta projektu
+// konsekwentnie loguje takie sytuacje (sendMail, /feed.xml), więc cisza
+// akurat tutaj byłaby niespójna. NIE loguj tu adresu e-mail ani tokenu.
 export async function createInvite(
   orderId: string,
   productId: string,
@@ -26,7 +38,16 @@ export async function createInvite(
     } as never)
     .select()
     .maybeSingle();
-  if (error || !data) return null;
+  if (error) {
+    if (error.code !== PG_UNIQUE_VIOLATION) {
+      console.error(
+        `[mail] createInvite nieudane (zamówienie ${orderId}, produkt ${productId}):`,
+        error.message
+      );
+    }
+    return null;
+  }
+  if (!data) return null;
   return { invite: data as ReviewInvite, token };
 }
 
