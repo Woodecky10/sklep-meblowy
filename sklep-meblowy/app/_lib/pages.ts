@@ -27,6 +27,9 @@ export const RESERVED_SLUGS: Set<string> = new Set([
   // Strona wystawienia opinii z linku w mailu, dla gościa bez konta
   // (app/opinia/[token]/) — trasa klienta, nie podstrona CMS.
   "opinia",
+  // Lista wszystkich zatwierdzonych opinii (app/opinie/) — trasa klienta,
+  // nie podstrona CMS.
+  "opinie",
   // Zamawianie próbek tkanin (app/probki/) — trasa klienta, nie podstrona CMS.
   "probki",
   "produkt",

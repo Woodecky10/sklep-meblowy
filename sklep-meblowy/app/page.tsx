@@ -16,6 +16,9 @@ import { alternatesFor } from "./_lib/sitemap-i18n";
 import { baseOpenGraph } from "./_lib/seo-og";
 import { getDictionary } from "./_lib/dictionaries";
 import ProductCard from "./_components/ui/ProductCard";
+import ReviewCard from "./_components/ui/ReviewCard";
+import ProductCarousel from "./_components/ui/ProductCarousel";
+import { getHomepageReviews } from "./_lib/reviews";
 import TrustBar from "./_components/ui/TrustBar";
 import { localizeBlock, type LocalizedBlock } from "./_lib/blocks";
 import { getHomeBlocks } from "./_lib/blocks-server";
@@ -62,6 +65,7 @@ export default async function HomePage() {
     rate,
     dbBlocks,
     siteTexts,
+    homepageReviews,
   ] = await Promise.all([
     getActiveSlides(),
     getActiveTiles(),
@@ -72,6 +76,7 @@ export default async function HomePage() {
     getEurRate(),
     getHomeBlocks(),
     getSiteTexts(),
+    getHomepageReviews(locale),
   ]);
   // Pusty fallback celowo — brak wpisu w panelu obsługuje AboutStore, sięgając
   // po tekst domyślny ze słownika (i po właściwy język).
@@ -245,6 +250,30 @@ export default async function HomePage() {
           <section className="max-w-7xl mx-auto px-6 py-24">
             {sectionHeader(b)}
             <HomeCollections tiles={collectionTiles} locale={locale} />
+          </section>
+        );
+
+      case "customer_reviews":
+        // Brak pasujących opinii → NIC. Pusty slider z nagłówkiem „Co mówią
+        // klienci" wygląda gorzej niż jego brak, a taki właśnie jest stan do
+        // pierwszej zatwierdzonej opinii.
+        if (homepageReviews.length === 0) return null;
+        return (
+          <section id="home-reviews" className="max-w-7xl mx-auto px-6 py-24">
+            {sectionHeader(b)}
+            <ProductCarousel prevLabel={t.a11y.prevReviews} nextLabel={t.a11y.nextReviews}>
+              {homepageReviews.map((r) => (
+                <ReviewCard key={r.id} review={r} locale={locale} />
+              ))}
+            </ProductCarousel>
+            <div className="mt-12 text-center">
+              <LocalizedLink
+                href="/opinie"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-[var(--border)] font-sans text-sm uppercase tracking-widest text-[var(--fg)] hover:bg-[var(--color-gold)] hover:text-[var(--color-navy)] hover:border-transparent transition-colors"
+              >
+                {t.home.reviewsSeeAll}
+              </LocalizedLink>
+            </div>
           </section>
         );
     }

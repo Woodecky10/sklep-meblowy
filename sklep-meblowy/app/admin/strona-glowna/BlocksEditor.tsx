@@ -76,6 +76,20 @@ const SYSTEM_META: Record<
     contentCta: "Edytuj kolekcje",
     hasHeadings: true,
   },
+  customer_reviews: {
+    // Nazwa MUSI się różnić od CONTENT_BLOCK_DEFS.reviews.name („Opinie
+    // klientów" — blok treściowy z ręcznie wpisywanymi cytatami). Bez tego
+    // rozróżnienia dwie karty na liście sekcji i w modalu „+ Dodaj sekcję"
+    // wyglądają identycznie — administratorka trafia w ręczne cytaty, szukając
+    // automatycznego slidera, i wnioskuje „opinie się nie pokazują".
+    // CONTENT_BLOCK_DEFS.reviews.name NIE zmieniać — siedzi w toastach akcji,
+    // edytorze podstron i komunikacie usuwania.
+    name: "Opinie klientów (automatyczne)",
+    desc: "Slider z zatwierdzonymi opiniami (ocena 4-5, dłuższe wypowiedzi). Treść bierze się z opinii klientów — pojedynczą opinię wykluczasz w „Opinie”.",
+    contentHref: "/admin/opinie",
+    contentCta: "Przejdź do opinii",
+    hasHeadings: true,
+  },
 };
 
 export default function BlocksEditor({
