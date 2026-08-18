@@ -45,6 +45,14 @@ test("karta produktu pokazuje cala kolekcje jako slider", async ({ page }) => {
   );
   // -1, bo ogladany produkt nie pokazuje sam siebie w swojej kolekcji.
   expect(unikalne).toBe(wKolekcji - 1);
+
+  // Wyjscie na strone kolekcji. Sprawdzamy TAKZE adres, nie sam napis:
+  // link prowadzacy donikad albo do zlej kolekcji wygladalby identycznie.
+  const doKolekcji = page.getByRole("link", { name: /całą kolekcj/i });
+  await expect(doKolekcji).toBeVisible();
+  await doKolekcji.click();
+  await expect(page).toHaveURL(new RegExp(`kolekcja=${KOLEKCJA}`));
+  await expect(page.locator("h1")).toHaveText(/Mio/);
 });
 
 test("na /sklep kolekcja jest zwykla lista, bez slidera", async ({ page }) => {

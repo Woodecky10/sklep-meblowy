@@ -460,6 +460,19 @@ export default async function ProduktPage({ params }: Props) {
               ))}
             </ProductCarousel>
           </div>
+
+          {/* Wyjście na stronę kolekcji. LINK, nie przycisk: działa bez
+              JavaScriptu, otwiera się w nowej karcie i wraca przyciskiem wstecz.
+              Slider wyżej pokazuje już całą kolekcję, więc ta strona dokłada
+              oglądany produkt z powrotem do zestawu oraz filtry i sortowanie. */}
+          <div className="flex justify-center mt-10">
+            <LocalizedLink
+              href={`/sklep?kolekcja=${encodeURIComponent(collection.slug)}`}
+              className="px-6 py-3 rounded-full border border-[var(--border)] text-sm font-sans uppercase tracking-widest text-[var(--color-gold)] hover:border-[var(--color-gold)] hover:bg-[var(--color-gold)]/5 transition-colors"
+            >
+              {t.product.seeFullCollection}
+            </LocalizedLink>
+          </div>
         </section>
       )}
 
