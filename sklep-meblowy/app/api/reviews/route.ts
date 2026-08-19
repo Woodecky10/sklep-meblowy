@@ -28,9 +28,15 @@ const UUID_RE =
 // polityka „reviews: delete własne" z migracji 80). Wspólna stała, a nie dwa
 // osobne literały, bo to jest opis JEDNEGO stanu opinii i klient ma poznać
 // prawdziwą przyczynę odmowy w obu ścieżkach tak samo.
+//
+// ⚠️ Zdanie wymienia OBIE zablokowane czynności celowo. Sama prawdziwa
+// przyczyna nie wystarcza: komunikat mówiący wyłącznie „nie można edytować"
+// pokazany komuś, kto właśnie kliknął „Usuń opinię", nazywa niewłaściwy
+// skutek — klient nie dowiaduje się, że kasowanie też jest zablokowane,
+// i klika drugi raz. Dopisując tu kolejną ścieżkę, dopisz ją do zdania.
 const ZDJETA_ZE_STRONY = {
-  pl: "Ta opinia została zdjęta ze strony przez sklep i nie można jej edytować.",
-  de: "Diese Bewertung wurde vom Shop von der Seite entfernt und kann nicht mehr bearbeitet werden.",
+  pl: "Ta opinia została zdjęta ze strony przez sklep i nie można jej już edytować ani usunąć.",
+  de: "Diese Bewertung wurde vom Shop von der Seite entfernt und kann nicht mehr bearbeitet oder gelöscht werden.",
 } as const;
 
 export async function POST(request: NextRequest) {
@@ -177,7 +183,12 @@ export async function POST(request: NextRequest) {
   if (error) {
     // Typowy błąd: 403 z RLS gdy user nie ma zamówienia tego produktu.
     // error.message NIE trafia do klienta (wyciekał schemat DB) — log na serwerze.
-    console.error("review upsert error:", error);
+    // Logujemy WYŁĄCZNIE code+message, nigdy całego obiektu: `error.details`
+    // od PostgREST dla tej tabeli potrafi nieść adres e-mail klienta (konflikt
+    // uniq_review_guest brzmi „Key (product_id, lower(guest_email))=(…, jan@x.pl)
+    // already exists.") i wsadziłby go do logów hostingu. Ta sama zasada i to
+    // samo uzasadnienie co w app/opinia/[token]/actions.ts.
+    console.error("review upsert error:", { code: error.code, message: error.message });
     return NextResponse.json(
       {
         error: tr(
@@ -277,7 +288,9 @@ export async function DELETE(request: NextRequest) {
 
   if (error) {
     // error.message nie trafia do klienta (wyciek schematu DB) — log serwerowy.
-    console.error("review delete error:", error);
+    // Tylko code+message, nigdy cały obiekt — `error.details` dla tej tabeli
+    // potrafi nieść adres e-mail klienta (patrz komentarz przy upsercie wyżej).
+    console.error("review delete error:", { code: error.code, message: error.message });
     return NextResponse.json(
       {
         error: tr(
