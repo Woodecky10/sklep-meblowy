@@ -9,7 +9,12 @@ import { inviteState } from "@/app/_lib/review-tokens";
 import { poluDlaNowegoZapisu } from "@/app/_lib/reviews-moderation";
 import { notifyAdminNewReview } from "@/app/_lib/mail/review-notify";
 import { validateImageUpload } from "@/app/_lib/image-upload";
-import { REVIEW_PHOTO_DIR, parseReviewPhotos, validateReviewPhotos } from "@/app/_lib/reviews-photos";
+import {
+  MAX_REVIEW_PHOTOS,
+  REVIEW_PHOTO_DIR,
+  parseReviewPhotos,
+  validateReviewPhotos,
+} from "@/app/_lib/reviews-photos";
 
 export type UploadGuestReviewPhotoResult =
   | { ok: true; url: string }
@@ -88,7 +93,7 @@ export async function submitGuestReview(formData: FormData): Promise<ActionResul
       ok: false,
       error:
         zdjecia.error === "count"
-          ? "Maksymalnie 3 zdjęcia"
+          ? `Maksymalnie ${MAX_REVIEW_PHOTOS} zdjęcia`
           : "Nie udało się dołączyć zdjęcia — spróbuj dodać je jeszcze raz",
     };
   }

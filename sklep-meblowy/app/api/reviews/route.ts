@@ -1,9 +1,13 @@
 import { NextResponse, after, type NextRequest } from "next/server";
-import { createClient } from "@/app/_lib/supabase/server";
+import { createClient, createAdminClient } from "@/app/_lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { poluDlaNowegoZapisu } from "@/app/_lib/reviews-moderation";
 import { notifyAdminNewReview } from "@/app/_lib/mail/review-notify";
-import { validateReviewPhotos } from "@/app/_lib/reviews-photos";
+import {
+  MAX_REVIEW_PHOTOS,
+  reviewPhotoPath,
+  validateReviewPhotos,
+} from "@/app/_lib/reviews-photos";
 
 type Body = {
   productId: string;
@@ -18,6 +22,16 @@ type Body = {
 // który zwracał error.message ujawniający schemat DB klientowi (audyt LOW).
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Komunikat o opinii ZDJĘTEJ ze strony — jedna stała dla OBU odmów: edycji
+// (POST, polityka „reviews: update własne" z migracji 78) i usunięcia (DELETE,
+// polityka „reviews: delete własne" z migracji 80). Wspólna stała, a nie dwa
+// osobne literały, bo to jest opis JEDNEGO stanu opinii i klient ma poznać
+// prawdziwą przyczynę odmowy w obu ścieżkach tak samo.
+const ZDJETA_ZE_STRONY = {
+  pl: "Ta opinia została zdjęta ze strony przez sklep i nie można jej edytować.",
+  de: "Diese Bewertung wurde vom Shop von der Seite entfernt und kann nicht mehr bearbeitet werden.",
+} as const;
 
 export async function POST(request: NextRequest) {
   // locale z query (?locale=de) — czytelne ZANIM sparsujemy body, więc działa
@@ -62,10 +76,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Bramka druga z trzech (widżet, tutaj, `check` w migracji 79). Ta jest
-  // jedyną, której nie da się ominąć z konsoli przeglądarki mając ważną sesję.
-  // Prefiks pilnuje, żeby do opinii nie wjechał dowolny obrazek z internetu —
-  // opinia ląduje na stronie głównej sklepu.
+  // Bramka druga z trzech (widżet, tutaj, `check` w migracji 79) — i trzeba
+  // wiedzieć, czego BRONI, a czego nie:
+  //
+  // - Ta walidacja broni ŚCIEŻKI APLIKACYJNEJ. NIE jest bramką nie do
+  //   ominięcia: klucz anon jest jawny w paczce przeglądarki, a sesja siedzi
+  //   w ciasteczku, więc bezpośredni upsert przez PostgREST omija tę trasę
+  //   w całości (dokładnie ten sam argument stoi za politykami z migracji
+  //   76 i 78 — patrz uzasadnienie W2 w 78).
+  // - Jedyną bramką nie do ominięcia jest `check` z migracji 79 — ale pilnuje
+  //   WYŁĄCZNIE liczby zdjęć, nie ich pochodzenia.
+  // - Przed „dowolnym obrazkiem z internetu" ostatecznie ratuje
+  //   `images.remotePatterns` w next.config.ts: renderują się wyłącznie nasz
+  //   host Supabase i images.unsplash.com, więc obcy URL wstawiony z pominięciem
+  //   tej trasy skończy jako zepsuta ikonka, a nie jako obraz na stronie.
+  //
+  // Prefiks (i wzorzec nazwy pliku — patrz isOwnReviewPhotoUrl) i tak jest tu
+  // wymogiem: opinia ląduje na stronie głównej sklepu.
   const zdjecia = validateReviewPhotos(
     body.photos,
     process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
@@ -75,7 +102,10 @@ export async function POST(request: NextRequest) {
       {
         error:
           zdjecia.error === "count"
-            ? tr("Maksymalnie 3 zdjęcia", "Maximal 3 Fotos")
+            ? tr(
+                `Maksymalnie ${MAX_REVIEW_PHOTOS} zdjęcia`,
+                `Maximal ${MAX_REVIEW_PHOTOS} Fotos`
+              )
             : tr("Nieprawidłowe zdjęcie", "Ungültiges Foto"),
       },
       { status: 400 }
@@ -112,12 +142,7 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
   if ((istniejaca as { status: string } | null)?.status === "rejected") {
     return NextResponse.json(
-      {
-        error: tr(
-          "Ta opinia została zdjęta ze strony przez sklep i nie można jej edytować.",
-          "Diese Bewertung wurde vom Shop von der Seite entfernt und kann nicht mehr bearbeitet werden."
-        ),
-      },
+      { error: tr(ZDJETA_ZE_STRONY.pl, ZDJETA_ZE_STRONY.de) },
       { status: 403 }
     );
   }
@@ -206,11 +231,49 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  const { error } = await supabase
+  // Ten sam jawny pre-check, co w POST — z tą samą przyczyną i tym samym
+  // komunikatem. Migracja 80 domyka politykę „reviews: delete własne"
+  // warunkiem `status <> 'rejected'`: bez niej autor kasował opinię zdjętą
+  // ze strony i pisał ją od nowa z tymi samymi zdjęciami (pliki zostają
+  // w Storage), czyli w kółko cofał decyzję właścicielki.
+  //
+  // Pre-check jest tu KONIECZNY, a nie kosmetyczny: odmowa RLS przy DELETE
+  // NIE jest błędem PostgREST — Postgres po prostu nie widzi wiersza i kasuje
+  // ZERO wierszy, więc bez tego sprawdzenia klient dostałby `{ ok: true }`
+  // i odświeżoną stronę, na której opinia dalej stoi. Fałszywe „udało się"
+  // jest gorsze niż nieprecyzyjny błąd.
+  //
+  // ⚠️ `select("*")`, a NIE `select("status, photos")`: dopóki migracja 79 nie
+  // jest zaaplikowana, kolumny `photos` NIE MA i nazwanie jej wprost sprawia,
+  // że PostgREST odrzuca CAŁE zapytanie — pre-check przestałby działać, a
+  // usuwanie opinii zdjętej ze strony znów by przechodziło. Przy `*` brakująca
+  // kolumna to po prostu `undefined` (stąd normalizacja niżej).
+  const { data: istniejaca } = await supabase
+    .from("product_reviews")
+    .select("*")
+    .eq("product_id", productId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const wiersz = istniejaca as { status: string; photos?: string[] } | null;
+  if (wiersz?.status === "rejected") {
+    return NextResponse.json(
+      { error: tr(ZDJETA_ZE_STRONY.pl, ZDJETA_ZE_STRONY.de) },
+      { status: 403 }
+    );
+  }
+
+  // `.select("id")` — potrzebujemy wiedzieć, czy DELETE naprawdę skasował
+  // wiersz. Patrz wyżej: brak uprawnienia to zero skasowanych wierszy, a nie
+  // błąd. Bez tego sprzątanie plików niżej mogłoby usunąć zdjęcia opinii,
+  // która WCIĄŻ wisi na stronie (np. gdyby Julia zdjęła ją między odczytem
+  // a kasowaniem). Kolumna `id` istnieje od migracji 06, więc nazwanie jej
+  // jest bezpieczne także przed migracją 79.
+  const { data: usuniete, error } = await supabase
     .from("product_reviews")
     .delete()
     .eq("product_id", productId)
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .select("id");
 
   if (error) {
     // error.message nie trafia do klienta (wyciek schematu DB) — log serwerowy.
@@ -224,6 +287,57 @@ export async function DELETE(request: NextRequest) {
       },
       { status: 500 }
     );
+  }
+
+  // Wiersz BYŁ przy odczycie, a nie skasował się ani jeden — to nie jest
+  // „nie było czego kasować", tylko odmowa RLS (patrz wyżej: odmowa nie jest
+  // błędem). Po migracji 80 jedyną przyczyną odmowy dla własnej opinii jest
+  // `status = 'rejected'`, więc komunikat jest ten sam, co w pre-checku.
+  // Domyka wyścig: Julia mogła zdjąć opinię ze strony MIĘDZY odczytem
+  // a kasowaniem. Bez tego klient dostałby `{ ok: true }` i odświeżoną
+  // stronę, na której jego opinia dalej stoi — czyli kłamstwo zamiast odmowy.
+  if (wiersz !== null && (usuniete?.length ?? 0) === 0) {
+    return NextResponse.json(
+      { error: tr(ZDJETA_ZE_STRONY.pl, ZDJETA_ZE_STRONY.de) },
+      { status: 403 }
+    );
+  }
+
+  // Sprzątanie plików ze Storage po UDANYM skasowaniu opinii. To NIE jest ten
+  // sam dług, co „pliki osierocone" (pliki, których nigdy nie dołączono do
+  // żadnej opinii): tu chodzi o zdjęcia, które BYŁY publiczne — ich adresy
+  // stały w HTML-u strony głównej, /opinie i karty produktu, więc mają je
+  // crawlery i cache optymalizatora obrazów. Bez tego kroku klientka, która
+  // usuwa swoją opinię, nie ma jak wycofać zdjęcia z internetu.
+  //
+  // ⚠️ Robimy to WYŁĄCZNIE tutaj, przy usunięciu opinii przez autora.
+  // „Zdejmij ze strony" w panelu jest ODWRACALNE (jest „Przywróć na witrynę"),
+  // więc kasowanie plików rozbiłoby przywracanie.
+  //
+  // Ścieżkę w buckecie liczy reviewPhotoPath, czyli ta sama bramka prefiksu
+  // i nazwy pliku, która pilnuje zapisu — klient administracyjny omija RLS,
+  // więc nie może dostać ścieżki spoza katalogu `opinie/`.
+  //
+  // `photos` bywa `undefined`, dopóki migracja 79 nie jest zaaplikowana.
+  const doUsuniecia = (Array.isArray(wiersz?.photos) ? wiersz.photos : [])
+    .map((u) => reviewPhotoPath(u, process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""))
+    .filter((p): p is string => p !== null);
+  if (usuniete !== null && usuniete.length > 0 && doUsuniecia.length > 0) {
+    // ⚠️ Błąd sprzątania NIE może wywalić odpowiedzi: opinia jest już
+    // skasowana i to jest wynik, który klient ma zobaczyć. Nieusunięty plik
+    // jest brzydki, ale odwracalny; błąd 500 po udanym kasowaniu kazałby
+    // klientowi klikać jeszcze raz w opinię, której już nie ma.
+    try {
+      const admin = await createAdminClient();
+      const { error: bladStorage } = await admin.storage
+        .from("products")
+        .remove(doUsuniecia);
+      if (bladStorage) {
+        console.error("[opinie] nie udało się usunąć plików zdjęć:", bladStorage.message);
+      }
+    } catch (e) {
+      console.error("[opinie] wyjątek przy usuwaniu plików zdjęć:", e);
+    }
   }
 
   // Usunięcie opinii zmienia to, co widać na tych ścieżkach — tak samo jak nowa

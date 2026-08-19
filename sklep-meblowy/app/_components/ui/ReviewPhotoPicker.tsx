@@ -31,6 +31,7 @@ export default function ReviewPhotoPicker({
   upload,
   teksty,
   disabled = false,
+  onBusyChange,
 }: {
   photos: string[];
   onChange: React.Dispatch<React.SetStateAction<string[]>>;
@@ -39,9 +40,27 @@ export default function ReviewPhotoPicker({
   ) => Promise<{ ok: true; url: string } | { ok: false; error: string }>;
   teksty: ReviewPhotoPickerTeksty;
   disabled?: boolean;
+  // Rodzic MUSI wiedzieć, że zdjęcie jest w trakcie wysyłki — inaczej klient
+  // wyśle opinię BEZ zdjęcia, którego przed chwilą się spodziewał. Napis
+  // „Wysyłam…" jest na małym przycisku obok i na telefonie po prostu nie
+  // rzuca się w oczy, a `onSubmit` czyta wtedy jeszcze pustą listę.
+  // Ten sam wzorzec ma OrderIssueModal (`uploading` w rodzicu).
+  //
+  // U GOŚCIA to jest nieodwracalne: po zapisie submitGuestReview woła
+  // markInviteUsed, więc token się pali i link nigdy się już nie otworzy —
+  // gość nie ma ŻADNEJ drogi, żeby zdjęcie dołożyć. Zalogowany może to
+  // naprawić edycją opinii.
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [wysylanie, setWysylanie] = useState(false);
   const [blad, setBlad] = useState<string | null>(null);
+
+  // Jedno miejsce zmiany `wysylanie`, żeby rodzic nigdy nie rozjechał się
+  // ze stanem widżetu (np. przy dopisaniu kolejnej ścieżki wyjścia).
+  function ustawWysylanie(busy: boolean) {
+    setWysylanie(busy);
+    onBusyChange?.(busy);
+  }
 
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -50,7 +69,7 @@ export default function ReviewPhotoPicker({
     e.target.value = "";
     if (!file || photos.length >= MAX_REVIEW_PHOTOS) return;
     setBlad(null);
-    setWysylanie(true);
+    ustawWysylanie(true);
     try {
       let doWyslania: File;
       try {
@@ -73,7 +92,7 @@ export default function ReviewPhotoPicker({
         );
       else setBlad(res.error);
     } finally {
-      setWysylanie(false);
+      ustawWysylanie(false);
     }
   }
 

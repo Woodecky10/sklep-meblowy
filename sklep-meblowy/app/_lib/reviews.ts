@@ -194,9 +194,21 @@ export async function getReviewStatus(productId: string): Promise<{
     .eq("user_id", user.id)
     .maybeSingle();
 
+  const wiersz = (existing as ProductReview | null) ?? undefined;
   return {
     canReview: true,
-    existingReview: (existing as ProductReview | null) ?? undefined,
+    existingReview: wiersz
+      ? {
+          ...wiersz,
+          // Dopóki migracja 79 nie jest zaaplikowana, `select("*")` NIE zwraca
+          // kolumny `photos` i pole jest `undefined` — a komponenty na niej
+          // mapują. Normalizacja siedzi w warstwie danych, bo to jedyne
+          // miejsce, które wie, że wiersz przyszedł z bazy. To ta sama zasada,
+          // co fail-soft przy migracji 76 (patrz komentarz nad
+          // getHomepageReviews).
+          photos: Array.isArray(wiersz.photos) ? wiersz.photos : [],
+        }
+      : undefined,
   };
 }
 

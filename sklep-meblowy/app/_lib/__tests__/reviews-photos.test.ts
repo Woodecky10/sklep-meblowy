@@ -4,6 +4,7 @@ import {
   REVIEW_PHOTO_DIR,
   reviewPhotoPrefix,
   isOwnReviewPhotoUrl,
+  reviewPhotoPath,
   validateReviewPhotos,
   parseReviewPhotos,
 } from "@/app/_lib/reviews-photos";
@@ -54,6 +55,62 @@ describe("isOwnReviewPhotoUrl — anti-injection", () => {
   it("odrzuca wszystko, gdy adres Supabase jest pusty (brak zmiennej != otwarta bramka)", () => {
     expect(isOwnReviewPhotoUrl(OK("1-a.jpg"), "")).toBe(false);
   });
+
+  // Sam prefiks nie wystarczy: `..` normalizuje się dopiero przy PARSOWANIU
+  // adresu, czyli PO walidacji. Bez sprawdzenia RESZTY adresu poniższe URL-e
+  // przechodziły przez bramkę, a przeglądarka i optymalizator obrazów
+  // pokazywały plik spoza katalogu `opinie/` — np. cudzą reklamację.
+  it("odrzuca wyjście z katalogu przez `..` — zdjęcie z reklamacji w publicznej opinii", () => {
+    expect(isOwnReviewPhotoUrl(OK("../order-issues/x.jpg"), SB)).toBe(false);
+  });
+
+  it("odrzuca `..` i `/` zakodowane procentowo (%2e%2e, %2f) — omijały wzorzec na surowe znaki", () => {
+    expect(isOwnReviewPhotoUrl(OK("%2e%2e%2forder-issues%2fx.jpg"), SB)).toBe(false);
+  });
+
+  it("odrzuca zagnieżdżony katalog — nazwy plików generujemy płasko", () => {
+    expect(isOwnReviewPhotoUrl(OK("podkatalog/x.jpg"), SB)).toBe(false);
+  });
+
+  it("odrzuca sam prefiks bez nazwy pliku (pusta reszta)", () => {
+    expect(isOwnReviewPhotoUrl(reviewPhotoPrefix(SB), SB)).toBe(false);
+  });
+
+  it("przepuszcza prawdziwą nazwę z uploadu (`${Date.now()}-${randomUUID()}.jpg`)", () => {
+    expect(
+      isOwnReviewPhotoUrl(OK("1755600000000-3f1c9a2e-1b2c-4d5e-8f90-abcdef012345.jpg"), SB)
+    ).toBe(true);
+  });
+});
+
+describe("reviewPhotoPath", () => {
+  it("zwraca ścieżkę w buckecie dla naszego URL-a", () => {
+    expect(reviewPhotoPath(OK("1-a.jpg"), SB)).toBe(`${REVIEW_PHOTO_DIR}/1-a.jpg`);
+  });
+
+  it("zwraca null dla obcego hosta", () => {
+    expect(
+      reviewPhotoPath("https://evil.example.com/storage/v1/object/public/products/opinie/x.jpg", SB)
+    ).toBeNull();
+  });
+
+  it("zwraca null dla innego bucketa", () => {
+    expect(reviewPhotoPath(`${SB}/storage/v1/object/public/inne/opinie/x.jpg`, SB)).toBeNull();
+  });
+
+  it("zwraca null dla prefiksu reklamacji — kasowanie opinii nie może ruszyć cudzej reklamacji", () => {
+    expect(
+      reviewPhotoPath(`${SB}/storage/v1/object/public/products/order-issues/x.jpg`, SB)
+    ).toBeNull();
+  });
+
+  it("zwraca null dla `..` w nazwie — inaczej kasowanie opinii sięgałoby poza katalog", () => {
+    expect(reviewPhotoPath(OK("../order-issues/x.jpg"), SB)).toBeNull();
+  });
+
+  it("zwraca null, gdy adres Supabase jest pusty", () => {
+    expect(reviewPhotoPath(OK("1-a.jpg"), "")).toBeNull();
+  });
 });
 
 describe("validateReviewPhotos", () => {
@@ -89,6 +146,22 @@ describe("validateReviewPhotos", () => {
   it("sprawdza limit PRZED prefiksem — cztery obce URL-e to nadal 'count'", () => {
     const lista = Array.from({ length: MAX_REVIEW_PHOTOS + 1 }, () => "https://evil.example.com/x.jpg");
     expect(validateReviewPhotos(lista, SB)).toEqual({ ok: false, error: "count" });
+  });
+
+  // Duplikaty dają zduplikowane `key={url}` w trzech rendererach zdjęć
+  // (ReviewCard, ReviewList, ReviewPhotoPicker) i ostrzeżenie Reacta.
+  it("usuwa duplikaty — ten sam adres trzy razy daje jedno zdjęcie", () => {
+    const jeden = OK("1.jpg");
+    expect(validateReviewPhotos([jeden, jeden, jeden], SB)).toEqual({
+      ok: true,
+      value: [jeden],
+    });
+  });
+
+  it("deduplikacja zachowuje kolejność pierwszych wystąpień", () => {
+    const a = OK("a.jpg");
+    const b = OK("b.jpg");
+    expect(validateReviewPhotos([a, b, a], SB)).toEqual({ ok: true, value: [a, b] });
   });
 });
 

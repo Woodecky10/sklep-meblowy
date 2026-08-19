@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import StarInput from "./StarInput";
 import ReviewPhotoPicker from "./ReviewPhotoPicker";
 import { uploadReviewPhoto } from "@/app/produkt/actions";
+import { MAX_REVIEW_PHOTOS } from "@/app/_lib/reviews-photos";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { ProductReview } from "@/app/_lib/types";
@@ -40,7 +41,7 @@ export default function ReviewForm({
         unknownError: "Unbekannter Fehler",
         moderacja: "Vielen Dank! Ihre Bewertung ist bereits auf der Seite.",
         photosLabel: "Fotos (optional)",
-        photosHint: "Bis zu 3 Fotos. Wir zeigen sie öffentlich zusammen mit Ihrer Bewertung.",
+        photosHint: `Bis zu ${MAX_REVIEW_PHOTOS} Fotos. Wir zeigen sie öffentlich zusammen mit Ihrer Bewertung.`,
         addPhoto: "Foto hinzufügen",
         uploadingPhoto: "Wird gesendet...",
         photoAlt: "Foto zur Bewertung",
@@ -66,7 +67,7 @@ export default function ReviewForm({
         unknownError: "Nieznany błąd",
         moderacja: "Dziękujemy! Twoja opinia jest już na stronie.",
         photosLabel: "Zdjęcia (opcjonalnie)",
-        photosHint: "Do 3 zdjęć. Pokażemy je publicznie razem z opinią.",
+        photosHint: `Do ${MAX_REVIEW_PHOTOS} zdjęć. Pokażemy je publicznie razem z opinią.`,
         addPhoto: "Dodaj zdjęcie",
         uploadingPhoto: "Wysyłam...",
         photoAlt: "Zdjęcie do opinii",
@@ -79,6 +80,11 @@ export default function ReviewForm({
   // Prefill z istniejącej opinii: edycja wysyła PEŁNĄ listę zdjęć, więc bez
   // tego pierwsza edycja skasowałaby zdjęcia dodane przy pierwszym zapisie.
   const [photos, setPhotos] = useState<string[]>(existingReview?.photos ?? []);
+  // Wysyłka zdjęcia trwa POZA `loading` (to stan zapisu opinii), a `onSubmit`
+  // czyta listę zdjęć w momencie kliknięcia — bez tej flagi klient wysyła
+  // opinię BEZ zdjęcia, które właśnie wgrywa. Tu da się to naprawić edycją
+  // opinii; u gościa nie (patrz komentarz przy onBusyChange w ReviewPhotoPicker).
+  const [wysylanieZdjecia, setWysylanieZdjecia] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -176,6 +182,7 @@ export default function ReviewForm({
         photos={photos}
         onChange={setPhotos}
         disabled={loading}
+        onBusyChange={setWysylanieZdjecia}
         upload={async (fd) => {
           fd.set("product_id", productId);
           return uploadReviewPhoto(fd);
@@ -216,7 +223,7 @@ export default function ReviewForm({
         )}
         <button
           type="submit"
-          disabled={loading || rating < 1}
+          disabled={loading || rating < 1 || wysylanieZdjecia}
           className="ml-auto px-6 py-3 bg-[var(--color-navy)] text-white font-sans text-xs font-semibold uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {loading ? c.saving : existingReview ? c.update : c.publish}

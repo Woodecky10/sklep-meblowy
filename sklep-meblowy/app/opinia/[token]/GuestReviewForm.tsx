@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import StarInput from "@/app/_components/ui/StarInput";
 import ReviewPhotoPicker from "@/app/_components/ui/ReviewPhotoPicker";
+import { MAX_REVIEW_PHOTOS } from "@/app/_lib/reviews-photos";
 import { submitGuestReview, uploadGuestReviewPhoto } from "./actions";
 
 export default function GuestReviewForm({
@@ -21,6 +22,11 @@ export default function GuestReviewForm({
   // Gość nigdy nie edytuje istniejącej opinii — link jest jednorazowy —
   // więc bez prefillu.
   const [zdjecia, setZdjecia] = useState<string[]>([]);
+  // Blokada wysyłki na czas wgrywania zdjęcia. Tu jest to groźniejsze niż
+  // w formularzu zalogowanego: udany zapis pali token (markInviteUsed), więc
+  // opinia wysłana o sekundę za wcześnie zapisuje się BEZ zdjęcia i gość nie
+  // ma jak wrócić — link nigdy się już nie otworzy.
+  const [wysylanieZdjecia, setWysylanieZdjecia] = useState(false);
   const [blad, setBlad] = useState<string | null>(null);
   // Trzyma TREŚĆ komunikatu zwróconego przez akcję, nie tylko fakt wysłania —
   // dzięki temu jest jedno źródło prawdy o tym, co dzieje się z opinią po
@@ -147,13 +153,14 @@ export default function GuestReviewForm({
           photos={zdjecia}
           onChange={setZdjecia}
           disabled={pending}
+          onBusyChange={setWysylanieZdjecia}
           upload={async (fd) => {
             fd.set("token", token);
             return uploadGuestReviewPhoto(fd);
           }}
           teksty={{
             label: "Zdjęcia (opcjonalnie)",
-            hint: "Do 3 zdjęć. Pokażemy je publicznie razem z opinią.",
+            hint: `Do ${MAX_REVIEW_PHOTOS} zdjęć. Pokażemy je publicznie razem z opinią.`,
             add: "Dodaj zdjęcie",
             uploading: "Wysyłam...",
             alt: "Zdjęcie do opinii",
@@ -171,7 +178,7 @@ export default function GuestReviewForm({
 
         <button
           type="submit"
-          disabled={pending || rating < 1}
+          disabled={pending || rating < 1 || wysylanieZdjecia}
           className="ml-auto px-6 py-3 bg-[var(--color-navy)] text-white font-sans text-xs font-semibold uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {pending ? "Wysyłam..." : "Wyślij opinię"}

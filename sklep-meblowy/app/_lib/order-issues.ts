@@ -67,10 +67,23 @@ export type OrderIssueValidation =
 
 // Czy URL zdjęcia pochodzi z naszego Storage (anti-injection w zgłoszeniach).
 // supabaseUrl = NEXT_PUBLIC_SUPABASE_URL (przekazywane przez wołającego server-side).
+//
+// Sam prefiks NIE wystarcza: segmenty `..` normalizują się dopiero przy
+// PARSOWANIU adresu, czyli PO tej walidacji, więc
+// `order-issues/../opinie/<plik>.jpg` przechodziło bramkę i wskazywało plik
+// spoza katalogu reklamacji. Dlatego sprawdzamy RESZTĘ adresu ciasnym wzorcem:
+// nazwy generujemy sami (`${Date.now()}-${randomUUID()}.${ext}`), więc niczego
+// prawidłowego nie odcina. Brak `/` blokuje wyjście z katalogu, a brak `%` —
+// to samo wyjście zakodowane procentowo (`%2e%2e`, `%2f`). NIE upraszczaj go
+// z powrotem do samego startsWith. Ta sama poprawka jest w reviews-photos.ts.
+const NAZWA_PLIKU_RE = /^[A-Za-z0-9._-]+$/;
+
 export function isOwnIssuePhotoUrl(url: string, supabaseUrl: string): boolean {
   if (!supabaseUrl) return false;
+  if (typeof url !== "string") return false;
   const prefix = `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/products/order-issues/`;
-  return typeof url === "string" && url.startsWith(prefix);
+  if (!url.startsWith(prefix)) return false;
+  return NAZWA_PLIKU_RE.test(url.slice(prefix.length));
 }
 
 // Czysta walidacja payloadu zgłoszenia (używana przez submitOrderIssue + testy).

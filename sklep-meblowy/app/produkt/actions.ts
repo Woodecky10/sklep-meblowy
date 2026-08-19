@@ -19,6 +19,13 @@ function isEmail(s: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 }
 
+// Ten sam wzorzec, którym /api/reviews sprawdza productId. Bez niego id
+// spoza formatu UUID szło wprost do getReviewStatus, tam PostgREST odrzucał
+// zapytanie o zamówienia, a klient dostawał komunikat o weryfikacji zakupów
+// zamiast informacji o nieprawidłowym produkcie.
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // Public server action — klient niezalogowany może wysłać zapytanie.
 // Insert idzie SERVICE ROLEM (createAdminClient), więc nie zależy od polityk
 // RLS na tabeli. Migracja 27 odebrała anon/authenticated prawo INSERT (był to
@@ -91,7 +98,7 @@ export async function uploadReviewPhoto(
   const tr = (pl: string, deTxt: string) => (de ? deTxt : pl);
 
   const productId = sanitize(formData.get("product_id"), 64);
-  if (!productId) {
+  if (!productId || !UUID_RE.test(productId)) {
     return { ok: false, error: tr("Nieprawidłowy produkt", "Ungültiges Produkt") };
   }
 
