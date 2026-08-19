@@ -22,9 +22,18 @@ export async function getReviewsForBucket(
     q = q.eq("status", "rejected");
   } else if (bucket === "nowe") {
     // „nowe" = wszystko, czego Julia nie dotknęła: świeże approved ORAZ
-    // resztki pending sprzed migracji 78. Filtr po samym moderated_at łapie
-    // oba, a odrzucone odsiewamy jawnie.
-    q = q.is("moderated_at", null).neq("status", "rejected");
+    // resztki pending sprzed migracji 78 — MUSI być ten sam warunek co
+    // reviewBucket() w reviews-moderation.ts (`moderated_at is null OR
+    // status = 'pending'`). Sam `moderated_at is null` by wystarczył, gdyby
+    // przejrzenie zawsze szło razem ze zmianą statusu — ale akcja „Przejrzane"
+    // ustawia WYŁĄCZNIE moderated_at. Legacy wiersz pending, którego ktoś
+    // dotknął (moderated_at już ustawione, status wciąż pending), musi mimo
+    // to zostać w „nowe" — inaczej nie pasuje do żadnego z trzech kubełków
+    // i znika z panelu, mimo że nie jest publiczny. Stąd jawny OR, nie samo
+    // `.is()`. Odrzucone odsiewamy jawnie, choć pending i rejected się
+    // wykluczają — dla symetrii z resztą funkcji i na wypadek przyszłej
+    // zmiany warunku.
+    q = q.or("moderated_at.is.null,status.eq.pending").neq("status", "rejected");
   } else {
     q = q.eq("status", "approved").not("moderated_at", "is", null);
   }
@@ -62,12 +71,15 @@ export async function getReviewsForBucket(
 // Plakietka „do przejrzenia": opinia JEST już publiczna, więc to nie jest
 // kolejka blokująca klienta — to lista rzeczy, na które nikt jeszcze nie
 // spojrzał. Ten sam wzorzec, co getNewOrdersCount (orders.status_updated_at).
+// Filtr MUSI zostać zsynchronizowany z gałęzią „nowe" w getReviewsForBucket
+// (i z reviewBucket() w reviews-moderation.ts) — to jeden warunek zapisany
+// w dwóch miejscach, nie dwie niezależne definicje „nieprzejrzanej" opinii.
 export async function getUnreviewedReviewsCount(): Promise<number> {
   const admin = await createAdminClient();
   const { count, error } = await admin
     .from("product_reviews")
     .select("id", { count: "exact", head: true })
-    .is("moderated_at", null)
+    .or("moderated_at.is.null,status.eq.pending")
     .neq("status", "rejected");
   if (error) {
     // Plakietka nie może wywalić panelu — layout renderuje się na każdej
