@@ -12,7 +12,8 @@ const COPY = {
     pomoc:
       "Twoja opinia pomaga innym osobom wybrać mebel, którego nie mogą wcześniej zobaczyć na żywo. Zajmie to minutę.",
     cta: "Wystaw opinię",
-    moderacja: "Opinia pojawi się na stronie po sprawdzeniu przez obsługę sklepu.",
+    moderacja:
+      "Twoja opinia pojawi się na stronie od razu po wysłaniu. Sprawdzamy opinie po publikacji i usuwamy wyłącznie spam oraz treści obraźliwe — nie usuwamy opinii krytycznych i nie zmieniamy ich treści.",
   },
   de: {
     preview: (p: string) => `Wie gefällt Ihnen ${p}?`,
@@ -23,7 +24,8 @@ const COPY = {
     pomoc:
       "Ihre Bewertung hilft anderen, ein Möbelstück auszuwählen, das sie vorher nicht in echt sehen können. Es dauert eine Minute.",
     cta: "Bewertung schreiben",
-    moderacja: "Die Bewertung erscheint nach der Prüfung durch den Shop.",
+    moderacja:
+      "Ihre Bewertung erscheint sofort nach dem Absenden auf der Seite. Wir prüfen Bewertungen nach der Veröffentlichung und entfernen ausschließlich Spam und beleidigende Inhalte — kritische Bewertungen löschen wir nicht und ihren Inhalt ändern wir nicht.",
   },
 } as const;
 

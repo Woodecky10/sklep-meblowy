@@ -72,6 +72,32 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Migracja 78 blokuje UPDATE opinii `rejected` (polityka „reviews: update
+  // własne", warunek `status <> 'rejected'` w `using`) — to jedyny mechanizm,
+  // który chroni decyzję Julii o zdjęciu opinii ze strony przed cofnięciem jej
+  // przez autora. Sprawdzamy to jawnie PRZED upsertem, żeby zwrócić prawdziwy
+  // komunikat: bez tego klient dostałby ten sam błąd, co przy braku zakupu
+  // ("weryfikujemy zakupy klientów"), mimo że zakup ma i problemem jest
+  // wyłącznie to, że jego opinia została zdjęta. Polityka „autor widzi swoje"
+  // przepuszcza odczyt własnego wiersza niezależnie od statusu.
+  const { data: istniejaca } = await supabase
+    .from("product_reviews")
+    .select("status")
+    .eq("product_id", productId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if ((istniejaca as { status: string } | null)?.status === "rejected") {
+    return NextResponse.json(
+      {
+        error: tr(
+          "Ta opinia została zdjęta ze strony przez sklep i nie można jej edytować.",
+          "Diese Bewertung wurde vom Shop von der Seite entfernt und kann nicht mehr bearbeitet werden."
+        ),
+      },
+      { status: 403 }
+    );
+  }
+
   // Upsert po (product_id, user_id) — edycja dotychczasowej opinii albo nowa.
   // RLS zadba o weryfikację zakupu (polityka reviews: insert po zakupie).
   const { data, error } = await supabase

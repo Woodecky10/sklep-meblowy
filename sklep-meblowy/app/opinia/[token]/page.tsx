@@ -17,7 +17,7 @@ export default async function OpiniaPage({
 
   const stan = inviteState(invite, new Date());
   if (stan === "used") {
-    return <Komunikat tytul="Opinia już wysłana" tresc="Dziękujemy — Twoja opinia czeka na sprawdzenie przez obsługę sklepu." />;
+    return <Komunikat tytul="Opinia już wysłana" tresc="Dziękujemy — Twoja opinia jest już na stronie." />;
   }
   if (stan === "expired") {
     return <Komunikat tytul="Link wygasł" tresc="Ten link do wystawienia opinii stracił ważność. Jeśli nadal chcesz podzielić się wrażeniami, napisz do nas." />;

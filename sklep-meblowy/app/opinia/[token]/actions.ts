@@ -79,5 +79,8 @@ export async function submitGuestReview(formData: FormData): Promise<ActionResul
   revalidatePath("/opinie");
   revalidatePath("/");
   revalidatePath("/admin/opinie");
-  return { ok: true, message: "Dziękujemy! Twoja opinia jest już na stronie." };
+  // Jedyne źródło prawdy o tym, co widzi gość po wysłaniu — GuestReviewForm
+  // pokazuje ten komunikat wprost, zamiast trzymać własny, osobny tekst,
+  // który mógłby się rozjechać z tym, co faktycznie się dzieje z opinią.
+  return { ok: true, message: "Twoja opinia jest już na stronie." };
 }

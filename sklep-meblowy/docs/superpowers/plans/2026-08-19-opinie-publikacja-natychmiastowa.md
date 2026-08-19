@@ -901,6 +901,24 @@ where table_name = 'product_reviews' and column_name in ('status','moderated_at'
 ```
 Expected: `status` z defaultem `'approved'::text`, `moderated_at` nullable.
 
+**⚠️ WYMÓG kolejności wdrożenia (K1 z recenzji gałęzi, 2026-08-19) — to jest
+wymóg, nie sugestia:** scalenie tego PR-a, czyli deploy kodu na Vercelu, może
+nastąpić WYŁĄCZNIE PO (a) zaaplikowaniu migracji 78 przez `apply_migration`
+**i** (b) potwierdzeniu Kroku 3 powyżej zapytaniem do `information_schema`.
+Obie ścieżki zapisu opinii (`app/api/reviews/route.ts`,
+`app/opinia/[token]/actions.ts`) wysyłają `moderated_at` w KAŻDYM zapisie —
+dopóki kolumny nie ma w bazie, PostgREST odrzuca cały payload i żaden klient
+(ani zalogowany, ani gość) nie zapisze opinii, widząc komunikat, który nie
+mówi prawdy o przyczynie. Kolejność jest jednokierunkowa: **migracja →
+potwierdzenie w `information_schema` → dopiero wtedy merge PR-a.** Nigdy
+odwrotnie.
+
+**Cache schematu PostgREST:** potwierdzenie Kroku 3 dowodzi, że kolumna
+ISTNIEJE W BAZIE — nie dowodzi, że PostgREST już ją widzi. PostgREST trzyma
+podręczną kopię schematu i bywa, że potrzebuje chwili na odświeżenie po
+migracji zastosowanej poza jego standardową ścieżką migracji. Nie scalaj PR-a
+„sekundę po" pomyślnym Kroku 3 — odczekaj, zanim uruchomisz deploy.
+
 - [ ] **Krok 4: Guard e2e**
 
 Run: `E2E_BASE_URL=http://localhost:3000 npx playwright test e2e/opinie-widok.spec.ts --no-deps`

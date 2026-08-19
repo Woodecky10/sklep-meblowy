@@ -31,6 +31,16 @@ describe("reviewBucket", () => {
   it("pending trafia do 'nowe'", () => {
     expect(reviewBucket({ status: "pending", moderated_at: null })).toBe("nowe");
   });
+
+  // To samo, ale z WYPEŁNIONYM moderated_at — np. ktoś kliknął „Przejrzane" na
+  // starszej wersji kodu, zanim poluDlaPrzejrzenia zaczęło wymuszać publikację.
+  // reviewBucket musi nadal traktować `pending` jako „nowe" niezależnie od
+  // stempla, inaczej taki wiersz zniknąłby z panelu bez śladu.
+  it("pending z wypełnionym moderated_at też trafia do 'nowe'", () => {
+    expect(
+      reviewBucket({ status: "pending", moderated_at: "2026-08-19T10:00:00.000Z" })
+    ).toBe("nowe");
+  });
 });
 
 describe("pola zapisu", () => {
@@ -38,9 +48,17 @@ describe("pola zapisu", () => {
     expect(poluDlaNowegoZapisu()).toEqual({ status: "approved", moderated_at: null });
   });
 
-  it("przejrzenie stempluje czas, nie rusza statusu", () => {
+  // Wymusza TAKŻE status: 'approved' — nie tylko stempel. Inaczej wiersz
+  // zapisany jako 'pending' w oknie między migracją a wdrożeniem kodu (W1)
+  // zostawałby niewidoczny na zawsze mimo kliknięcia „Przejrzane": znika
+  // z „nowe" (moderated_at przestaje być puste), a do „opublikowane" i tak
+  // nie trafia (tam wymóg to status = 'approved').
+  it("przejrzenie stempluje czas I publikuje", () => {
     const teraz = new Date("2026-08-19T12:34:56.000Z");
-    expect(poluDlaPrzejrzenia(teraz)).toEqual({ moderated_at: "2026-08-19T12:34:56.000Z" });
+    expect(poluDlaPrzejrzenia(teraz)).toEqual({
+      status: "approved",
+      moderated_at: "2026-08-19T12:34:56.000Z",
+    });
   });
 
   it("usunięcie z witryny odrzuca I stempluje — inaczej wisi w 'nowe'", () => {

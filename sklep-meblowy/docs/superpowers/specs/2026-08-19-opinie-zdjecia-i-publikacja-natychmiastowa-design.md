@@ -239,8 +239,32 @@ Projekt nie ma testów komponentów (`environment: "node"`, zero jsdom), więc:
 ## 6. Kolejność wdrożenia
 
 1. **Migracja 78** — ręcznie przez MCP `apply_migration` (auto-apply w tym
-   projekcie nie działa: 57, 58, 75, 76, 77). Jest wstecznie zgodna (§3.1), więc
-   może iść przed kodem.
+   projekcie nie działa: 57, 58, 75, 76, 77). Jest wstecznie zgodna (§3.1) —
+   dopuszcza jednocześnie `pending` i `approved`, więc stary kod na produkcji
+   nadal może zapisywać opinie, dopóki nowy kod nie zostanie wdrożony. **To
+   dotyczy wyłącznie tego, że migracja może wejść, zanim wejdzie kod — NIE
+   znaczy to, że kolejność jest dowolna w drugą stronę.**
+
+   **WYMÓG (nie sugestia):** scalenie PR-a z tą zmianą, czyli deploy kodu na
+   Vercelu, może nastąpić WYŁĄCZNIE PO (a) zaaplikowaniu migracji 78 przez
+   `apply_migration` **i** (b) potwierdzeniu zapytaniem do
+   `information_schema`, że kolumna `moderated_at` istnieje w tabeli
+   `product_reviews`. Obie ścieżki zapisu opinii wysyłają `moderated_at`
+   w każdym zapisie (nowa opinia i edycja) — dopóki kolumny nie ma w bazie,
+   PostgREST odrzuca CAŁY payload i żaden klient, ani zalogowany, ani gość,
+   nie zapisze opinii, widząc komunikat, który nie mówi prawdy o przyczynie
+   (wygląda jak błąd weryfikacji zakupu, a jest brakującą kolumną). Kolejność
+   jest jednokierunkowa: **migracja → potwierdzenie w `information_schema` →
+   dopiero wtedy merge PR-a.** Nigdy odwrotnie i nigdy „w tej samej chwili co"
+   migrację.
+
+   **Cache schematu PostgREST:** potwierdzenie zapytaniem do
+   `information_schema` dowodzi wyłącznie, że kolumna istnieje W BAZIE — nie
+   dowodzi, że PostgREST już ją widzi. PostgREST trzyma podręczną kopię
+   schematu, którą odświeża z opóźnieniem po zmianach zastosowanych poza jego
+   standardową ścieżką migracji (tak jak `apply_migration` przez MCP). Nie
+   scalaj PR-a „sekundę po" potwierdzeniu w `information_schema` — odczekaj
+   chwilę po migracji, zanim uruchomisz deploy.
 2. **Część 1** — publikacja natychmiastowa: polityki, panel, plakietka, mail,
    teksty. Wdrażana i sprawdzona osobno.
 3. **Część 2** — zdjęcia: kolumna, upload, walidacja, wyświetlanie.

@@ -35,7 +35,9 @@ describe("notifyAdminNewReview", () => {
     expect(sendMailMock).toHaveBeenCalledTimes(1);
     const payload = sendMailMock.mock.calls[0][0];
     expect(payload.to).toBe("wlascicielka@example.com");
-    expect(payload.subject).toContain("5");
+    // "5/5", nie samo "5" — w temacie jest sufiks "/5", więc goły "5" jako
+    // podłańcuch przechodziłby nawet dla oceny 0 ("0/5" zawiera "5").
+    expect(payload.subject).toContain("5/5");
     expect(payload.subject).toContain("Element prosty Nube");
   });
 
@@ -43,6 +45,10 @@ describe("notifyAdminNewReview", () => {
     delete process.env.MAIL_ADMIN_TO;
     await expect(notifyAdminNewReview(OPINIA.id)).resolves.toBeUndefined();
     expect(sendMailMock).not.toHaveBeenCalled();
+    // Dowód, że funkcja wraca ZANIM sięgnie do bazy — bez tej asercji test
+    // przechodziłby też wtedy, gdyby odczyt opinii wykonywał się niepotrzebnie
+    // przed sprawdzeniem MAIL_ADMIN_TO.
+    expect(getReviewMock).not.toHaveBeenCalled();
   });
 
   // Kontrakt: wołane z after() po zapisie opinii. Wyjątek nie może wrócić do

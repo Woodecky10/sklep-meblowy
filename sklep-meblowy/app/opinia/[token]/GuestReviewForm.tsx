@@ -18,7 +18,12 @@ export default function GuestReviewForm({
   const [rating, setRating] = useState(0);
   const [tresc, setTresc] = useState("");
   const [blad, setBlad] = useState<string | null>(null);
-  const [wyslane, setWyslane] = useState(false);
+  // Trzyma TREŚĆ komunikatu zwróconego przez akcję, nie tylko fakt wysłania —
+  // dzięki temu jest jedno źródło prawdy o tym, co dzieje się z opinią po
+  // zapisie (submitGuestReview), zamiast dwóch niezależnych tekstów, które
+  // recenzja gałęzi znalazła rozjechane (komponent ignorował `wynik.message`
+  // i pokazywał własny, nieaktualny tekst o moderacji przed publikacją).
+  const [wyslane, setWyslane] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   // GoogleAnalytics i MetaPixel siedzą w layoucie korzenia i obejmują też tę
@@ -41,7 +46,7 @@ export default function GuestReviewForm({
     startTransition(async () => {
       const wynik = await submitGuestReview(formData);
       if (!wynik.ok) setBlad(wynik.error);
-      else setWyslane(true);
+      else setWyslane(wynik.message ?? "Twoja opinia jest już na stronie.");
     });
   }
 
@@ -49,9 +54,7 @@ export default function GuestReviewForm({
     return (
       <section className="max-w-2xl mx-auto px-6 py-24 text-center">
         <h1 className="font-display text-3xl font-bold text-[var(--fg)] mb-3">Dziękujemy!</h1>
-        <p className="text-[var(--muted)]">
-          Opinia pojawi się na stronie po sprawdzeniu przez obsługę sklepu.
-        </p>
+        <p className="text-[var(--muted)]">{wyslane}</p>
       </section>
     );
   }

@@ -45,6 +45,11 @@ async function zapisz(
   return { ok: true, message: komunikat };
 }
 
+// poluDlaPrzejrzenia zapisuje TAKŻE status: 'approved', nie tylko stempel —
+// zobacz komentarz przy jej definicji. Bez tego wiersz zapisany jako 'pending'
+// w oknie między migracją 78 a wdrożeniem kodu ginąłby na zawsze po kliknięciu
+// „Przejrzane": znika z „nowe" (moderated_at przestaje być puste), a do
+// „opublikowane" i tak nie trafia (tam wymóg to status = 'approved').
 export async function oznaczPrzejrzana(reviewId: string): Promise<ActionResult> {
   return zapisz(reviewId, poluDlaPrzejrzenia(new Date()), "Oznaczono jako przejrzaną");
 }
