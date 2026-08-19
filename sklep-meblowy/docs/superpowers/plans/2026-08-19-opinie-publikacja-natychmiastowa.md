@@ -24,6 +24,47 @@ Playwright, Tailwind v4.
 **Spec:** `docs/superpowers/specs/2026-08-19-opinie-zdjecia-i-publikacja-natychmiastowa-design.md`
 (sekcje 1–3 i 5–7; zdjęcia z sekcji 4 to plan 2/2, NIE ten plan).
 
+## STAN WYKONANIA — 2026-08-19
+
+**Cały plan (zadania 1–8) WYKONANY** na gałęzi `feat/opinie-publikacja-natychmiastowa`.
+Każde zadanie przeszło recenzję zadaniową, całość — szeroką recenzję gałęzi, po której
+poszła jedna fala poprawek i re-recenzja. Testy: 1640 zielonych, build exit 0.
+
+### ZOSTAŁO — do zrobienia ręcznie, w tej kolejności
+
+1. **Zaaplikować migrację 78** przez MCP `apply_migration` (auto-apply w tym projekcie
+   nie działa: 57, 58, 75, 76, 77).
+2. **Potwierdzić kolumnę zapytaniem** do `information_schema` i odczekać na odświeżenie
+   pamięci podręcznej schematu PostgREST.
+3. **Dopiero potem scalić PR.** Odwrotna kolejność blokuje KAŻDY zapis opinii i pokazuje
+   klientowi komunikat kłamiący o przyczynie — patrz „WYMÓG kolejności wdrożenia" w Zadaniu 9.
+4. Sprawdzić `MAIL_ADMIN_TO` w Vercelu (Production) — bez niej powiadomienie o nowej opinii
+   milknie bez śladu dla właścicielki.
+5. Po scaleniu sprawdzić `select count(*) from product_reviews where status = 'pending'`
+   — wiersze z okna wdrożeniowego publikuje przycisk „Przejrzane".
+
+### Co właściciel musi usłyszeć wprost
+
+- **Zdjęcie opinii z panelu nie jest blokadą na zawsze.** Autor może własną opinię skasować
+  (polityka `reviews: delete własne` z migracji 06, przycisk jest w UI) i napisać nową, która
+  publikuje się natychmiast. Zamknięcie tego wymaga warunku `status <> 'rejected'` w polityce
+  DELETE ORAZ obsługi w `DELETE /api/reviews`, bo RLS odfiltrowałby wiersz cicho i UI
+  zameldowałoby sukces mimo braku efektu. Świadomie NIE zrobione w tej gałęzi.
+- **Mail idzie po każdym zapisie**, także po edycji opinii przez klienta — to celowe.
+- **Plakietka gaśnie od kliknięcia „Przejrzane" w panelu**, nie od przeczytania maila.
+- **Ta gałąź NIE zawiera zdjęć w opiniach** — to sekcja 4 specyfikacji i osobny plan 2/2.
+
+### Follow-upy (nie blokują scalenia)
+
+- `GuestReviewForm.tsx` powtarza literał komunikatu jako nieosiągalny fallback — czystsze
+  byłoby zawężenie typu `ActionResult`.
+- Indeks częściowy z migracji 78 (`where moderated_at is null`) nie obsłuży wprost zapytania
+  plakietki, bo doszedł człon `OR status='pending'`. Przy zerze opinii bez znaczenia.
+- `getReviewsForBucket` robi `select("*")`, więc `guest_email` trafia do payloadu komponentu
+  panelu. Stan sprzed tej gałęzi, odnotowany, żeby nie zginął.
+- `review-notify.ts` powiela inline bazowy URL zamiast sięgnąć po istniejący helper — trzecia
+  kopia w repo.
+
 ## Global Constraints
 
 - **Next.js 16 to nie jest Next, który znasz.** Przed pisaniem kodu przeczytaj
