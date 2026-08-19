@@ -42,10 +42,22 @@ export default function ReviewCard({
           basis-[calc(25%-1.5rem)], więc jedna długa opinia zrobiłaby ze
           wszystkich kart wąskie, bardzo wysokie słupy tekstu. line-clamp-6
           obcina wizualnie na home — pełna treść jest zawsze dostępna na
-          /opinie, do której prowadzi przycisk pod sliderem. */}
-      <blockquote className="flex-1 whitespace-pre-wrap leading-relaxed text-[var(--fg)] line-clamp-6">
-        {review.comment}
-      </blockquote>
+          /opinie, do której prowadzi przycisk pod sliderem.
+
+          ⚠️ Rozciąganie (`flex-1`) MUSI siedzieć na opakowaniu, a nie na tym
+          samym elemencie co `line-clamp-6`. Na jednym elemencie flex rozciąga
+          pudełko do wysokości najwyższej karty w rzędzie (zmierzone: 176 px
+          przy 6 liniach × 26 px = 156 px), więc pod wielokropkiem zostaje
+          miejsce i przeglądarka dorysowuje SIÓDMĄ linię: czytelnik widzi
+          „…w zapowiedziany… / oknie.". Dodatkowo flex blokifikuje
+          `display: -webkit-box` do `flow-root`, więc wymuszanie displayu
+          niczego nie ratuje. Opakowanie rośnie, cytat obcina się na sześciu
+          liniach. */}
+      <div className="flex-1">
+        <blockquote className="whitespace-pre-wrap leading-relaxed text-[var(--fg)] line-clamp-6">
+          {review.comment}
+        </blockquote>
+      </div>
 
       <figcaption className="text-sm text-[var(--muted)]">
         <span className="font-semibold text-[var(--fg)]">{author}</span>
