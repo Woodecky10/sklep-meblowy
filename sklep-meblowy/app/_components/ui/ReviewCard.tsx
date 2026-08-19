@@ -1,6 +1,8 @@
+import Image from "next/image";
 import StarRating from "./StarRating";
 import LocalizedLink from "./LocalizedLink";
 import { anonymizeAuthor, formatReviewDate } from "@/app/_lib/reviews-display";
+import { MAX_REVIEW_PHOTOS } from "@/app/_lib/reviews-photos";
 import type { Locale } from "@/app/_lib/i18n";
 import type { PublicReview } from "@/app/_lib/reviews";
 
@@ -17,12 +19,25 @@ import type { PublicReview } from "@/app/_lib/reviews";
 export default function ReviewCard({
   review,
   locale,
+  wariant = "slider",
 }: {
   review: PublicReview;
   locale: Locale;
+  // "slider" — kafelek na stronie głównej: cytat obcięty do 6 linii, miniatury
+  //   72 px. "pelna" — siatka na /opinie: cała treść i większe zdjęcia.
+  // Bez tego wariantu obietnica z komentarza niżej („pełna treść jest zawsze
+  // dostępna na /opinie") była nieprawdziwa: /opinie renderuje TEN SAM
+  // komponent, więc obcinało też tam i przycisk pod sliderem prowadził do
+  // strony z dokładnie tak samo przyciętymi opiniami.
+  wariant?: "slider" | "pelna";
 }) {
   const author = anonymizeAuthor(review.author_name, locale);
   const de = locale === "de";
+  const pelna = wariant === "pelna";
+  const zdjecia = review.photos ?? [];
+  const altBazowy = de
+    ? `Kundenfoto zur Bewertung von ${review.product_name ?? "dem Produkt"}`
+    : `Zdjęcie od klienta do opinii o ${review.product_name ?? "produkcie"}`;
   return (
     <figure
       data-review-card
@@ -42,7 +57,8 @@ export default function ReviewCard({
           basis-[calc(25%-1.5rem)], więc jedna długa opinia zrobiłaby ze
           wszystkich kart wąskie, bardzo wysokie słupy tekstu. line-clamp-6
           obcina wizualnie na home — pełna treść jest zawsze dostępna na
-          /opinie, do której prowadzi przycisk pod sliderem.
+          /opinie dzięki wariantowi `wariant="pelna"` niżej, do której prowadzi
+          przycisk pod sliderem.
 
           ⚠️ Rozciąganie (`flex-1`) MUSI siedzieć na opakowaniu, a nie na tym
           samym elemencie co `line-clamp-6`. Na jednym elemencie flex rozciąga
@@ -54,10 +70,37 @@ export default function ReviewCard({
           niczego nie ratuje. Opakowanie rośnie, cytat obcina się na sześciu
           liniach. */}
       <div className="flex-1">
-        <blockquote className="whitespace-pre-wrap leading-relaxed text-[var(--fg)] line-clamp-6">
+        <blockquote
+          className={`whitespace-pre-wrap leading-relaxed text-[var(--fg)] ${pelna ? "" : "line-clamp-6"}`}
+        >
           {review.comment}
         </blockquote>
       </div>
+
+      {/* Miniatury stoją POD cytatem jako osobny rząd, a nie w opakowaniu
+          z `flex-1`. To opakowanie ma rosnąć do wysokości najwyższej karty
+          w rzędzie — wrzucenie do niego zdjęć zabrałoby cytatowi wysokość
+          i przywróciło usterkę obcinania, którą naprawił commit 33cf0cc.
+          Bez lightboxa i bez linku: cała karta w sliderze prowadzi do produktu,
+          a druga akcja w tym samym kafelku to pułapka na dotyku. */}
+      {zdjecia.length > 0 && (
+        <ul className={pelna ? "grid grid-cols-3 gap-2" : "flex gap-2"}>
+          {zdjecia.slice(0, MAX_REVIEW_PHOTOS).map((url, i) => (
+            <li
+              key={url}
+              className={`relative aspect-square rounded-lg overflow-hidden border border-[var(--border)] ${pelna ? "" : "w-[72px] shrink-0"}`}
+            >
+              <Image
+                src={url}
+                alt={`${altBazowy} (${i + 1})`}
+                fill
+                sizes={pelna ? "200px" : "72px"}
+                className="object-cover"
+              />
+            </li>
+          ))}
+        </ul>
+      )}
 
       <figcaption className="text-sm text-[var(--muted)]">
         <span className="font-semibold text-[var(--fg)]">{author}</span>

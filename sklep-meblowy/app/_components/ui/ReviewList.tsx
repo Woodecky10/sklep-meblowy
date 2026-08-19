@@ -1,19 +1,31 @@
+import Image from "next/image";
 import StarRating from "./StarRating";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { anonymizeAuthor, formatReviewDate } from "@/app/_lib/reviews-display";
+import { MAX_REVIEW_PHOTOS } from "@/app/_lib/reviews-photos";
 import type { ProductReview } from "@/app/_lib/types";
 
-export default async function ReviewList({ reviews }: { reviews: ProductReview[] }) {
+export default async function ReviewList({
+  reviews,
+  productName,
+}: {
+  reviews: ProductReview[];
+  // Do treści `alt` przy zdjęciach. Karta produktu zna nazwę, a opinia
+  // (ProductReview) — w odróżnieniu od PublicReview — jej nie niesie.
+  productName: string;
+}) {
   const locale = await getLocale();
   const de = locale === "de";
   const c = de
     ? {
         empty: "Für dieses Produkt gibt es noch keine Bewertungen. Seien Sie nach dem Kauf der Erste.",
         verified: "Verifizierter Kauf",
+        photoAlt: `Kundenfoto zur Bewertung von ${productName}`,
       }
     : {
         empty: "Ten produkt nie ma jeszcze opinii. Bądź pierwszy po zakupie.",
         verified: "Zweryfikowany zakup",
+        photoAlt: `Zdjęcie od klienta do opinii o ${productName}`,
       };
 
   if (reviews.length === 0) {
@@ -62,6 +74,24 @@ export default async function ReviewList({ reviews }: { reviews: ProductReview[]
             <p className="text-sm text-[var(--muted)] leading-relaxed whitespace-pre-wrap">
               {r.comment}
             </p>
+          )}
+          {(r.photos ?? []).length > 0 && (
+            <ul className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-3 max-w-md">
+              {(r.photos ?? []).slice(0, MAX_REVIEW_PHOTOS).map((url, i) => (
+                <li
+                  key={url}
+                  className="relative aspect-square rounded-lg overflow-hidden border border-[var(--border)]"
+                >
+                  <Image
+                    src={url}
+                    alt={`${c.photoAlt} (${i + 1})`}
+                    fill
+                    sizes="160px"
+                    className="object-cover"
+                  />
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       ))}

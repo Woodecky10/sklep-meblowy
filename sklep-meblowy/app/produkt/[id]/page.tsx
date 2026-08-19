@@ -501,7 +501,7 @@ export default async function ProduktPage({ params }: Props) {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-10 items-start">
-          <ReviewList reviews={reviews} />
+          <ReviewList reviews={reviews} productName={product.name} />
 
           <aside>
             {reviewStatus.canReview ? (
