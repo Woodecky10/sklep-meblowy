@@ -110,7 +110,9 @@ jeszcze nie dotknął" istnieje w projekcie: `getNewOrdersCount` w
 ### 3.3 Mail do Julii
 
 Przy każdej nowej opinii, przez Resend (działa od 2026-07-29). Adres odbiorcy:
-`COMPANY.email` (`app/_lib/company.ts:34`). Temat niesie ocenę i produkt, żeby
+**`MAIL_ADMIN_TO`** — ta sama zmienna, na którą idzie powiadomienie o nowym
+zamówieniu próbek (`sample-notify.ts:59`). NIE `COMPANY.email`: tamten adres jest
+tekstem marki w stopce, a nie skrzynką powiadomień. Temat niesie ocenę i produkt, żeby
 dało się ustawić priorytet bez otwierania: `Nowa opinia: 5★ — Element prosty Nube`.
 Treść: ocena, autor, pełny tekst i link do `/admin/opinie`. Zdjęcia dochodzą
 do maila razem z częścią 2 — część 1 wdraża się wcześniej i nie ma czego pokazać.
