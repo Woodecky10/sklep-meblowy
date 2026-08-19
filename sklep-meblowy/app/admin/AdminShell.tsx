@@ -49,7 +49,7 @@ function navBadge(
     return { count: counts.newSamples, label: "zamówienia próbek do obsłużenia" };
   }
   if (href === "/admin/opinie" && counts.newReviews > 0) {
-    return { count: counts.newReviews, label: "opinie do sprawdzenia" };
+    return { count: counts.newReviews, label: "nowe opinie do przejrzenia" };
   }
   return null;
 }

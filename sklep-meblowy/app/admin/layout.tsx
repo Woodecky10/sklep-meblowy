@@ -3,7 +3,7 @@ import { requireAdmin } from "@/app/_lib/admin";
 import { getNewOrderIssuesCount } from "@/app/_lib/order-issues-data";
 import { getNewOrdersCount } from "@/app/_lib/orders";
 import { getNewSampleOrdersCount } from "@/app/_lib/samples";
-import { getPendingReviewsCount } from "@/app/_lib/reviews-admin";
+import { getUnreviewedReviewsCount } from "@/app/_lib/reviews-admin";
 import AdminShell from "./AdminShell";
 
 export const metadata: Metadata = {
@@ -23,7 +23,7 @@ export default async function AdminLayout({
     getNewOrderIssuesCount(),
     getNewOrdersCount(),
     getNewSampleOrdersCount(),
-    getPendingReviewsCount(),
+    getUnreviewedReviewsCount(),
   ]);
 
   return (
