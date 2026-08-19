@@ -347,6 +347,10 @@ export type ProductReview = {
   comment: string | null;
   status: ReviewStatus;
   homepage_excluded: boolean;
+  // Kiedy Julia ostatnio przejrzała tę opinię. null = nieprzejrzana (plakietka
+  // w panelu liczy właśnie te). Opinia jest publiczna niezależnie od tego pola —
+  // o widoczności decyduje wyłącznie status. Migracja 78.
+  moderated_at: string | null;
   created_at: string;
   updated_at: string;
   // Dołączane przez getReviewsForProduct: dla konta z profiles.full_name,
