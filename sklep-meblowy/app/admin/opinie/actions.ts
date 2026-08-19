@@ -3,28 +3,34 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/app/_lib/admin";
 import { createAdminClient } from "@/app/_lib/supabase/server";
-import type { ReviewStatus } from "@/app/_lib/types";
+import {
+  poluDlaPrzejrzenia,
+  poluDlaUsuniecia,
+  poluDlaPrzywrocenia,
+} from "@/app/_lib/reviews-moderation";
 
 export type ActionResult =
   | { ok: true; message?: string }
   | { ok: false; error: string };
 
-const DOZWOLONE: ReviewStatus[] = ["pending", "approved", "rejected"];
-
-export async function setReviewStatus(
+// Wspólny zapis + odświeżenia. revalidatePath("/") jest tu konieczne, bo
+// slider opinii stoi na stronie głównej, a /sklep i karta produktu niosą
+// średnią ocen. revalidatePath("/opinie") z tego samego powodu: ta strona
+// listuje WSZYSTKIE zatwierdzone opinie (getAllApprovedReviews) — wymóg
+// Omnibusa nie pozwala jej filtrować ocen — więc zdjęcie/przywrócenie/
+// przejrzenie zmienia dokładnie to, co ona pokazuje.
+async function zapisz(
   reviewId: string,
-  status: string
+  pola: Record<string, unknown>,
+  komunikat: string
 ): Promise<ActionResult> {
   await requireAdmin();
   if (!reviewId) return { ok: false, error: "Brak id opinii" };
-  if (!DOZWOLONE.includes(status as ReviewStatus)) {
-    return { ok: false, error: "Nieprawidłowy status" };
-  }
 
   const admin = await createAdminClient();
   const { data, error } = await admin
     .from("product_reviews")
-    .update({ status } as never)
+    .update(pola as never)
     .eq("id", reviewId)
     .select("product_id");
   if (error) return { ok: false, error: error.message };
@@ -34,9 +40,26 @@ export async function setReviewStatus(
   revalidatePath("/admin/opinie");
   revalidatePath(`/produkt/${productId}`);
   revalidatePath("/sklep");
-  // Zatwierdzenie zmienia średnią ocen widoczną na kafelkach strony głównej.
+  revalidatePath("/opinie");
   revalidatePath("/");
-  return { ok: true, message: status === "approved" ? "Opinia opublikowana" : "Zapisano" };
+  return { ok: true, message: komunikat };
+}
+
+// poluDlaPrzejrzenia zapisuje TAKŻE status: 'approved', nie tylko stempel —
+// zobacz komentarz przy jej definicji. Bez tego wiersz zapisany jako 'pending'
+// w oknie między migracją 78 a wdrożeniem kodu ginąłby na zawsze po kliknięciu
+// „Przejrzane": znika z „nowe" (moderated_at przestaje być puste), a do
+// „opublikowane" i tak nie trafia (tam wymóg to status = 'approved').
+export async function oznaczPrzejrzana(reviewId: string): Promise<ActionResult> {
+  return zapisz(reviewId, poluDlaPrzejrzenia(new Date()), "Oznaczono jako przejrzaną");
+}
+
+export async function usunZWitryny(reviewId: string): Promise<ActionResult> {
+  return zapisz(reviewId, poluDlaUsuniecia(new Date()), "Opinia zdjęta ze strony");
+}
+
+export async function przywrocNaWitryne(reviewId: string): Promise<ActionResult> {
+  return zapisz(reviewId, poluDlaPrzywrocenia(), "Opinia wróciła na stronę");
 }
 
 export async function setReviewHomepageExcluded(

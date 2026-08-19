@@ -64,4 +64,22 @@ describe("isOwnIssuePhotoUrl", () => {
   it("odrzuca gdy brak supabaseUrl", () => {
     expect(isOwnIssuePhotoUrl(`${base}/storage/v1/object/public/products/order-issues/x.jpg`, "")).toBe(false);
   });
+  // Sam prefiks nie wystarczy: `..` normalizuje się dopiero przy PARSOWANIU
+  // adresu, czyli PO walidacji — patrz ten sam przypadek w reviews-photos.test.ts.
+  it("odrzuca wyjście z katalogu przez `..`", () => {
+    expect(
+      isOwnIssuePhotoUrl(`${base}/storage/v1/object/public/products/order-issues/../opinie/x.jpg`, base)
+    ).toBe(false);
+  });
+  it("odrzuca `..` i `/` zakodowane procentowo (%2e%2e, %2f)", () => {
+    expect(
+      isOwnIssuePhotoUrl(`${base}/storage/v1/object/public/products/order-issues/%2e%2e%2fopinie%2fx.jpg`, base)
+    ).toBe(false);
+  });
+  // Sama kropka/kropki mieszczą się we wzorcu nazwy, ale nigdy nie są
+  // poprawnym kluczem pliku — patrz ten sam przypadek w reviews-photos.test.ts.
+  it("odrzuca resztę złożoną z samych kropek", () => {
+    expect(isOwnIssuePhotoUrl(`${base}/storage/v1/object/public/products/order-issues/..`, base)).toBe(false);
+    expect(isOwnIssuePhotoUrl(`${base}/storage/v1/object/public/products/order-issues/.`, base)).toBe(false);
+  });
 });

@@ -347,6 +347,15 @@ export type ProductReview = {
   comment: string | null;
   status: ReviewStatus;
   homepage_excluded: boolean;
+  // Kiedy Julia ostatnio przejrzała tę opinię. null = nieprzejrzana (plakietka
+  // w panelu liczy właśnie te). Opinia jest publiczna niezależnie od tego pola —
+  // o widoczności decyduje wyłącznie status. Migracja 78.
+  moderated_at: string | null;
+  // Publiczne URL-e zdjęć dołączonych przez klienta (migracja 79), do trzech.
+  // Warstwa danych normalizuje brak kolumny do [] (patrz reviews.ts), więc
+  // komponenty mogą mapować bez sprawdzania. NIE jest opcjonalne w typie,
+  // bo kolumna ma `not null default '{}'`.
+  photos: string[];
   created_at: string;
   updated_at: string;
   // Dołączane przez getReviewsForProduct: dla konta z profiles.full_name,

@@ -65,7 +65,7 @@ export const de: DeepPartial<PlShape> = {
     eyebrow: "Kundenmeinungen",
     heading: "Was Kunden über unsere Möbel sagen",
     intro:
-      "Wir veröffentlichen ausschließlich Bewertungen von Personen, die bei uns ein Möbelstück gekauft haben — die Einladung zur Bewertung senden wir nach der Lieferung an die E-Mail-Adresse aus der Bestellung. Jede Bewertung wird moderiert, um Spam und beleidigende Inhalte auszusortieren; kritische Bewertungen löschen wir nicht und ihren Inhalt ändern wir nicht.",
+      "Wir veröffentlichen ausschließlich Bewertungen von Personen, die bei uns ein Möbelstück gekauft haben — die Einladung zur Bewertung senden wir nach der Lieferung an die E-Mail-Adresse aus der Bestellung. Die Bewertung erscheint sofort; wir prüfen sie nach der Veröffentlichung und entfernen ausschließlich Spam und beleidigende Inhalte. Kritische Bewertungen löschen wir nicht und ihren Inhalt ändern wir nicht.",
     metaDescription:
       "Kundenbewertungen zu Mollien-Möbeln — abgegeben nach der Lieferung von Personen, die ein Möbelstück gekauft haben. Auch kritische Bewertungen veröffentlichen wir.",
     empty: "Wir haben noch keine Bewertungen. Sie erscheinen hier, sobald die ersten Kunden ihre Möbel bewerten.",
