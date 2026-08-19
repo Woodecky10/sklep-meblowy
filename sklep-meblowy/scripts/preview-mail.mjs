@@ -15,6 +15,7 @@ import { PasswordReset } from "../app/_lib/mail/templates/PasswordReset.tsx";
 import { AdminNewSampleOrder } from "../app/_lib/mail/templates/AdminNewSampleOrder.tsx";
 import { SampleOrderConfirmation } from "../app/_lib/mail/templates/SampleOrderConfirmation.tsx";
 import { SampleOrderSent } from "../app/_lib/mail/templates/SampleOrderSent.tsx";
+import { AdminNewReview } from "../app/_lib/mail/templates/AdminNewReview.tsx";
 import { wasOrderPaid } from "../app/_lib/mail/status-notify.ts";
 
 const OUT = "mail-preview";
@@ -138,6 +139,23 @@ const sampleItemsFree = sampleItems.slice(0, 3);
 
 const SAMPLE_ORDER_URL = "https://www.mollien.pl/probki/sukces?zamowienie=" + sampleOrder.id;
 const SAMPLE_SHOP_URL = "https://www.mollien.pl/sklep";
+
+// ── Opinie klientów ──────────────────────────────────────────────────────
+// Task 8: AdminNewReview / notifyAdminNewReview — mail do właścicielki po
+// KAŻDYM zapisie opinii (nowej i edycji). Ten sam rodzaj luki co FIX 7
+// (mail do właścicielki nieobecny w podglądzie) — naprawiona od razu przy
+// dodaniu szablonu, żeby nie czekać na osobne zgłoszenie. Fikstura ma
+// wyłącznie cztery pola, które szablon przyjmuje (Pick w typie propsów
+// AdminNewReview) — bez guest_email i pól moderacyjnych, których mail nie
+// pokazuje.
+const review = {
+  rating: 5,
+  comment:
+    "Narożnik stoi u nas od miesiąca i nadal wygląda jak nowy. Bardzo wygodny, polecam każdemu, kto szuka czegoś solidnego.",
+  author_name: "Anna Kowalska",
+  product_name: "Narożnik VEGAS L",
+};
+const REVIEWS_ADMIN_URL = "http://localhost:3000/admin/opinie";
 
 const cases = [
   {
@@ -307,6 +325,14 @@ const cases = [
       items: sampleItems,
       branding,
       shopUrl: SAMPLE_SHOP_URL,
+    }),
+  },
+  {
+    name: "admin-new-review",
+    el: AdminNewReview({
+      opinia: review,
+      branding,
+      panelUrl: REVIEWS_ADMIN_URL,
     }),
   },
 ];
