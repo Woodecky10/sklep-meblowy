@@ -12,6 +12,7 @@ import { validateImageUpload } from "@/app/_lib/image-upload";
 import {
   MAX_REVIEW_PHOTOS,
   REVIEW_PHOTO_DIR,
+  odmianaZdjec,
   parseReviewPhotos,
   validateReviewPhotos,
 } from "@/app/_lib/reviews-photos";
@@ -93,7 +94,7 @@ export async function submitGuestReview(formData: FormData): Promise<ActionResul
       ok: false,
       error:
         zdjecia.error === "count"
-          ? `Maksymalnie ${MAX_REVIEW_PHOTOS} zdjęcia`
+          ? `Maksymalnie ${MAX_REVIEW_PHOTOS} ${odmianaZdjec(MAX_REVIEW_PHOTOS)}`
           : "Nie udało się dołączyć zdjęcia — spróbuj dodać je jeszcze raz",
     };
   }

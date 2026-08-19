@@ -78,12 +78,17 @@ export type OrderIssueValidation =
 // z powrotem do samego startsWith. Ta sama poprawka jest w reviews-photos.ts.
 const NAZWA_PLIKU_RE = /^[A-Za-z0-9._-]+$/;
 
+// Reszta złożona z samych kropek mieści się we wzorcu wyżej, a nigdy nie jest
+// poprawną nazwą pliku — ta sama poprawka jest w reviews-photos.ts.
+const SAME_KROPKI_RE = /^\.+$/;
+
 export function isOwnIssuePhotoUrl(url: string, supabaseUrl: string): boolean {
   if (!supabaseUrl) return false;
   if (typeof url !== "string") return false;
   const prefix = `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/products/order-issues/`;
   if (!url.startsWith(prefix)) return false;
-  return NAZWA_PLIKU_RE.test(url.slice(prefix.length));
+  const reszta = url.slice(prefix.length);
+  return NAZWA_PLIKU_RE.test(reszta) && !SAME_KROPKI_RE.test(reszta);
 }
 
 // Czysta walidacja payloadu zgłoszenia (używana przez submitOrderIssue + testy).

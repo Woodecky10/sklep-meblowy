@@ -4,6 +4,7 @@ import {
   REVIEW_PHOTO_DIR,
   reviewPhotoPrefix,
   isOwnReviewPhotoUrl,
+  odmianaZdjec,
   reviewPhotoPath,
   validateReviewPhotos,
   parseReviewPhotos,
@@ -76,6 +77,14 @@ describe("isOwnReviewPhotoUrl — anti-injection", () => {
     expect(isOwnReviewPhotoUrl(reviewPhotoPrefix(SB), SB)).toBe(false);
   });
 
+  // `..` samo w sobie mieści się we wzorcu nazwy pliku, a nigdy nie jest
+  // poprawną nazwą — i trafiłoby do storage.remove() jako klucz obiektu.
+  it("odrzuca resztę złożoną z samych kropek (`.`, `..`)", () => {
+    expect(isOwnReviewPhotoUrl(OK(".."), SB)).toBe(false);
+    expect(isOwnReviewPhotoUrl(OK("."), SB)).toBe(false);
+    expect(isOwnReviewPhotoUrl(OK("..."), SB)).toBe(false);
+  });
+
   it("przepuszcza prawdziwą nazwę z uploadu (`${Date.now()}-${randomUUID()}.jpg`)", () => {
     expect(
       isOwnReviewPhotoUrl(OK("1755600000000-3f1c9a2e-1b2c-4d5e-8f90-abcdef012345.jpg"), SB)
@@ -110,6 +119,50 @@ describe("reviewPhotoPath", () => {
 
   it("zwraca null, gdy adres Supabase jest pusty", () => {
     expect(reviewPhotoPath(OK("1-a.jpg"), "")).toBeNull();
+  });
+
+  it("zwraca null dla samych kropek — `opinie/..` nigdy nie jest kluczem pliku", () => {
+    expect(reviewPhotoPath(OK(".."), SB)).toBeNull();
+  });
+});
+
+// Liczba zdjęć trafia do zdań pokazywanych klientowi i właścicielce, a limit
+// jest stałą, którą wolno podnieść — bez odmiany „Maksymalnie 5 zdjęcia".
+describe("odmianaZdjec", () => {
+  it("1 → zdjęcie", () => {
+    expect(odmianaZdjec(1)).toBe("zdjęcie");
+  });
+
+  it("2, 3, 4 → zdjęcia", () => {
+    expect(odmianaZdjec(2)).toBe("zdjęcia");
+    expect(odmianaZdjec(3)).toBe("zdjęcia");
+    expect(odmianaZdjec(4)).toBe("zdjęcia");
+  });
+
+  it("5 → zdjęć (tu psuł się stary, zaszyty tekst)", () => {
+    expect(odmianaZdjec(5)).toBe("zdjęć");
+  });
+
+  it("12 → zdjęć — nastki są wyjątkiem od reguły końcówki 2–4", () => {
+    expect(odmianaZdjec(12)).toBe("zdjęć");
+  });
+
+  it("22 → zdjęcia (końcówka 2 poza nastkami)", () => {
+    expect(odmianaZdjec(22)).toBe("zdjęcia");
+  });
+
+  it("25 → zdjęć", () => {
+    expect(odmianaZdjec(25)).toBe("zdjęć");
+  });
+
+  it("0 → zdjęć", () => {
+    expect(odmianaZdjec(0)).toBe("zdjęć");
+  });
+
+  it("odmienia poprawnie dla dzisiejszego MAX_REVIEW_PHOTOS", () => {
+    expect(`Maksymalnie ${MAX_REVIEW_PHOTOS} ${odmianaZdjec(MAX_REVIEW_PHOTOS)}`).toBe(
+      "Maksymalnie 3 zdjęcia"
+    );
   });
 });
 

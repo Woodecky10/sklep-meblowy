@@ -76,4 +76,10 @@ describe("isOwnIssuePhotoUrl", () => {
       isOwnIssuePhotoUrl(`${base}/storage/v1/object/public/products/order-issues/%2e%2e%2fopinie%2fx.jpg`, base)
     ).toBe(false);
   });
+  // Sama kropka/kropki mieszczą się we wzorcu nazwy, ale nigdy nie są
+  // poprawnym kluczem pliku — patrz ten sam przypadek w reviews-photos.test.ts.
+  it("odrzuca resztę złożoną z samych kropek", () => {
+    expect(isOwnIssuePhotoUrl(`${base}/storage/v1/object/public/products/order-issues/..`, base)).toBe(false);
+    expect(isOwnIssuePhotoUrl(`${base}/storage/v1/object/public/products/order-issues/.`, base)).toBe(false);
+  });
 });

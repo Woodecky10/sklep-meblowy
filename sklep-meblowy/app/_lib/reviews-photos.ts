@@ -37,6 +37,13 @@ export function reviewPhotoPrefix(supabaseUrl: string): string {
 //   by nie zobaczył.
 const NAZWA_PLIKU_RE = /^[A-Za-z0-9._-]+$/;
 
+// Reszta złożona z SAMYCH kropek (`.`, `..`, `...`) mieści się we wzorcu wyżej,
+// a nigdy nie jest poprawną nazwą pliku — nasze nazwy zawsze mają znacznik
+// czasu i UUID. To nie jest traversal (Storage traktuje ścieżkę jako dosłowny
+// klucz obiektu), ale jest to wartość, która nie może być prawidłowa, a
+// trafiłaby do `storage.remove()` przy sprzątaniu po skasowanej opinii.
+const SAME_KROPKI_RE = /^\.+$/;
+
 // Czy URL pochodzi z NASZEGO Storage i z katalogu opinii. Bez tego ktoś wstawi
 // do opinii dowolny obrazek z internetu — a opinia ląduje na stronie głównej.
 // supabaseUrl = NEXT_PUBLIC_SUPABASE_URL, przekazywane przez wołającego.
@@ -48,7 +55,8 @@ export function isOwnReviewPhotoUrl(url: unknown, supabaseUrl: string): boolean 
   if (typeof url !== "string") return false;
   const prefix = reviewPhotoPrefix(supabaseUrl);
   if (!url.startsWith(prefix)) return false;
-  return NAZWA_PLIKU_RE.test(url.slice(prefix.length));
+  const reszta = url.slice(prefix.length);
+  return NAZWA_PLIKU_RE.test(reszta) && !SAME_KROPKI_RE.test(reszta);
 }
 
 // Ścieżka pliku w buckecie `products` dla NASZEGO URL-a zdjęcia z opinii,
@@ -62,6 +70,29 @@ export function isOwnReviewPhotoUrl(url: unknown, supabaseUrl: string): boolean 
 export function reviewPhotoPath(url: string, supabaseUrl: string): string | null {
   if (!isOwnReviewPhotoUrl(url, supabaseUrl)) return null;
   return `${REVIEW_PHOTO_DIR}/${url.slice(reviewPhotoPrefix(supabaseUrl).length)}`;
+}
+
+// Poprawna forma rzeczownika „zdjęcie" po liczebniku. Limit jest STAŁĄ, którą
+// wolno podnieść, a `Maksymalnie ${MAX_REVIEW_PHOTOS} zdjęcia` jest poprawne
+// tylko dla 2–4: po zmianie stałej na 5 klient zobaczyłby „Maksymalnie
+// 5 zdjęcia". Interpolacja samej liczby (P5) nie wystarcza — trzeba odmienić
+// też rzeczownik, inaczej ta stała nadal nie jest bezpieczna do zmiany.
+//
+// ⚠️ To NIE jest duplikat `pluralForm` z ./plural.ts i nie wolno ich scalić.
+// Tamta funkcja ŚWIADOMIE pomija wyjątek 12–14 (jej komentarz mówi wprost, że
+// tak został ustawiony wzorzec w całej aplikacji i że zmiana ruszyłaby widoczne
+// etykiety w kilkunastu miejscach). Tutaj potrzebujemy formy poprawnej, więc
+// nastki są obsłużone — i dlatego jest to osobna, lokalna funkcja.
+export function odmianaZdjec(n: number): string {
+  const liczba = Math.abs(Math.trunc(n));
+  if (liczba === 1) return "zdjęcie";
+  const jednosci = liczba % 10;
+  const nastki = liczba % 100;
+  // Końcówka 2–4 daje „zdjęcia", ale 12–14 to wyjątek („dwanaście zdjęć").
+  if (jednosci >= 2 && jednosci <= 4 && !(nastki >= 12 && nastki <= 14)) {
+    return "zdjęcia";
+  }
+  return "zdjęć";
 }
 
 export type ReviewPhotosValidation =

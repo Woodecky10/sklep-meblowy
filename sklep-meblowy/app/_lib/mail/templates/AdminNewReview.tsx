@@ -1,6 +1,7 @@
 import { Hr, Text } from "@react-email/components";
 import type { ReviewForMail } from "../../reviews-admin";
 import type { MailBranding } from "../branding";
+import { odmianaZdjec } from "../../reviews-photos";
 import { MailButton, MailLayout } from "./_Layout";
 
 // Zawsze PL — panel opinii jest PL-only (ten sam powód co w AdminNewSampleOrder.tsx
@@ -61,9 +62,13 @@ export function AdminNewReview({
           powiedzieć, że jest CO obejrzeć. */}
       {opinia.photos_count > 0 && (
         <Text style={{ color: c.muted, fontSize: "13px", margin: "0 0 24px" }}>
-          {opinia.photos_count === 1
-            ? "Klient dołączył 1 zdjęcie — jest już widoczne na stronie."
-            : `Klient dołączył ${opinia.photos_count} zdjęcia — są już widoczne na stronie.`}
+          {/* Rzeczownik odmienia odmianaZdjec (wspólne z komunikatami dla
+              klienta), bo gałąź 1-vs-N psuła się od 5 zdjęć w górę: „Klient
+              dołączył 5 zdjęcia". Czasownik zostaje w gałęzi — jego liczba
+              zależy od tego, czy zdjęcie jest jedno, a nie od końcówki. */}
+          {`Klient dołączył ${opinia.photos_count} ${odmianaZdjec(opinia.photos_count)} — ${
+            opinia.photos_count === 1 ? "jest już widoczne" : "są już widoczne"
+          } na stronie.`}
         </Text>
       )}
 

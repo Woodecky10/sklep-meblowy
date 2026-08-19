@@ -5,6 +5,7 @@ import { poluDlaNowegoZapisu } from "@/app/_lib/reviews-moderation";
 import { notifyAdminNewReview } from "@/app/_lib/mail/review-notify";
 import {
   MAX_REVIEW_PHOTOS,
+  odmianaZdjec,
   reviewPhotoPath,
   validateReviewPhotos,
 } from "@/app/_lib/reviews-photos";
@@ -38,6 +39,90 @@ const ZDJETA_ZE_STRONY = {
   pl: "Ta opinia została zdjęta ze strony przez sklep i nie można jej już edytować ani usunąć.",
   de: "Diese Bewertung wurde vom Shop von der Seite entfernt und kann nicht mehr bearbeitet oder gelöscht werden.",
 } as const;
+
+// Kasuje z Storage pliki zdjęć, które przestały być używane — po usunięciu
+// opinii (DELETE) i po edycji, która zdjęła zdjęcie z opinii (POST).
+//
+// ⚠️ SEDNO TEJ FUNKCJI: obecność URL-a w wierszu NIE JEST dowodem, że autor
+// tego wiersza wgrał ten plik. Walidacja zapisu sprawdza prefiks i kształt
+// nazwy — nigdy autorstwo. Zweryfikowany kupujący może skopiować publiczny
+// adres CUDZEGO zdjęcia prosto ze strony głównej, wysłać go w `photos` swojej
+// opinii (przejdzie walidację), a potem skasować własną opinię. Bez poniższego
+// sprawdzenia service role usunąłby wtedy plik CUDZEJ, opublikowanej opinii —
+// zostawiając na stronie głównej, /opinie i karcie produktu trwale zepsute
+// zdjęcie, nie do odzyskania. Samo POKAZANIE cudzego zdjęcia było możliwe
+// wcześniej; ZNISZCZENIE go pojawiło się razem ze sprzątaniem plików.
+//
+// Dlatego: kasujemy wyłącznie te pliki, do których nie odwołuje się już ŻADNA
+// inna opinia. `pomijanyReviewId` wyłącza z pytania wiersz, którego dotyczy
+// operacja (przy edycji wiersz nadal istnieje).
+//
+// Reguła awaryjna jest asymetryczna i celowo ostrożna: gdy NIE WIEMY (błąd
+// zapytania), NIE kasujemy. Osierocony plik jest odwracalny, skasowane cudze
+// zdjęcie nie jest. Nic tutaj nie może też wywalić odpowiedzi dla klienta —
+// jego opinia jest już zapisana albo skasowana i to jest wynik, który ma
+// zobaczyć — więc całość jest w try/catch, a błędy idą wyłącznie do logu.
+async function usunNieuzywaneZdjecia(
+  urle: string[],
+  pomijanyReviewId: string | null
+): Promise<void> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+    // Mapa url -> ścieżka w buckecie. reviewPhotoPath to ta sama bramka
+    // prefiksu i nazwy pliku, która pilnuje zapisu, więc do `remove` nie
+    // trafi ścieżka spoza katalogu `opinie/`. Set na wejściu: ta sama opinia
+    // mogła nieść ten sam URL dwa razy tylko w danych sprzed deduplikacji.
+    const sciezki = new Map<string, string>();
+    for (const url of new Set(urle)) {
+      const sciezka = reviewPhotoPath(url, supabaseUrl);
+      if (sciezka) sciezki.set(url, sciezka);
+    }
+    if (sciezki.size === 0) return;
+
+    const admin = await createAdminClient();
+    const doUsuniecia: string[] = [];
+    for (const [url, sciezka] of sciezki) {
+      // `.contains` na kolumnie text[] (operator `cs` w PostgREST) — pytamy
+      // o FILTR po `photos`, a nie o `select("photos")`, więc nie łamie to
+      // zasady fail-soft. Dopóki migracja 79 nie jest zaaplikowana, kolumny
+      // nie ma i zapytanie zwróci błąd — wtedy (patrz niżej) NIE kasujemy,
+      // co jest właściwym zachowaniem, a nie regresją.
+      //
+      // ⚠️ supabase-js skleja tu literał tablicy BEZ cytowania (`cs.{<url>}`),
+      // więc URL nie może zawierać `,` `{` `}` `"` `\` ani spacji. Trzyma to
+      // isOwnReviewPhotoUrl: nazwa pliku przechodzi wzorzec [A-Za-z0-9._-],
+      // a prefiks jest stały. Gdyby ktoś ROZLUŹNIŁ tamten wzorzec, to
+      // zapytanie zaczęłoby po cichu nie znajdować wierszy — czyli mylnie
+      // uznawać cudze zdjęcie za nieużywane i je kasować. Jedno pytanie na
+      // URL (a nie wszystkie naraz) usuwa przy okazji problem przecinka.
+      let zapytanie = admin
+        .from("product_reviews")
+        .select("id")
+        .contains("photos", [url])
+        .limit(1);
+      if (pomijanyReviewId) zapytanie = zapytanie.neq("id", pomijanyReviewId);
+      const { data, error } = await zapytanie;
+      if (error) {
+        console.error("[opinie] nie sprawdzono, czy zdjęcie jest jeszcze używane:", {
+          code: error.code,
+          message: error.message,
+        });
+        continue;
+      }
+      if ((data ?? []).length === 0) doUsuniecia.push(sciezka);
+    }
+    if (doUsuniecia.length === 0) return;
+
+    const { error: bladStorage } = await admin.storage
+      .from("products")
+      .remove(doUsuniecia);
+    if (bladStorage) {
+      console.error("[opinie] nie udało się usunąć plików zdjęć:", bladStorage.message);
+    }
+  } catch (e) {
+    console.error("[opinie] wyjątek przy sprzątaniu plików zdjęć:", e);
+  }
+}
 
 export async function POST(request: NextRequest) {
   // locale z query (?locale=de) — czytelne ZANIM sparsujemy body, więc działa
@@ -109,7 +194,7 @@ export async function POST(request: NextRequest) {
         error:
           zdjecia.error === "count"
             ? tr(
-                `Maksymalnie ${MAX_REVIEW_PHOTOS} zdjęcia`,
+                `Maksymalnie ${MAX_REVIEW_PHOTOS} ${odmianaZdjec(MAX_REVIEW_PHOTOS)}`,
                 `Maximal ${MAX_REVIEW_PHOTOS} Fotos`
               )
             : tr("Nieprawidłowe zdjęcie", "Ungültiges Foto"),
@@ -140,13 +225,23 @@ export async function POST(request: NextRequest) {
   // ("weryfikujemy zakupy klientów"), mimo że zakup ma i problemem jest
   // wyłącznie to, że jego opinia została zdjęta. Polityka „autor widzi swoje"
   // przepuszcza odczyt własnego wiersza niezależnie od statusu.
+  //
+  // ⚠️ `select("*")`, a NIE `select("status, photos")`: dopóki migracja 79 nie
+  // jest zaaplikowana, kolumny `photos` NIE MA i nazwanie jej wprost sprawia,
+  // że PostgREST odrzuca CAŁE zapytanie — pre-check przestałby działać. Przy
+  // `*` brakująca kolumna to po prostu `undefined`. `photos` z tego samego
+  // odczytu służy niżej do sprzątania plików zdjętych z opinii przy edycji.
   const { data: istniejaca } = await supabase
     .from("product_reviews")
-    .select("status")
+    .select("*")
     .eq("product_id", productId)
     .eq("user_id", user.id)
     .maybeSingle();
-  if ((istniejaca as { status: string } | null)?.status === "rejected") {
+  const wiersz = istniejaca as { status: string; photos?: string[] } | null;
+  // `photos` sprzed zapisu — po udanym upsercie porównamy je z nową listą
+  // i sprzątniemy pliki, które z opinii wypadły. `undefined` przed migracją 79.
+  const zdjeciaPrzedZapisem = Array.isArray(wiersz?.photos) ? wiersz.photos : [];
+  if (wiersz?.status === "rejected") {
     return NextResponse.json(
       { error: tr(ZDJETA_ZE_STRONY.pl, ZDJETA_ZE_STRONY.de) },
       { status: 403 }
@@ -198,6 +293,23 @@ export async function POST(request: NextRequest) {
       },
       { status: 403 }
     );
+  }
+
+  // Zdjęcia, które klientka zdjęła z opinii tą edycją: były w wierszu przed
+  // zapisem, nie ma ich w nowej liście. To jest ta sama sprawa, co sprzątanie
+  // przy usunięciu opinii — a nawet WAŻNIEJSZA, bo to jest właśnie ścieżka,
+  // którą idzie ktoś, kto opublikował zdjęcie i chce je wycofać: bez tego
+  // „usunęłam zdjęcie" znaczyło tylko „zniknęło ze strony", a plik zostawał
+  // pod publicznym adresem NA ZAWSZE. Adres był w HTML-u strony głównej,
+  // /opinie i karty produktu, więc mają go crawlery i cache optymalizatora.
+  //
+  // Wiersz nadal istnieje, więc wykluczamy go z pytania „czy ktoś jeszcze
+  // tego używa" — inaczej opinia zawsze blokowałaby sprzątanie sama sobie.
+  const zdjeteZOpinii = zdjeciaPrzedZapisem.filter(
+    (url) => !zdjecia.value.includes(url)
+  );
+  if (zdjeteZOpinii.length > 0) {
+    await usunNieuzywaneZdjecia(zdjeteZOpinii, data.id as string);
   }
 
   // Mail do właścicielki PO udanym zapisie, przez after(): wysyłka nie może
@@ -327,30 +439,17 @@ export async function DELETE(request: NextRequest) {
   // „Zdejmij ze strony" w panelu jest ODWRACALNE (jest „Przywróć na witrynę"),
   // więc kasowanie plików rozbiłoby przywracanie.
   //
-  // Ścieżkę w buckecie liczy reviewPhotoPath, czyli ta sama bramka prefiksu
-  // i nazwy pliku, która pilnuje zapisu — klient administracyjny omija RLS,
-  // więc nie może dostać ścieżki spoza katalogu `opinie/`.
+  // Kasujemy tylko wtedy, gdy wiersz NAPRAWDĘ zniknął (patrz `.select("id")`
+  // wyżej) i tylko te pliki, których nie trzyma już żadna inna opinia —
+  // usunNieuzywaneZdjecia tłumaczy, dlaczego to drugie jest konieczne.
+  // Wiersza już nie ma, więc nie ma czego wykluczać z tamtego pytania.
   //
   // `photos` bywa `undefined`, dopóki migracja 79 nie jest zaaplikowana.
-  const doUsuniecia = (Array.isArray(wiersz?.photos) ? wiersz.photos : [])
-    .map((u) => reviewPhotoPath(u, process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""))
-    .filter((p): p is string => p !== null);
-  if (usuniete !== null && usuniete.length > 0 && doUsuniecia.length > 0) {
-    // ⚠️ Błąd sprzątania NIE może wywalić odpowiedzi: opinia jest już
-    // skasowana i to jest wynik, który klient ma zobaczyć. Nieusunięty plik
-    // jest brzydki, ale odwracalny; błąd 500 po udanym kasowaniu kazałby
-    // klientowi klikać jeszcze raz w opinię, której już nie ma.
-    try {
-      const admin = await createAdminClient();
-      const { error: bladStorage } = await admin.storage
-        .from("products")
-        .remove(doUsuniecia);
-      if (bladStorage) {
-        console.error("[opinie] nie udało się usunąć plików zdjęć:", bladStorage.message);
-      }
-    } catch (e) {
-      console.error("[opinie] wyjątek przy usuwaniu plików zdjęć:", e);
-    }
+  if (usuniete !== null && usuniete.length > 0) {
+    await usunNieuzywaneZdjecia(
+      Array.isArray(wiersz?.photos) ? wiersz.photos : [],
+      null
+    );
   }
 
   // Usunięcie opinii zmienia to, co widać na tych ścieżkach — tak samo jak nowa
