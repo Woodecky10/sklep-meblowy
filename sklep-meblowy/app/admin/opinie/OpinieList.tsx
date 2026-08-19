@@ -35,9 +35,10 @@ export default function OpinieList({
             ostrzeżenie ma stać tam, gdzie Julia klika, a nie w dokumentacji,
             której nikt nie czyta. NIE parafrazować, NIE przenosić. */}
         <p className="text-xs text-[var(--muted)] mb-4 max-w-2xl">
-          Odrzucaj spam, obelgi i treści niezwiązane z produktem.{" "}
+          Zdejmuj ze strony spam, obelgi i treści niezwiązane z produktem.{" "}
           <strong className="text-[var(--fg)]">
-            Nie zdejmuj opinii tylko dlatego, że ocena jest niska
+            Nie zdejmuj opinii tylko dlatego, że ocena jest niska, i nie
+            zmieniaj jej treści
           </strong>{" "}
           — pokazywanie wyłącznie pochwał przy ukrywaniu krytyki jest niezgodne
           z przepisami o opiniach konsumenckich.
@@ -53,7 +54,14 @@ export default function OpinieList({
               pokazPrzejrzyj
               pokazZdejmij
               pokazWykluczenie
-              widocznaNaStronie
+              // Kubełek „nowe" łapie też legacy wiersze `pending` sprzed
+              // migracji 78 (patrz reviewBucket w reviews-moderation.ts) —
+              // te NIE są publiczne, bo reguła publicznego odczytu przepuszcza
+              // wyłącznie `approved`. Plakietka musi więc patrzeć na status
+              // TEGO wiersza, nie na samą przynależność do sekcji „nowe" —
+              // inaczej kłamie dokładnie wtedy, gdy Julia najbardziej jej
+              // ufa (świeży, jeszcze nieprzejrzany wpis).
+              widocznaNaStronie={o.status === "approved"}
             />
           ))
         )}

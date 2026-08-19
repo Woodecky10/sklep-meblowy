@@ -15,7 +15,10 @@ export type ActionResult =
 
 // Wspólny zapis + odświeżenia. revalidatePath("/") jest tu konieczne, bo
 // slider opinii stoi na stronie głównej, a /sklep i karta produktu niosą
-// średnią ocen.
+// średnią ocen. revalidatePath("/opinie") z tego samego powodu: ta strona
+// listuje WSZYSTKIE zatwierdzone opinie (getAllApprovedReviews) — wymóg
+// Omnibusa nie pozwala jej filtrować ocen — więc zdjęcie/przywrócenie/
+// przejrzenie zmienia dokładnie to, co ona pokazuje.
 async function zapisz(
   reviewId: string,
   pola: Record<string, unknown>,
