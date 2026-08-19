@@ -57,6 +57,13 @@ export async function submitGuestReview(formData: FormData): Promise<ActionResul
   // Token jednorazowy — zużywamy DOPIERO po udanym zapisie, żeby błąd
   // walidacji nie spalił linku.
   await markInviteUsed(invite.id);
+  // Opinia publikuje się od razu — odśwież wszystkie ścieżki jej widoczności.
+  // Karta produktu i /sklep biorą ją do średniej; / ma slider opinii; /opinie
+  // listuje wszystkie zatwierdzone (Omnibus). /admin/opinie to panel admina.
+  revalidatePath(`/produkt/${invite.product_id}`);
+  revalidatePath("/sklep");
+  revalidatePath("/opinie");
+  revalidatePath("/");
   revalidatePath("/admin/opinie");
   return { ok: true, message: "Dziękujemy! Opinia pojawi się po sprawdzeniu." };
 }

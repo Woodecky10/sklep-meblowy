@@ -107,9 +107,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Odśwież stronę produktu i sklep (nowe oceny wpływają na średnią)
+  // Opinia publikuje się od razu — odśwież WSZYSTKIE ścieżki, gdzie się pojawia.
+  // Karta produktu i /sklep biorą ją do średniej ocen; / ma slider opinii;
+  // /opinie listuje wszystkie zatwierdzone (Omnibus). Bez tego byłaby widoczna
+  // tylko dlatego, że inne ścieżki czytają ciasteczka (niezamierzona zależność).
   revalidatePath(`/produkt/${productId}`);
   revalidatePath("/sklep");
+  revalidatePath("/opinie");
+  revalidatePath("/");
 
   return NextResponse.json({ review: data });
 }
@@ -157,7 +162,11 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
+  // Usunięcie opinii zmienia to, co widać na tych ścieżkach — tak samo jak nowa
+  // opinia czy edycja. Odśwież komplet.
   revalidatePath(`/produkt/${productId}`);
   revalidatePath("/sklep");
+  revalidatePath("/opinie");
+  revalidatePath("/");
   return NextResponse.json({ ok: true });
 }
