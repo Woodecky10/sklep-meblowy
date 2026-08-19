@@ -74,7 +74,19 @@ describe("notifyAdminNewReview", () => {
   });
 
   it("mówi, ile zdjęć dołączył klient, ale NIE osadza ich w mailu", async () => {
-    getReviewMock.mockResolvedValue({ ...OPINIA, photos_count: 2 });
+    // Główna gwarancja jest strukturalna: `AdminNewReview` przyjmuje
+    // `Pick<ReviewForMail, ...>` bez `photos`, więc URL-a nie da się tam
+    // wstawić przez typy. Ta asercja to backstop w runtime — mock musi
+    // NAPRAWDĘ nieść URL zdjęcia (czego `ReviewForMail` normalnie nie robi),
+    // żeby test miał szansę wykryć regresję, gdyby ktoś kiedyś przepisał
+    // szablon tak, by czytał `photos` bezpośrednio z obiektu opinii.
+    getReviewMock.mockResolvedValue({
+      ...OPINIA,
+      photos_count: 2,
+      photos: [
+        "https://xyz.supabase.co/storage/v1/object/public/products/opinie/1-a.jpg",
+      ],
+    });
     await notifyAdminNewReview(OPINIA.id);
     const payload = sendMailMock.mock.calls[0][0];
     expect(payload.html).toContain("2 zdjęcia");

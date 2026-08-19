@@ -100,11 +100,32 @@ export type ReviewForMail = {
 
 export async function getReviewForMail(reviewId: string): Promise<ReviewForMail | null> {
   const admin = await createAdminClient();
-  const { data } = await admin
+  // ⚠️ Wildcard, NIE lista kolumn: to zapytanie działa w oknie między deployem
+  // a ręcznym zaaplikowaniem migracji 79. PostgREST na nazwaną kolumnę, której
+  // jeszcze nie ma w bazie, odpowiada błędem 42703 — a przy jawnej liście
+  // kolumn (`photos` wprost w `.select`) ten błąd wywalałby TO zapytanie
+  // za każdym razem, dopóki migracja nie wejdzie, czyli CAŁY mail do
+  // właścicielki (nie tylko wzmianka o zdjęciach) przestałby wychodzić.
+  // Wildcard zwraca po prostu wiersz bez kolumny `photos`, którą i tak
+  // normalizujemy niżej przez `Array.isArray`. `guest_email` nadal nie
+  // wycieka z tej funkcji — to zwracany TYP (ReviewForMail) go nie niesie,
+  // nie kształt zapytania.
+  const { data, error } = await admin
     .from("product_reviews")
-    .select("id, rating, comment, created_at, user_id, guest_name, photos, products(name)")
+    .select("*, products(name)")
     .eq("id", reviewId)
     .maybeSingle();
+  if (error) {
+    // Logujemy WYŁĄCZNIE code+message — error.details od PostgREST potrafi
+    // nieść dane wiersza (dla tej tabeli: adres gościa), którym nie jest
+    // miejsce w logach Vercela. Patrz ten sam komentarz w
+    // app/opinia/[token]/actions.ts.
+    console.error("[mail] odczyt opinii do powiadomienia nieudany:", {
+      code: error.code,
+      message: error.message,
+    });
+    return null;
+  }
   if (!data) return null;
 
   const r = data as unknown as {
