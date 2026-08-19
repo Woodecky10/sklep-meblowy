@@ -65,5 +65,5 @@ export async function submitGuestReview(formData: FormData): Promise<ActionResul
   revalidatePath("/opinie");
   revalidatePath("/");
   revalidatePath("/admin/opinie");
-  return { ok: true, message: "Dziękujemy! Opinia pojawi się po sprawdzeniu." };
+  return { ok: true, message: "Dziękujemy! Twoja opinia jest już na stronie." };
 }

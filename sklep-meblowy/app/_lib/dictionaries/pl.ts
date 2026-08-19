@@ -476,7 +476,7 @@ export const pl = {
     // ścieżki wystawienia opinii wymagają zakupu (konto przez regułę bazy,
     // gość przez jednorazowy link przypisany do pozycji zamówienia).
     intro:
-      "Publikujemy tylko opinie osób, które kupiły u nas mebel — zaproszenie do wystawienia opinii wysyłamy po dostawie, na adres z zamówienia. Każda opinia przechodzi moderację, która odsiewa spam i wypowiedzi obraźliwe; nie usuwamy opinii krytycznych i nie zmieniamy ich treści.",
+      "Publikujemy tylko opinie osób, które kupiły u nas mebel — zaproszenie do wystawienia opinii wysyłamy po dostawie, na adres z zamówienia. Opinia pojawia się od razu; sprawdzamy je po publikacji i usuwamy wyłącznie spam oraz treści obraźliwe. Nie usuwamy opinii krytycznych i nie zmieniamy ich treści.",
     metaDescription:
       "Opinie klientów o meblach Mollien — wystawiane po dostawie przez osoby, które kupiły mebel. Publikujemy także oceny krytyczne.",
     empty: "Nie mamy jeszcze opinii do pokazania. Pojawią się tutaj, gdy pierwsi klienci ocenią swoje meble.",

@@ -36,7 +36,7 @@ export default function ReviewForm({
         saveError: "Bewertung konnte nicht gespeichert werden",
         deleteError: "Bewertung konnte nicht gelöscht werden",
         unknownError: "Unbekannter Fehler",
-        moderacja: "Vielen Dank. Die Bewertung erscheint nach der Prüfung durch den Shop.",
+        moderacja: "Vielen Dank! Ihre Bewertung ist bereits auf der Seite.",
       }
     : {
         editTitle: "Edytuj swoją opinię",
@@ -54,7 +54,7 @@ export default function ReviewForm({
         saveError: "Nie udało się zapisać opinii",
         deleteError: "Nie udało się usunąć opinii",
         unknownError: "Nieznany błąd",
-        moderacja: "Dziękujemy. Opinia pojawi się po sprawdzeniu przez obsługę sklepu.",
+        moderacja: "Dziękujemy! Twoja opinia jest już na stronie.",
       };
   const [rating, setRating] = useState<number>(existingReview?.rating ?? 0);
   const [comment, setComment] = useState<string>(existingReview?.comment ?? "");
