@@ -30,9 +30,17 @@ export async function getReviewsForBucket(
     // dotknął (moderated_at już ustawione, status wciąż pending), musi mimo
     // to zostać w „nowe" — inaczej nie pasuje do żadnego z trzech kubełków
     // i znika z panelu, mimo że nie jest publiczny. Stąd jawny OR, nie samo
-    // `.is()`. Odrzucone odsiewamy jawnie, choć pending i rejected się
-    // wykluczają — dla symetrii z resztą funkcji i na wypadek przyszłej
-    // zmiany warunku.
+    // `.is()`.
+    //
+    // `.neq("status","rejected")` NIE jest kosmetyką ani zabezpieczeniem na
+    // zapas — jest konieczny. Pierwszy człon OR-a (`moderated_at.is.null`)
+    // łapie też wiersze odrzucone PRZED migracją 78: migracja dodaje kolumnę
+    // `moderated_at` bez backfillu, więc każda opinia, którą Julia odrzuciła
+    // zanim migracja dojechała, ma dziś `status='rejected'` i
+    // `moderated_at=null`. Bez `.neq` taki wiersz trafiłby do „nowe", mimo że
+    // reviewBucket() sprawdza `rejected` NAJPIERW i bezwarunkowo zwraca
+    // „usuniete" — kubełki panelu musiałyby się wtedy rozjechać z regułą
+    // publicznego odczytu (rejected nigdy nie jest widoczne dla klienta).
     q = q.or("moderated_at.is.null,status.eq.pending").neq("status", "rejected");
   } else {
     q = q.eq("status", "approved").not("moderated_at", "is", null);
@@ -74,6 +82,8 @@ export async function getReviewsForBucket(
 // Filtr MUSI zostać zsynchronizowany z gałęzią „nowe" w getReviewsForBucket
 // (i z reviewBucket() w reviews-moderation.ts) — to jeden warunek zapisany
 // w dwóch miejscach, nie dwie niezależne definicje „nieprzejrzanej" opinii.
+// Uzasadnienie każdego członu (w tym dlaczego `.neq("status","rejected")`
+// jest konieczny, a nie tylko symetryczny) opisane przy gałęzi „nowe" wyżej.
 export async function getUnreviewedReviewsCount(): Promise<number> {
   const admin = await createAdminClient();
   const { count, error } = await admin
