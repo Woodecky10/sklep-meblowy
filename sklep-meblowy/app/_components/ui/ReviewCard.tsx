@@ -69,7 +69,12 @@ export default function ReviewCard({
           `display: -webkit-box` do `flow-root`, więc wymuszanie displayu
           niczego nie ratuje. Opakowanie rośnie, cytat obcina się na sześciu
           liniach. */}
-      <div className="flex-1">
+      {/* flex-1 na opakowaniu TYLKO w "slider": tam wyrównuje wysokość kart
+          w rzędzie embla (patrz komentarz wyżej). W "pelna" na /opinie karty
+          stoją w gridzie, więc rozciąganie niczego nie wyrównuje — tylko
+          odpycha zdjęcia w dół, zostawiając pustą przestrzeń między krótkim
+          cytatem a rzędem miniatur, do którego się odnosi. */}
+      <div className={pelna ? "" : "flex-1"}>
         <blockquote
           className={`whitespace-pre-wrap leading-relaxed text-[var(--fg)] ${pelna ? "" : "line-clamp-6"}`}
         >

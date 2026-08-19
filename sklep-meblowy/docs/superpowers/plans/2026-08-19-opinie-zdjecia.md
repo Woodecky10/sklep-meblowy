@@ -1042,16 +1042,25 @@ export default function ReviewCard({
     : `Zdjęcie od klienta do opinii o ${review.product_name ?? "produkcie"}`;
 ```
 
-W `<blockquote>` zamień stałą klasę `line-clamp-6` na warunkową:
+W `<blockquote>` zamień stałą klasę `line-clamp-6` na warunkową, i w opakowaniu
+wokół niego zrób `flex-1` warunkowym tak samo: rozciąganie zostaje TYLKO
+w wariancie "slider" (tam wyrównuje wysokość kart w rzędzie embla), w "pelna"
+na /opinie karty stoją w gridzie, więc nic go nie wyrównuje — samo `flex-1`
+tylko odpychałoby zdjęcia w dół, oddzielając je od cytatu, do którego się
+odnoszą:
 
 ```tsx
+      <div className={pelna ? "" : "flex-1"}>
         <blockquote
           className={`whitespace-pre-wrap leading-relaxed text-[var(--fg)] ${pelna ? "" : "line-clamp-6"}`}
         >
+          {review.comment}
+        </blockquote>
+      </div>
 ```
 
-ZARAZ POD zamknięciem `</div>` opakowującego `blockquote` (czyli POZA opakowaniem
-z `flex-1`, przed `<figcaption>`) wstaw:
+ZARAZ POD zamknięciem `</div>` opakowującego `blockquote` (czyli POZA tym
+opakowaniem — `flex-1` w wariancie "slider" — przed `<figcaption>`) wstaw:
 
 ```tsx
       {/* Miniatury stoją POD cytatem jako osobny rząd, a nie w opakowaniu
@@ -1317,14 +1326,17 @@ W `scripts/preview-mail.mjs`, w fiksturze opinii dla `AdminNewReview`, dopisz
 Bez tego podgląd pokazuje wariant bez zdjęć i nikt nie zobaczy nowego zdania,
 zanim wyjdzie do właścicielki.
 
-Run: `node scripts/preview-mail.mjs`
-Expected: exit 0, w `mail-preview/` plik `AdminNewReview.html` zawiera
-„Klient dołączył 2 zdjęcia".
+Run: `npx tsx scripts/preview-mail.mjs` (skrypt jest `.mjs`, ale importuje pliki
+`.tsx`/`.ts` bez rozszerzenia — zwykły `node` pada na `ERR_MODULE_NOT_FOUND`;
+`npm run preview:mail` w `package.json` uruchamia go właśnie przez `tsx`).
+Expected: exit 0, w `mail-preview/` plik `admin-new-review.html` (nazwa
+kebab-case z pola `name` w tablicy `cases`, tak jak wszystkie pozostałe pliki
+w tym katalogu) zawiera „Klient dołączył 2 zdjęcia".
 
 Sprawdź to poleceniem, nie okiem:
 
 ```bash
-grep -c "Klient dołączył 2 zdjęcia" mail-preview/AdminNewReview.html
+grep -c "Klient dołączył 2 zdjęcia" mail-preview/admin-new-review.html
 ```
 Expected: `1`.
 
@@ -1336,11 +1348,24 @@ Utwórz `e2e/opinie-zdjecia.spec.ts`:
 import { test, expect } from "@playwright/test";
 
 // ⚠️ Baza jest WSPÓLNA z produkcją — ten spec NICZEGO nie zapisuje.
-// Sprawdza wyłącznie to, co da się sprawdzić odczytem: że strony renderujące
-// opinie nie wywalają się na kodzie czytającym `photos`. To jest test na
-// FAIL-SOFT przed migracją 79 (kolumny nie ma → pole jest undefined),
-// czyli dokładnie na scenariusz, który wystąpi na produkcji między
-// deployem a migracją, gdyby ktoś odwrócił kolejność.
+//
+// Co ten spec REALNIE łapie zawsze: crash CAŁEJ strony na kodzie czytającym
+// opinie (np. `review.photos.length` bez normalizacji wywaliłoby renderowanie
+// strony, nie tylko jednej karty) — to test na FAIL-SOFT przed migracją 79:
+// dopóki kolumny `photos` nie ma w bazie, `select("*")` jej nie zwraca,
+// więc `review.photos` jest `undefined`.
+//
+// Czego NIE łapie sam, bez dalszego kroku niżej: normalizacja
+// `Array.isArray(photos) ? photos : []` siedzi WEWNĄTRZ `rows.map(...)`
+// w warstwie danych — `[].map(fn)` nigdy nie wywołuje `fn`. Dopóki w bazie
+// jest zero zatwierdzonych opinii, ta gałąź kodu w ogóle się nie wykonuje,
+// więc samo „strona zwróciła 200 i nie ma pageerror” o niej nic nie mówi.
+// Dlatego każdy test liczy karty opinii (`[data-review-card]`) i:
+// - przy zera kart ŚWIADOMIE się pomija (test.skip) zamiast udawać zielono,
+//   że sprawdził ścieżkę per-wiersz, której nie wykonał;
+// - przy co najmniej jednej karcie dodatkowo sprawdza, że KAŻDE zdjęcie
+//   w karcie faktycznie się załadowało (naturalWidth > 0) — to już realnie
+//   dotyka ścieżki `photos`, nie tylko obecności strony.
 test.describe("opinie ze zdjęciami — odczyt", () => {
   test("strona główna renderuje się mimo braku kolumny photos", async ({ page }) => {
     const bledy: string[] = [];
@@ -1349,6 +1374,21 @@ test.describe("opinie ze zdjęciami — odczyt", () => {
     expect(res?.status()).toBe(200);
     await expect(page.locator("footer")).toBeVisible();
     expect(bledy).toEqual([]);
+
+    const karty = page.locator("[data-review-card]");
+    const liczbaKart = await karty.count();
+    test.skip(
+      liczbaKart === 0,
+      "Baza nie ma jeszcze zatwierdzonych opinii — ścieżka per-wiersz " +
+        "(normalizacja photos w rows.map) się nie wykonała, więc guard śpi."
+    );
+
+    const zdjecia = karty.locator("img");
+    for (const img of await zdjecia.all()) {
+      await expect
+        .poll(() => img.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+        .toBeGreaterThan(0);
+    }
   });
 
   test("/opinie renderuje się i nie zgłasza błędów", async ({ page }) => {
@@ -1358,12 +1398,31 @@ test.describe("opinie ze zdjęciami — odczyt", () => {
     expect(res?.status()).toBe(200);
     await expect(page.locator("h1")).toBeVisible();
     expect(bledy).toEqual([]);
+
+    const karty = page.locator("[data-review-card]");
+    const liczbaKart = await karty.count();
+    test.skip(
+      liczbaKart === 0,
+      "Baza nie ma jeszcze zatwierdzonych opinii — ścieżka per-wiersz " +
+        "(normalizacja photos w rows.map) się nie wykonała, więc guard śpi."
+    );
+
+    const zdjecia = karty.locator("img");
+    for (const img of await zdjecia.all()) {
+      await expect
+        .poll(() => img.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+        .toBeGreaterThan(0);
+    }
   });
 });
 ```
 
 Run: `npm run build && npm start` w tle, potem `npx playwright test e2e/opinie-zdjecia.spec.ts`
-Expected: 2 passed.
+Expected: 1 passed, 2 skipped, razem 3 testy — projekt `chromium` zależy od
+`setup` (logowanie admina w `auth.setup.ts`), stąd trzeci test w przebiegu.
+Same dwa testy z tego pliku dziś, przy zera zatwierdzonych opinii w bazie,
+kończą się `skipped` (przez `test.skip()` w środku), nie `passed` — to
+oczekiwany wynik, nie regresja.
 
 ⚠️ NIGDY `next dev` — umiera po pierwszym teście (port słucha, nawigacja
 ERR_ABORTED). Zawsze `npm run build` + `npm start`.
