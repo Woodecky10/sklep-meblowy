@@ -95,8 +95,11 @@ export async function uploadReviewPhoto(
     return { ok: false, error: tr("Nieprawidłowy produkt", "Ungültiges Produkt") };
   }
 
-  const { canReview } = await getReviewStatus(productId);
+  const { canReview, reason } = await getReviewStatus(productId);
   if (!canReview) {
+    if (reason === "not_logged_in") {
+      return { ok: false, error: tr("Musisz być zalogowany", "Sie müssen angemeldet sein") };
+    }
     return {
       ok: false,
       error: tr(
