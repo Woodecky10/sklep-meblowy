@@ -76,6 +76,62 @@ export async function getReviewsForBucket(
   }));
 }
 
+// Snapshot opinii na potrzeby maila — osobny odczyt, żeby miejsce wpięcia
+// wołało jedną linijkę zamiast samo zbierać dane (wzorzec loadOrder
+// z sample-notify.ts). Bez guest_email: mail do właścicielki nie potrzebuje
+// adresu klienta, a PublicReview celowo go nie niesie.
+export type ReviewForMail = {
+  id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+  author_name: string | null;
+  product_name: string | null;
+};
+
+export async function getReviewForMail(reviewId: string): Promise<ReviewForMail | null> {
+  const admin = await createAdminClient();
+  const { data } = await admin
+    .from("product_reviews")
+    .select("id, rating, comment, created_at, user_id, guest_name, products(name)")
+    .eq("id", reviewId)
+    .maybeSingle();
+  if (!data) return null;
+
+  const r = data as unknown as {
+    id: string;
+    rating: number;
+    comment: string | null;
+    created_at: string;
+    user_id: string | null;
+    guest_name: string | null;
+    products: { name: string | null } | null;
+  };
+
+  // Dla konta imię leży w profiles (RLS: using(auth.uid() = id)), więc czyta je
+  // klient administracyjny — dokładnie jak getReviewsForBucket. Dla gościa
+  // guest_name jest wprost w wierszu. Rozstrzyga authorNameOf, żeby podpis
+  // w mailu i podpis na stronie brały się z jednej reguły.
+  let fullName: string | null = null;
+  if (r.user_id) {
+    const { data: profil } = await admin
+      .from("profiles")
+      .select("full_name")
+      .eq("id", r.user_id)
+      .maybeSingle();
+    fullName = (profil as { full_name: string | null } | null)?.full_name ?? null;
+  }
+
+  return {
+    id: r.id,
+    rating: r.rating,
+    comment: r.comment,
+    created_at: r.created_at,
+    author_name: authorNameOf(r, fullName),
+    product_name: r.products?.name ?? null,
+  };
+}
+
 // Plakietka „do przejrzenia": opinia JEST już publiczna, więc to nie jest
 // kolejka blokująca klienta — to lista rzeczy, na które nikt jeszcze nie
 // spojrzał. Ten sam wzorzec, co getNewOrdersCount (orders.status_updated_at).

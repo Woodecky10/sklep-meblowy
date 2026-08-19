@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { findInviteByToken, markInviteUsed } from "@/app/_lib/review-invites-server";
 import { inviteState } from "@/app/_lib/review-tokens";
 import { poluDlaNowegoZapisu } from "@/app/_lib/reviews-moderation";
+import { notifyAdminNewReview } from "@/app/_lib/mail/review-notify";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -30,15 +32,21 @@ export async function submitGuestReview(formData: FormData): Promise<ActionResul
   const tresc = String(formData.get("tresc") ?? "").trim().slice(0, 2000);
 
   const admin = await createAdminClient();
-  const { error } = await admin.from("product_reviews").insert({
-    product_id: invite.product_id,
-    user_id: null,
-    guest_name: imie,
-    guest_email: email,
-    rating,
-    comment: tresc || null,
-    ...poluDlaNowegoZapisu(),
-  } as never);
+  // `.select("id")` jest tu KONIECZNE, nie kosmetyką: bez zwróconego wiersza
+  // nie ma czym nakarmić notifyAdminNewReview poniżej.
+  const { data, error } = await admin
+    .from("product_reviews")
+    .insert({
+      product_id: invite.product_id,
+      user_id: null,
+      guest_name: imie,
+      guest_email: email,
+      rating,
+      comment: tresc || null,
+      ...poluDlaNowegoZapisu(),
+    } as never)
+    .select("id")
+    .single();
 
   if (error) {
     // Najczęstszy przypadek: uniq_review_guest — ten adres już ocenił ten
@@ -57,6 +65,12 @@ export async function submitGuestReview(formData: FormData): Promise<ActionResul
   // Token jednorazowy — zużywamy DOPIERO po udanym zapisie, żeby błąd
   // walidacji nie spalił linku.
   await markInviteUsed(invite.id);
+
+  // Mail do właścicielki PO udanym zapisie, przez after(): wysyłka nie może
+  // opóźnić ani zepsuć odpowiedzi dla klienta, który opinię zapisał poprawnie
+  // (ten sam wzorzec i uzasadnienie co w app/admin/zamowienia/actions.ts).
+  after(() => notifyAdminNewReview(data.id));
+
   // Opinia publikuje się od razu — odśwież wszystkie ścieżki jej widoczności.
   // Karta produktu i /sklep biorą ją do średniej; / ma slider opinii; /opinie
   // listuje wszystkie zatwierdzone (Omnibus). /admin/opinie to panel admina.

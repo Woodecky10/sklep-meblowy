@@ -1,7 +1,8 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import { createClient } from "@/app/_lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { poluDlaNowegoZapisu } from "@/app/_lib/reviews-moderation";
+import { notifyAdminNewReview } from "@/app/_lib/mail/review-notify";
 
 type Body = {
   productId: string;
@@ -106,6 +107,13 @@ export async function POST(request: NextRequest) {
       { status: 403 }
     );
   }
+
+  // Mail do właścicielki PO udanym zapisie, przez after(): wysyłka nie może
+  // opóźnić ani zepsuć odpowiedzi dla klienta, który opinię zapisał poprawnie
+  // (ten sam wzorzec i uzasadnienie co w app/admin/zamowienia/actions.ts).
+  // Leci też przy edycji — upsert nie rozróżnia nowej opinii od zmiany, a edycja
+  // wraca właścicielce przed oczy równie mocno, jak zupełnie nowa opinia.
+  after(() => notifyAdminNewReview(data.id));
 
   // Opinia publikuje się od razu — odśwież WSZYSTKIE ścieżki, gdzie się pojawia.
   // Karta produktu i /sklep biorą ją do średniej ocen; / ma slider opinii;
