@@ -3,11 +3,15 @@ import { createClient } from "@/app/_lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { poluDlaNowegoZapisu } from "@/app/_lib/reviews-moderation";
 import { notifyAdminNewReview } from "@/app/_lib/mail/review-notify";
+import { validateReviewPhotos } from "@/app/_lib/reviews-photos";
 
 type Body = {
   productId: string;
   rating: number;
   comment?: string;
+  // `unknown`, nie `string[]` — to jest payload z internetu, a nie obietnica.
+  // Rozstrzyga validateReviewPhotos.
+  photos?: unknown;
 };
 
 // Walidacja productId jako UUID — bez tego błędny id leciał do PostgREST,
@@ -53,6 +57,26 @@ export async function POST(request: NextRequest) {
           "Ocena musi być w zakresie 1–5",
           "Die Bewertung muss zwischen 1 und 5 liegen"
         ),
+      },
+      { status: 400 }
+    );
+  }
+
+  // Bramka druga z trzech (widżet, tutaj, `check` w migracji 79). Ta jest
+  // jedyną, której nie da się ominąć z konsoli przeglądarki mając ważną sesję.
+  // Prefiks pilnuje, żeby do opinii nie wjechał dowolny obrazek z internetu —
+  // opinia ląduje na stronie głównej sklepu.
+  const zdjecia = validateReviewPhotos(
+    body.photos,
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
+  );
+  if (!zdjecia.ok) {
+    return NextResponse.json(
+      {
+        error:
+          zdjecia.error === "count"
+            ? tr("Maksymalnie 3 zdjęcia", "Maximal 3 Fotos")
+            : tr("Nieprawidłowe zdjęcie", "Ungültiges Foto"),
       },
       { status: 400 }
     );
@@ -108,6 +132,12 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         rating: ratingInt,
         comment: trimmedComment || null,
+        // Zapisujemy PEŁNĄ listę, także pustą — edycja opinii jest wymianą
+        // stanu, nie doklejaniem. Formularz prefillowuje listę z istniejącej
+        // opinii, więc pusta lista tutaj znaczy „klient skasował zdjęcia",
+        // a nie „klient nic nie przysłał" (ten drugi przypadek odsiewa
+        // validateReviewPhotos, zwracając [] wyłącznie dla braku pola).
+        photos: zdjecia.value,
         // Każdy zapis (nowa opinia I edycja) publikuje się od razu i wraca
         // Julii przed oczy: moderated_at znów jest puste, więc opinia ląduje
         // w „nowe — do przejrzenia". Bez zerowania stempla podmiana treści po

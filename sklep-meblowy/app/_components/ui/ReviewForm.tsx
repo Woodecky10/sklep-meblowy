@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import StarInput from "./StarInput";
+import ReviewPhotoPicker from "./ReviewPhotoPicker";
+import { uploadReviewPhoto } from "@/app/produkt/actions";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import type { ProductReview } from "@/app/_lib/types";
@@ -37,6 +39,14 @@ export default function ReviewForm({
         deleteError: "Bewertung konnte nicht gelöscht werden",
         unknownError: "Unbekannter Fehler",
         moderacja: "Vielen Dank! Ihre Bewertung ist bereits auf der Seite.",
+        photosLabel: "Fotos (optional)",
+        photosHint: "Bis zu 3 Fotos. Wir zeigen sie öffentlich zusammen mit Ihrer Bewertung.",
+        addPhoto: "Foto hinzufügen",
+        uploadingPhoto: "Wird gesendet...",
+        photoAlt: "Foto zur Bewertung",
+        removePhoto: "Foto entfernen",
+        photoPrepareFailed:
+          "Das Foto konnte nicht vorbereitet werden. Wenn es eine HEIC-Datei vom iPhone ist, senden Sie es direkt vom Telefon oder speichern Sie es als JPG.",
       }
     : {
         editTitle: "Edytuj swoją opinię",
@@ -55,9 +65,20 @@ export default function ReviewForm({
         deleteError: "Nie udało się usunąć opinii",
         unknownError: "Nieznany błąd",
         moderacja: "Dziękujemy! Twoja opinia jest już na stronie.",
+        photosLabel: "Zdjęcia (opcjonalnie)",
+        photosHint: "Do 3 zdjęć. Pokażemy je publicznie razem z opinią.",
+        addPhoto: "Dodaj zdjęcie",
+        uploadingPhoto: "Wysyłam...",
+        photoAlt: "Zdjęcie do opinii",
+        removePhoto: "Usuń zdjęcie",
+        photoPrepareFailed:
+          "Nie udało się przygotować zdjęcia. Jeśli to plik HEIC z iPhone'a, wyślij zdjęcie prosto z telefonu albo zapisz je jako JPG.",
       };
   const [rating, setRating] = useState<number>(existingReview?.rating ?? 0);
   const [comment, setComment] = useState<string>(existingReview?.comment ?? "");
+  // Prefill z istniejącej opinii: edycja wysyła PEŁNĄ listę zdjęć, więc bez
+  // tego pierwsza edycja skasowałaby zdjęcia dodane przy pierwszym zapisie.
+  const [photos, setPhotos] = useState<string[]>(existingReview?.photos ?? []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -75,7 +96,7 @@ export default function ReviewForm({
       const res = await fetch(`/api/reviews?locale=${locale}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId, rating, comment }),
+        body: JSON.stringify({ productId, rating, comment, photos }),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? c.saveError);
@@ -100,6 +121,7 @@ export default function ReviewForm({
       if (!res.ok) throw new Error(data.error ?? c.deleteError);
       setRating(0);
       setComment("");
+      setPhotos([]);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : c.unknownError);
@@ -149,6 +171,25 @@ export default function ReviewForm({
           {comment.length}/2000
         </p>
       </div>
+
+      <ReviewPhotoPicker
+        photos={photos}
+        onChange={setPhotos}
+        disabled={loading}
+        upload={async (fd) => {
+          fd.set("product_id", productId);
+          return uploadReviewPhoto(fd);
+        }}
+        teksty={{
+          label: c.photosLabel,
+          hint: c.photosHint,
+          add: c.addPhoto,
+          uploading: c.uploadingPhoto,
+          alt: c.photoAlt,
+          remove: c.removePhoto,
+          prepareFailed: c.photoPrepareFailed,
+        }}
+      />
 
       {error && (
         <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 rounded-xl px-4 py-3 text-sm">
