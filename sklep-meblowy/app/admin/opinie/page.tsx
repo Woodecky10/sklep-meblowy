@@ -1,13 +1,13 @@
-import { getReviewsForModeration } from "@/app/_lib/reviews-admin";
+import { getReviewsForBucket } from "@/app/_lib/reviews-admin";
 import OpinieList from "./OpinieList";
 
 export const metadata = { title: "Opinie — panel" };
 
 export default async function OpiniePage() {
-  const [oczekujace, zatwierdzone, odrzucone] = await Promise.all([
-    getReviewsForModeration("pending"),
-    getReviewsForModeration("approved"),
-    getReviewsForModeration("rejected"),
+  const [nowe, opublikowane, usuniete] = await Promise.all([
+    getReviewsForBucket("nowe"),
+    getReviewsForBucket("opublikowane"),
+    getReviewsForBucket("usuniete"),
   ]);
 
   return (
@@ -15,14 +15,11 @@ export default async function OpiniePage() {
       <div>
         <h1 className="font-display text-3xl font-bold mb-1">Opinie</h1>
         <p className="text-sm text-[var(--muted)]">
-          Opinia staje się publiczna dopiero po zatwierdzeniu.
+          Opinie klientów publikują się od razu. Tutaj je przeglądasz i
+          zdejmujesz ze strony, jeśli coś jest nie tak.
         </p>
       </div>
-      <OpinieList
-        oczekujace={oczekujace}
-        zatwierdzone={zatwierdzone}
-        odrzucone={odrzucone}
-      />
+      <OpinieList nowe={nowe} opublikowane={opublikowane} usuniete={usuniete} />
     </div>
   );
 }

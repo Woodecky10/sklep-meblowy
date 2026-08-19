@@ -2,17 +2,23 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { setReviewStatus, setReviewHomepageExcluded } from "./actions";
+import {
+  oznaczPrzejrzana,
+  usunZWitryny,
+  przywrocNaWitryne,
+  setReviewHomepageExcluded,
+  type ActionResult,
+} from "./actions";
 import type { ReviewForModeration } from "@/app/_lib/reviews-admin";
 
 export default function OpinieList({
-  oczekujace,
-  zatwierdzone,
-  odrzucone,
+  nowe,
+  opublikowane,
+  usuniete,
 }: {
-  oczekujace: ReviewForModeration[];
-  zatwierdzone: ReviewForModeration[];
-  odrzucone: ReviewForModeration[];
+  nowe: ReviewForModeration[];
+  opublikowane: ReviewForModeration[];
+  usuniete: ReviewForModeration[];
 }) {
   const [blad, setBlad] = useState<string | null>(null);
 
@@ -24,42 +30,50 @@ export default function OpinieList({
         </div>
       )}
 
-      <Sekcja tytul={`Oczekujące (${oczekujace.length})`}>
+      <Sekcja tytul={`Nowe — do przejrzenia (${nowe.length})`}>
         {/* ⚠️ Wymóg ze specyfikacji, sekcja „Zgodność z przepisami": to
             ostrzeżenie ma stać tam, gdzie Julia klika, a nie w dokumentacji,
             której nikt nie czyta. NIE parafrazować, NIE przenosić. */}
         <p className="text-xs text-[var(--muted)] mb-4 max-w-2xl">
           Odrzucaj spam, obelgi i treści niezwiązane z produktem.{" "}
           <strong className="text-[var(--fg)]">
-            Nie odrzucaj opinii tylko dlatego, że ocena jest niska
+            Nie zdejmuj opinii tylko dlatego, że ocena jest niska
           </strong>{" "}
           — pokazywanie wyłącznie pochwał przy ukrywaniu krytyki jest niezgodne
           z przepisami o opiniach konsumenckich.
         </p>
-        {oczekujace.length === 0 ? (
-          <Pusto tekst="Nic nie czeka na sprawdzenie." />
+        {nowe.length === 0 ? (
+          <Pusto tekst="Nic nowego." />
         ) : (
-          oczekujace.map((o) => (
-            <Wiersz key={o.id} opinia={o} onBlad={setBlad} pokazDecyzje />
+          nowe.map((o) => (
+            <Wiersz
+              key={o.id}
+              opinia={o}
+              onBlad={setBlad}
+              pokazPrzejrzyj
+              pokazZdejmij
+              pokazWykluczenie
+              widocznaNaStronie
+            />
           ))
         )}
       </Sekcja>
 
-      <Sekcja tytul={`Opublikowane (${zatwierdzone.length})`}>
-        {zatwierdzone.length === 0 ? (
+      <Sekcja tytul={`Opublikowane (${opublikowane.length})`}>
+        {opublikowane.length === 0 ? (
           <Pusto tekst="Nie ma jeszcze żadnej opublikowanej opinii." />
         ) : (
-          zatwierdzone.map((o) => (
-            <Wiersz key={o.id} opinia={o} onBlad={setBlad} pokazWykluczenie />
+          opublikowane.map((o) => (
+            <Wiersz key={o.id} opinia={o} onBlad={setBlad} pokazZdejmij pokazWykluczenie />
           ))
         )}
       </Sekcja>
 
-      <Sekcja tytul={`Odrzucone (${odrzucone.length})`}>
-        {odrzucone.length === 0 ? (
-          <Pusto tekst="Nic nie zostało odrzucone." />
+      <Sekcja tytul={`Zdjęte ze strony (${usuniete.length})`}>
+        {usuniete.length === 0 ? (
+          <Pusto tekst="Nic nie zostało zdjęte." />
         ) : (
-          odrzucone.map((o) => <Wiersz key={o.id} opinia={o} onBlad={setBlad} pokazPrzywroc />)
+          usuniete.map((o) => <Wiersz key={o.id} opinia={o} onBlad={setBlad} pokazPrzywroc />)
         )}
       </Sekcja>
     </div>
@@ -82,23 +96,27 @@ function Pusto({ tekst }: { tekst: string }) {
 function Wiersz({
   opinia,
   onBlad,
-  pokazDecyzje = false,
+  pokazPrzejrzyj = false,
+  pokazZdejmij = false,
   pokazWykluczenie = false,
   pokazPrzywroc = false,
+  widocznaNaStronie = false,
 }: {
   opinia: ReviewForModeration;
   onBlad: (b: string | null) => void;
-  pokazDecyzje?: boolean;
+  pokazPrzejrzyj?: boolean;
+  pokazZdejmij?: boolean;
   pokazWykluczenie?: boolean;
   pokazPrzywroc?: boolean;
+  widocznaNaStronie?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  function zmien(status: "approved" | "rejected" | "pending") {
+  function wykonaj(akcja: (id: string) => Promise<ActionResult>) {
     onBlad(null);
     startTransition(async () => {
-      const wynik = await setReviewStatus(opinia.id, status);
+      const wynik = await akcja(opinia.id);
       if (!wynik.ok) onBlad(wynik.error);
       else router.refresh();
     });
@@ -132,15 +150,22 @@ function Wiersz({
             {new Date(opinia.created_at).toLocaleDateString("pl-PL")}
           </p>
         </div>
-        <span
-          className={
-            odGoscia
-              ? "text-[10px] uppercase tracking-widest px-2 py-1 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-              : "text-[10px] uppercase tracking-widest px-2 py-1 rounded-full bg-[var(--border)] text-[var(--muted)]"
-          }
-        >
-          {odGoscia ? "gość" : "konto"}
-        </span>
+        <div className="flex items-center gap-2">
+          <span
+            className={
+              odGoscia
+                ? "text-[10px] uppercase tracking-widest px-2 py-1 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                : "text-[10px] uppercase tracking-widest px-2 py-1 rounded-full bg-[var(--border)] text-[var(--muted)]"
+            }
+          >
+            {odGoscia ? "gość" : "konto"}
+          </span>
+          {widocznaNaStronie && (
+            <span className="text-[10px] uppercase tracking-widest px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+              widoczna na stronie
+            </span>
+          )}
+        </div>
       </div>
 
       {opinia.comment && (
@@ -150,34 +175,34 @@ function Wiersz({
       )}
 
       <div className="flex items-center gap-3 flex-wrap">
-        {pokazDecyzje && (
-          <>
-            <button
-              type="button"
-              onClick={() => zmien("approved")}
-              disabled={pending}
-              className="px-4 py-2 bg-[var(--color-navy)] text-white text-xs font-semibold uppercase tracking-widest rounded-full disabled:opacity-40"
-            >
-              Zatwierdź
-            </button>
-            <button
-              type="button"
-              onClick={() => zmien("rejected")}
-              disabled={pending}
-              className="text-xs font-semibold uppercase tracking-widest text-red-600 hover:text-red-700 disabled:opacity-40"
-            >
-              Odrzuć
-            </button>
-          </>
+        {pokazPrzejrzyj && (
+          <button
+            type="button"
+            onClick={() => wykonaj(oznaczPrzejrzana)}
+            disabled={pending}
+            className="px-4 py-2 bg-[var(--color-navy)] text-white text-xs font-semibold uppercase tracking-widest rounded-full disabled:opacity-40"
+          >
+            Przejrzane
+          </button>
+        )}
+        {pokazZdejmij && (
+          <button
+            type="button"
+            onClick={() => wykonaj(usunZWitryny)}
+            disabled={pending}
+            className="text-xs font-semibold uppercase tracking-widest text-red-600 hover:text-red-700 disabled:opacity-40"
+          >
+            Zdejmij ze strony
+          </button>
         )}
         {pokazPrzywroc && (
           <button
             type="button"
-            onClick={() => zmien("pending")}
+            onClick={() => wykonaj(przywrocNaWitryne)}
             disabled={pending}
             className="text-xs font-semibold uppercase tracking-widest text-[var(--muted)] hover:text-[var(--fg)] disabled:opacity-40"
           >
-            Przywróć do sprawdzenia
+            Przywróć
           </button>
         )}
         {pokazWykluczenie && (
