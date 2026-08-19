@@ -530,7 +530,7 @@ git commit -m "feat(opinie): serwerowe wgrywanie zdjęcia do opinii (konto i go�
 - Produces:
   - `prepareReviewPhoto(file: File): Promise<File>` — RZUCA przy nieudanym przekodowaniu
   - `type ReviewPhotoPickerTeksty = { label; hint; add; uploading; alt; remove; prepareFailed }` (wszystkie `string`)
-  - domyślny eksport `ReviewPhotoPicker` z propsami `{ photos: string[]; onChange: (photos: string[]) => void; upload: (fd: FormData) => Promise<{ ok: true; url: string } | { ok: false; error: string }>; teksty: ReviewPhotoPickerTeksty; disabled?: boolean }`
+  - domyślny eksport `ReviewPhotoPicker` z propsami `{ photos: string[]; onChange: React.Dispatch<React.SetStateAction<string[]>>; upload: (fd: FormData) => Promise<{ ok: true; url: string } | { ok: false; error: string }>; teksty: ReviewPhotoPickerTeksty; disabled?: boolean }`
 
 - [ ] **Krok 1: `prepareReviewPhoto`**
 
@@ -610,7 +610,7 @@ export default function ReviewPhotoPicker({
   disabled = false,
 }: {
   photos: string[];
-  onChange: (photos: string[]) => void;
+  onChange: React.Dispatch<React.SetStateAction<string[]>>;
   upload: (
     fd: FormData
   ) => Promise<{ ok: true; url: string } | { ok: false; error: string }>;
@@ -642,7 +642,12 @@ export default function ReviewPhotoPicker({
       const fd = new FormData();
       fd.set("photo", doWyslania, doWyslania.name);
       const res = await upload(fd);
-      if (res.ok) onChange([...photos, res.url]);
+      if (res.ok)
+        // Funkcjonalnie, bo między pick a upload może wylądować usunięcie.
+        // Snapshot przepuściłby zmieniony plik. Re-check limitu w append.
+        onChange((prev) =>
+          prev.length >= MAX_REVIEW_PHOTOS ? prev : [...prev, res.url]
+        );
       else setBlad(res.error);
     } finally {
       setWysylanie(false);
@@ -665,7 +670,7 @@ export default function ReviewPhotoPicker({
               <Image src={url} alt={`${teksty.alt} ${i + 1}`} fill sizes="80px" className="object-cover" />
               <button
                 type="button"
-                onClick={() => onChange(photos.filter((u) => u !== url))}
+                onClick={() => onChange((prev) => prev.filter((u) => u !== url))}
                 aria-label={teksty.remove}
                 className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center rounded-full bg-black/60 text-white text-xs"
               >
