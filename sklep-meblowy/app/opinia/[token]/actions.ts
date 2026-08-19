@@ -9,7 +9,7 @@ import { inviteState } from "@/app/_lib/review-tokens";
 import { poluDlaNowegoZapisu } from "@/app/_lib/reviews-moderation";
 import { notifyAdminNewReview } from "@/app/_lib/mail/review-notify";
 import { validateImageUpload } from "@/app/_lib/image-upload";
-import { REVIEW_PHOTO_DIR } from "@/app/_lib/reviews-photos";
+import { REVIEW_PHOTO_DIR, parseReviewPhotos, validateReviewPhotos } from "@/app/_lib/reviews-photos";
 
 export type UploadGuestReviewPhotoResult =
   | { ok: true; url: string }
@@ -79,6 +79,20 @@ export async function submitGuestReview(formData: FormData): Promise<ActionResul
   if (!email.includes("@")) return { ok: false, error: "Podaj poprawny adres e-mail" };
   const tresc = String(formData.get("tresc") ?? "").trim().slice(0, 2000);
 
+  const zdjecia = validateReviewPhotos(
+    parseReviewPhotos(formData.get("photos")),
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
+  );
+  if (!zdjecia.ok) {
+    return {
+      ok: false,
+      error:
+        zdjecia.error === "count"
+          ? "Maksymalnie 3 zdjęcia"
+          : "Nie udało się dołączyć zdjęcia — spróbuj dodać je jeszcze raz",
+    };
+  }
+
   const admin = await createAdminClient();
   // `.select("id")` jest tu KONIECZNE, nie kosmetyką: bez zwróconego wiersza
   // nie ma czym nakarmić notifyAdminNewReview poniżej.
@@ -91,6 +105,7 @@ export async function submitGuestReview(formData: FormData): Promise<ActionResul
       guest_email: email,
       rating,
       comment: tresc || null,
+      photos: zdjecia.value,
       ...poluDlaNowegoZapisu(),
     } as never)
     .select("id")

@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import StarInput from "@/app/_components/ui/StarInput";
-import { submitGuestReview } from "./actions";
+import ReviewPhotoPicker from "@/app/_components/ui/ReviewPhotoPicker";
+import { submitGuestReview, uploadGuestReviewPhoto } from "./actions";
 
 export default function GuestReviewForm({
   token,
@@ -17,6 +18,9 @@ export default function GuestReviewForm({
 }) {
   const [rating, setRating] = useState(0);
   const [tresc, setTresc] = useState("");
+  // Gość nigdy nie edytuje istniejącej opinii — link jest jednorazowy —
+  // więc bez prefillu.
+  const [zdjecia, setZdjecia] = useState<string[]>([]);
   const [blad, setBlad] = useState<string | null>(null);
   // Trzyma TREŚĆ komunikatu zwróconego przez akcję, nie tylko fakt wysłania —
   // dzięki temu jest jedno źródło prawdy o tym, co dzieje się z opinią po
@@ -43,6 +47,9 @@ export default function GuestReviewForm({
     const formData = new FormData(e.currentTarget);
     // StarInput trzyma ocenę w stanie Reacta, nie w polu formularza.
     formData.set("rating", String(rating));
+    // Widżet trzyma listę URL-i w stanie Reacta, nie w polu formularza —
+    // tak samo jak StarInput trzyma ocenę.
+    formData.set("photos", JSON.stringify(zdjecia));
     startTransition(async () => {
       const wynik = await submitGuestReview(formData);
       if (!wynik.ok) setBlad(wynik.error);
@@ -135,6 +142,26 @@ export default function GuestReviewForm({
           />
           <p className="text-xs text-[var(--muted)] mt-1 text-right">{tresc.length}/2000</p>
         </div>
+
+        <ReviewPhotoPicker
+          photos={zdjecia}
+          onChange={setZdjecia}
+          disabled={pending}
+          upload={async (fd) => {
+            fd.set("token", token);
+            return uploadGuestReviewPhoto(fd);
+          }}
+          teksty={{
+            label: "Zdjęcia (opcjonalnie)",
+            hint: "Do 3 zdjęć. Pokażemy je publicznie razem z opinią.",
+            add: "Dodaj zdjęcie",
+            uploading: "Wysyłam...",
+            alt: "Zdjęcie do opinii",
+            remove: "Usuń zdjęcie",
+            prepareFailed:
+              "Nie udało się przygotować zdjęcia. Jeśli to plik HEIC z iPhone'a, wyślij zdjęcie prosto z telefonu albo zapisz je jako JPG.",
+          }}
+        />
 
         {blad && (
           <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 rounded-xl px-4 py-3 text-sm">
