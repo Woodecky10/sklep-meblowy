@@ -71,6 +71,11 @@ export async function getReviewsForBucket(
 
   return rows.map((r) => ({
     ...r,
+    // Dopóki migracja 79 nie jest zaaplikowana, `select("*")` NIE zwraca
+    // kolumny `photos` i pole jest `undefined` — a komponenty na niej mapują.
+    // Normalizacja siedzi w warstwie danych, bo to jedyne miejsce, które wie,
+    // że wiersz przyszedł z bazy. To ta sama zasada, co fail-soft w reviews.ts.
+    photos: Array.isArray(r.photos) ? r.photos : [],
     author_name: authorNameOf(r, nameMap.get(r.user_id ?? "")),
     product_name: r.products?.name ?? null,
   }));
@@ -87,13 +92,17 @@ export type ReviewForMail = {
   created_at: string;
   author_name: string | null;
   product_name: string | null;
+  // Liczba zdjęć, nie same URL-e: mail ma powiedzieć Julii, że jest CO obejrzeć,
+  // a oglądanie odbywa się w panelu. Wklejanie publicznych URL-i do maila
+  // rozsyłałoby zdjęcia klientów poza witrynę.
+  photos_count: number;
 };
 
 export async function getReviewForMail(reviewId: string): Promise<ReviewForMail | null> {
   const admin = await createAdminClient();
   const { data } = await admin
     .from("product_reviews")
-    .select("id, rating, comment, created_at, user_id, guest_name, products(name)")
+    .select("id, rating, comment, created_at, user_id, guest_name, photos, products(name)")
     .eq("id", reviewId)
     .maybeSingle();
   if (!data) return null;
@@ -105,6 +114,7 @@ export async function getReviewForMail(reviewId: string): Promise<ReviewForMail 
     created_at: string;
     user_id: string | null;
     guest_name: string | null;
+    photos: string[] | undefined;
     products: { name: string | null } | null;
   };
 
@@ -129,6 +139,7 @@ export async function getReviewForMail(reviewId: string): Promise<ReviewForMail 
     created_at: r.created_at,
     author_name: authorNameOf(r, fullName),
     product_name: r.products?.name ?? null,
+    photos_count: Array.isArray(r.photos) ? r.photos.length : 0,
   };
 }
 

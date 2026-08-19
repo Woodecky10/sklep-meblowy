@@ -21,6 +21,7 @@ const OPINIA = {
   author_name: "Anna Kowalska",
   product_name: "Element prosty Nube",
   created_at: "2026-08-19T10:00:00.000Z",
+  photos_count: 0,
 };
 
 beforeEach(() => {
@@ -63,5 +64,22 @@ describe("notifyAdminNewReview", () => {
     getReviewMock.mockResolvedValue(null);
     await expect(notifyAdminNewReview(OPINIA.id)).resolves.toBeUndefined();
     expect(sendMailMock).not.toHaveBeenCalled();
+  });
+
+  it("nie wspomina o zdjęciach, gdy opinia ich nie ma", async () => {
+    await notifyAdminNewReview(OPINIA.id);
+    const payload = sendMailMock.mock.calls[0][0];
+    expect(payload.html).not.toContain("zdjęcie");
+    expect(payload.html).not.toContain("zdjęcia");
+  });
+
+  it("mówi, ile zdjęć dołączył klient, ale NIE osadza ich w mailu", async () => {
+    getReviewMock.mockResolvedValue({ ...OPINIA, photos_count: 2 });
+    await notifyAdminNewReview(OPINIA.id);
+    const payload = sendMailMock.mock.calls[0][0];
+    expect(payload.html).toContain("2 zdjęcia");
+    // Kontrakt: liczba, nie zawartość. Gdyby ktoś kiedyś wstawił <img> ze
+    // zdjęciem klienta, ten test ma o tym powiedzieć.
+    expect(payload.html).not.toContain("/storage/v1/object/public/products/opinie/");
   });
 });

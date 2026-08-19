@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   oznaczPrzejrzana,
@@ -180,6 +181,32 @@ function Wiersz({
         <p className="whitespace-pre-wrap text-sm text-[var(--fg)] leading-relaxed">
           {opinia.comment}
         </p>
+      )}
+
+      {(opinia.photos ?? []).length > 0 && (
+        <ul className="flex flex-wrap gap-2 mt-3">
+          {(opinia.photos ?? []).map((url, i) => (
+            <li
+              key={url}
+              className="relative w-20 h-20 rounded-lg overflow-hidden border border-[var(--border)]"
+            >
+              {/* Zwykły <a target="_blank">, nie lightbox: właścicielka musi móc
+                  obejrzeć zdjęcie w pełnym rozmiarze, zanim zdecyduje o zdjęciu
+                  opinii ze strony. Na karcie klienta tego linku CELOWO nie ma
+                  (druga akcja w kafelku slidera to pułapka na dotyku) — tu jest
+                  odwrotnie: to narzędzie pracy, nie witryna. */}
+              <a href={url} target="_blank" rel="noopener noreferrer">
+                <Image
+                  src={url}
+                  alt={`Zdjęcie ${i + 1} dołączone do opinii`}
+                  fill
+                  sizes="80px"
+                  className="object-cover"
+                />
+              </a>
+            </li>
+          ))}
+        </ul>
       )}
 
       <div className="flex items-center gap-3 flex-wrap">

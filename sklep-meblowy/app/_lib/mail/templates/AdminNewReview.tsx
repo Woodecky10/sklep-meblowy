@@ -12,10 +12,13 @@ export function AdminNewReview({
   branding,
   panelUrl,
 }: {
-  // Świadomie tylko te cztery pola z ReviewForMail: `id` i `created_at` nie
+  // Świadomie tylko te pięć pól z ReviewForMail: `id` i `created_at` nie
   // mają się w mailu pojawić, więc lepiej ich nie przyjmować, niż liczyć na to,
   // że nikt ich nie użyje.
-  opinia: Pick<ReviewForMail, "rating" | "comment" | "author_name" | "product_name">;
+  opinia: Pick<
+    ReviewForMail,
+    "rating" | "comment" | "author_name" | "product_name" | "photos_count"
+  >;
   branding: MailBranding;
   panelUrl: string;
 }) {
@@ -51,6 +54,18 @@ export function AdminNewReview({
       <Text style={{ color: c.fg, fontSize: "14px", lineHeight: "1.6", margin: "0 0 24px" }}>
         {opinia.comment || "— bez komentarza —"}
       </Text>
+
+      {/* Sama liczba, nie zdjęcia. Osadzenie zdjęć klienta w mailu wysłałoby je
+          poza witrynę (i poza kontrolę nad tym, gdzie wylądują), a decyzja
+          o zdjęciu opinii ze strony i tak zapada w panelu — mail ma tylko
+          powiedzieć, że jest CO obejrzeć. */}
+      {opinia.photos_count > 0 && (
+        <Text style={{ color: c.muted, fontSize: "13px", margin: "0 0 24px" }}>
+          {opinia.photos_count === 1
+            ? "Klient dołączył 1 zdjęcie — jest już widoczne na stronie."
+            : `Klient dołączył ${opinia.photos_count} zdjęcia — są już widoczne na stronie.`}
+        </Text>
+      )}
 
       <MailButton branding={branding} href={panelUrl}>
         Otwórz panel opinii
