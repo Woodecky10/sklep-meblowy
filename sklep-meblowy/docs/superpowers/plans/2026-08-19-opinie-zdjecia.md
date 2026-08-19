@@ -53,7 +53,7 @@
 - `app/produkt/[id]/page.tsx` — przekazanie nazwy produktu do `ReviewList`.
 - `app/_lib/reviews-admin.ts` — normalizacja `photos`, liczba zdjęć w `ReviewForMail`.
 - `app/_lib/mail/review-notify.ts`, `app/_lib/mail/templates/AdminNewReview.tsx` — wzmianka o zdjęciach.
-- `app/_lib/mail/__tests__/mail-review-notify.test.ts` — pokrycie powyższego.
+- `app/_lib/__tests__/mail-review-notify.test.ts` — pokrycie powyższego.
 - `app/admin/opinie/OpinieList.tsx` — podgląd zdjęć w panelu.
 
 ---
@@ -1176,7 +1176,7 @@ strony. Panel ślepy na zdjęcia unieważniałby cały ten model.
 - Modify: `app/_lib/reviews-admin.ts` (`getReviewsForBucket`, `ReviewForMail`, `getReviewForMail`)
 - Modify: `app/admin/opinie/OpinieList.tsx` (komponent `Wiersz`, ok. linia 179)
 - Modify: `app/_lib/mail/templates/AdminNewReview.tsx`
-- Modify: `app/_lib/mail/__tests__/mail-review-notify.test.ts`
+- Modify: `app/_lib/__tests__/mail-review-notify.test.ts`
 
 **Interfaces:**
 - Consumes: `ProductReview.photos` (Zadanie 1), `MAX_REVIEW_PHOTOS` (Zadanie 1).
