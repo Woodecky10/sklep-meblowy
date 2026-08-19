@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { createAdminClient } from "@/app/_lib/supabase/server";
@@ -7,6 +8,53 @@ import { findInviteByToken, markInviteUsed } from "@/app/_lib/review-invites-ser
 import { inviteState } from "@/app/_lib/review-tokens";
 import { poluDlaNowegoZapisu } from "@/app/_lib/reviews-moderation";
 import { notifyAdminNewReview } from "@/app/_lib/mail/review-notify";
+import { validateImageUpload } from "@/app/_lib/image-upload";
+import { REVIEW_PHOTO_DIR } from "@/app/_lib/reviews-photos";
+
+export type UploadGuestReviewPhotoResult =
+  | { ok: true; url: string }
+  | { ok: false; error: string };
+
+// Wgranie JEDNEGO zdjęcia do opinii — ścieżka GOŚCIA. Uprawnieniem jest ważny
+// token z zaproszenia, dokładnie jak przy zapisie opinii niżej.
+//
+// Token zużywa się (markInviteUsed) DOPIERO po udanym zapisie opinii, więc trzy
+// uploady na jednym tokenie działają, a po wysłaniu opinii link przestaje
+// otwierać cokolwiek — także tę akcję.
+//
+// Ten sam komunikat dla „nie ma takiego" i „nieważny": nie podpowiadamy
+// zgadującemu, czy trafił w istniejący token.
+export async function uploadGuestReviewPhoto(
+  formData: FormData
+): Promise<UploadGuestReviewPhotoResult> {
+  const token = String(formData.get("token") ?? "");
+  const invite = await findInviteByToken(token);
+  if (!invite || inviteState(invite, new Date()) !== "ok") {
+    return { ok: false, error: "Link jest nieprawidłowy lub stracił ważność" };
+  }
+
+  const valid = validateImageUpload(formData.get("photo"));
+  if (!valid.ok) return { ok: false, error: valid.error };
+
+  const path = `${REVIEW_PHOTO_DIR}/${Date.now()}-${randomUUID()}.${valid.ext}`;
+  const admin = await createAdminClient();
+  const { error } = await admin.storage
+    .from("products")
+    .upload(path, valid.file, {
+      contentType: valid.contentType,
+      cacheControl: "3600",
+      upsert: false,
+    });
+  if (error) {
+    console.error("[opinie] upload zdjęcia gościa nieudany:", error.message);
+    return { ok: false, error: "Nie udało się wysłać zdjęcia — spróbuj ponownie" };
+  }
+
+  const {
+    data: { publicUrl },
+  } = admin.storage.from("products").getPublicUrl(path);
+  return { ok: true, url: publicUrl };
+}
 
 export type ActionResult =
   | { ok: true; message?: string }
