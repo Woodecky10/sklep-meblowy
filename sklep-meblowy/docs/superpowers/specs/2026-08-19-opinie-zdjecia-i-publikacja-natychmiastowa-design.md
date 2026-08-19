@@ -89,7 +89,9 @@ wystawić, przed zmianą defaultu: `update public.product_reviews set status =
 ### 3.2 Panel — trzy sekcje o nowym znaczeniu
 
 - **Nowe — do przejrzenia**: `status='approved' and moderated_at is null`.
-  Akcje: „Przejrzane" (stempluje `moderated_at`), „Usuń z witryny"
+  Akcje: „Przejrzane" (ustawia `status='approved'` + stempluje `moderated_at` —
+  druga część chroni wiersze pending zapisane w oknie wdrożenia, które panel
+  musi wyświetlić, żeby mogły być opublikowane), „Usuń z witryny"
   (`status='rejected'` + stempel).
 - **Opublikowane**: `approved` z wypełnionym `moderated_at`. Zostaje istniejący
   przełącznik „wyklucz ze strony głównej".

@@ -131,11 +131,31 @@ create policy "reviews: insert po zakupie"
 
 drop policy if exists "reviews: update własne" on public.product_reviews;
 
+-- Recenzja CAŁEJ gałęzi (2026-08-19) znalazła dwa problemy:
+-- 1) `using` bez warunku na statusie pozwalał zedytować nawet `rejected` —
+--    przy publikacji natychmiastowej autor mógł przywrócić zdjętą opinię.
+-- 2) `with check` nie miał warunku zakupu — editor z bezpośrednim REST-em
+--    mógłby zmienić treść opinii bez weryfikacji, że ma prawo (ten sam klucz
+--    anon, co insert).
 create policy "reviews: update własne"
   on public.product_reviews for update
   to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id and status in ('pending','approved'));
+  using (auth.uid() = user_id and status <> 'rejected')
+  with check (
+    auth.uid() = user_id
+    and status in ('pending','approved')
+    and exists (
+      select 1
+      from public.orders o
+      join public.order_items oi on oi.order_id = o.id
+      where o.user_id = auth.uid()
+        and oi.product_id = product_reviews.product_id
+        and (
+          (o.payment_method = 'online' and o.status in ('paid','processing','shipped','delivered'))
+          or (o.payment_method = 'cod' and o.status in ('shipped','delivered'))
+        )
+    )
+  );
 ```
 
 - [ ] **Krok 2: Sprawdź idempotencję czytaniem**
@@ -171,7 +191,7 @@ wyłapała dwie usterki krytyczne, zanim schemat wszedł na żywą bazę.
   - `type ReviewBucket = "nowe" | "opublikowane" | "usuniete"`
   - `reviewBucket(r: { status: ReviewStatus; moderated_at: string | null }): ReviewBucket`
   - `poluDlaNowegoZapisu(): { status: "approved"; moderated_at: null }`
-  - `poluDlaPrzejrzenia(teraz: Date): { moderated_at: string }`
+  - `poluDlaPrzejrzenia(teraz: Date): { status: "approved"; moderated_at: string }`
   - `poluDlaUsuniecia(teraz: Date): { status: "rejected"; moderated_at: string }`
   - `poluDlaPrzywrocenia(): { status: "approved"; moderated_at: null }`
 
@@ -231,9 +251,12 @@ describe("pola zapisu", () => {
     expect(poluDlaNowegoZapisu()).toEqual({ status: "approved", moderated_at: null });
   });
 
-  it("przejrzenie stempluje czas, nie rusza statusu", () => {
+  it("przejrzenie ustawia status i stempluje czas", () => {
     const teraz = new Date("2026-08-19T12:34:56.000Z");
-    expect(poluDlaPrzejrzenia(teraz)).toEqual({ moderated_at: "2026-08-19T12:34:56.000Z" });
+    expect(poluDlaPrzejrzenia(teraz)).toEqual({
+      status: "approved",
+      moderated_at: "2026-08-19T12:34:56.000Z",
+    });
   });
 
   it("usunięcie z witryny odrzuca I stempluje — inaczej wisi w 'nowe'", () => {
@@ -291,8 +314,20 @@ export function poluDlaNowegoZapisu(): { status: "approved"; moderated_at: null 
   return { status: "approved", moderated_at: null };
 }
 
-export function poluDlaPrzejrzenia(teraz: Date): { moderated_at: string } {
-  return { moderated_at: teraz.toISOString() };
+// Zwraca też status, nie tylko stempel — celowo. W oknie między aplikacją
+// migracji 78 a wdrożeniem kodu stary kod nadal zapisywał `status: "pending"`.
+// Taki wiersz trafia do kubełka „nowe" (patrz reviewBucket — pending zawsze
+// ląduje tam, niezależnie od moderated_at), ale gdyby „Przejrzane" stemplowało
+// WYŁĄCZNIE moderated_at, wiersz zniknąłby z „nowe" (moderated_at przestaje być
+// puste) i NIE trafiłby do „opublikowane" (tam warunek to `status = 'approved'`)
+// — zostałby niewidoczny na zawsze. Wymuszenie 'approved' jest tu bezpieczne,
+// bo w kubełku „nowe" NIGDY nie ma wierszy `rejected` — reviewBucket i
+// getReviewsForBucket odsiewają je jawnie.
+export function poluDlaPrzejrzenia(teraz: Date): {
+  status: "approved";
+  moderated_at: string;
+} {
+  return { status: "approved", moderated_at: teraz.toISOString() };
 }
 
 export function poluDlaUsuniecia(teraz: Date): {

@@ -24,13 +24,13 @@ export async function getReviewsForBucket(
     // „nowe" = wszystko, czego Julia nie dotknęła: świeże approved ORAZ
     // resztki pending sprzed migracji 78 — MUSI być ten sam warunek co
     // reviewBucket() w reviews-moderation.ts (`moderated_at is null OR
-    // status = 'pending'`). Sam `moderated_at is null` by wystarczył, gdyby
-    // przejrzenie zawsze szło razem ze zmianą statusu — ale akcja „Przejrzane"
-    // ustawia WYŁĄCZNIE moderated_at. Legacy wiersz pending, którego ktoś
-    // dotknął (moderated_at już ustawione, status wciąż pending), musi mimo
-    // to zostać w „nowe" — inaczej nie pasuje do żadnego z trzech kubełków
-    // i znika z panelu, mimo że nie jest publiczny. Stąd jawny OR, nie samo
-    // `.is()`.
+    // status = 'pending'`). Sam `moderated_at is null` byłby wystarczający,
+    // ale legacy wiersze pending (wciąż istniejące sprzed migracji 78 albo
+    // zapisane starym kodem w oknie wdrożenia) nigdy nie powinny zniknąć
+    // z oczu moderatora. Takie wiersze NIE są publiczne (RLS przepuszcza
+    // tylko approved), więc panel MUSI je wyświetlić w „nowe" — inaczej
+    // nikt ich nie opublikuje. Stąd jawny `.or()`, choć akcja „Przejrzane"
+    // zawsze je ustawia na approved.
     //
     // `.neq("status","rejected")` NIE jest kosmetyką ani zabezpieczeniem na
     // zapas — jest konieczny. Pierwszy człon OR-a (`moderated_at.is.null`)
@@ -137,9 +137,10 @@ export async function getReviewForMail(reviewId: string): Promise<ReviewForMail 
 // spojrzał. Ten sam wzorzec, co getNewOrdersCount (orders.status_updated_at).
 // Filtr MUSI zostać zsynchronizowany z gałęzią „nowe" w getReviewsForBucket
 // (i z reviewBucket() w reviews-moderation.ts) — to jeden warunek zapisany
-// w dwóch miejscach, nie dwie niezależne definicje „nieprzejrzanej" opinii.
-// Uzasadnienie każdego członu (w tym dlaczego `.neq("status","rejected")`
-// jest konieczny, a nie tylko symetryczny) opisane przy gałęzi „nowe" wyżej.
+// w trzech miejscach, nie dwie niezależne definicje „nieprzejrzanej" opinii.
+// `.neq("status","rejected")` broni wierszy sprzed migracji 78 (opinion
+// published i odrzuconych zanim kolumna `moderated_at` została dodana) —
+// bez niego trafiłyby do plakietki, mimo że panel je odsiewał już wcześniej.
 export async function getUnreviewedReviewsCount(): Promise<number> {
   const admin = await createAdminClient();
   const { count, error } = await admin
