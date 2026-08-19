@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { findInviteByToken, markInviteUsed } from "@/app/_lib/review-invites-server";
 import { inviteState } from "@/app/_lib/review-tokens";
+import { poluDlaNowegoZapisu } from "@/app/_lib/reviews-moderation";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -36,7 +37,7 @@ export async function submitGuestReview(formData: FormData): Promise<ActionResul
     guest_email: email,
     rating,
     comment: tresc || null,
-    status: "pending",
+    ...poluDlaNowegoZapisu(),
   } as never);
 
   if (error) {

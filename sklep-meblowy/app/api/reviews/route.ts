@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/app/_lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { poluDlaNowegoZapisu } from "@/app/_lib/reviews-moderation";
 
 type Body = {
   productId: string;
@@ -80,10 +81,11 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         rating: ratingInt,
         comment: trimmedComment || null,
-        // Każdy zapis (nowa opinia I edycja) wraca do moderacji. Bez tego
-        // wystarczyłoby napisać coś neutralnego, doczekać zatwierdzenia
-        // i podmienić treść.
-        status: "pending",
+        // Każdy zapis (nowa opinia I edycja) publikuje się od razu i wraca
+        // Julii przed oczy: moderated_at znów jest puste, więc opinia ląduje
+        // w „nowe — do przejrzenia". Bez zerowania stempla podmiana treści po
+        // przejrzeniu przechodziłaby niezauważona.
+        ...poluDlaNowegoZapisu(),
       } as never,
       { onConflict: "product_id,user_id" }
     )
