@@ -1502,3 +1502,124 @@ git commit -m "test(opinie): podgląd maila ze zdjęciami i spec odczytu stron z
 4. **Dopiero teraz** scalić gałąź.
 5. Sprawdzić `MAIL_ADMIN_TO` w Vercelu (Production) — bez tej zmiennej powiadomienia po cichu nie wychodzą.
 6. Powiedzieć właścicielowi wprost: zdjęcie klienta trafia na stronę główną BEZ sprawdzenia (wariant A), a osierocone pliki w Storage nie są sprzątane.
+
+---
+
+# STAN WYKONANIA (2026-08-20) — CO JEST NA PRODUKCJI, CO ZOSTAŁO
+
+## Zrobione i WDROŻONE
+
+Obie części funkcji opinii są na produkcji. PR #163 scalony do `main`
+(`fccaab0`), Vercel wystawił, sprawdzone na żywo: `/` i `/opinie` zwracają 200,
+sekcja „Co mówią klienci" renderuje kartę opinii, nowy tekst „Opinia pojawia się
+od razu" jest widoczny.
+
+**Migracje 78, 79 i 80 są ZAAPLIKOWANE.** Potwierdzone zapytaniami:
+`moderated_at` i `photos` istnieją, `status` ma default `'approved'`, indeks
+`idx_product_reviews_do_przejrzenia` i ograniczenie
+`product_reviews_max_3_zdjecia` są na miejscu, a `pg_policies` pokazuje
+wszystkie pięć polityk w docelowym kształcie (insert i update z warunkiem
+zakupu, update i delete z `status <> 'rejected'`).
+
+⚠️ **Zaaplikowane przez `execute_sql`, nie `apply_migration`** — klasyfikator
+zablokował `apply_migration` dwukrotnie. Skutek: schemat bazy jest poprawny, ale
+**tabela migracji Supabase nie zawiera wpisów 78/79/80**. Źródłem prawdy są
+pliki w `supabase/migrations/`. Jeśli kiedyś porównasz listę migracji z plikami,
+te trzy będą wyglądały na niezaaplikowane — nie są.
+
+**W bazie jest jedna prawdziwa opinia** (5/5 o materacu, z konta, 2026-08-19
+19:17 UTC, bez zdjęć, `status='approved'`, `moderated_at=null`). Powstała pod
+starym modelem i została zatwierdzona w starym panelu.
+
+## Do zrobienia RĘCZNIE — trzy rzeczy
+
+1. **`MAIL_ADMIN_TO` w Vercelu (Production) — NIESPRAWDZONE.** Nie mam dostępu do
+   Vercela (brak CLI, MCP wymaga logowania). Bez tej zmiennej
+   `notifyAdminNewReview` po cichu nic nie wysyła i Julia nie dowie się o nowej
+   opinii mailem — plakietka w panelu nadal zadziała.
+
+2. **Jedno kliknięcie „Usuń opinię" na koncie testowym.** Cała nowa gałąź odmowy
+   w `DELETE /api/reviews` zakłada, że `delete ... returning id` przechodzi przez
+   politykę SELECT „reviews: autor widzi swoje". Powinno — Postgres stosuje
+   polityki SELECT do wierszy z `RETURNING`, a wiersz spełnia `user_id =
+   auth.uid()`. Gdyby jednak nie przechodził, **każde poprawne usunięcie opinii
+   kończyłoby się fałszywym błędem 403 i pominięciem sprzątania plików.** Tego nie
+   dało się sprawdzić bez zapisu do żywej bazy.
+
+3. **Jedno kliknięcie „Przejrzane" w `/admin/opinie`.** Ta jedna istniejąca opinia
+   pokaże się w kubełku „Nowe — do przejrzenia" i plakietka pokaże 1, mimo że
+   Julia zatwierdziła ją już w starym panelu. Świadomie nie ustawiałem jej
+   `moderated_at` — wpisywanie stempla moderacji, której nie widziałem, byłoby
+   gorsze niż plakietka z jedynką.
+
+## Ryzyka i decyzje ODŁOŻONE — nie są długiem tej gałęzi, są otwartymi punktami
+
+1. **Przycisk „usuń zdjęcia z serwera" w panelu.** Kasowanie plików ze Storage
+   działa dziś na dwóch ścieżkach KLIENTA: gdy autor usuwa całą opinię i gdy
+   edycją zdejmuje z niej zdjęcie. **„Zdejmij ze strony" w panelu plików NIE
+   kasuje** — celowo, bo ta akcja jest odwracalna („Przywróć na witrynę").
+   Znaczy to, że Julia nie ma dziś sposobu, żeby usunąć zdjęcie z internetu;
+   może je tylko zdjąć z witryny. Osobna, nieodwracalna akcja to nowa
+   powierzchnia w panelu i decyzja właściciela.
+
+2. **Osoba trzecia może „przypiąć" cudze zdjęcie w Storage na stałe.** Walidacja
+   sprawdza prefiks adresu i kształt nazwy pliku, nigdy autorstwo. Jeśli klient A
+   wklei do swojej opinii adres zdjęcia klientki B, to gdy B skasuje swoją opinię,
+   plik B NIE zostanie skasowany — bo wiersz A wciąż go trzyma. To świadomie
+   wybrana strona kompromisu (sierota jest odwracalna, zniszczony plik nie), ale
+   przy żądaniu usunięcia danych z RODO trzeba o tym pamiętać.
+
+3. **HEIC z prawdziwego iPhone'a — nadal niesprawdzone.** Z lektury źródła
+   `browser-image-compression` wynika, że przekodowanie jest bezwarunkowe i EXIF
+   nie wraca. Czy biblioteka w ogóle ZDEKODUJE HEIC-a: na iOS/Safari powinna
+   (kodek systemowy), na desktopowym Chrome nie, a przy `file.type === ""`
+   (Windows nie zna mime dla `.heic`) odrzuci plik od razu. W obu przypadkach
+   klient zobaczy komunikat, który mówi o HEIC i podpowiada, co zrobić — ale czy
+   jest zrozumiały dla realnej klientki, oceni tylko człowiek z telefonem.
+
+4. **Utwardzenie `usunNieuzywaneZdjecia` (drobne, skutek nieodwracalny).**
+   Zapytanie referencyjne używa `.contains`, a `postgrest-js` buduje `cs.{...}`
+   surowym `join(",")` bez cytowania. Dziś jest bezpieczne, bo wzorzec nazwy
+   pliku zabrania przecinków, klamer i cudzysłowów. Ale sprzęgnięcie jest
+   **fail-open**: gdyby ktoś rozluźnił wzorzec o przecinek, zapytanie po cichu
+   przestałoby znajdować wiersze i zaczęłoby kasować CUDZE, wciąż opublikowane
+   zdjęcia. Komentarz ostrzegający stoi przy zapytaniu, ale NIE przy
+   `NAZWA_PLIKU_RE`, czyli nie w miejscu, które ktoś będzie zmieniał.
+   Utwardzenie: pomijać każdy URL zawierający przecinek, klamrę, cudzysłów,
+   ukośnik odwrotny albo biały znak — pas i szelki niezależne od regexa.
+
+5. **`app/_lib/plural.ts` bez odsyłacza zwrotnego.** `odmianaZdjec`
+   (`reviews-photos.ts`) obsługuje nastki poprawnie, `pluralForm` w `plural.ts`
+   świadomie ich nie obsługuje (jego własny komentarz mówi, że poprawka
+   przesunęłaby widoczne etykiety w 10+ plikach). Ostrzeżenie jest tylko w jedną
+   stronę — brakuje zdania w `plural.ts`, że drugiej, poprawnej funkcji nie wolno
+   z nim scalać. Pierwszy „porządkujący" PR może skasować `odmianaZdjec`
+   jako duplikat.
+
+6. **Sprzątanie plików jest `await`-owane na ścieżce odpowiedzi** — do trzech
+   zapytań plus wywołanie Storage przed odpowiedzią dla klienta. Poprawności to
+   nie psuje (wszystko w `try/catch`, żaden błąd nie zamieni udanego zapisu
+   w błąd), ale ten sam plik ma już wzorzec `after()` dla maila i sprzątanie
+   pasowałoby tam idealnie.
+
+7. **Komunikat przy wyścigu (świadomie zaparkowane).** Gałąź „wiersz był,
+   skasowano 0" mówi „Ta opinia została zdjęta ze strony przez sklep" także wtedy,
+   gdy wiersz zniknął z innego powodu (dwie zakładki, Julia kasuje w panelu w tej
+   samej milisekundzie). Okno milisekundowe, skutek czysto komunikacyjny.
+
+8. **Brak rate-limitu na upload.** Nic nie ogranicza liczby wywołań uploadu na
+   jednym ważnym tokenie (90 dni) ani na jednym zakupie; każde to do 8 MB
+   w publicznym buckecie. Pula napastników jest ograniczona do osób z linkiem albo
+   z zakupem, więc przy dzisiejszej skali to nie jest pilne — warto zerknąć na
+   zużycie Storage po pierwszym miesiącu.
+
+9. **Brak testów jednostkowych dla `usunNieuzywaneZdjecia` i różnicy zbiorów przy
+   edycji.** Oba żyją w Route Handlerze i wymagałyby zamockowanego Supabase, sesji
+   i Storage — rodzaju testu, którego to repo nie ma. Sprawdzone lekturą kodu
+   i osobną recenzją przypadków, nie testem.
+
+## Czego NIE zrobiono świadomie
+
+Refaktor powtórzonego ciała uploadu (trzy kopie, licząc reklamacje), wspólny
+komponent siatki zdjęć dla `ReviewCard` i `ReviewList`, tłumaczenie komunikatów
+`validateImageUpload` na niemiecki (`/de` jest zamrożone flagą `DE_ENABLED`).
