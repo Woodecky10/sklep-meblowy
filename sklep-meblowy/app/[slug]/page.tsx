@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Fragment } from "react";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { localizePath } from "@/app/_lib/i18n";
 import { alternatesFor } from "@/app/_lib/sitemap-i18n";
@@ -12,6 +12,8 @@ import {
   canViewPage,
 } from "@/app/_lib/pages";
 import { getPageBySlug } from "@/app/_lib/pages-server";
+import { legacyFabricSlug } from "@/app/_lib/legacy-urls";
+import { getFabricBySlug } from "@/app/_lib/fabrics";
 import { getPageBlocks } from "@/app/_lib/blocks-server";
 import {
   localizeBlock,
@@ -55,7 +57,16 @@ export default async function PodstronaPage({ params }: Props) {
   const { slug } = await params;
   if (!PAGE_SLUG_RE.test(slug)) notFound();
   const [page, locale] = await Promise.all([getPageBySlug(slug), getLocale()]);
-  if (!page) notFound();
+  if (!page) {
+    // Stary płaski adres tkaniny (/tkanina-woolly, wciąż w indeksie Google) →
+    // 308 na /tkaniny/woolly. Tylko gdy tkanina faktycznie istnieje: inaczej
+    // uczciwy 404, a nie przekierowanie kończące się błędem.
+    const fabric = legacyFabricSlug(slug);
+    if (fabric && (await getFabricBySlug(fabric))) {
+      permanentRedirect(localizePath(`/tkaniny/${fabric}`, locale));
+    }
+    notFound();
+  }
   const isDraftPreview = !page.published;
   // Short-circuit: auth sprawdzamy tylko dla szkiców (opublikowane bez kosztu).
   if (isDraftPreview && !canViewPage(page.published, await getIsAdmin())) {
