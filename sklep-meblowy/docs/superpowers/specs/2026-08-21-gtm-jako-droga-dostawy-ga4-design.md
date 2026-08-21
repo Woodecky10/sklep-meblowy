@@ -216,7 +216,40 @@ Dalej: wyzwalacze na zdarzenia własne o nazwach `view_item`, `add_to_cart`,
 `NEXT_PUBLIC_GA_ID` (**nie zakładać nowej usługi** — historia zostaje w starej);
 Consent Mode włączony w pojemniku; **żadnych tagów „Custom HTML"** (sekcja 7).
 
-## 11. Czego ten spec NIE obejmuje
+## 11. STAN WYKONANIA (2026-08-21)
+
+Przerwane świadomie — właściciel dokańcza na innym komputerze. Ta sekcja jest
+jedynym nośnikiem między maszynami, bo `.superpowers/sdd/` jest gitignorowany.
+
+**Zrobione:** rozmowa, sprostowanie mitu „GTM zamiast GA i GSC", rozpoznanie stanu
+kodu (sekcja 2 — wszystko zmierzone w plikach, nie z pamięci), wybór wariantu przez
+właściciela, ten spec.
+
+**Kodu: ZERO.** Nie tknięto `ga-client.ts`, `analytics.ts`, `csp.ts` ani
+`middleware.ts`. Nie ma żadnego `NEXT_PUBLIC_GTM_ID` w Vercelu. Produkcja działa
+dokładnie jak przed rozmową — na `gtag.js`.
+
+**Gdzie stanęliśmy:** właściciel zatwierdził projekt w rozmowie, ale **nie
+przeczytał jeszcze tego pliku**. Poproszony był w szczególności o przegląd
+sekcji 10 (kolejność wdrożenia) i instrukcji dla panelu — to jedyne części, których
+nie wykonamy sami.
+
+**Następny krok:** plan wdrożenia (skill `writing-plans`), potem implementacja
+w TDD. Zaczynać od czystej części w `analytics.ts`, bo tylko ona jest testowalna
+jednostkowo.
+
+**Czego NIE sprawdzono na żywo — nie brać za sprawdzone:**
+
+- Czy pojemnik GTM podnosi pchnięcia w stylu `gtag('event', …)`. Dokumentacja nie
+  rozstrzyga, a projekt jest zrobiony tak, że odpowiedź nie ma znaczenia
+  (sekcja 5). **Nie wracać do tego jako do luki** — to obejście świadome.
+- Stan pojemnika GTM-5CHQ99MZ. **Nie mamy dostępu do panelu.** Nie wiadomo, czy
+  jest pusty, czy ktoś już dodał w nim tag GA4. ⚠️ Sprawdzić to **przed** krokiem 3
+  z sekcji 10 — jeśli tag GA4 już tam jest, a my włączymy zmienną, przez chwilę
+  wszystko poleci podwójnie.
+- Żadnej weryfikacji w Czasie rzeczywistym GA4 — nie było czego weryfikować.
+
+## 12. Czego ten spec NIE obejmuje
 
 - **Pixel Meta** — zostaje w kodzie, `MetaPixel.tsx` i `meta-pixel-client.ts`
   nietknięte. Skutek uboczny bez zmian: liczby w GA4 i w Menedżerze reklam nie
