@@ -161,11 +161,15 @@ export async function sendReviewReminders(): Promise<{ wyslane: number }> {
       const productName = (produkt as { name: string } | null)?.name ?? "Twój zakup";
 
       // ⚠️ Jawnego tokenu NIE MA w bazie (leży tylko skrót), więc przypomnienie
-      // dla gościa nie może odtworzyć starego linku. Wystawiamy NOWY token —
-      // ale skrót w bazie podmieniamy DOPIERO po udanej wysyłce (niżej). Gdyby
-      // zapisać go od razu, nieudana wysyłka (Resend odrzucił, brak MAIL_FROM,
-      // limit) zostawiałaby gościa z linkiem z pierwszego maila, który właśnie
+      // nie może odtworzyć starego linku. Wystawiamy NOWY token — ale skrót w
+      // bazie podmieniamy DOPIERO po udanej wysyłce (niżej). Gdyby zapisać go od
+      // razu, nieudana wysyłka (Resend odrzucił, brak MAIL_FROM, limit)
+      // zostawiałaby klienta z linkiem z pierwszego maila, który właśnie
       // przestał działać, i bez nowego w zamian.
+      //
+      // Konto tokenu nie dostaje — jego link prowadzi na logowanie z adresem
+      // powrotu (patrz reviewUrlFor), więc rotowanie skrótu byłoby zapisem do
+      // bazy bez żadnego skutku.
       let nowyToken: string | null = null;
       if (!o.user_id) {
         nowyToken = generateInviteToken();

@@ -514,7 +514,18 @@ export default async function ProduktPage({ params }: Props) {
                 {reviewStatus.reason === "not_logged_in" ? (
                   <>
                     {t.product.reviewGuardLoggedOut}{" "}
-                    <a href={localizeHref("/logowanie", locale)} className="text-[var(--color-gold)] underline">
+                    {/* Adres powrotu w ?next=, bo bez niego zalogowanie wyrzuca
+                        klienta na /konto i traci produkt, który chciał ocenić —
+                        ta sama pułapka co przy bramce próbek (patrz nextFromForm
+                        w _lib/auth-actions.ts). Kotwica #opinie idzie
+                        zakodowana, inaczej urwałaby query stringa. */}
+                    <a
+                      href={localizeHref(
+                        `/logowanie?next=${encodeURIComponent(`/produkt/${product.id}#opinie`)}`,
+                        locale
+                      )}
+                      className="text-[var(--color-gold)] underline"
+                    >
                       {t.product.reviewGuardLogin}
                     </a>
                     {t.product.reviewGuardLoggedOutSuffix}
