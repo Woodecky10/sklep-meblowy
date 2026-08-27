@@ -53,6 +53,20 @@ export function clampPage(value: number | undefined): number {
   return Math.floor(value);
 }
 
+// PostgREST odrzuca zakres, którego początek leży za ostatnim wierszem:
+// `?strona=9` przy 7 stronach wyników daje „PGRST103: An offset of 96 was
+// requested, but there are only 83 rows". clampPage tego NIE łapie — pilnuje
+// tylko dolnej granicy, bo górnej nie da się poznać bez policzenia wyników.
+// Rozpoznanie jest tutaj, a nie w /sklep, żeby kod błędu PostgREST nie wyciekał
+// do warstwy widoku.
+export function jestStronaZaZakresem(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: unknown }).code === "PGRST103"
+  );
+}
+
 export function clampLimit(value: number | undefined, fallback = 12): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 1) {
     return fallback;

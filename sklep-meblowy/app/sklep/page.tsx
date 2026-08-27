@@ -1,6 +1,7 @@
+import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { getProducts, getFilterFacets } from "@/app/_lib/products";
+import { getProducts, getFilterFacets, jestStronaZaZakresem } from "@/app/_lib/products";
 import { usesCollectionOrder } from "@/app/_lib/collection-order";
 import { parseOptionFilterParams } from "@/app/_lib/option-filter";
 import { parseFeatureFilterParams } from "@/app/_lib/feature-filter";
@@ -136,6 +137,15 @@ export default async function SklepPage({
       useCollectionOrder: usesCollectionOrder(sp),
       sectionSlug,
       locale,
+    }).catch((e: unknown) => {
+      // Strona za ostatnią (np. ?strona=9 przy 7 stronach wyników) sypała 500 na
+      // CAŁYM /sklep — cztery razy w tygodniu 21-26.08 w logach Vercela, zawsze
+      // z robota, bo paginacja nigdy nie linkuje poza ostatnią stronę. Taka
+      // strona po prostu nie istnieje, więc 404: pusta lista z kodem 200 byłaby
+      // soft-404 i Google zapamiętałby ją jako treść. Ta sama zasada co przy
+      // nieistniejących adresach tkanin.
+      if (jestStronaZaZakresem(e)) notFound();
+      throw e;
     }),
     getFilterFacets(locale),
     // Filtry i pasek dzieci pokazują tylko widoczne gałęzie…
