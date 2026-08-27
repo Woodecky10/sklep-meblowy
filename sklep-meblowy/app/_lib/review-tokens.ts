@@ -33,9 +33,24 @@ export function inviteState(
 }
 
 // Dokąd prowadzi przycisk w mailu. Wydzielone z budowania maila, bo to jedyny
-// jego fragment, w którym da się popełnić cichy błąd: gość, który dostanie
-// link do karty produktu, nie ma jak napisać opinii (nie jest zalogowany),
-// a mail wygląda poprawnie.
+// jego fragment, w którym da się popełnić cichy błąd: mail wygląda poprawnie,
+// a klient trafia tam, gdzie opinii napisać NIE MOŻE.
+//
+// Dwie ścieżki, każda kończąca się formularzem — decyzja właściciela z
+// 2026-08-27 po zgłoszeniu „po kliknięciu «Wystaw opinię» nic się nie dzieje":
+//
+// - zamówienie BEZ konta → formularz gościa z tokenem (imię + e-mail w polach),
+// - zamówienie Z KONTEM → /logowanie z adresem powrotu na sekcję opinii karty
+//   produktu, bo tamten formularz renderuje się wyłącznie zalogowanemu.
+//
+// Wcześniej konto dostawało goły `/produkt/<id>#opinie`. Z maila klika się
+// zwykle w przeglądarce bez sesji, więc klient widział sekcję opinii z notką
+// „Zaloguj się" i ŻADNEGO pola — stąd zgłoszenie. Adres powrotu w `?next=`
+// domyka pętlę: kto ma już sesję, ląduje prosto na formularzu (obsługa w
+// supabase/middleware.ts), a kto nie ma — po zalogowaniu.
+//
+// ⚠️ `next` musi nieść prefiks locale, inaczej Niemiec po zalogowaniu wypada na
+// polską wersję karty produktu.
 export function reviewUrlFor(opts: {
   base: string;
   locale: "pl" | "de";
@@ -44,7 +59,10 @@ export function reviewUrlFor(opts: {
   token: string | null;
 }): string {
   const prefix = opts.locale === "de" ? "/de" : "";
-  if (opts.maKonto) return `${opts.base}${prefix}/produkt/${opts.productId}#opinie`;
+  if (opts.maKonto) {
+    const powrot = encodeURIComponent(`${prefix}/produkt/${opts.productId}#opinie`);
+    return `${opts.base}${prefix}/logowanie?next=${powrot}`;
+  }
   if (!opts.token) {
     // Głośno zamiast /opinia/undefined w wysłanym mailu.
     throw new Error("reviewUrlFor: gość bez tokenu");

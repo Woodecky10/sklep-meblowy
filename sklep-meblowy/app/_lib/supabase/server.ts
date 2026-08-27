@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { fetchZLimitem } from "./fetch-timeout";
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -9,6 +10,9 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      // Bez limitu czasu zawieszone zapytanie wisi do limitu platformy i zabiera
+      // ze sobą cały render strony — patrz fetch-timeout.ts.
+      global: { fetch: fetchZLimitem },
       cookies: {
         getAll() {
           return cookieStore.getAll();
@@ -34,6 +38,7 @@ export async function createAdminClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
+      global: { fetch: fetchZLimitem },
       auth: {
         persistSession: false,
         autoRefreshToken: false,

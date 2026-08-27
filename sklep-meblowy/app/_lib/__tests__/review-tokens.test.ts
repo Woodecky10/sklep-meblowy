@@ -58,36 +58,65 @@ describe("inviteState", () => {
   });
 });
 
-// Wymóg ze specyfikacji: „właściwy adres w linku" dla gościa i dla konta.
-// To jedyny fragment budowania maila, w którym da się popełnić cichy błąd —
-// gość dostający link do karty produktu nie ma jak napisać opinii, bo nie jest
-// zalogowany, a mail wygląda na poprawny.
+// Zgłoszenie z 2026-08-27: „po kliknięciu «Wystaw opinię» nic się nie dzieje".
+// Posiadacz konta dostawał goły `/produkt/<id>#opinie`, a formularz w tej sekcji
+// renderuje się WYŁĄCZNIE zalogowanemu (getReviewStatus → "not_logged_in") — z
+// maila klika się zwykle bez sesji, więc klient widział notkę „Zaloguj się" i
+// żadnego pola. Decyzja właściciela: obie grupy mają dojść do formularza, gość
+// od razu, konto przez logowanie z powrotem na to samo miejsce.
 describe("reviewUrlFor", () => {
   const base = "https://www.mollien.pl";
 
-  it("gość dostaje link z tokenem", () => {
+  it("gość dostaje formularz z tokenem", () => {
     expect(
       reviewUrlFor({ base, locale: "pl", maKonto: false, productId: "p1", token: "abc" })
     ).toBe("https://www.mollien.pl/opinia/abc");
   });
 
-  it("posiadacz konta dostaje link na kartę produktu do sekcji opinii", () => {
+  it("posiadacz konta dostaje logowanie z powrotem na sekcję opinii", () => {
     expect(
       reviewUrlFor({ base, locale: "pl", maKonto: true, productId: "p1", token: "abc" })
-    ).toBe("https://www.mollien.pl/produkt/p1#opinie");
+    ).toBe("https://www.mollien.pl/logowanie?next=%2Fprodukt%2Fp1%23opinie");
   });
 
-  it("wersja niemiecka niesie prefiks /de", () => {
+  // Regresja: adres dla konta NIE MOŻE być gołą kartą produktu, bo tam formularz
+  // dla niezalogowanego się nie pojawia i to właśnie zgłosiła klientka.
+  it("adres dla konta prowadzi na logowanie, nie na samą kartę produktu", () => {
+    const url = reviewUrlFor({
+      base,
+      locale: "pl",
+      maKonto: true,
+      productId: "p1",
+      token: "abc",
+    });
+    expect(url).toContain("/logowanie");
+    expect(url).toContain("next=");
+    expect(url).not.toBe("https://www.mollien.pl/produkt/p1#opinie");
+  });
+
+  it("wersja niemiecka niesie prefiks /de w obu ścieżkach", () => {
     expect(
       reviewUrlFor({ base, locale: "de", maKonto: false, productId: "p1", token: "abc" })
     ).toBe("https://www.mollien.pl/de/opinia/abc");
+    // Cel powrotu też musi być niemiecki, inaczej po zalogowaniu klient wypada
+    // na polską kartę produktu.
+    expect(
+      reviewUrlFor({ base, locale: "de", maKonto: true, productId: "p1", token: "abc" })
+    ).toBe("https://www.mollien.pl/de/logowanie?next=%2Fde%2Fprodukt%2Fp1%23opinie");
   });
 
-  // Gdyby ktoś kiedyś zawołał to bez tokenu dla gościa, link prowadziłby
-  // do /opinia/undefined. Lepiej rzucić w testach niż wysłać taki mail.
+  // Bez tokenu link gościa prowadziłby do /opinia/undefined. Lepiej rzucić w
+  // testach niż wysłać taki mail.
   it("rzuca, gdy gość nie ma tokenu", () => {
     expect(() =>
       reviewUrlFor({ base, locale: "pl", maKonto: false, productId: "p1", token: null })
     ).toThrow();
+  });
+
+  // Konto tokenu nie potrzebuje — jego link go nie zawiera.
+  it("konto nie potrzebuje tokenu", () => {
+    expect(() =>
+      reviewUrlFor({ base, locale: "pl", maKonto: true, productId: "p1", token: null })
+    ).not.toThrow();
   });
 });
