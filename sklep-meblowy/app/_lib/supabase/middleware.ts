@@ -2,6 +2,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { frozenDeRedirectPath, localizePath, stripLocale } from "../i18n";
 import { buildCsp } from "../csp";
+import { safeNextPath } from "../safe-redirect";
+import { fetchZLimitem } from "./fetch-timeout";
 import { GA_MEASUREMENT_ID } from "../analytics";
 import { META_PIXEL_ID } from "../meta-pixel";
 
@@ -64,6 +66,10 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      // getUser() niżej leci przy KAŻDYM żądaniu niestatycznym, więc bez limitu
+      // czasu jedno zawieszone wywołanie auth wiesza cały sklep — patrz
+      // fetch-timeout.ts.
+      global: { fetch: fetchZLimitem },
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -122,6 +128,15 @@ export async function updateSession(request: NextRequest) {
   // Zalogowany → /logowanie i /rejestracja przekieruj
   // Admin → /admin, zwykły user → /konto
   if (user && (path === "/logowanie" || path === "/rejestracja")) {
+    // Cel powrotu wygrywa nad domyślnym pulpitem. Mail z prośbą o opinię
+    // prowadzi posiadacza konta na /logowanie?next=/produkt/<id>#opinie — kto ma
+    // już sesję, musi trafić PROSTO na formularz opinii, nie na /konto, bo
+    // inaczej znowu „nic się nie dzieje". safeNextPath odrzuca wszystko poza
+    // ścieżką lokalną (ochrona przed open redirect), a `new URL` zachowuje
+    // kotwicę #opinie, której url.pathname by zgubił.
+    const powrot = safeNextPath(request.nextUrl.searchParams.get("next"));
+    if (powrot) return NextResponse.redirect(new URL(powrot, request.url));
+
     const role = (user.app_metadata as { role?: string } | undefined)?.role;
     const url = request.nextUrl.clone();
     url.pathname = role === "admin" ? "/admin" : localizePath("/konto", locale);

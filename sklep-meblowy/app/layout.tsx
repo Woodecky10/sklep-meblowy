@@ -37,6 +37,15 @@ import { getPromoBanner } from "@/app/_lib/promo-banner-server";
 import { baseOpenGraph } from "@/app/_lib/seo-og";
 import { buildOrganizationJsonLd, serializeJsonLd } from "@/app/_lib/seo-jsonld";
 
+// Sufit czasu renderowania strony. Domyślnie funkcja może wisieć do limitu
+// platformy (300 s) — 2026-08-27 strona główna zrobiła dokładnie to: jedno
+// zapytanie do Supabase nie wróciło, render trwał 5 minut i skończył się 504,
+// a odwiedzający przez ten czas patrzył w pustkę i widział „utracono połączenie
+// z siecią" (request stxsb-1787817205243 w logach Vercela). 15 s to granica, po
+// której klient ma dostać błąd i móc odświeżyć, zamiast czekać bez końca.
+// Trasy API i crony mają własne, wyższe limity ustawione u siebie.
+export const maxDuration = 15;
+
 const inter = Inter({
   subsets: ["latin", "latin-ext"],
   variable: "--font-inter",
