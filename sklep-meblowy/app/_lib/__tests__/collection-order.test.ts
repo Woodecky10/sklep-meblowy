@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { usesCollectionOrder } from "@/app/_lib/collection-order";
+import {
+  byCollectionSortOrder,
+  maKolumneKolejnosci,
+  usesCollectionOrder,
+} from "@/app/_lib/collection-order";
 
 // Kiedy produkty mają iść w kolejności ustawionej przez admina, a kiedy
 // w tej, o którą poprosił klient. Reguła: ręczna kolejność jest DOMYŚLNA
@@ -80,5 +84,65 @@ describe("usesCollectionOrder", () => {
     expect(
       usesCollectionOrder({ kolekcja: "kolekcja-nuvo", sortuj: ["newest", "x"] })
     ).toBe(false);
+  });
+});
+
+// ── Kolejność produktów W OBRĘBIE kolekcji ────────────────────────────────
+// Regresja z 2026-08-28: panel kolekcji pobierał produkty bez kolumny
+// collection_sort_order, więc odejmowanie dawało NaN. NaN jest FAŁSZYWY, więc
+// `NaN || a.name.localeCompare(b.name)` wykonywało gałąź zapasową i lista
+// wychodziła alfabetycznie — a zapis utrwalał ten alfabet w bazie, kasując
+// ułożoną kolejność. Rzutowanie `as Product[]` ukryło brak kolumny przed
+// TypeScriptem.
+describe("byCollectionSortOrder", () => {
+  const p = (name: string, collection_sort_order: number) => ({ name, collection_sort_order });
+
+  it("ustawia po zapisanej kolejności, nie po nazwie", () => {
+    const lista = [p("Zebra", 0), p("Antylopa", 1), p("Mysz", 2)];
+    expect([...lista].sort(byCollectionSortOrder).map((x) => x.name)).toEqual([
+      "Zebra",
+      "Antylopa",
+      "Mysz",
+    ]);
+  });
+
+  it("przy równych numerach rozstrzyga nazwa (po polsku)", () => {
+    const lista = [p("Łódka", 5), p("Lampa", 5), p("Zegar", 5)];
+    expect([...lista].sort(byCollectionSortOrder).map((x) => x.name)).toEqual([
+      "Lampa",
+      "Łódka",
+      "Zegar",
+    ]);
+  });
+
+  it("radzi sobie z zerem i wartościami ujemnymi", () => {
+    const lista = [p("Trzeci", 1), p("Pierwszy", -2), p("Drugi", 0)];
+    expect([...lista].sort(byCollectionSortOrder).map((x) => x.name)).toEqual([
+      "Pierwszy",
+      "Drugi",
+      "Trzeci",
+    ]);
+  });
+});
+
+// Strażnik brakującej kolumny. Sam komparator nie ma jak się bronić: dostaje
+// już wyciągnięte wartości. Zapytanie sprawdzamy więc osobno, ZANIM cokolwiek
+// posortujemy — inaczej brak kolumny znowu wygląda jak alfabet, zamiast jak
+// błąd.
+describe("maKolumneKolejnosci", () => {
+  it("pusta lista przechodzi — nie ma czego sortować", () => {
+    expect(maKolumneKolejnosci([])).toBe(true);
+  });
+
+  it("wykrywa brak kolumny w wyniku zapytania", () => {
+    expect(maKolumneKolejnosci([{ collection_sort_order: undefined }])).toBe(false);
+  });
+
+  it("przepuszcza poprawny wynik", () => {
+    expect(maKolumneKolejnosci([{ collection_sort_order: 0 }])).toBe(true);
+  });
+
+  it("null też jest brakiem — kolumna jest NOT NULL, więc null znaczy błąd zapytania", () => {
+    expect(maKolumneKolejnosci([{ collection_sort_order: null }])).toBe(false);
   });
 });

@@ -32,6 +32,7 @@ import {
 } from "./actions";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import { filterBySearch } from "@/app/_lib/search-normalize";
+import { byCollectionSortOrder } from "@/app/_lib/collection-order";
 // Czyste helpery — z collection-tiles, NIE z collections.ts: ten drugi ma
 // `import "server-only"` i ciągnie next/cache, więc import stąd ("use client")
 // wysypałby build.
@@ -405,11 +406,7 @@ function CollectionForm({
   const initialSelected = initial
     ? allProducts
         .filter((p) => p.collection_id === initial.id)
-        .sort(
-          (a, b) =>
-            a.collection_sort_order - b.collection_sort_order ||
-            a.name.localeCompare(b.name, "pl")
-        )
+        .sort(byCollectionSortOrder)
         .map((p) => p.id)
     : [];
   const [selected, setSelected] = useState<string[]>(initialSelected);

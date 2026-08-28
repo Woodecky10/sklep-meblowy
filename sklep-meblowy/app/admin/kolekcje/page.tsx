@@ -4,6 +4,7 @@ import {
   countActiveProductsByCollection,
   type CollectionProductRow,
 } from "@/app/_lib/collection-tiles";
+import { maKolumneKolejnosci } from "@/app/_lib/collection-order";
 import { getAllCollections } from "@/app/_lib/collections";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import type { Product } from "@/app/_lib/types";
@@ -23,7 +24,13 @@ export default async function AdminCollectionsPage() {
     // produktów liczy się z tych wierszy (patrz niżej).
     supabase
       .from("products")
-      .select("id, name, images, collection_id, is_active, category, price")
+      // collection_sort_order JEST WYMAGANE, mimo że picker go nie wyświetla:
+      // edytor układa po nim produkty w kolekcji. Bez niego sort dostaje NaN,
+      // wpada w gałąź alfabetyczną i zapis kasuje ułożoną kolejność w bazie
+      // (usterka z 2026-08-28). Strażnik niżej pilnuje, żeby nie wypadło znowu.
+      .select(
+        "id, name, images, collection_id, is_active, category, price, collection_sort_order"
+      )
       .order("name", { ascending: true }),
   ]);
 
@@ -45,6 +52,22 @@ export default async function AdminCollectionsPage() {
   }
 
   const products = (productsRaw ?? []) as Product[];
+
+  // Rzutowanie wyżej jest OBIETNICĄ, nie sprawdzeniem: gdy z select() wypadnie
+  // kolumna, TypeScript nadal widzi pełny Product, a w runtime jest undefined.
+  // Tak zniknęła kolejność kolekcji. Sprawdzamy więc wprost i — jak przy błędzie
+  // zapytania wyżej — wolimy pokazać błąd niż wyrenderować alfabet, który po
+  // pierwszym zapisie utrwaliłby się w bazie.
+  if (!maKolumneKolejnosci(products)) {
+    return (
+      <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-800 dark:text-red-300 text-sm">
+        Zapytanie o produkty nie zwróciło kolumny z kolejnością
+        (collection_sort_order), więc edytor pokazałby produkty alfabetycznie i
+        pierwszy zapis skasowałby ułożoną kolejność. Lista kolekcji nie została
+        pokazana celowo — to błąd do naprawienia w kodzie, nie w panelu.
+      </div>
+    );
+  }
 
   // Licznik liczy TYLKO aktywne produkty — tym samym helperem, co strona
   // główna, żeby "aktywny produkt" nie miał w panelu innej definicji.
