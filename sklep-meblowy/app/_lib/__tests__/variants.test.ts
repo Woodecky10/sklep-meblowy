@@ -19,6 +19,7 @@ import {
   buildFabricMetaMap,
   rebuildFabricValuePrices,
   removeFabricFromVariants,
+  remapFabricInVariants,
   optionHasValueImages,
 } from "@/app/_lib/variants";
 import type { Product } from "@/app/_lib/types";
@@ -428,6 +429,97 @@ describe("removeFabricFromVariants", () => {
     expect(removeFabricFromVariants(null, sawana)).toBeNull();
     expect(
       removeFabricFromVariants({ options: [{ name: "Strona", values: ["Lewa"] }] }, sawana)
+    ).toBeNull();
+  });
+});
+
+describe("remapFabricInVariants", () => {
+  const poprzednia = { name: "Woolly", colors: ["1", "3"] };
+
+  it("kolor wykreślony z katalogu znika z produktu (sedno usterki)", () => {
+    // Przenumerowanie: „1" i „3" zastąpione przez „01" i „03". Stare wartości
+    // nie mają odpowiednika, więc nie mogą zostać jako sieroty w „Pozostałych".
+    const res = remapFabricInVariants(
+      { options: [{ name: "Tkanina", values: ["Woolly 1", "Woolly 3", "Monolith 84"] }] },
+      poprzednia,
+      { name: "Woolly", colors: ["01", "03"], price: 0, group_id: "g" }
+    )!;
+    expect(res.changed).toBe(true);
+    expect(res.variants.options[0].values).toEqual(["Monolith 84"]);
+  });
+
+  it("kolor, który został, zostaje nietknięty", () => {
+    const res = remapFabricInVariants(
+      { options: [{ name: "Tkanina", values: ["Woolly 1", "Woolly 3"] }] },
+      poprzednia,
+      { name: "Woolly", colors: ["1"], price: 0, group_id: "g" }
+    )!;
+    expect(res.variants.options[0].values).toEqual(["Woolly 1"]);
+  });
+
+  it("zmiana nazwy tkaniny PRZEPISUJE wartości razem z dopłatą i zdjęciem", () => {
+    // Bez tego po zmianie nazwy KAŻDA wartość stałaby się sierotą, a katalog
+    // nie miałby już jak jej odnaleźć — to jedyny moment na naprawę.
+    const res = remapFabricInVariants(
+      {
+        options: [
+          {
+            name: "Tkanina",
+            values: ["Woolly 1"],
+            value_prices: { "Woolly 1": 250 },
+            value_images: { "Woolly 1": ["w.jpg"] },
+          },
+        ],
+      },
+      poprzednia,
+      { name: "Wooly", colors: ["1"], price: 0, group_id: "g" }
+    )!;
+    const opt = res.variants.options[0];
+    expect(opt.values).toEqual(["Wooly 1"]);
+    expect(opt.value_prices).toEqual({ "Wooly 1": 250 });
+    expect(opt.value_images).toEqual({ "Wooly 1": ["w.jpg"] });
+  });
+
+  it("gdy nie zostaje żadna tkanina, opcja Tkanina znika", () => {
+    const res = remapFabricInVariants(
+      { options: [{ name: "Strona", values: ["Lewa"] }, { name: "Tkanina", values: ["Woolly 1"] }] },
+      poprzednia,
+      { name: "Woolly", colors: ["09"], price: 0, group_id: "g" }
+    )!;
+    expect(res.variants.options.map((o) => o.name)).toEqual(["Strona"]);
+  });
+
+  it("nie rusza tkaniny o nazwie zaczynającej się tak samo", () => {
+    const res = remapFabricInVariants(
+      { options: [{ name: "Tkanina", values: ["Magic 01", "Magic Velvet 2239"] }] },
+      { name: "Magic", colors: ["01"] },
+      { name: "Magic", colors: [], price: 0, group_id: "g" },
+      [{ name: "Magic Velvet", colors: ["2239"], price: 0, group_id: "g" }]
+    )!;
+    expect(res.variants.options[0].values).toEqual(["Magic Velvet 2239"]);
+  });
+
+  it("przepisanie na istniejącą już wartość nie robi duplikatu", () => {
+    const res = remapFabricInVariants(
+      { options: [{ name: "Tkanina", values: ["Woolly 1", "Wooly 1"] }] },
+      poprzednia,
+      { name: "Wooly", colors: ["1"], price: 0, group_id: "g" }
+    )!;
+    expect(res.variants.options[0].values).toEqual(["Wooly 1"]);
+  });
+
+  it("changed=false gdy nazwa i kolory bez zmian", () => {
+    const res = remapFabricInVariants(
+      { options: [{ name: "Tkanina", values: ["Woolly 1", "Woolly 3"] }] },
+      poprzednia,
+      { name: "Woolly", colors: ["1", "3"], price: 0, group_id: "g" }
+    )!;
+    expect(res.changed).toBe(false);
+  });
+
+  it("null gdy produkt nie ma opcji Tkanina", () => {
+    expect(
+      remapFabricInVariants(null, poprzednia, { name: "Woolly", colors: [], price: 0, group_id: "g" })
     ).toBeNull();
   });
 });
