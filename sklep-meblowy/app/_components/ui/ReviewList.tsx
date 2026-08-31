@@ -1,8 +1,7 @@
-import Image from "next/image";
 import StarRating from "./StarRating";
+import ReviewPhotos from "./ReviewPhotos";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { anonymizeAuthor, formatReviewDate } from "@/app/_lib/reviews-display";
-import { MAX_REVIEW_PHOTOS } from "@/app/_lib/reviews-photos";
 import type { ProductReview } from "@/app/_lib/types";
 
 export default async function ReviewList({
@@ -76,22 +75,12 @@ export default async function ReviewList({
             </p>
           )}
           {(r.photos ?? []).length > 0 && (
-            <ul className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-3 max-w-md">
-              {(r.photos ?? []).slice(0, MAX_REVIEW_PHOTOS).map((url, i) => (
-                <li
-                  key={url}
-                  className="relative aspect-square rounded-lg overflow-hidden border border-[var(--border)]"
-                >
-                  <Image
-                    src={url}
-                    alt={`${c.photoAlt} (${i + 1})`}
-                    fill
-                    sizes="160px"
-                    className="object-cover"
-                  />
-                </li>
-              ))}
-            </ul>
+            <ReviewPhotos
+              photos={r.photos ?? []}
+              altBazowy={c.photoAlt}
+              locale={locale}
+              wariant="produkt"
+            />
           )}
         </div>
       ))}
