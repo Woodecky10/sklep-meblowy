@@ -426,11 +426,7 @@ export function removeFabricFromVariants(
   const opt = variants?.options.find((o) => o.name === FABRIC_OPTION_NAME);
   if (!variants || !opt) return null;
   const name = fabric.name.trim();
-  const belongsToFabric = (v: string) =>
-    !!name &&
-    (v === name || v.startsWith(name + " ")) &&
-    !otherFabrics.some((f) => f.name.trim() !== name && fabricValueBelongsTo(v, f));
-  const kept = opt.values.filter((v) => !belongsToFabric(v));
+  const kept = opt.values.filter((v) => !nalezyDoTkaniny(v, name, otherFabrics));
   if (kept.length === opt.values.length) return { variants, changed: false };
 
   if (kept.length === 0) {
@@ -446,6 +442,105 @@ export function removeFabricFromVariants(
   const nextOptions = variants.options.map((o) =>
     o.name === FABRIC_OPTION_NAME
       ? { ...o, values: kept, value_prices: pick(o.value_prices), value_images: pick(o.value_images) }
+      : o
+  );
+  return { variants: { ...variants, options: nextOptions }, changed: true };
+}
+
+// Wartości opcji „Tkanina" należące do tkaniny o podanej nazwie — z ochroną
+// przed tkaniną, której nazwa zaczyna się tak samo („Magic" vs „Magic Velvet").
+// Wspólne dla usuwania i edycji tkaniny.
+function nalezyDoTkaniny(
+  value: string,
+  name: string,
+  otherFabrics: FabricLite[]
+): boolean {
+  if (!name) return false;
+  if (value !== name && !value.startsWith(name + " ")) return false;
+  return !otherFabrics.some((f) => f.name.trim() !== name && fabricValueBelongsTo(value, f));
+}
+
+// Dociąga warianty produktu do NOWEGO stanu tkaniny po edycji w panelu:
+// kolor, który przetrwał, zostaje (pod nową nazwą, jeśli nazwa się zmieniła),
+// a kolor wykreślony z katalogu ZNIKA razem z dopłatą i zdjęciami.
+//
+// Bez tego edycja zostawiała sieroty dokładnie tak, jak robiło to usuwanie
+// tkaniny przed poprawką: przenumerowanie kolorów („1" → „01") wypychało stare
+// wartości do karty „Pozostałe", bez zdjęcia, bez strony tkaniny i z zamrożoną
+// dopłatą, czyli TAŃSZE od tej samej tkaniny w jej właściwej grupie.
+//
+// Przepisanie przy zmianie nazwy jest tu jedyną szansą na naprawę: po zapisie
+// katalog zna już wyłącznie nową nazwę i nie ma jak odnaleźć starych wartości.
+// Nowe kolory NIE są dosypywane do produktów — o tym, co produkt oferuje,
+// decyduje picker w edytorze produktu, nie katalog.
+export function remapFabricInVariants(
+  variants: ProductVariants | null,
+  poprzednia: { name: string; colors: string[] },
+  aktualna: FabricLite,
+  otherFabrics: FabricLite[] = []
+): { variants: ProductVariants; changed: boolean } | null {
+  const opt = variants?.options.find((o) => o.name === FABRIC_OPTION_NAME);
+  if (!variants || !opt) return null;
+
+  const staraNazwa = poprzednia.name.trim();
+  const nowaNazwa = aktualna.name.trim();
+  const noweKolory = new Set((aktualna.colors ?? []).map((c) => c.trim()).filter(Boolean));
+
+  const kolejne: string[] = [];
+  const przepisane = new Map<string, string>();
+  let zmiana = false;
+
+  for (const v of opt.values) {
+    if (!nalezyDoTkaniny(v, staraNazwa, otherFabrics)) {
+      kolejne.push(v);
+      continue;
+    }
+    // Kolor = to, co zostaje po nazwie. Pusty (wartością była sama nazwa)
+    // przeżywa tylko wtedy, gdy tkanina nadal nie ma kolorów.
+    const kolor = v === staraNazwa ? "" : v.slice(staraNazwa.length + 1);
+    const zostaje = kolor === "" ? noweKolory.size === 0 : noweKolory.has(kolor);
+    if (!zostaje) {
+      zmiana = true;
+      continue;
+    }
+    const nowa = kolor === "" ? nowaNazwa : `${nowaNazwa} ${kolor}`;
+    if (nowa !== v) {
+      zmiana = true;
+      przepisane.set(v, nowa);
+    }
+    kolejne.push(nowa);
+  }
+
+  if (!zmiana) return { variants, changed: false };
+
+  // Przepisanie może trafić w wartość, którą produkt już ma (np. miał obie
+  // pisownie) — Set zachowuje kolejność pierwszych wystąpień.
+  const wartosci = Array.from(new Set(kolejne));
+
+  if (wartosci.length === 0) {
+    const bezTkaniny = variants.options.filter((o) => o.name !== FABRIC_OPTION_NAME);
+    return { variants: { ...variants, options: bezTkaniny }, changed: true };
+  }
+
+  const zostajace = new Set(wartosci);
+  const przenies = <T,>(m: Record<string, T> | undefined): Record<string, T> | undefined => {
+    if (!m) return undefined;
+    const next: Record<string, T> = {};
+    for (const [klucz, wartosc] of Object.entries(m)) {
+      const docelowy = przepisane.get(klucz) ?? klucz;
+      if (zostajace.has(docelowy)) next[docelowy] = wartosc;
+    }
+    return Object.keys(next).length > 0 ? next : undefined;
+  };
+
+  const nextOptions = variants.options.map((o) =>
+    o.name === FABRIC_OPTION_NAME
+      ? {
+          ...o,
+          values: wartosci,
+          value_prices: przenies(o.value_prices),
+          value_images: przenies(o.value_images),
+        }
       : o
   );
   return { variants: { ...variants, options: nextOptions }, changed: true };

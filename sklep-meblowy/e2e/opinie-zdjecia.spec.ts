@@ -38,6 +38,10 @@ test.describe("opinie ze zdjęciami — odczyt", () => {
 
     const zdjecia = karty.locator("img");
     for (const img of await zdjecia.all()) {
+      // Sekcja opinii leży ~7000 px poniżej ekranu, a next/image ładuje
+      // miniatury leniwie — bez przewinięcia `naturalWidth` zostaje 0 na
+      // ZAŁADOWANYM zdjęciu i test oskarżał sklep o usterkę, której nie ma.
+      await img.scrollIntoViewIfNeeded();
       await expect
         .poll(() => img.evaluate((el) => (el as HTMLImageElement).naturalWidth))
         .toBeGreaterThan(0);

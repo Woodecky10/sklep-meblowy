@@ -15,6 +15,7 @@ import {
   buildGroupSurchargeMap,
   rebuildFabricValuePrices,
   removeFabricFromVariants,
+  remapFabricInVariants,
   type FabricLite,
 } from "@/app/_lib/variants";
 import type { ProductVariants } from "@/app/_lib/types";
@@ -209,6 +210,39 @@ async function writeProductVariants(
 // Wycina usuwaną tkaninę z opcji „Tkanina" wszystkich produktów. Wołane PRZED
 // usunięciem wiersza — potrzebuje nazwy i listy kolorów, żeby wiedzieć, które
 // wartości do niej należą.
+// Dociąga produkty do nowego stanu tkaniny po edycji: kolor wykreślony
+// z katalogu znika z wariantów, a zmiana nazwy przepisuje wartości. Wołane
+// PO zapisie wiersza, z nazwą i kolorami sprzed zapisu.
+async function remapFabricOnProducts(
+  poprzednia: { name: string; colors: string[] },
+  aktualna: FabricLite
+): Promise<{ updated: number }> {
+  const supabase = await createAdminClient();
+  const [{ data: productRows }, { data: fabricRows }] = await Promise.all([
+    supabase.from("products").select("id, variants").not("variants", "is", null),
+    supabase.from("fabrics").select("name, colors, price, group_id"),
+  ]);
+  // Ochrona przed tkaniną o nazwie zaczynającej się tak samo — porównujemy po
+  // STAREJ nazwie, bo to ona występuje w wartościach produktów.
+  const otherFabrics = ((fabricRows ?? []) as FabricLite[]).filter(
+    (f) => f.name.trim() !== poprzednia.name.trim()
+  );
+
+  const changed: { id: string; variants: ProductVariants }[] = [];
+  for (const row of productRows ?? []) {
+    const p = row as { id: string; variants: ProductVariants | null };
+    const res = remapFabricInVariants(p.variants, poprzednia, aktualna, otherFabrics);
+    if (res && res.changed) changed.push({ id: p.id, variants: res.variants });
+  }
+
+  const updated = await writeProductVariants(changed, "remapFabricOnProducts");
+  if (updated > 0) {
+    invalidateFacetsCache();
+    revalidatePath("/sklep");
+  }
+  return { updated };
+}
+
 async function removeFabricFromProducts(fabric: FabricLite): Promise<{ updated: number }> {
   const supabase = await createAdminClient();
   const [{ data: productRows }, { data: fabricRows }] = await Promise.all([
@@ -323,6 +357,17 @@ export async function updateFabric(formData: FormData): Promise<ActionResult> {
     formData.getAll("properties")
   );
   if (properties === null) return { ok: false, error: PROPERTIES_READ_ERROR };
+
+  // Stan SPRZED zapisu — po update'cie nie da się już odtworzyć, którą nazwą
+  // i którymi kolorami produkty opisują tę tkaninę.
+  const { data: przedRow, error: readError } = await supabase
+    .from("fabrics")
+    .select("name, colors")
+    .eq("id", id)
+    .single();
+  if (readError) return { ok: false, error: readError.message };
+  const poprzednia = przedRow as { name: string; colors: string[] };
+
   // Klucz `properties` trafia do payloadu TYLKO wtedy, gdy formularz pokazał
   // sekcję cech. Bez markera (niedostępny słownik) edycja tkaniny zostawia jej
   // dotychczasowe zaznaczenia w spokoju, zamiast nadpisać je pustą tablicą.
@@ -347,12 +392,29 @@ export async function updateFabric(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: error.message };
   }
 
+  // Przemapowanie tylko wtedy, gdy zmieniła się TOŻSAMOŚĆ wartości (nazwa lub
+  // lista kolorów) — inaczej zapis samego opisu czy grupy przeorywałby
+  // wszystkie produkty bez powodu. Idzie PRZED przeliczeniem dopłat, żeby
+  // recompute liczył ceny dla już poprawnych wartości.
+  const tozsamoscZmieniona =
+    poprzednia.name.trim() !== name.trim() ||
+    JSON.stringify(poprzednia.colors ?? []) !== JSON.stringify(colors);
+  const wycofane = tozsamoscZmieniona
+    ? (await remapFabricOnProducts(poprzednia, { name, colors, price, group_id: groupId })).updated
+    : 0;
+
   await recomputeFabricSurchargesOnProducts();
   invalidateFabricsCache();
   invalidateFacetsCache();
   revalidatePath("/admin/tkaniny");
   revalidatePath("/tkaniny");
-  return { ok: true, message: "Tkanina zapisana" };
+  return {
+    ok: true,
+    message:
+      wycofane > 0
+        ? `Tkanina zapisana — zaktualizowano ${wycofane} ${plProducts(wycofane)}`
+        : "Tkanina zapisana",
+  };
 }
 
 // Usunięcie z katalogu wycina tkaninę TAKŻE z wariantów produktów, które ją
