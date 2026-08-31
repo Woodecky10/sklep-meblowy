@@ -14,6 +14,7 @@ import { fabricSlug } from "@/app/_lib/fabric-slug";
 import {
   buildGroupSurchargeMap,
   rebuildFabricValuePrices,
+  removeFabricFromVariants,
   type FabricLite,
 } from "@/app/_lib/variants";
 import type { ProductVariants } from "@/app/_lib/types";
@@ -159,9 +160,23 @@ async function recomputeFabricSurchargesOnProducts(): Promise<{ updated: number 
     if (res && res.changed) changed.push({ id: p.id, variants: res.variants });
   }
 
-  // Faza 2: zapis wsadowy z ograniczoną współbieżnością. Błąd per produkt jest
-  // logowany i pomijany (licznik liczy tylko udane) — częściowy fail nie wywala
-  // całej akcji ani nie fałszuje liczby.
+  const updated = await writeProductVariants(changed, "recomputeFabricSurcharges");
+  if (updated > 0) {
+    invalidateFacetsCache();
+    revalidatePath("/sklep");
+  }
+  return { updated };
+}
+
+// Zapis wsadowy variants z ograniczoną współbieżnością. Błąd per produkt jest
+// logowany i pomijany (licznik liczy tylko udane) — częściowy fail nie wywala
+// całej akcji ani nie fałszuje liczby. Wspólne dla propagacji dopłat i dla
+// usuwania tkaniny z produktów.
+async function writeProductVariants(
+  changed: { id: string; variants: ProductVariants }[],
+  logTag: string
+): Promise<number> {
+  const supabase = await createAdminClient();
   let updated = 0;
   for (let i = 0; i < changed.length; i += PRODUCT_WRITE_CONCURRENCY) {
     const batch = changed.slice(i, i + PRODUCT_WRITE_CONCURRENCY);
@@ -173,7 +188,7 @@ async function recomputeFabricSurchargesOnProducts(): Promise<{ updated: number 
             .update({ variants: c.variants } as never)
             .eq("id", c.id);
           if (error) {
-            console.error(`[recomputeFabricSurcharges] update ${c.id}:`, error.message);
+            console.error(`[${logTag}] update ${c.id}:`, error.message);
             return false;
           }
           revalidatePath(`/produkt/${c.id}`);
@@ -181,13 +196,38 @@ async function recomputeFabricSurchargesOnProducts(): Promise<{ updated: number 
         } catch (e) {
           // Sieciowy/nieoczekiwany błąd pojedynczego zapisu nie może wywalić
           // całej porcji — logujemy i pomijamy (jak przy błędzie zapytania).
-          console.error(`[recomputeFabricSurcharges] update ${c.id} threw:`, e);
+          console.error(`[${logTag}] update ${c.id} threw:`, e);
           return false;
         }
       })
     );
     updated += results.filter(Boolean).length;
   }
+  return updated;
+}
+
+// Wycina usuwaną tkaninę z opcji „Tkanina" wszystkich produktów. Wołane PRZED
+// usunięciem wiersza — potrzebuje nazwy i listy kolorów, żeby wiedzieć, które
+// wartości do niej należą.
+async function removeFabricFromProducts(fabric: FabricLite): Promise<{ updated: number }> {
+  const supabase = await createAdminClient();
+  const [{ data: productRows }, { data: fabricRows }] = await Promise.all([
+    supabase.from("products").select("id, variants").not("variants", "is", null),
+    // Reszta katalogu = ochrona tkanin o nazwie zaczynającej się tak samo.
+    supabase.from("fabrics").select("name, colors, price, group_id"),
+  ]);
+  const otherFabrics = ((fabricRows ?? []) as FabricLite[]).filter(
+    (f) => f.name.trim() !== fabric.name.trim()
+  );
+
+  const changed: { id: string; variants: ProductVariants }[] = [];
+  for (const row of productRows ?? []) {
+    const p = row as { id: string; variants: ProductVariants | null };
+    const res = removeFabricFromVariants(p.variants, fabric, otherFabrics);
+    if (res && res.changed) changed.push({ id: p.id, variants: res.variants });
+  }
+
+  const updated = await writeProductVariants(changed, "removeFabricFromProducts");
   if (updated > 0) {
     invalidateFacetsCache();
     revalidatePath("/sklep");
@@ -315,15 +355,28 @@ export async function updateFabric(formData: FormData): Promise<ActionResult> {
   return { ok: true, message: "Tkanina zapisana" };
 }
 
-// Usunięcie z katalogu NIE rusza produktów, które już mają tę tkaninę w wariancie
-// (wartość zostaje zapisana w products.variants). Znika tylko z listy do wyboru
-// i z mapy DE (jej wartość zacznie renderować się jako PL).
+// Usunięcie z katalogu wycina tkaninę TAKŻE z wariantów produktów, które ją
+// oferowały. Inaczej wartość zostawała w products.variants bez odpowiednika
+// w katalogu i lądowała na karcie produktu w koszu „Pozostałe" — bez zdjęcia,
+// bez strony tkaniny i z zamrożoną dopłatą. Produkty czyścimy PRZED usunięciem
+// wiersza: dopasowanie potrzebuje nazwy tkaniny, a przy nieudanym kasowaniu
+// zostaje stan „jest w katalogu, nie ma w produktach" — odwracalny z panelu,
+// w przeciwieństwie do sierot po usuniętej tkaninie.
 export async function deleteFabric(formData: FormData): Promise<ActionResult> {
   await requireAdmin();
   const id = sanitize(formData.get("id"));
   if (!id) return { ok: false, error: "Brak id" };
 
   const supabase = await createAdminClient();
+  const { data: fabricRow, error: readError } = await supabase
+    .from("fabrics")
+    .select("name, colors, price, group_id")
+    .eq("id", id)
+    .single();
+  if (readError) return { ok: false, error: readError.message };
+
+  const { updated } = await removeFabricFromProducts(fabricRow as FabricLite);
+
   const { error } = await supabase.from("fabrics").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
 
@@ -331,7 +384,18 @@ export async function deleteFabric(formData: FormData): Promise<ActionResult> {
   invalidateFacetsCache();
   revalidatePath("/admin/tkaniny");
   revalidatePath("/tkaniny");
-  return { ok: true, message: "Tkanina usunięta" };
+  return {
+    ok: true,
+    message:
+      updated > 0
+        ? `Tkanina usunięta — wycofana też z ${updated} ${plProducts(updated)}`
+        : "Tkanina usunięta",
+  };
+}
+
+// Odmiana „produktu/produktów" w komunikacie po usunięciu tkaniny.
+function plProducts(n: number): string {
+  return n === 1 ? "produktu" : "produktów";
 }
 
 // Edycja grupy cenowej (nazwy + kwota). Kod (code) i liczba grup są stałe — v1

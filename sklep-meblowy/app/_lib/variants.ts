@@ -409,6 +409,48 @@ export function buildFabricMetaMap(
   return map;
 }
 
+// Wycina z opcji „Tkanina" wszystkie wartości danej tkaniny — razem z ich
+// dopłatami i zdjęciami, żeby po usunięciu z katalogu nie zostawał osierocony
+// wpis lądujący w karcie „Pozostałe".
+// Dopasowanie po NAZWIE („Sawana", „Sawana <cokolwiek>"), nie po liście kolorów:
+// kolor przenumerowany w międzyczasie („Sawana 99") to nadal Sawana i też musi
+// zniknąć. `otherFabrics` chroni tkaniny o nazwie zaczynającej się tak samo —
+// usuwając „Magic" nie ruszamy „Magic Velvet 2239".
+// Gdy nie zostanie żadna wartość — opcja znika w całości. Inne opcje nietknięte.
+// Zwraca null gdy produkt nie ma opcji „Tkanina"; changed=false gdy nic nie ubyło.
+export function removeFabricFromVariants(
+  variants: ProductVariants | null,
+  fabric: FabricLite,
+  otherFabrics: FabricLite[] = []
+): { variants: ProductVariants; changed: boolean } | null {
+  const opt = variants?.options.find((o) => o.name === FABRIC_OPTION_NAME);
+  if (!variants || !opt) return null;
+  const name = fabric.name.trim();
+  const belongsToFabric = (v: string) =>
+    !!name &&
+    (v === name || v.startsWith(name + " ")) &&
+    !otherFabrics.some((f) => f.name.trim() !== name && fabricValueBelongsTo(v, f));
+  const kept = opt.values.filter((v) => !belongsToFabric(v));
+  if (kept.length === opt.values.length) return { variants, changed: false };
+
+  if (kept.length === 0) {
+    const nextOptions = variants.options.filter((o) => o.name !== FABRIC_OPTION_NAME);
+    return { variants: { ...variants, options: nextOptions }, changed: true };
+  }
+  const keptSet = new Set(kept);
+  const pick = <T,>(m: Record<string, T> | undefined): Record<string, T> | undefined => {
+    if (!m) return undefined;
+    const next = Object.fromEntries(Object.entries(m).filter(([v]) => keptSet.has(v)));
+    return Object.keys(next).length > 0 ? next : undefined;
+  };
+  const nextOptions = variants.options.map((o) =>
+    o.name === FABRIC_OPTION_NAME
+      ? { ...o, values: kept, value_prices: pick(o.value_prices), value_images: pick(o.value_images) }
+      : o
+  );
+  return { variants: { ...variants, options: nextOptions }, changed: true };
+}
+
 // Przelicza value_prices opcji „Tkanina" produktu wg aktualnego katalogu:
 // wartość z katalogu → surcharge grupy + korekta; orphan (spoza katalogu) →
 // zachowuje dotychczasową dopłatę. Inne opcje nietknięte. Zwraca null gdy

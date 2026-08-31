@@ -18,6 +18,7 @@ import {
   buildGroupSurchargeMap,
   buildFabricMetaMap,
   rebuildFabricValuePrices,
+  removeFabricFromVariants,
   optionHasValueImages,
 } from "@/app/_lib/variants";
 import type { Product } from "@/app/_lib/types";
@@ -346,5 +347,87 @@ describe("optionHasValueImages", () => {
   });
   it("opcja z samymi pustymi tablicami → false", () => {
     expect(optionHasValueImages({ name: "X", values: ["a"], value_images: { a: [] } })).toBe(false);
+  });
+});
+
+describe("removeFabricFromVariants", () => {
+  const sawana = { name: "Sawana", colors: ["21", "25"], price: 0, group_id: "g-std" };
+  const variants = {
+    options: [
+      { name: "Strona", values: ["Lewa", "Prawa"] },
+      {
+        name: "Tkanina",
+        values: ["Monolith 84", "Sawana 21", "Sawana 25"],
+        value_prices: { "Monolith 84": 250, "Sawana 21": 10 },
+        value_images: { "Sawana 21": ["saw.jpg"], "Monolith 84": ["mono.jpg"] },
+        filterable: true,
+      },
+    ],
+  };
+
+  it("usuwa wartości tkaniny wraz z dopłatami i zdjęciami, resztę zostawia", () => {
+    const res = removeFabricFromVariants(variants, sawana)!;
+    expect(res.changed).toBe(true);
+    const opt = res.variants.options.find((o) => o.name === "Tkanina")!;
+    expect(opt.values).toEqual(["Monolith 84"]);
+    expect(opt.value_prices).toEqual({ "Monolith 84": 250 });
+    expect(opt.value_images).toEqual({ "Monolith 84": ["mono.jpg"] });
+    // Pozostałe pola opcji i inne opcje nietknięte.
+    expect(opt.filterable).toBe(true);
+    expect(res.variants.options[0]).toEqual(variants.options[0]);
+  });
+
+  it("ostatnia tkanina → opcja Tkanina znika, inne opcje zostają", () => {
+    const only = {
+      options: [
+        { name: "Strona", values: ["Lewa"] },
+        { name: "Tkanina", values: ["Sawana 21", "Sawana 25"] },
+      ],
+    };
+    const res = removeFabricFromVariants(only, sawana)!;
+    expect(res.changed).toBe(true);
+    expect(res.variants.options.map((o) => o.name)).toEqual(["Strona"]);
+  });
+
+  it("tkanina bez kolorów — wartością jest sama nazwa", () => {
+    const v = { options: [{ name: "Tkanina", values: ["Velvet", "Monolith 84"] }] };
+    const res = removeFabricFromVariants(v, { name: "Velvet", colors: [], price: 0, group_id: "g" })!;
+    expect(res.variants.options[0].values).toEqual(["Monolith 84"]);
+  });
+
+  it("zabiera też kolory spoza katalogu — stary zapis nie zostaje w „Pozostałych\"", () => {
+    const res = removeFabricFromVariants(
+      { options: [{ name: "Tkanina", values: ["Monolith 84", "Sawana 21", "Sawana 99"] }] },
+      sawana
+    )!;
+    // „Sawana 99" nie ma już wpisu w colors (np. przenumerowano kolory), ale to
+    // wciąż Sawana — po usunięciu tkaniny nie może zostać jako sierota.
+    expect(res.variants.options[0].values).toEqual(["Monolith 84"]);
+  });
+
+  it("nie zabiera kolorów innej tkaniny, której nazwa zaczyna się tak samo", () => {
+    const magic = { name: "Magic", colors: ["01"], price: 0, group_id: "g" };
+    const magicVelvet = { name: "Magic Velvet", colors: ["2239"], price: 0, group_id: "g" };
+    const res = removeFabricFromVariants(
+      { options: [{ name: "Tkanina", values: ["Magic 01", "Magic Velvet 2239"] }] },
+      magic,
+      [magicVelvet]
+    )!;
+    expect(res.variants.options[0].values).toEqual(["Magic Velvet 2239"]);
+  });
+
+  it("changed=false gdy produkt nie ma tej tkaniny", () => {
+    const res = removeFabricFromVariants(
+      { options: [{ name: "Tkanina", values: ["Monolith 84"] }] },
+      sawana
+    )!;
+    expect(res.changed).toBe(false);
+  });
+
+  it("null gdy brak wariantów lub opcji Tkanina", () => {
+    expect(removeFabricFromVariants(null, sawana)).toBeNull();
+    expect(
+      removeFabricFromVariants({ options: [{ name: "Strona", values: ["Lewa"] }] }, sawana)
+    ).toBeNull();
   });
 });
