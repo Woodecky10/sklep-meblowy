@@ -34,7 +34,10 @@ export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
   const t = getDictionary(locale);
   return {
-    title: t.meta.homeTitle,
+    // `absolute`, nie zwykły string: layout ma `title.template` = "%s | Mollien",
+    // a `meta.homeTitle` niesie markę już w sobie (tak wygląda wynik w Google).
+    // Bez tego w karcie przeglądarki stanęłoby „… | Mollien | Mollien".
+    title: { absolute: t.meta.homeTitle },
     alternates: {
       canonical: localizePath("/", locale),
       languages: alternatesFor("/", { hasDe: true }).languages,
