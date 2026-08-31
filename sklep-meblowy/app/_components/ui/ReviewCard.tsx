@@ -1,8 +1,7 @@
-import Image from "next/image";
 import StarRating from "./StarRating";
 import LocalizedLink from "./LocalizedLink";
+import ReviewPhotos from "./ReviewPhotos";
 import { anonymizeAuthor, formatReviewDate } from "@/app/_lib/reviews-display";
-import { MAX_REVIEW_PHOTOS } from "@/app/_lib/reviews-photos";
 import type { Locale } from "@/app/_lib/i18n";
 import type { PublicReview } from "@/app/_lib/reviews";
 
@@ -86,25 +85,18 @@ export default function ReviewCard({
           z `flex-1`. To opakowanie ma rosnąć do wysokości najwyższej karty
           w rzędzie — wrzucenie do niego zdjęć zabrałoby cytatowi wysokość
           i przywróciło usterkę obcinania, którą naprawił commit 33cf0cc.
-          Bez lightboxa i bez linku: cała karta w sliderze prowadzi do produktu,
-          a druga akcja w tym samym kafelku to pułapka na dotyku. */}
+          Miniatury są klikalne (ReviewPhotos → ImageLightbox): mają 72 px
+          w sliderze i ok. 200 px na /opinie, więc bez powiększenia zdjęcia od
+          klientów były nie do obejrzenia. Wcześniejsza obawa o „pułapkę na
+          dotyku" nie miała podstaw — karta NIE jest jednym wielkim linkiem,
+          klikalny jest tylko podpis produktu na dole. */}
       {zdjecia.length > 0 && (
-        <ul className={pelna ? "grid grid-cols-3 gap-2" : "flex gap-2"}>
-          {zdjecia.slice(0, MAX_REVIEW_PHOTOS).map((url, i) => (
-            <li
-              key={url}
-              className={`relative aspect-square rounded-lg overflow-hidden border border-[var(--border)] ${pelna ? "" : "w-[72px] shrink-0"}`}
-            >
-              <Image
-                src={url}
-                alt={`${altBazowy} (${i + 1})`}
-                fill
-                sizes={pelna ? "200px" : "72px"}
-                className="object-cover"
-              />
-            </li>
-          ))}
-        </ul>
+        <ReviewPhotos
+          photos={zdjecia}
+          altBazowy={altBazowy}
+          locale={locale}
+          pelna={pelna}
+        />
       )}
 
       <figcaption className="text-sm text-[var(--muted)]">
