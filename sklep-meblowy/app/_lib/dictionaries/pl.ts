@@ -64,6 +64,9 @@ export type PlShape = {
     intro: string;
     metaDescription: string;
     empty: string;
+    tabAll: string;
+    tabPhotos: string;
+    photosFromCustomers: string;
   };
   product: {
     addToCart: string;
@@ -480,6 +483,9 @@ export const pl = {
     metaDescription:
       "Opinie klientów o meblach Mollien — wystawiane po dostawie przez osoby, które kupiły mebel. Publikujemy także oceny krytyczne.",
     empty: "Nie mamy jeszcze opinii do pokazania. Pojawią się tutaj, gdy pierwsi klienci ocenią swoje meble.",
+    tabAll: "Wszystkie opinie",
+    tabPhotos: "Tylko zdjęcia",
+    photosFromCustomers: "Zdjęcia od klientów",
   },
   product: {
     addToCart: "Dodaj do koszyka",

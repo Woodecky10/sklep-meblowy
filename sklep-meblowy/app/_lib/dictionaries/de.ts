@@ -69,6 +69,9 @@ export const de: DeepPartial<PlShape> = {
     metaDescription:
       "Kundenbewertungen zu Mollien-Möbeln — abgegeben nach der Lieferung von Personen, die ein Möbelstück gekauft haben. Auch kritische Bewertungen veröffentlichen wir.",
     empty: "Wir haben noch keine Bewertungen. Sie erscheinen hier, sobald die ersten Kunden ihre Möbel bewerten.",
+    tabAll: "Alle Bewertungen",
+    tabPhotos: "Nur Fotos",
+    photosFromCustomers: "Kundenfotos",
   },
   product: {
     addToCart: "In den Warenkorb",
