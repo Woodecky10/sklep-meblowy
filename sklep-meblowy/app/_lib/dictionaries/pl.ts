@@ -460,8 +460,10 @@ export const pl = {
     reviewsSeeAll: "Zobacz wszystkie opinie",
     h1: "Sklep internetowy z meblami tapicerowanymi od polskiego producenta",
     // ⚠️ Bliźniak: `meta.description` (niżej w tym pliku) to to samo zdanie
-    // „czym jest sklep", tylko krótsze i z inną listą kategorii. Zmieniasz
-    // jedno — przejrzyj drugie, bo już raz się rozjechały.
+    // „czym jest sklep", tylko krótsze, z inną listą kategorii (są tam pufy,
+    // nie ma materacy) i bez nazwy marki — bo od 2026-08-31 jest pisane pod
+    // wynik w Google, a nie pod czytelnika strony. Zmieniasz jedno —
+    // przejrzyj drugie, bo już raz się rozjechały.
     h1Lead:
       "Mollien.pl — łóżka, materace, narożniki, sofy i fotele produkowane w Polsce, w większości na zamówienie. Konto, zakładane adresem e-mail lub przez Google, służy do śledzenia zamówień i zapisywania ulubionych modeli.",
     aboutEyebrow: "O sklepie",
@@ -647,12 +649,18 @@ export const pl = {
   meta: {
     tagline: "Meble premium",
     // ⚠️ Bliźniak: `home.h1Lead` (wyżej w tym pliku) mówi to samo pod h1
-    // strony głównej. Zmieniasz jedno — przejrzyj drugie; dziś różnią się
-    // m.in. tym, że tu są jeszcze pufy.
+    // strony głównej. Zmieniasz jedno — przejrzyj drugie. Dziś się różnią
+    // celem: ten opis jest snippetem w Google (kategorie razem z pufami,
+    // polski producent, tkaniny, darmowa dostawa — bez nazwy marki i bez
+    // materacy), a h1Lead odpowiada na zarzut Google „strona nie wyjaśnia
+    // celu aplikacji" (nazwa marki + po co jest konto).
     description:
-      "Mollien.pl to sklep internetowy z meblami tapicerowanymi produkowanymi w Polsce: łóżka, materace, narożniki, sofy, fotele i pufy. Darmowe próbki tkanin i darmowa dostawa.",
+      "Meble tapicerowane – narożniki, sofy, fotele, łóżka i pufy do salonu i sypialni. Polski producent, szeroki wybór tkanin i kolorów, darmowa dostawa w całej Polsce.",
     keywords: "meble, sofy, narożniki, łóżka, fotele, sklep meblowy",
-    homeTitle: "Mollien.pl — sklep internetowy z meblami tapicerowanymi",
+    // ⚠️ Ten tytuł idzie do <title> DOSŁOWNIE, razem z „| Mollien" na końcu:
+    // app/page.tsx podaje go jako `title.absolute`, żeby NIE dopisał się drugi
+    // raz z `title.template` w app/layout.tsx. Zmieniasz jedno — sprawdź oba.
+    homeTitle: "Meble tapicerowane – narożniki, sofy, fotele i łóżka | Mollien",
     shopTitle: "Sklep",
     wishlistTitle: "Ulubione",
   },
