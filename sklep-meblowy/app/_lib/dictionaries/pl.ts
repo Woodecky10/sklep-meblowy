@@ -45,10 +45,13 @@ export type PlShape = {
     // Eyebrow i nagłówek używane TYLKO w wariancie samodzielnym (gdy pasek
     // zaufania jest wyłączony); normalnie nagłówek daje pasek.
     //
-    // ⚠️ Stały tu `h1` i `h1Lead` — jedyny <h1> home wraz ze zdaniem
-    // definiującym, dodane po TRZECIM odrzuceniu weryfikacji marki Google
-    // („strona główna nie wyjaśnia celu aplikacji"). Usunięte 2026-08-17 na
-    // polecenie właściciela. Home nie ma teraz żadnego <h1>.
+    // Jedyny <h1> strony głównej wraz ze zdaniem definiującym. Nie zamieniać
+    // na hasło marketingowe: h1 ma nieść frazy, które ludzie naprawdę wpisują
+    // w wyszukiwarkę (PL: sklep + polski producent, DE: möbel aus polen
+    // online). Klucz znikał już raz z obu słowników — pełna historia:
+    // app/_lib/__tests__/home-h1.test.ts.
+    h1: string;
+    h1Lead: string;
     aboutEyebrow: string;
     aboutHeading: string;
     // Treść domyślna, gdy w panelu (site_texts → home_about) nic nie wpisano.
@@ -455,6 +458,12 @@ export const pl = {
     reviewsEyebrow: "Opinie klientów",
     reviewsHeading: "Co mówią klienci",
     reviewsSeeAll: "Zobacz wszystkie opinie",
+    h1: "Sklep internetowy z meblami tapicerowanymi od polskiego producenta",
+    // ⚠️ Bliźniak: `meta.description` (niżej w tym pliku) to to samo zdanie
+    // „czym jest sklep", tylko krótsze i z inną listą kategorii. Zmieniasz
+    // jedno — przejrzyj drugie, bo już raz się rozjechały.
+    h1Lead:
+      "Mollien.pl — łóżka, materace, narożniki, sofy i fotele produkowane w Polsce, w większości na zamówienie. Konto, zakładane adresem e-mail lub przez Google, służy do śledzenia zamówień i zapisywania ulubionych modeli.",
     aboutEyebrow: "O sklepie",
     aboutHeading: "Meble tapicerowane prosto od producenta",
     aboutDefaultHtml: [
@@ -637,6 +646,9 @@ export const pl = {
   },
   meta: {
     tagline: "Meble premium",
+    // ⚠️ Bliźniak: `home.h1Lead` (wyżej w tym pliku) mówi to samo pod h1
+    // strony głównej. Zmieniasz jedno — przejrzyj drugie; dziś różnią się
+    // m.in. tym, że tu są jeszcze pufy.
     description:
       "Mollien.pl to sklep internetowy z meblami tapicerowanymi produkowanymi w Polsce: łóżka, materace, narożniki, sofy, fotele i pufy. Darmowe próbki tkanin i darmowa dostawa.",
     keywords: "meble, sofy, narożniki, łóżka, fotele, sklep meblowy",
