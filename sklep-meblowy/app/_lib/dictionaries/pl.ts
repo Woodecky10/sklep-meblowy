@@ -45,10 +45,17 @@ export type PlShape = {
     // Eyebrow i nagłówek używane TYLKO w wariancie samodzielnym (gdy pasek
     // zaufania jest wyłączony); normalnie nagłówek daje pasek.
     //
-    // ⚠️ Stały tu `h1` i `h1Lead` — jedyny <h1> home wraz ze zdaniem
-    // definiującym, dodane po TRZECIM odrzuceniu weryfikacji marki Google
-    // („strona główna nie wyjaśnia celu aplikacji"). Usunięte 2026-08-17 na
-    // polecenie właściciela. Home nie ma teraz żadnego <h1>.
+    // Jedyny <h1> strony głównej wraz ze zdaniem definiującym. Historia, żeby
+    // nikt nie ruszał tego przypadkiem: dodane 2026-08-10 po TRZECIM odrzuceniu
+    // weryfikacji marki Google („strona główna nie wyjaśnia celu aplikacji"),
+    // usunięte 2026-08-17 na polecenie właściciela (home została wtedy bez
+    // żadnego h1), przywrócone 2026-08-31 — również decyzją właściciela, tym
+    // razem z treścią dobraną pod realne frazy z Search Console.
+    // Nie zamieniać na hasło marketingowe: h1 ma zawierać frazy, które ludzie
+    // naprawdę wpisują w wyszukiwarkę (PL: sklep + polski producent,
+    // DE: möbel aus polen online).
+    h1: string;
+    h1Lead: string;
     aboutEyebrow: string;
     aboutHeading: string;
     // Treść domyślna, gdy w panelu (site_texts → home_about) nic nie wpisano.
@@ -455,6 +462,9 @@ export const pl = {
     reviewsEyebrow: "Opinie klientów",
     reviewsHeading: "Co mówią klienci",
     reviewsSeeAll: "Zobacz wszystkie opinie",
+    h1: "Sklep internetowy z meblami tapicerowanymi od polskiego producenta",
+    h1Lead:
+      "Mollien.pl — łóżka, materace, narożniki, sofy i fotele produkowane w Polsce, w większości na zamówienie. Konto, zakładane adresem e-mail lub przez Google, służy do śledzenia zamówień i zapisywania ulubionych modeli.",
     aboutEyebrow: "O sklepie",
     aboutHeading: "Meble tapicerowane prosto od producenta",
     aboutDefaultHtml: [

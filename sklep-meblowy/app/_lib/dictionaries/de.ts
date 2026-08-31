@@ -38,6 +38,9 @@ export const de: DeepPartial<PlShape> = {
     seeCollection: "Kollektion ansehen",
     collectionsShowAll: "Alle Kollektionen anzeigen",
     collectionsCollapse: "Einklappen",
+    h1: "Polstermöbel aus Polen — Online-Shop",
+    h1Lead:
+      "Mollien.pl — Betten, Matratzen, Ecksofas, Sofas und Sessel direkt vom Hersteller aus Polen, größtenteils auf Bestellung gefertigt. Ein Kundenkonto, per E-Mail oder über Google angelegt, dient dazu, Bestellungen zu verfolgen und Lieblingsmodelle zu speichern.",
     aboutEyebrow: "Über den Shop",
     aboutHeading: "Polstermöbel direkt vom Hersteller",
     aboutDefaultHtml: [
