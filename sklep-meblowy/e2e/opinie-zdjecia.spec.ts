@@ -68,3 +68,42 @@ test.describe("opinie ze zdjęciami — odczyt", () => {
     }
   });
 });
+
+// Klik w miniaturę ma otwierać lightbox z powiększeniem — tak jak we wzorniku
+// tkanin (FabricSwatchGrid). Wcześniej miniatury były zwykłym <Image> bez
+// żadnego celu kliknięcia, więc zdjęcia od klientów dało się oglądać wyłącznie
+// w rozmiarze kciuka.
+test.describe("opinie ze zdjęciami — powiększanie", () => {
+  test("klik w miniaturę otwiera lightbox, Esc go zamyka", async ({ page }) => {
+    await page.goto("/opinie");
+
+    // Celowo szukamy po samym <img>, a nie po markerze dodanym razem z poprawką:
+    // inaczej na kodzie SPRZED niej test by się pomijał zamiast spaść, a wtedy
+    // niczego nie dowodzi. Karta opinii nie ma innych <img> niż zdjęcia klienta
+    // (gwiazdki to SVG).
+    const miniatury = page.locator("[data-review-card] img");
+    const liczba = await miniatury.count();
+    test.skip(
+      liczba === 0,
+      "Baza nie ma zatwierdzonej opinii ZE ZDJĘCIEM — nie ma czego kliknąć."
+    );
+
+    const lightbox = page.getByRole("dialog");
+    await expect(lightbox).toBeHidden();
+
+    await miniatury.first().click();
+    await expect(lightbox).toBeVisible();
+
+    // Powiększone zdjęcie faktycznie się załadowało i jest większe niż miniatura
+    // (72–200 px w karcie) — sam otwarty dialog niczego by nie dowodził.
+    const duze = lightbox.locator("img").first();
+    await expect
+      .poll(() => duze.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+      .toBeGreaterThan(0);
+    const szerokosc = await duze.evaluate((el) => el.getBoundingClientRect().width);
+    expect(szerokosc).toBeGreaterThan(300);
+
+    await page.keyboard.press("Escape");
+    await expect(lightbox).toBeHidden();
+  });
+});
