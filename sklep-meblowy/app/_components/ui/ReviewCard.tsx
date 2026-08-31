@@ -95,7 +95,7 @@ export default function ReviewCard({
           photos={zdjecia}
           altBazowy={altBazowy}
           locale={locale}
-          pelna={pelna}
+          wariant={pelna ? "pelna" : "slider"}
         />
       )}
 

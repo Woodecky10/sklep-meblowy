@@ -106,4 +106,40 @@ test.describe("opinie ze zdjęciami — powiększanie", () => {
     await page.keyboard.press("Escape");
     await expect(lightbox).toBeHidden();
   });
+
+  // Zdjęcia opinii renderuje TRZECI komponent — ReviewList na karcie produktu.
+  // Poprawka lightboxa objęła najpierw tylko ReviewCard (home + /opinie), więc
+  // na karcie produktu miniatury zostały nieklikalne. Zgłoszenie od właściciela.
+  test("na karcie produktu klik w miniaturę też otwiera lightbox", async ({ page }) => {
+    // Produkt bierzemy z galerii na /opinie, zamiast wpisywać id na sztywno —
+    // test ma przeżyć zmianę danych.
+    await page.goto("/opinie");
+    await expect(page.locator("[data-review-card]").first()).toBeVisible();
+    test.skip(
+      (await page.locator("[data-review-card] img").count()) === 0,
+      "Żadna zatwierdzona opinia nie ma zdjęcia — nie ma czego kliknąć."
+    );
+    await page.getByRole("button", { name: "Tylko zdjęcia" }).click();
+    const link = page.locator("section:has([data-gallery-photo]) a").first();
+    const href = await link.getAttribute("href");
+    await page.goto(href!);
+
+    // Alt jest ten sam w ReviewList i w ReviewPhotos, więc lokator działa
+    // ZARÓWNO przed poprawką, jak i po niej — inaczej test nie mógłby spaść.
+    const miniatury = page.locator('img[alt^="Zdjęcie od klienta do opinii"]');
+    await expect(miniatury.first()).toBeVisible();
+
+    const lightbox = page.getByRole("dialog");
+    await expect(lightbox).toBeHidden();
+    await miniatury.first().click();
+    await expect(lightbox).toBeVisible();
+
+    const duze = lightbox.locator("img").first();
+    await expect
+      .poll(() => duze.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+      .toBeGreaterThan(0);
+
+    await page.keyboard.press("Escape");
+    await expect(lightbox).toBeHidden();
+  });
 });

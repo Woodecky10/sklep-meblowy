@@ -14,29 +14,49 @@ import type { Locale } from "@/app/_lib/i18n";
 //
 // Miniatury mają 72 px w sliderze i ok. 200 px na /opinie, więc bez
 // powiększenia zdjęcia od klientów były praktycznie nie do obejrzenia.
+// Trzy miejsca renderują te same miniatury i różnią się WYŁĄCZNIE układem
+// siatki oraz rozmiarem, pod jaki next/image ma dobrać plik. Trzymamy je tutaj
+// w jednym miejscu, żeby czwarte wywołanie nie było kolejną kopią znaczników —
+// to właśnie kopia w ReviewList sprawiła, że karta produktu nie dostała
+// lightboxa razem z resztą.
+const UKLAD = {
+  // Rządek pod cytatem w sliderze na stronie głównej.
+  slider: { lista: "flex gap-2", kafelek: "w-[72px] shrink-0", sizes: "72px" },
+  // Siatka w karcie opinii na /opinie.
+  pelna: { lista: "grid grid-cols-3 gap-2", kafelek: "", sizes: "200px" },
+  // Sekcja opinii na karcie produktu (węższa kolumna niż /opinie).
+  produkt: {
+    lista: "grid grid-cols-3 sm:grid-cols-4 gap-2 mt-3 max-w-md",
+    kafelek: "",
+    sizes: "160px",
+  },
+} as const;
+
+export type ReviewPhotosWariant = keyof typeof UKLAD;
+
 export default function ReviewPhotos({
   photos,
   altBazowy,
   locale,
-  pelna,
+  wariant,
 }: {
   photos: string[];
   altBazowy: string;
   locale: Locale;
-  // Jak w ReviewCard: "pelna" = siatka na /opinie, inaczej rządek w sliderze.
-  pelna: boolean;
+  wariant: ReviewPhotosWariant;
 }) {
   const t = getDictionary(locale);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const widoczne = photos.slice(0, MAX_REVIEW_PHOTOS);
+  const uklad = UKLAD[wariant];
 
   return (
     <>
-      <ul className={pelna ? "grid grid-cols-3 gap-2" : "flex gap-2"}>
+      <ul className={uklad.lista}>
         {widoczne.map((url, i) => (
           <li
             key={url}
-            className={`relative aspect-square rounded-lg overflow-hidden border border-[var(--border)] ${pelna ? "" : "w-[72px] shrink-0"}`}
+            className={`relative aspect-square rounded-lg overflow-hidden border border-[var(--border)] ${uklad.kafelek}`}
           >
             {/* Przycisk wypełnia kafelek (absolute inset-0), więc jest zarazem
                 pozycjonowanym rodzicem dla <Image fill> — inaczej zdjęcie
@@ -52,7 +72,7 @@ export default function ReviewPhotos({
                 src={url}
                 alt={`${altBazowy} (${i + 1})`}
                 fill
-                sizes={pelna ? "200px" : "72px"}
+                sizes={uklad.sizes}
                 className="object-cover"
               />
             </button>
