@@ -86,9 +86,14 @@ export default async function HomePage() {
     .filter((b): b is LocalizedBlock => b !== null);
   const categoryLabels = new Map(allCategories.map((c) => [c.slug, c.label]));
   const hasTrustBar = blocks.some((b) => b.visible && b.type === "trust_bar");
-  // h1 wisi pod hero. Gdyby blok hero wyłączono w panelu, strona zostałaby bez
-  // jedynego h1 — i bez zdania wyjaśniającego, czym jest sklep.
-  const hasHero = blocks.some((b) => b.visible && b.type === "hero");
+  // Jedyny <h1> strony wisi pod hero, ale TYLKO gdy hero otwiera stronę.
+  // Kolejność i widoczność bloków ustawia panel, a mergeHomeBlocks nie
+  // deduplikuje — w page_blocks mogą stać dwa widoczne wiersze hero. Stąd
+  // porównanie po id konkretnego bloku, nie po typie. Gdy pierwszy widoczny
+  // blok nie jest hero (albo bloków nie ma wcale), h1 idzie na samą górę:
+  // zawsze dokładnie jeden i zawsze w górnej części strony.
+  const firstVisible = blocks.find((b) => b.visible);
+  const heroOpensPage = firstVisible?.type === "hero";
 
   function purposeHeading() {
     return (
@@ -135,15 +140,11 @@ export default async function HomePage() {
     switch (b.type) {
       case "hero":
         // Hero — slider z auto-rotacją (6s) i nawigacją (strzałki + kropki).
-        // Pod nim JEDYNY <h1> strony. Historia w trzech krokach: do 2026-08-10
-        // home nie miała h1 wcale, a nad zgięciem stały same hasła („Meble,
-        // które opowiadają historię"), przez co weryfikacja marki Google
-        // odrzucała ją z powodem „strona główna nie wyjaśnia celu aplikacji";
-        // 2026-08-17 h1 usunięto na polecenie właściciela; 2026-08-31 wrócił —
-        // też decyzją właściciela, z treścią dobraną pod realne frazy
-        // z Search Console. NIE zamieniać go na hasło marketingowe.
-        // Tekst jest wyciszony, ale nie ukryty — ukrycie Google traktuje
-        // jak cloaking.
+        // Pod nim JEDYNY <h1> strony, o ile to ten blok otwiera stronę.
+        // Treść h1 jest dobrana pod realne frazy z Search Console — NIE
+        // zamieniać jej na hasło marketingowe. Tekst jest wyciszony, ale nie
+        // ukryty: ukrycie Google traktuje jak cloaking. Pełna historia tego
+        // nagłówka: app/_lib/__tests__/home-h1.test.ts.
         //
         // Slajdy slidera są celowo <h2>, nie <h1>: slider trzyma wszystkie
         // slajdy w DOM naraz, więc jako h1 dawały ich cztery. Nie zamieniać
@@ -151,7 +152,7 @@ export default async function HomePage() {
         return (
           <>
             <HomeHeroSlider slides={slides} />
-            {purposeHeading()}
+            {b.id === firstVisible?.id && purposeHeading()}
           </>
         );
 
@@ -308,7 +309,9 @@ export default async function HomePage() {
 
   return (
     <>
-      {!hasHero && purposeHeading()}
+      {/* Hero nie otwiera strony (wyłączony, przesunięty w dół albo bloków
+          brak) → h1 startuje stronę samodzielnie. Patrz heroOpensPage wyżej. */}
+      {!heroOpensPage && purposeHeading()}
       {blocks
         .filter((b) => b.visible)
         .map((b) => (

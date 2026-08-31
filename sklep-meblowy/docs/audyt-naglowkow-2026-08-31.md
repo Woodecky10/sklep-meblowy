@@ -89,3 +89,27 @@ do zatwierdzenia, dopiero potem kod (sekcja pod hero + klucze `home.h1`
 i `home.h1Lead` w słownikach PL i DE). Przy okazji sprawdzić, czy nazwy
 kategorii i tytuły stron nie rozmijają się z tym, czego ludzie szukają — to
 bywa większa dźwignia niż sam nagłówek.
+
+## Aktualizacja 2026-08-31 — wykonane
+
+Dane z Search Console dostarczone tego samego dnia (zakres 3 miesiące):
+**109 kliknięć / 954 wyświetlenia**. Dwa klastry fraz z wyświetleniami
+i **zerem kliknięć**: PL „polski producent" (~20 wyświetleń), DE
+„möbel aus polen online" (~41 wyświetleń).
+
+Decyzją właściciela H1 na stronie głównej został **przywrócony**, z treścią
+dobraną pod te frazy:
+
+- PL: „Sklep internetowy z meblami tapicerowanymi od polskiego producenta"
+- DE: „Polstermöbel aus Polen — Online-Shop"
+
+DE jest **zamrożone**: front niemiecki odpuszczony decyzją właściciela, `/de`
+stoi za flagą `DE_ENABLED`, więc niemiecki H1 czeka uśpiony w słowniku.
+
+Zabezpieczenie przed powtórką z 2026-08-17 (nagłówek zniknął przez zmianę
+w jednym pliku i nic tego nie wyłapało): test jednostkowy
+`app/_lib/__tests__/home-h1.test.ts` (treść w słownikach + podpięcie w kodzie,
+zero H1 w sliderze) oraz spec e2e `e2e/home-h1.spec.ts` (dokładnie jeden
+widoczny H1 w wyrenderowanym DOM). H1 renderuje się pod hero, a gdy hero nie
+otwiera strony — na jej górze; niezależnie od kolejności i duplikatów bloków
+w `page_blocks`.
