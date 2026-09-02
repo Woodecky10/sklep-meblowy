@@ -37,6 +37,11 @@ export function ExternalOrderAccepted({
       <Text style={p}>
         Potwierdzamy, że Państwa zamówienie zostało przyjęte i przekazane do realizacji.
       </Text>
+      {/* Celowo literał szablonowy, nie `Źródło zamówienia: {order.source}`:
+          React wstawia znacznik <!-- --> między sąsiadującym tekstem statycznym
+          a wyrażeniem, więc w źródle HTML napis rozciąłby się na dwa węzły i
+          test sprawdzający ciągły ciąg „Źródło zamówienia: Allegro” by nie
+          przeszedł. */}
       <Text style={{ ...p, fontWeight: 600 }}>{`Źródło zamówienia: ${order.source}`}</Text>
       <Text style={p}>Mebel zostanie przygotowany zgodnie z wybranym przez Państwa wariantem.</Text>
       <Text style={p}>🛋️ Przewidywany czas realizacji: do 21 dni roboczych.</Text>
