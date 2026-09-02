@@ -13,11 +13,20 @@ export default async function AdminNewExternalOrderPage() {
   await requireAdmin();
 
   const supabase = await createAdminClient();
-  const { data: products } = await supabase
+  const { data: products, error: productsError } = await supabase
     .from("products")
     .select("id, name, price, sale_price, images, is_active")
     .eq("is_active", true)
     .order("name", { ascending: true });
+  // Błąd nie może zniknąć w ciszy: bez tego wyszukiwarka po prostu nic nie
+  // znajduje, a admin nie odróżni „nie ma takiego produktu" od „katalog się
+  // nie wczytał" — renderujemy stronę dalej, tylko z ostrzeżeniem nad formularzem.
+  if (productsError) {
+    console.error(
+      "[admin] pobranie listy produktow do zamowienia zewnetrznego nieudane:",
+      productsError.message
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -37,6 +46,11 @@ export default async function AdminNewExternalOrderPage() {
           przestawisz je na „W realizacji”, klient dostanie mail „Dziękujemy za zamówienie”.
         </p>
       </div>
+      {productsError && (
+        <p className="text-sm text-red-600" role="alert">
+          Nie udało się pobrać listy produktów — odśwież stronę.
+        </p>
+      )}
       <ExternalOrderForm products={(products ?? []) as ProductOption[]} />
     </div>
   );
