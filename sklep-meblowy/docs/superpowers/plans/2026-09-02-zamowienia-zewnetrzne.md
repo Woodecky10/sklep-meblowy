@@ -2089,7 +2089,7 @@ git add docs/superpowers/plans/2026-09-02-zamowienia-zewnetrzne.md
 git commit -m "docs(plan): stan wykonania — zamowienia zewnetrzne"
 ```
 
-PR z `feat/zamowienia-zewnetrzne` do `main` przez `gh` (konto Woodecky10 — patrz pamięć `push-auth-woodecky10`), **tylko po poleceniu właściciela**. W opisie PR: „Po merge zaaplikować migrację 81 ręcznie przez MCP `apply_migration`; potem test na żywo: dodać zamówienie testowe na własny adres, przestawić na W realizacji, sprawdzić mail, usunąć zamówienie".
+PR z `feat/zamowienia-zewnetrzne` do `main` przez `gh` (konto Woodecky10 — patrz pamięć `push-auth-woodecky10`), **tylko po poleceniu właściciela**. W opisie PR: „Migrację 81 zaaplikować ręcznie przez MCP `apply_migration` PRZED mergem (patrz „Po merge", punkt 1); po wdrożeniu test na żywo: dodać zamówienie testowe na własny adres, przestawić na W realizacji, sprawdzić mail, usunąć zamówienie".
 
 ---
 

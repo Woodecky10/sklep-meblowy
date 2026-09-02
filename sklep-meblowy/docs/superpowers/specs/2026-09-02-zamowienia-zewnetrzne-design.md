@@ -136,12 +136,20 @@ Formularz **nie wysyła żadnego maila** — mail idzie dopiero przy zmianie sta
 `app/_lib/mail/status-notify.ts`:
 
 ```ts
-shouldNotifyCustomer(status, source: string | null): boolean
-// source === null  → ["shipped", "cancelled"]          (jak dotąd)
-// source !== null  → ["processing", "shipped", "cancelled"]
+shouldNotifyCustomer(status, source: string | null | undefined): boolean
+// brak źródła → ["shipped", "cancelled"]                (jak dotąd)
+// jest źródło → ["processing", "shipped", "cancelled"]
 wasOrderPaid(paymentMethod, previousStatus, source): boolean
-// source !== null → false (zwrot idzie przez marketplace, mail o anulowaniu
-//                          nie ma obiecywać pieniędzy od sklepu)
+// jest źródło → false (zwrot idzie przez marketplace, mail o anulowaniu
+//                      nie ma obiecywać pieniędzy od sklepu)
+
+// ⚠️ Warunek to PRAWDZIWOŚCIOWOŚĆ (`if (source)`), nie `source !== null`.
+// Odczyty idą przez `select("*")`, a PostgREST na tabeli BEZ kolumny `source`
+// nie rzuca — po prostu nie zwraca pola, więc `order.source` to `undefined`.
+// Porównanie z `null` uznałoby wtedy KAŻDE zamówienie ze sklepu za zewnętrzne:
+// mail „Dziękujemy” ze `Źródło zamówienia: undefined` przy każdym przestawieniu
+// na „W realizacji”. Dokładnie taki jest stan między wdrożeniem kodu a ręczną
+// aplikacją migracji 81.
 ```
 
 `notifyStatusChange` czyta `order.source` po `getOrderById` i dla
