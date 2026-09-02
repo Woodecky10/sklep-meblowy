@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canTransition, nextStatuses } from "@/app/_lib/order-status";
+import { canTransition, nextStatuses, adminStatusLabel, ADMIN_STATUS_LABELS } from "@/app/_lib/order-status";
 
 describe("canTransition", () => {
   it("pozwala iść do przodu po osi paid→processing→shipped→delivered", () => {
@@ -55,5 +55,32 @@ describe("nextStatuses", () => {
   it("delivered i cancelled → [] (stany końcowe)", () => {
     expect(nextStatuses("delivered")).toEqual([]);
     expect(nextStatuses("cancelled")).toEqual([]);
+  });
+});
+
+describe("adminStatusLabel", () => {
+  it("sklep: to samo co ADMIN_STATUS_LABELS", () => {
+    for (const s of ["pending", "paid", "processing", "shipped", "delivered", "cancelled"] as const) {
+      expect(adminStatusLabel(s, null)).toEqual(ADMIN_STATUS_LABELS[s]);
+    }
+  });
+
+  it("zewnetrzne + paid: zwraca Oplacone (zewn.) - aby nie sugerowac wplaty przez P24", () => {
+    const l = adminStatusLabel("paid", "Allegro");
+    expect(l.label).toBe("Opłacone (zewn.)");
+    expect(l.className).toBe(ADMIN_STATUS_LABELS.paid.className);
+  });
+
+  it("zewnętrzne + inne statusy: bez zmian", () => {
+    expect(adminStatusLabel("processing", "Allegro")).toEqual(ADMIN_STATUS_LABELS.processing);
+    expect(adminStatusLabel("shipped", "OLX")).toEqual(ADMIN_STATUS_LABELS.shipped);
+  });
+
+  // select("*") na `orders` bez kolumny `source` (okno między wdrożeniem kodu
+  // a ręczną aplikacją migracji 81) zwraca `source === undefined`, NIE `null`.
+  // undefined ma znaczyć „ze sklepu" — inaczej każde opłacone zamówienie ze
+  // sklepu dostałoby w panelu plakietkę „Opłacone (zewn.)".
+  it("source undefined (kolumna jeszcze nie istnieje) → jak sklep, bez dopisku (zewn.)", () => {
+    expect(adminStatusLabel("paid", undefined)).toEqual(ADMIN_STATUS_LABELS.paid);
   });
 });

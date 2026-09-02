@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "@/app/_lib/admin";
 import { getOrderById, getProfilesByIds } from "@/app/_lib/orders";
 import { orderCustomerDisplay } from "@/app/_lib/admin-orders";
-import { ADMIN_STATUS_LABELS, nextStatuses } from "@/app/_lib/order-status";
+import { adminStatusLabel, nextStatuses } from "@/app/_lib/order-status";
 import { formatOrderAmount } from "@/app/_lib/money";
 import { formatVariantLabel } from "@/app/_lib/variants";
 import { Card } from "@/app/admin/_shared";
@@ -38,7 +38,7 @@ export default async function AdminOrderDetailPage({
   const subtotal = items.reduce((s, i) => s + Number(i.price) * i.quantity, 0);
   const promoDiscount = Number(order.promo_discount ?? 0);
   const bundleDiscount = Number(order.bundle_discount ?? 0);
-  const s = ADMIN_STATUS_LABELS[order.status];
+  const s = adminStatusLabel(order.status, order.source);
   const addr = order.shipping_address;
 
   return (
@@ -64,6 +64,12 @@ export default async function AdminOrderDetailPage({
               minute: "2-digit",
             })}
           </p>
+          {order.source && (
+            <p className="text-xs text-[var(--muted)] mt-1">
+              Źródło: <span className="font-semibold text-[var(--fg)]">{order.source}</span>{" "}
+              (zamówienie spoza sklepu)
+            </p>
+          )}
         </div>
         <span className={`px-3 py-1 rounded-full text-xs font-sans uppercase tracking-widest self-start ${s.className}`}>
           {s.label}
@@ -140,7 +146,13 @@ export default async function AdminOrderDetailPage({
                 </div>
               )}
               <div className="flex justify-between border-t border-[var(--border)] pt-2 font-bold text-base text-[var(--fg)]">
-                <dt>{order.payment_method === "cod" ? "Do pobrania" : "Zapłacono"}</dt>
+                <dt>
+                  {order.payment_method === "cod"
+                    ? "Do pobrania"
+                    : order.source
+                      ? `Zapłacono (${order.source})`
+                      : "Zapłacono"}
+                </dt>
                 <dd>{formatOrderAmount(Number(order.total), order.currency)}</dd>
               </div>
             </dl>
@@ -151,7 +163,11 @@ export default async function AdminOrderDetailPage({
             <p className="text-sm text-[var(--fg)]">{customer.name ?? "—"}</p>
             {customer.email && <p className="text-sm text-[var(--muted)]">{customer.email}</p>}
             <p className="text-xs text-[var(--muted)] mt-1">
-              {customer.isGuest ? "Zamówienie gościa" : "Konto zarejestrowane"}
+              {order.source
+                ? `Zamówienie zewnętrzne — ${order.source}`
+                : customer.isGuest
+                  ? "Zamówienie gościa"
+                  : "Konto zarejestrowane"}
             </p>
             {addr?.phone && <p className="text-sm text-[var(--muted)] mt-2">tel. {addr.phone}</p>}
           </Card>

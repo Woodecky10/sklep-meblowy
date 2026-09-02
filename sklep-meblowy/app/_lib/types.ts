@@ -312,6 +312,9 @@ export type Order = {
   delivery_cost: number | null;
   delivery_paid: boolean;
   status_updated_at: string | null;
+  // Zamówienia spoza sklepu (migracja 81): nazwa źródła („Allegro") pokazywana
+  // klientowi w mailu. null = złożone przez stronę.
+  source: string | null;
   items?: OrderItem[];
   // Dołączane przez query — kod promo z joina. Null jeśli zamówienie bez kuponu
   // albo gdy admin usunął kod (FK ON DELETE SET NULL).
@@ -388,6 +391,7 @@ type OrderInsert = {
   status?: OrderStatus;
   payment_ref?: string | null;
   payment_provider?: "p24" | null;
+  source?: string | null;
 };
 
 type OrderItemInsert = {

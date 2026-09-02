@@ -4,11 +4,15 @@ import type { OrderStatus } from "../types";
 import { getMailBranding } from "./branding-server";
 import { mailLocale } from "./locale";
 import { sendMail } from "./send";
-import { shouldNotifyCustomer, wasOrderPaid } from "./status-notify";
+import { mayNotifyCustomer, shouldNotifyCustomer, wasOrderPaid } from "./status-notify";
 import { OrderConfirmation } from "./templates/OrderConfirmation";
 import { AdminNewOrder } from "./templates/AdminNewOrder";
 import { OrderShipped } from "./templates/OrderShipped";
 import { OrderCancelled } from "./templates/OrderCancelled";
+import {
+  ExternalOrderAccepted,
+  EXTERNAL_ORDER_ACCEPTED_SUBJECT,
+} from "./templates/ExternalOrderAccepted";
 
 // Adres klienta: gość ma guest_email, zalogowany — email z profiles.
 async function customerEmailOf(order: {
@@ -94,9 +98,12 @@ export async function notifyStatusChange(
   status: OrderStatus,
   previousStatus: OrderStatus
 ): Promise<void> {
-  if (!shouldNotifyCustomer(status)) return;
+  // Tani filtr bez bazy; właściwa decyzja wymaga `order.source`, więc zapada
+  // dopiero po odczycie zamówienia.
+  if (!mayNotifyCustomer(status)) return;
   try {
     const order = await getOrderById(orderId);
+    if (!shouldNotifyCustomer(status, order.source)) return;
     const branding = await getMailBranding();
     const locale = mailLocale(order.currency);
     const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://mollien.pl";
@@ -123,8 +130,19 @@ export async function notifyStatusChange(
       return;
     }
 
+    // processing przechodzi przez shouldNotifyCustomer TYLKO dla zamówień
+    // zewnętrznych — klient z marketplace dostaje tu jedyne od nas
+    // potwierdzenie przyjęcia (spec 2026-09-02).
+    if (status === "processing") {
+      const html = await render(
+        ExternalOrderAccepted({ order, branding, shopUrl: base })
+      );
+      await sendMail({ to, subject: EXTERNAL_ORDER_ACCEPTED_SUBJECT, html });
+      return;
+    }
+
     // cancelled — jedyny pozostały status z shouldNotifyCustomer
-    const wasPaid = wasOrderPaid(order.payment_method, previousStatus);
+    const wasPaid = wasOrderPaid(order.payment_method, previousStatus, order.source);
     const html = await render(
       OrderCancelled({ order, branding, locale, wasPaid })
     );

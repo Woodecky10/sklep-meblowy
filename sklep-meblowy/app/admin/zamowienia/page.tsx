@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireAdmin } from "@/app/_lib/admin";
 import { getAdminOrders, getProfilesByIds } from "@/app/_lib/orders";
 import { orderCustomerDisplay, orderItemsSummary } from "@/app/_lib/admin-orders";
-import { ADMIN_STATUS_LABELS } from "@/app/_lib/order-status";
+import { adminStatusLabel } from "@/app/_lib/order-status";
 import { formatOrderAmount } from "@/app/_lib/money";
 import { EmptyState, inputCls } from "@/app/admin/_shared";
 import Pagination from "@/app/_components/ui/Pagination";
@@ -11,8 +11,11 @@ import type { OrderStatus } from "@/app/_lib/types";
 
 export const metadata = { title: "Zamówienia — Admin" };
 
-const FILTERS: { value: OrderStatus | "all"; label: string }[] = [
+type FilterValue = OrderStatus | "all" | "external";
+
+const FILTERS: { value: FilterValue; label: string }[] = [
   { value: "all", label: "Wszystkie" },
+  { value: "external", label: "Zewnętrzne" },
   { value: "paid", label: "Opłacone" },
   { value: "processing", label: "W realizacji" },
   { value: "shipped", label: "Wysłane" },
@@ -30,9 +33,12 @@ export default async function AdminOrdersPage({
 }) {
   await requireAdmin();
   const sp = await searchParams;
-  const status = (FILTERS.some((f) => f.value === sp.status) ? sp.status : "all") as
-    | OrderStatus
-    | "all";
+  // „external" jedzie w tym samym parametrze `status`, żeby linki filtrów i
+  // paginacja nie musiały znać drugiego parametru. Dla zapytania to
+  // status=all + source is not null.
+  const filter = (FILTERS.some((f) => f.value === sp.status) ? sp.status : "all") as FilterValue;
+  const external = filter === "external";
+  const status: OrderStatus | "all" = external ? "all" : filter;
   const search = sp.q?.trim() || undefined;
   const page = Number(sp.strona ?? 1);
 
@@ -40,13 +46,14 @@ export default async function AdminOrdersPage({
     status,
     search,
     page,
+    external,
   });
   const profiles = await getProfilesByIds(
     orders.map((o) => o.user_id).filter((id): id is string => !!id)
   );
 
   const rawParams: Record<string, string> = {};
-  if (status !== "all") rawParams.status = status;
+  if (filter !== "all") rawParams.status = filter;
   if (search) rawParams.q = search;
 
   return (
@@ -61,22 +68,30 @@ export default async function AdminOrdersPage({
         </p>
       </div>
 
-      {/* Szukajka — natywny formularz GET (działa bez JS) */}
-      <form action="/admin/zamowienia" data-guard-ignore className="flex gap-2 max-w-lg">
-        {status !== "all" && <input type="hidden" name="status" value={status} />}
-        <input
-          name="q"
-          defaultValue={search ?? ""}
-          placeholder="Szukaj: numer, e-mail lub nazwisko"
-          className={inputCls}
-        />
-        <button
-          type="submit"
-          className="shrink-0 px-5 py-2 bg-[var(--color-navy)] text-white font-sans text-sm uppercase tracking-widest rounded-lg hover:bg-[var(--color-gold)] transition-colors"
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Szukajka — natywny formularz GET (działa bez JS) */}
+        <form action="/admin/zamowienia" data-guard-ignore className="flex gap-2 flex-1 min-w-[280px] max-w-lg">
+          {filter !== "all" && <input type="hidden" name="status" value={filter} />}
+          <input
+            name="q"
+            defaultValue={search ?? ""}
+            placeholder="Szukaj: numer, e-mail lub nazwisko"
+            className={inputCls}
+          />
+          <button
+            type="submit"
+            className="shrink-0 px-5 py-2 bg-[var(--color-navy)] text-white font-sans text-sm uppercase tracking-widest rounded-lg hover:bg-[var(--color-gold)] transition-colors"
+          >
+            Szukaj
+          </button>
+        </form>
+        <Link
+          href="/admin/zamowienia/nowe"
+          className="shrink-0 px-5 py-2 border border-[var(--color-gold)] text-[var(--color-gold)] font-sans text-sm uppercase tracking-widest rounded-lg hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
         >
-          Szukaj
-        </button>
-      </form>
+          + Dodaj zamówienie
+        </Link>
+      </div>
 
       {/* Filtry statusu — linki z zachowaniem szukajki */}
       <div className="flex flex-wrap gap-2">
@@ -86,7 +101,7 @@ export default async function AdminOrdersPage({
           if (search) params.set("q", search);
           const qs = params.toString();
           const href = `/admin/zamowienia${qs ? `?${qs}` : ""}`;
-          const active = f.value === status;
+          const active = f.value === filter;
           return (
             <Link
               key={f.value}
@@ -126,7 +141,7 @@ export default async function AdminOrdersPage({
                   o,
                   o.user_id ? profiles[o.user_id] ?? null : null
                 );
-                const s = ADMIN_STATUS_LABELS[o.status];
+                const s = adminStatusLabel(o.status, o.source);
                 const products = orderItemsSummary(o.items ?? []);
                 return (
                   <OrderRow
@@ -147,6 +162,7 @@ export default async function AdminOrdersPage({
                     amountLabel={formatOrderAmount(Number(o.total), o.currency)}
                     deliveryPaid={o.delivery_paid}
                     cod={o.payment_method === "cod"}
+                    source={o.source}
                   />
                 );
               })}

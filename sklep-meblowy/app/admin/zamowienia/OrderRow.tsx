@@ -19,6 +19,7 @@ export default function OrderRow({
   amountLabel,
   deliveryPaid,
   cod,
+  source,
 }: {
   id: string;
   orderNumber: number;
@@ -32,6 +33,7 @@ export default function OrderRow({
   amountLabel: string;
   deliveryPaid: boolean;
   cod: boolean;
+  source: string | null;
 }) {
   const router = useRouter();
   const href = `/admin/zamowienia/${id}`;
@@ -74,6 +76,14 @@ export default function OrderRow({
             title="Płatność przy odbiorze — kurier pobiera gotówkę"
           >
             Pobranie
+          </span>
+        )}
+        {source && (
+          <span
+            className="ml-1.5 px-2.5 py-1 rounded-full text-xs font-sans uppercase tracking-widest text-sky-800 bg-sky-100 dark:bg-sky-950 dark:text-sky-300"
+            title={`Zamówienie spoza sklepu: ${source}`}
+          >
+            {source}
           </span>
         )}
       </td>
