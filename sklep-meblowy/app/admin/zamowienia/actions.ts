@@ -238,8 +238,9 @@ export async function createExternalOrder(
     })) as never[]
   );
   if (itemsErr) {
-    // Zamówienie bez pozycji to śmieć z zajętym numerem — sprzątamy, żeby admin
-    // mógł poprawić dane i zapisać od nowa bez dziury w numeracji na liście.
+    // Zamówienie bez pozycji to śmieć — sprzątamy, żeby na liście nie został
+    // pusty wiersz. Numer (z sekwencji) i tak przepada — to sprzątanie nie
+    // zapobiega dziurze w numeracji, tylko usuwa pusty wiersz.
     const { error: cleanupErr } = await supabase.from("orders").delete().eq("id", orderId);
     if (cleanupErr) {
       // Sprzątanie też padło, więc puste zamówienie ZOSTAJE w bazie. Admin musi
