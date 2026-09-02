@@ -21,8 +21,16 @@ const SHOP_NOTIFY_STATUSES: OrderStatus[] = ["shipped", "cancelled"];
 // stąd mail „Dziękujemy za zamówienie" właśnie tutaj.
 const EXTERNAL_NOTIFY_STATUSES: OrderStatus[] = ["processing", "shipped", "cancelled"];
 
-export function shouldNotifyCustomer(status: OrderStatus, source: string | null): boolean {
-  const list = source === null ? SHOP_NOTIFY_STATUSES : EXTERNAL_NOTIFY_STATUSES;
+// Prawdziwościowość, NIE `source === null`: `select("*")` na `orders` bez
+// kolumny `source` (okno między wdrożeniem kodu a ręczną aplikacją migracji
+// 81) zwraca `undefined`, nie `null` — porównanie z `null` uznałoby wtedy
+// KAŻDE zamówienie ze sklepu za zewnętrzne. `if (source)` traktuje zarówno
+// `null`, jak i `undefined` (i pusty string) jako „ze sklepu".
+export function shouldNotifyCustomer(
+  status: OrderStatus,
+  source: string | null | undefined
+): boolean {
+  const list = source ? EXTERNAL_NOTIFY_STATUSES : SHOP_NOTIFY_STATUSES;
   return list.includes(status);
 }
 
@@ -51,12 +59,17 @@ export function mayNotifyCustomer(status: OrderStatus): boolean {
 // dopuszcza) i anulowac je dopiero potem — wtedy wyjdzie wasPaid=true. Dokladne
 // rozstrzygniecie wymagaloby oparcia sie o kolumne platnosci, ktora otwarty
 // PR #48 (migracja na Przelewy24) usuwa — nie wiazemy sie z nia teraz.
+// Prawdziwościowość, NIE `source !== null` — z tego samego powodu co w
+// shouldNotifyCustomer: przed aplikacją migracji 81 `select("*")` daje
+// `source === undefined` dla KAŻDEGO zamówienia, a `undefined !== null` jest
+// prawdziwe, więc porównanie z `null` kazałoby traktować zwykłe zamówienie ze
+// sklepu jak zewnętrzne (mail o anulowaniu przestałby wspominać zwrot).
 export function wasOrderPaid(
   paymentMethod: PaymentMethod,
   previousStatus: OrderStatus,
-  source: string | null
+  source: string | null | undefined
 ): boolean {
-  if (source !== null) return false;
+  if (source) return false;
   if (paymentMethod === "cod") return false;
   return previousStatus !== "pending";
 }

@@ -58,11 +58,15 @@ export const ADMIN_STATUS_LABELS: Record<
 // (Allegro itp.) wpisane ręcznie startuje jako `paid`, ale pieniądze wziął
 // marketplace, nie P24 — „Opłacone" bez dopisku sugerowałoby wpłatę, której
 // w panelu Przelewy24 nie ma. Pozostałe statusy znaczą to samo dla obu.
+// Prawdziwościowość, NIE `source !== null`: przed ręczną aplikacją migracji
+// 81 `select("*")` na `orders` zwraca `source === undefined` (kolumny jeszcze
+// nie ma), a `undefined !== null` jest prawdziwe — porównanie z `null`
+// przykleiłoby plakietkę „(zewn.)" do KAŻDEGO opłaconego zamówienia ze sklepu.
 export function adminStatusLabel(
   status: OrderStatus,
-  source: string | null
+  source: string | null | undefined
 ): { label: string; className: string } {
   const base = ADMIN_STATUS_LABELS[status];
-  if (status === "paid" && source !== null) return { ...base, label: "Opłacone (zewn.)" };
+  if (status === "paid" && source) return { ...base, label: "Opłacone (zewn.)" };
   return base;
 }

@@ -47,6 +47,21 @@ describe("shouldNotifyCustomer — zamówienie zewnętrzne (source = „Allegro�
   });
 });
 
+describe("shouldNotifyCustomer — source undefined (kolumna jeszcze nie istnieje w bazie)", () => {
+  // select("*") na `orders` bez kolumny `source` (okno między wdrożeniem kodu
+  // a ręczną aplikacją migracji 81) zwraca `source === undefined`, NIE `null`.
+  // `undefined` musi się zachowywać jak „zamówienie ze sklepu" — inaczej admin
+  // przestawiający zwykłe zamówienie na „W realizacji" wysłałby klientowi mail
+  // „Dziękujemy za zamówienie" z „Źródło zamówienia: undefined".
+  it('processing → false, tak jak dla source=null (undefined ma znaczyć "ze sklepu")', () => {
+    expect(shouldNotifyCustomer("processing", undefined)).toBe(false);
+  });
+
+  it("shipped → true, tak jak dla source=null", () => {
+    expect(shouldNotifyCustomer("shipped", undefined)).toBe(true);
+  });
+});
+
 describe("mayNotifyCustomer — tani filtr przed odczytem zamówienia", () => {
   it("true dla każdego statusu, przy którym JAKIKOLWIEK rodzaj zamówienia mailuje", () => {
     expect(mayNotifyCustomer("processing")).toBe(true);
@@ -102,5 +117,9 @@ describe("wasOrderPaid", () => {
     expect(wasOrderPaid("online", "paid", "Allegro")).toBe(false);
     expect(wasOrderPaid("online", "shipped", "Allegro")).toBe(false);
     expect(wasOrderPaid("online", "processing", "OLX")).toBe(false);
+  });
+
+  it('("online", "paid", undefined) → true — undefined (brak kolumny przed migracją) ma znaczyć "ze sklepu", nie "zewnętrzne"', () => {
+    expect(wasOrderPaid("online", "paid", undefined)).toBe(true);
   });
 });

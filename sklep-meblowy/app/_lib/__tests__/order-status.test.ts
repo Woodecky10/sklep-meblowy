@@ -75,4 +75,12 @@ describe("adminStatusLabel", () => {
     expect(adminStatusLabel("processing", "Allegro")).toEqual(ADMIN_STATUS_LABELS.processing);
     expect(adminStatusLabel("shipped", "OLX")).toEqual(ADMIN_STATUS_LABELS.shipped);
   });
+
+  // select("*") na `orders` bez kolumny `source` (okno między wdrożeniem kodu
+  // a ręczną aplikacją migracji 81) zwraca `source === undefined`, NIE `null`.
+  // undefined ma znaczyć „ze sklepu" — inaczej każde opłacone zamówienie ze
+  // sklepu dostałoby w panelu plakietkę „Opłacone (zewn.)".
+  it("source undefined (kolumna jeszcze nie istnieje) → jak sklep, bez dopisku (zewn.)", () => {
+    expect(adminStatusLabel("paid", undefined)).toEqual(ADMIN_STATUS_LABELS.paid);
+  });
 });
