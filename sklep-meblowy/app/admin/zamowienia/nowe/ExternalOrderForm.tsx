@@ -106,7 +106,19 @@ export default function ExternalOrderForm({ products }: { products: ProductOptio
   }
 
   return (
-    <form action={submit} className="flex flex-col gap-6">
+    <form
+      action={submit}
+      className="flex flex-col gap-6"
+      onKeyDown={(e) => {
+        // Enter w dowolnym polu tekstowym wysyłałby formularz — a po dodaniu
+        // pierwszej pozycji przycisk „Zapisz” przestaje być disabled, więc
+        // Enter przy wpisywaniu DRUGIEGO produktu zapisałby PRAWDZIWE
+        // zamówienie w produkcyjnej bazie. Zapis wyłącznie kliknięciem.
+        if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "TEXTAREA") {
+          e.preventDefault();
+        }
+      }}
+    >
       {toast && <ToastView toast={toast} onClose={() => setToast(null)} />}
 
       {/* Źródło */}
