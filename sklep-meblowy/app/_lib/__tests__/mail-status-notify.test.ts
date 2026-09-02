@@ -1,29 +1,71 @@
 import { describe, it, expect } from "vitest";
-import { shouldNotifyCustomer, wasOrderPaid } from "../mail/status-notify";
+import { shouldNotifyCustomer, mayNotifyCustomer, wasOrderPaid } from "../mail/status-notify";
 
-describe("shouldNotifyCustomer", () => {
+describe("shouldNotifyCustomer — zamówienie ze sklepu (source = null)", () => {
   it("shipped wysyła — o tym klient musi wiedzieć", () => {
-    expect(shouldNotifyCustomer("shipped")).toBe(true);
+    expect(shouldNotifyCustomer("shipped", null)).toBe(true);
   });
 
   it("cancelled wysyła — dziś klient nie dowiedziałby się w żaden sposób", () => {
-    expect(shouldNotifyCustomer("cancelled")).toBe(true);
+    expect(shouldNotifyCustomer("cancelled", null)).toBe(true);
   });
 
   it("processing NIE wysyła — to klik gaszący licznik nowych zamowien (PR #100)", () => {
-    expect(shouldNotifyCustomer("processing")).toBe(false);
+    expect(shouldNotifyCustomer("processing", null)).toBe(false);
   });
 
   it("paid NIE wysyła — koliduje z mailem o zakupie z webhooka", () => {
-    expect(shouldNotifyCustomer("paid")).toBe(false);
+    expect(shouldNotifyCustomer("paid", null)).toBe(false);
   });
 
   it("delivered NIE wysyła — decyzja 2026-07-28", () => {
-    expect(shouldNotifyCustomer("delivered")).toBe(false);
+    expect(shouldNotifyCustomer("delivered", null)).toBe(false);
   });
 
   it("pending NIE wysyła", () => {
-    expect(shouldNotifyCustomer("pending")).toBe(false);
+    expect(shouldNotifyCustomer("pending", null)).toBe(false);
+  });
+});
+
+describe("shouldNotifyCustomer — zamówienie zewnętrzne (source = „Allegro”)", () => {
+  it("processing WYSYŁA — to jedyny moment, w którym klient z Allegro dowiaduje się od nas o przyjęciu", () => {
+    expect(shouldNotifyCustomer("processing", "Allegro")).toBe(true);
+  });
+
+  it("shipped i cancelled wysyłają jak w sklepie (decyzja właściciela 2026-09-02)", () => {
+    expect(shouldNotifyCustomer("shipped", "Allegro")).toBe(true);
+    expect(shouldNotifyCustomer("cancelled", "Allegro")).toBe(true);
+  });
+
+  it("paid NIE wysyła — z tym statusem zamówienie jest zapisywane, mail idzie dopiero przy „W realizacji”", () => {
+    expect(shouldNotifyCustomer("paid", "Allegro")).toBe(false);
+  });
+
+  it("delivered i pending NIE wysyłają", () => {
+    expect(shouldNotifyCustomer("delivered", "Allegro")).toBe(false);
+    expect(shouldNotifyCustomer("pending", "Allegro")).toBe(false);
+  });
+});
+
+describe("mayNotifyCustomer — tani filtr przed odczytem zamówienia", () => {
+  it("true dla każdego statusu, przy którym JAKIKOLWIEK rodzaj zamówienia mailuje", () => {
+    expect(mayNotifyCustomer("processing")).toBe(true);
+    expect(mayNotifyCustomer("shipped")).toBe(true);
+    expect(mayNotifyCustomer("cancelled")).toBe(true);
+  });
+
+  it("false tam, gdzie nikt nie mailuje — bez zbędnego zapytania do bazy", () => {
+    expect(mayNotifyCustomer("paid")).toBe(false);
+    expect(mayNotifyCustomer("delivered")).toBe(false);
+    expect(mayNotifyCustomer("pending")).toBe(false);
+  });
+
+  it("jest nadzbiorem shouldNotifyCustomer dla obu rodzajów zamówień", () => {
+    for (const s of ["pending", "paid", "processing", "shipped", "delivered", "cancelled"] as const) {
+      if (shouldNotifyCustomer(s, null) || shouldNotifyCustomer(s, "Allegro")) {
+        expect(mayNotifyCustomer(s)).toBe(true);
+      }
+    }
   });
 });
 
@@ -33,26 +75,32 @@ describe("wasOrderPaid", () => {
   // !== "pending"` byłoby dla każdego COD prawdziwe — mail obiecywałby zwrot
   // gotówki, której sklep nigdy nie wziął.
   it('("cod", "processing") → false — pobranie płaci się gotówką przy dostawie, nie wcześniej', () => {
-    expect(wasOrderPaid("cod", "processing")).toBe(false);
+    expect(wasOrderPaid("cod", "processing", null)).toBe(false);
   });
 
   it('("cod", "shipped") → false — pobranie można anulować też po wysyłce, wciąż bez zwrotu', () => {
-    expect(wasOrderPaid("cod", "shipped")).toBe(false);
+    expect(wasOrderPaid("cod", "shipped", null)).toBe(false);
   });
 
   it('("cod", "pending") → false', () => {
-    expect(wasOrderPaid("cod", "pending")).toBe(false);
+    expect(wasOrderPaid("cod", "pending", null)).toBe(false);
   });
 
   it('("online", "pending") → false — nigdy nie opłacone, bez tekstu o zwrocie', () => {
-    expect(wasOrderPaid("online", "pending")).toBe(false);
+    expect(wasOrderPaid("online", "pending", null)).toBe(false);
   });
 
   it('("online", "paid") → true', () => {
-    expect(wasOrderPaid("online", "paid")).toBe(true);
+    expect(wasOrderPaid("online", "paid", null)).toBe(true);
   });
 
   it('("online", "shipped") → true — opłacone wcześniej, admin przesunął dalej przed anulowaniem', () => {
-    expect(wasOrderPaid("online", "shipped")).toBe(true);
+    expect(wasOrderPaid("online", "shipped", null)).toBe(true);
+  });
+
+  it("zamówienie zewnętrzne → ZAWSZE false — zwrot idzie przez marketplace, sklep nie obiecuje pieniędzy", () => {
+    expect(wasOrderPaid("online", "paid", "Allegro")).toBe(false);
+    expect(wasOrderPaid("online", "shipped", "Allegro")).toBe(false);
+    expect(wasOrderPaid("online", "processing", "OLX")).toBe(false);
   });
 });

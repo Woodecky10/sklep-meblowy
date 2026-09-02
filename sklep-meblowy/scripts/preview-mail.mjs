@@ -218,7 +218,7 @@ const cases = [
       locale: "pl",
       // Po poprawce wasOrderPaid("cod", ...) daje false, wiec ten wariant NIE
       // moze zawierac akapitu o zwrocie srodkow.
-      wasPaid: wasOrderPaid("cod", "processing"),
+      wasPaid: wasOrderPaid("cod", "processing", null),
     }),
   },
   {

@@ -4,7 +4,7 @@ import type { OrderStatus } from "../types";
 import { getMailBranding } from "./branding-server";
 import { mailLocale } from "./locale";
 import { sendMail } from "./send";
-import { shouldNotifyCustomer, wasOrderPaid } from "./status-notify";
+import { mayNotifyCustomer, shouldNotifyCustomer, wasOrderPaid } from "./status-notify";
 import { OrderConfirmation } from "./templates/OrderConfirmation";
 import { AdminNewOrder } from "./templates/AdminNewOrder";
 import { OrderShipped } from "./templates/OrderShipped";
@@ -94,9 +94,12 @@ export async function notifyStatusChange(
   status: OrderStatus,
   previousStatus: OrderStatus
 ): Promise<void> {
-  if (!shouldNotifyCustomer(status)) return;
+  // Tani filtr bez bazy; właściwa decyzja wymaga `order.source`, więc zapada
+  // dopiero po odczycie zamówienia.
+  if (!mayNotifyCustomer(status)) return;
   try {
     const order = await getOrderById(orderId);
+    if (!shouldNotifyCustomer(status, order.source)) return;
     const branding = await getMailBranding();
     const locale = mailLocale(order.currency);
     const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://mollien.pl";
@@ -123,8 +126,10 @@ export async function notifyStatusChange(
       return;
     }
 
+    if (status === "processing") return; // szablon dochodzi w Task 5
+
     // cancelled — jedyny pozostały status z shouldNotifyCustomer
-    const wasPaid = wasOrderPaid(order.payment_method, previousStatus);
+    const wasPaid = wasOrderPaid(order.payment_method, previousStatus, order.source);
     const html = await render(
       OrderCancelled({ order, branding, locale, wasPaid })
     );
