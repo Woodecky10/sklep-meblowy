@@ -53,3 +53,16 @@ export const ADMIN_STATUS_LABELS: Record<
   delivered: { label: "Dostarczone", className: "text-emerald-700 bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300" },
   cancelled: { label: "Anulowane", className: "text-red-700 bg-red-100 dark:bg-red-950 dark:text-red-300" },
 };
+
+// Etykieta statusu z uwzględnieniem źródła zamówienia. Zamówienie zewnętrzne
+// (Allegro itp.) wpisane ręcznie startuje jako `paid`, ale pieniądze wziął
+// marketplace, nie P24 — „Opłacone" bez dopisku sugerowałoby wpłatę, której
+// w panelu Przelewy24 nie ma. Pozostałe statusy znaczą to samo dla obu.
+export function adminStatusLabel(
+  status: OrderStatus,
+  source: string | null
+): { label: string; className: string } {
+  const base = ADMIN_STATUS_LABELS[status];
+  if (status === "paid" && source !== null) return { ...base, label: "Opłacone (zewn.)" };
+  return base;
+}
