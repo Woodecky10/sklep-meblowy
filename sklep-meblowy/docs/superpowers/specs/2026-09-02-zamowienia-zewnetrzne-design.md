@@ -77,7 +77,7 @@ Zamówienie zewnętrzne zapisywane jako wiersz `orders`:
 | `source` | etykieta z listy („Allegro") albo nazwa wpisana przy „Inne" — dokładnie ten tekst idzie do maila |
 | `user_id` | `null` |
 | `guest_email` | e-mail klienta, małymi literami, po `trim` |
-| `shipping_address` | `{ fullname, phone, street, postal_code, city, country: "PL" }` (`phone` pomijany, gdy pusty) |
+| `shipping_address` | `{ fullname, phone, street, postal_code, city, country: "Polska" }` (`phone` pomijany, gdy pusty; „Polska" — tak zapisuje checkout sklepu i tak drukuje karta zamówienia) |
 | `status` | `'paid'`, `status_updated_at = null` → wpada do licznika „nowe zamówienia" i gaśnie przy „W realizacji" jak zakup ze sklepu |
 | `payment_method` | `'online'` (bez nowej wartości — rozróżnienie daje `source`, a CHECK i 9 plików zostają w spokoju) |
 | `payment_provider`, `payment_ref` | `null` |
