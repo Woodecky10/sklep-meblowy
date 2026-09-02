@@ -1366,7 +1366,20 @@ export async function createExternalOrder(
   if (itemsErr) {
     // Zamówienie bez pozycji to śmieć z zajętym numerem — sprzątamy, żeby admin
     // mógł poprawić dane i zapisać od nowa bez dziury w numeracji na liście.
-    await supabase.from("orders").delete().eq("id", orderId);
+    const { error: cleanupErr } = await supabase.from("orders").delete().eq("id", orderId);
+    if (cleanupErr) {
+      // Sprzątanie też padło, więc puste zamówienie ZOSTAJE w bazie. Admin musi
+      // o tym wiedzieć — inaczej zobaczy na liście pozycję znikąd i nie będzie
+      // miał jak powiązać jej z tym błędem.
+      console.error(
+        "[zamowienia] sprzatanie po nieudanym zapisie pozycji nieudane:",
+        cleanupErr.message
+      );
+      return {
+        ok: false,
+        error: `${itemsErr.message}. Uwaga: nie udało się usunąć pustego zamówienia — sprawdź listę zamówień.`,
+      };
+    }
     return { ok: false, error: itemsErr.message };
   }
 
