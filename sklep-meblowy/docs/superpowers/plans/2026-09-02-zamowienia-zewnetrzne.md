@@ -2095,26 +2095,52 @@ PR z `feat/zamowienia-zewnetrzne` do `main` przez `gh` (konto Woodecky10 — pat
 
 ## Po merge (poza kodem)
 
-1. `apply_migration` 81 przez MCP Supabase (auto-apply nie działa); `list_tables`/`execute_sql` → `select column_name from information_schema.columns where table_name='orders' and column_name='source'`.
+1. **`apply_migration` 81 przez MCP Supabase PRZED mergem, nie po nim.**
+   Migracja jest czysto addytywna (`add column if not exists` + indeks
+   częściowy), więc jest bezpieczna do zaaplikowania w dowolnym momencie — ale
+   kod na `main` (po mergu, przed ręczną aplikacją migracji) czyta `source`
+   przez `select("*")` na tabeli, która tej kolumny jeszcze nie ma. PostgREST
+   wtedy po prostu nie zwraca pola zamiast rzucić błędem, więc `order.source`
+   wychodzi jako `undefined` — funkcje `shouldNotifyCustomer`/`wasOrderPaid`/
+   `adminStatusLabel` mają dziś prawdziwościową obronę na ten przypadek
+   (traktują `undefined` jak `null`, czyli „ze sklepu"), ale aplikacja migracji
+   przed mergem całkowicie zamyka to okno zamiast polegać wyłącznie na obronie
+   w kodzie. `list_tables`/`execute_sql` → `select column_name from
+   information_schema.columns where table_name='orders' and
+   column_name='source'`.
 2. Właściciel: na produkcji dodaje zamówienie testowe (własny adres), przestawia na „W realizacji" → sprawdza mail „Dziękujemy za zamówienie – Mollien 🤍" (nadawca `MAIL_FROM`, temat z sercem), potem usuwa zamówienie przyciskiem „Usuń".
 3. Sprawdzić, że licznik „nowe zamówienia" wzrósł po dodaniu i zgasł po „W realizacji".
+4. **Do pokazania właścicielce:** `canTransition` dopuszcza skok „Opłacone" →
+   „Wysłane" (`paid → shipped`), a mail „Dziękujemy za zamówienie" jest
+   związany wyłącznie ze statusem „W realizacji" (`processing`). Jeśli
+   właścicielka wpisze zamówienie z Allegro i od razu przestawi je na
+   „Wysłane" (bo mebel akurat jest gotowy), z pominięciem „W realizacji",
+   klient NIGDY nie dostanie maila z potwierdzeniem przyjęcia zamówienia —
+   dostanie tylko mail „w drodze" z numerem przesyłki, o zamówieniu, którego
+   przyjęcia sklep nigdy nie potwierdził. To świadoma decyzja co do specyfikacji
+   (logiki NIE zmieniamy), ale właścicielka powinna o tym wiedzieć zanim
+   odkryje to przez zdziwionego klienta.
 
 ## STAN WYKONANIA
 
 _(uzupełniane w trakcie — jedyny nośnik stanu między komputerami, bo `.superpowers/sdd/` jest gitignorowany)_
 
-- [ ] Task 1 — migracja 81, `Order.source`
-- [ ] Task 2 — `order-source.ts`
-- [ ] Task 3 — `external-order.ts`
-- [ ] Task 4 — `status-notify.ts` ze źródłem
-- [ ] Task 5 — szablon `ExternalOrderAccepted` + `notifyStatusChange`
-- [ ] Task 6 — `adminStatusLabel`
-- [ ] Task 7 — `createExternalOrder`, filtr `external`
-- [ ] Task 8 — formularz `/admin/zamowienia/nowe`
-- [ ] Task 9 — lista, karta, etykiety
-- [ ] Task 10 — spec Playwrighta na buildzie
-- [ ] Task 11 — pełne testy, lint, PR
+- [x] Task 1 — migracja 81, `Order.source`
+- [x] Task 2 — `order-source.ts`
+- [x] Task 3 — `external-order.ts`
+- [x] Task 4 — `status-notify.ts` ze źródłem
+- [x] Task 5 — szablon `ExternalOrderAccepted` + `notifyStatusChange`
+- [x] Task 6 — `adminStatusLabel`
+- [x] Task 7 — `createExternalOrder`, filtr `external`
+- [x] Task 8 — formularz `/admin/zamowienia/nowe`
+- [x] Task 9 — lista, karta, etykiety
+- [x] Task 10 — spec Playwrighta na buildzie
+- [x] Task 11 — pełne testy, lint, PR
 
 **Nie sprawdzono na żywo:** zapis zamówienia do bazy i wysyłka maila (wymagają produkcyjnej bazy i Resenda — próba właściciela po merge, patrz „Po merge").
 
-**Rozstrzygnięcia w trakcie:** _(brak)_
+**Rozstrzygnięcia w trakcie:**
+
+- **Task 5:** literał szablonowy `` {`Źródło zamówienia: ${order.source}`} `` w `ExternalOrderAccepted.tsx` zostaje — React wstawia `<!-- -->` między sąsiadujący tekst statyczny a wyrażenie, więc bez tego napis byłby rozcięty w źródle HTML; komentarz w kodzie to odnotowuje.
+- **Task 7:** błąd samego `DELETE` w ścieżce sprzątania po nieudanym zapisie pozycji jest teraz wyłuskiwany, logowany i sygnalizowany adminowi — pierwotna wersja z planu połykała go, zostawiając puste zamówienie bez śladu.
+- **Recenzja końcowa:** porównania `source !== null` zamienione na prawdziwościowość, bo `select("*")` przed migracją zwraca `undefined` (patrz punkt 1 w „Po merge").
