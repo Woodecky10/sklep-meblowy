@@ -34,7 +34,7 @@ z nazwą źródła podstawioną w miejsce „[Allegro]".
 | pytanie | decyzja |
 |---|---|
 | kiedy wychodzi mail „Dziękujemy" | przy ręcznej zmianie statusu na **„W realizacji"** (`processing`) |
-| skąd lista źródeł | **stała lista w kodzie**: Allegro, OLX, Empik, Facebook · Instagram, Telefon · e-mail, Inne; przy „Inne" **nazwa jest obowiązkowa** i to ona idzie do maila |
+| skąd lista źródeł | **stała lista w kodzie**: Allegro, OLX, Empik, Facebook / Instagram, Telefon / e-mail, Inne; przy „Inne" **nazwa jest obowiązkowa** i to ona idzie do maila |
 | wariant produktu | **wolny tekst** w notatce pozycji (bez opcji strukturalnych — ceny z opcji i tak nie pasują do cen zewnętrznych) |
 | maile „Wysłane" i „Anulowane" | **tak, klient zewnętrzny dostaje oba**; mail o anulowaniu **nie obiecuje zwrotu** — zwrot idzie przez marketplace |
 | model danych | **ta sama tabela `orders` + kolumna `source`** (podejście A); osobna tabela odrzucona — dublowałaby listę, kartę, statusy, licznik i wysyłkę |
@@ -189,9 +189,10 @@ w którym klient dowiaduje się od nas, że zamówienie przyjęliśmy.
 
 Vitest (`environment: node`, bez bazy i bez Resenda):
 
-- `order-source.test.ts` — lista ma 6 pozycji z „Inne" na końcu; „Inne" bez
-  nazwy → błąd; „Inne" z nazwą → nazwa po `trim`; pozycja z listy ignoruje
-  wpisaną nazwę.
+- `order-source.test.ts` — `ORDER_SOURCES` ma 5 pozycji, „Inne" jest osobną
+  stałą (`OTHER_SOURCE`), nie elementem listy — nie jest nazwą źródła i nie
+  powinno trafić do maila jako etykieta; „Inne" bez nazwy → błąd; „Inne" z
+  nazwą → nazwa po `trim`; pozycja z listy ignoruje wpisaną nazwę.
 - `status-notify.test.ts` (rozszerzenie) — `shouldNotifyCustomer("processing",
   null) === false`, `("processing", "Allegro") === true`; `wasOrderPaid(…,
   "Allegro") === false` niezależnie od metody i poprzedniego statusu.
