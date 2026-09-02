@@ -8,6 +8,7 @@ import { canTransition } from "@/app/_lib/order-status";
 import type { OrderStatus } from "@/app/_lib/types";
 import { notifyStatusChange } from "@/app/_lib/mail/notify-order";
 import { requestReviews } from "@/app/_lib/mail/review-request";
+import { parseExternalOrderInput } from "@/app/_lib/external-order";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -156,4 +157,93 @@ export async function deleteOrder(orderId: string): Promise<ActionResult> {
 
   revalidatePath("/admin/zamowienia");
   return { ok: true, message: "Zamówienie usunięte" };
+}
+
+export type CreateExternalOrderResult =
+  | { ok: true; orderId: string }
+  | { ok: false; error: string };
+
+// Ręczne dodanie zamówienia spoza sklepu (Allegro, OLX, …) — spec 2026-09-02.
+// Walidacja i suma w czystym parseExternalOrderInput; tu tylko zapis.
+// Zamówienie startuje jako `paid` (zapłacone na marketplace) z
+// status_updated_at = null, więc wpada do licznika „nowe zamówienia" jak zakup
+// ze sklepu i gaśnie przy „W realizacji" — a ta zmiana wysyła klientowi mail
+// „Dziękujemy za zamówienie" (notifyStatusChange). Tu maila NIE wysyłamy.
+export async function createExternalOrder(
+  formData: FormData
+): Promise<CreateExternalOrderResult> {
+  await requireAdmin();
+  const parsed = parseExternalOrderInput({
+    source: formData.get("source"),
+    source_name: formData.get("source_name"),
+    email: formData.get("email"),
+    fullname: formData.get("fullname"),
+    phone: formData.get("phone"),
+    street: formData.get("street"),
+    postal_code: formData.get("postal_code"),
+    city: formData.get("city"),
+    items: formData.get("items"),
+  });
+  if (!parsed.ok) return parsed;
+  const input = parsed.value;
+
+  const supabase = await createAdminClient();
+
+  // Produkty muszą istnieć: FK i tak by odrzucił, ale komunikat ma być po
+  // polsku, a nie z Postgresa — i zanim zajmiemy numer zamówienia.
+  const ids = [...new Set(input.items.map((i) => i.product_id))];
+  const { data: found, error: prodErr } = await supabase
+    .from("products")
+    .select("id")
+    .in("id", ids);
+  if (prodErr) return { ok: false, error: prodErr.message };
+  if ((found ?? []).length !== ids.length) {
+    return { ok: false, error: "Któryś z produktów już nie istnieje — odśwież stronę" };
+  }
+
+  const { data: order, error: orderErr } = await supabase
+    .from("orders")
+    .insert({
+      user_id: null,
+      guest_email: input.email,
+      source: input.source,
+      status: "paid",
+      total: input.total,
+      shipping_address: input.address as unknown as Record<string, unknown>,
+      // 'online' bez nowej wartości CHECK — rozróżnienie daje `source`.
+      payment_method: "online",
+      payment_provider: null,
+      payment_ref: null,
+      currency: "pln",
+      fx_rate: null,
+      promo_code_id: null,
+      promo_discount: 0,
+      bundle_discount: 0,
+    } as never)
+    .select("id")
+    .single();
+  if (orderErr || !order) {
+    return { ok: false, error: orderErr?.message ?? "Nie udało się zapisać zamówienia" };
+  }
+  const orderId = (order as { id: string }).id;
+
+  const { error: itemsErr } = await supabase.from("order_items").insert(
+    input.items.map((it) => ({
+      order_id: orderId,
+      product_id: it.product_id,
+      quantity: it.quantity,
+      price: it.price,
+      notes: it.notes,
+      variant_values: null,
+    })) as never[]
+  );
+  if (itemsErr) {
+    // Zamówienie bez pozycji to śmieć z zajętym numerem — sprzątamy, żeby admin
+    // mógł poprawić dane i zapisać od nowa bez dziury w numeracji na liście.
+    await supabase.from("orders").delete().eq("id", orderId);
+    return { ok: false, error: itemsErr.message };
+  }
+
+  revalidatePath("/admin/zamowienia");
+  return { ok: true, orderId };
 }

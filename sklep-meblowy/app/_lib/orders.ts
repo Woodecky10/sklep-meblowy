@@ -140,10 +140,14 @@ export async function getAdminOrders({
   status,
   search,
   page = 1,
+  external = false,
 }: {
   status?: OrderStatus | "all";
   search?: string;
   page?: number;
+  // Tylko zamówienia spoza sklepu (orders.source is not null) — filtr
+  // „Zewnętrzne" na liście w panelu.
+  external?: boolean;
 }): Promise<{ orders: AdminOrderRow[]; total: number; pages: number; page: number }> {
   const supabase = await createAdminClient();
   const safePage = Number.isFinite(page) && page > 0 ? Math.trunc(page) : 1;
@@ -157,6 +161,10 @@ export async function getAdminOrders({
 
   if (status && status !== "all") {
     query = query.eq("status", status);
+  }
+
+  if (external) {
+    query = query.not("source", "is", null);
   }
 
   const term = search?.trim();
