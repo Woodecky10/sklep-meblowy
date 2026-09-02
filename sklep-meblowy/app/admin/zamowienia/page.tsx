@@ -61,8 +61,9 @@ export default async function AdminOrdersPage({
         </p>
       </div>
 
+      <div className="flex flex-wrap items-center gap-3">
       {/* Szukajka — natywny formularz GET (działa bez JS) */}
-      <form action="/admin/zamowienia" data-guard-ignore className="flex gap-2 max-w-lg">
+      <form action="/admin/zamowienia" data-guard-ignore className="flex gap-2 flex-1 min-w-[280px] max-w-lg">
         {status !== "all" && <input type="hidden" name="status" value={status} />}
         <input
           name="q"
@@ -77,6 +78,13 @@ export default async function AdminOrdersPage({
           Szukaj
         </button>
       </form>
+      <Link
+        href="/admin/zamowienia/nowe"
+        className="shrink-0 px-5 py-2 border border-[var(--color-gold)] text-[var(--color-gold)] font-sans text-sm uppercase tracking-widest rounded-lg hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
+      >
+        + Dodaj zamówienie
+      </Link>
+      </div>
 
       {/* Filtry statusu — linki z zachowaniem szukajki */}
       <div className="flex flex-wrap gap-2">
