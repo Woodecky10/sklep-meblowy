@@ -28,7 +28,7 @@ vi.mock("../mail/branding-server", async () => {
   };
 });
 
-import { notifyOrderPlaced } from "../mail/notify-order";
+import { notifyOrderPlaced, notifyStatusChange } from "../mail/notify-order";
 
 // Zamówienie minimalne, ale kompletne pod kątem pól, których faktycznie
 // dotykają OrderConfirmation i AdminNewOrder (patrz sekcja "pola wymagane
@@ -61,6 +61,7 @@ const MINIMAL_ORDER = {
   delivery_cost: null,
   delivery_paid: false,
   status_updated_at: null,
+  source: null,
   items: [
     {
       id: "item-1",
@@ -111,5 +112,51 @@ describe("notifyOrderPlaced", () => {
 
     expect(adminCall.to).toBe("wlascicielka@mollien.pl");
     expect(adminCall.subject).toContain("Nowe zamówienie");
+  });
+});
+
+describe("notifyStatusChange — zamówienie zewnętrzne", () => {
+  const EXTERNAL_ORDER = { ...MINIMAL_ORDER, source: "Allegro", status: "processing" };
+
+  beforeEach(() => {
+    getOrderByIdMock.mockReset();
+    sendMailMock.mockReset();
+    sendMailMock.mockResolvedValue(true);
+  });
+
+  it("processing + źródło → mail „Dziękujemy” ze źródłem w treści", async () => {
+    getOrderByIdMock.mockResolvedValue(EXTERNAL_ORDER);
+
+    await notifyStatusChange(EXTERNAL_ORDER.id, "processing", "paid");
+
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+    const payload = sendMailMock.mock.calls[0][0];
+    expect(payload.to).toBe(EXTERNAL_ORDER.guest_email);
+    expect(payload.subject).toBe("Dziękujemy za zamówienie – Mollien 🤍");
+    expect(payload.html).toContain("Źródło zamówienia: Allegro");
+  });
+
+  it("processing BEZ źródła (sklep) → nic nie wysyła i nie odpytuje bazy o nic więcej", async () => {
+    getOrderByIdMock.mockResolvedValue({ ...MINIMAL_ORDER, source: null });
+
+    await notifyStatusChange(MINIMAL_ORDER.id, "processing", "paid");
+
+    expect(sendMailMock).not.toHaveBeenCalled();
+  });
+
+  it("delivered → nie czyta nawet zamówienia (tani filtr)", async () => {
+    await notifyStatusChange("any", "delivered", "shipped");
+
+    expect(getOrderByIdMock).not.toHaveBeenCalled();
+    expect(sendMailMock).not.toHaveBeenCalled();
+  });
+
+  it("cancelled + źródło → mail o anulowaniu BEZ obietnicy zwrotu", async () => {
+    getOrderByIdMock.mockResolvedValue({ ...EXTERNAL_ORDER, status: "cancelled" });
+
+    await notifyStatusChange(EXTERNAL_ORDER.id, "cancelled", "paid");
+
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+    expect(sendMailMock.mock.calls[0][0].html).not.toContain("zwrotu środków");
   });
 });

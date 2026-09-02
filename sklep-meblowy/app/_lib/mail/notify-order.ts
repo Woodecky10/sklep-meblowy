@@ -9,6 +9,10 @@ import { OrderConfirmation } from "./templates/OrderConfirmation";
 import { AdminNewOrder } from "./templates/AdminNewOrder";
 import { OrderShipped } from "./templates/OrderShipped";
 import { OrderCancelled } from "./templates/OrderCancelled";
+import {
+  ExternalOrderAccepted,
+  EXTERNAL_ORDER_ACCEPTED_SUBJECT,
+} from "./templates/ExternalOrderAccepted";
 
 // Adres klienta: gość ma guest_email, zalogowany — email z profiles.
 async function customerEmailOf(order: {
@@ -126,7 +130,16 @@ export async function notifyStatusChange(
       return;
     }
 
-    if (status === "processing") return; // szablon dochodzi w Task 5
+    // processing przechodzi przez shouldNotifyCustomer TYLKO dla zamówień
+    // zewnętrznych — klient z marketplace dostaje tu jedyne od nas
+    // potwierdzenie przyjęcia (spec 2026-09-02).
+    if (status === "processing") {
+      const html = await render(
+        ExternalOrderAccepted({ order, branding, shopUrl: base })
+      );
+      await sendMail({ to, subject: EXTERNAL_ORDER_ACCEPTED_SUBJECT, html });
+      return;
+    }
 
     // cancelled — jedyny pozostały status z shouldNotifyCustomer
     const wasPaid = wasOrderPaid(order.payment_method, previousStatus, order.source);

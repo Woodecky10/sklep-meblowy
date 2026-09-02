@@ -16,6 +16,7 @@ import { AdminNewSampleOrder } from "../app/_lib/mail/templates/AdminNewSampleOr
 import { SampleOrderConfirmation } from "../app/_lib/mail/templates/SampleOrderConfirmation.tsx";
 import { SampleOrderSent } from "../app/_lib/mail/templates/SampleOrderSent.tsx";
 import { AdminNewReview } from "../app/_lib/mail/templates/AdminNewReview.tsx";
+import { ExternalOrderAccepted } from "../app/_lib/mail/templates/ExternalOrderAccepted.tsx";
 import { wasOrderPaid } from "../app/_lib/mail/status-notify.ts";
 
 const OUT = "mail-preview";
@@ -219,6 +220,14 @@ const cases = [
       // Po poprawce wasOrderPaid("cod", ...) daje false, wiec ten wariant NIE
       // moze zawierac akapitu o zwrocie srodkow.
       wasPaid: wasOrderPaid("cod", "processing", null),
+    }),
+  },
+  {
+    name: "external-order-accepted-pl",
+    el: ExternalOrderAccepted({
+      order: { ...order, source: "Allegro" },
+      branding,
+      shopUrl: "https://www.mollien.pl",
     }),
   },
   {
