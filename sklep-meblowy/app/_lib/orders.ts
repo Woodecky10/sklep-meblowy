@@ -5,6 +5,8 @@ type CreateOrderInput = {
   userId: string | null;
   guestEmail: string | null;
   items: {
+    // Checkout sklepu ZAWSZE ma produkt z katalogu — pozycje spoza katalogu
+    // (migracja 82) powstają wyłącznie w panelu, przez createExternalOrder.
     product_id: string;
     quantity: number;
     price: number;
@@ -130,7 +132,11 @@ export async function getOrderById(orderId: string) {
 const ADMIN_ORDERS_PAGE_SIZE = 30;
 
 export type AdminOrderRow = Order & {
-  items: { quantity: number; product: { name: string } | null }[];
+  // `custom_name` obok produktu z joina: pozycja spoza katalogu (migracja 82)
+  // nie ma czego dociągnąć z `products`, a lista zamówień ma pokazać jej nazwę,
+  // nie „produkt usunięty". Opcjonalne — przed aplikacją migracji 82 PostgREST
+  // po prostu nie zwraca tego pola.
+  items: { quantity: number; custom_name?: string | null; product: { name: string } | null }[];
 };
 
 // Lista zamówień dla panelu admina — filtr statusu, szukajka (numer / e-mail
@@ -154,9 +160,15 @@ export async function getAdminOrders({
   const from = (safePage - 1) * ADMIN_ORDERS_PAGE_SIZE;
   const to = from + ADMIN_ORDERS_PAGE_SIZE - 1;
 
+  // `order_items(*)` zamiast wyliczanki kolumn — potrzebujemy jeszcze
+  // `custom_name` (migracja 82), a PostgREST na WYMIENIONĄ z nazwy kolumnę,
+  // której w bazie nie ma, odpowiada błędem: wpisanie jej wprost zamieniłoby
+  // brak migracji w awarię CAŁEJ listy zamówień, nie tylko nowej funkcji.
+  // `*` takiej kolumny po prostu nie zwraca. Kilka pól więcej na 30 wierszy
+  // strony to żaden koszt, a `getOrderById`/`getUserOrders` czytają tak samo.
   let query = supabase
     .from("orders")
-    .select("*, items:order_items(quantity, product:products(name))", { count: "exact" })
+    .select("*, items:order_items(*, product:products(name))", { count: "exact" })
     .order("created_at", { ascending: false });
 
   if (status && status !== "all") {

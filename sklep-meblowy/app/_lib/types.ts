@@ -324,7 +324,15 @@ export type Order = {
 export type OrderItem = {
   id: string;
   order_id: string;
-  product_id: string;
+  // null = pozycja SPOZA KATALOGU (migracja 82) — mebel dogadany indywidualnie
+  // przy zamówieniu z Allegro/OLX, którego nie ma w sklepie. Nazwę niesie wtedy
+  // `custom_name`; do wyświetlania używaj orderItemDisplayName (order-items.ts),
+  // nie sięgaj po `product?.name` bezpośrednio.
+  product_id: string | null;
+  // Snapshot nazwy pozycji spoza katalogu. Kolumna jest `not null default ''`,
+  // więc pozycja Z katalogu ma tu pusty string — dlatego typ nie jest
+  // opcjonalny (ten sam wzorzec co ProductReview.photos).
+  custom_name: string;
   quantity: number;
   price: number;
   variant_values: Record<string, string> | null;
@@ -396,7 +404,12 @@ type OrderInsert = {
 
 type OrderItemInsert = {
   order_id: string;
-  product_id: string;
+  // null tylko dla pozycji spoza katalogu (migracja 82) — wtedy `custom_name`
+  // jest obowiązkowe (CHECK order_items_pozycja_z_katalogu_albo_nazwa).
+  product_id: string | null;
+  // Opcjonalne w INSERCIE: kolumna ma DEFAULT '', a pomijanie jej dla pozycji
+  // z katalogu sprawia, że zwykły checkout działa też na bazie bez migracji 82.
+  custom_name?: string;
   quantity: number;
   price: number;
   variant_values?: Record<string, string> | null;

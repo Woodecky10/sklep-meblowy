@@ -50,3 +50,48 @@ test("wyszukiwarka dodaje wiersz z ceną, suma się przelicza, „Zapisz” NIE 
 
   await page.screenshot({ path: "e2e/screens/zamowienie-zewnetrzne-form.png", fullPage: true });
 });
+
+// Zgłoszenie pracownicy 2026-09-09 — dwa braki naprawione w tej samej sesji.
+// Ten test też NIE ZAPISUJE: sprawdza wyłącznie, że formularz daje się ustawić
+// na pobranie i przyjmuje pozycję spoza katalogu.
+test("pobranie i pozycja spoza katalogu — formularz przyjmuje oba, „Zapisz” NIE jest klikane", async ({
+  page,
+}) => {
+  await page.goto("/admin/zamowienia/nowe");
+  await expect(page).not.toHaveURL(/\/logowanie/);
+  await expect(page.getByRole("heading", { name: "Dodaj zamówienie" })).toBeVisible();
+
+  // Domyślnie „Opłacone w źródle" — tak działał formularz przed tą zmianą
+  // i taka jest większość zamówień z marketplace'ów.
+  const oplacone = page.getByRole("radio", { name: /Opłacone w źródle/ });
+  const pobranie = page.getByRole("radio", { name: /Płatność przy odbiorze/ });
+  await expect(oplacone).toBeChecked();
+  await expect(pobranie).not.toBeChecked();
+
+  await pobranie.check();
+  await expect(pobranie).toBeChecked();
+  await expect(oplacone).not.toBeChecked();
+
+  // Pozycja spoza katalogu: wiersz z pustą nazwą do wpisania, bez wyszukiwarki.
+  const save = page.getByRole("button", { name: "Zapisz zamówienie" });
+  await expect(save).toBeDisabled();
+  await page.getByRole("button", { name: "+ Pozycja spoza katalogu" }).click();
+
+  const rows = page.getByLabel("Pozycje zamówienia").getByRole("listitem");
+  await expect(rows).toHaveCount(1);
+  const nazwa = rows.first().getByLabel("Nazwa pozycji");
+  await expect(nazwa).toHaveValue("");
+  await nazwa.fill("Pufa Vena, tkanina Rico 12");
+
+  // Cena bez podpowiedzi — nie ma jej skąd wziąć; ta sama walidacja co zawsze.
+  await rows.first().getByLabel("Cena (zł)").fill("250,00");
+  await rows.first().getByLabel("Ilość").fill("2");
+  await expect(page.getByTestId("external-order-total")).toContainText("500");
+
+  await expect(save).toBeEnabled();
+
+  await page.screenshot({
+    path: "e2e/screens/zamowienie-zewnetrzne-pobranie-custom.png",
+    fullPage: true,
+  });
+});

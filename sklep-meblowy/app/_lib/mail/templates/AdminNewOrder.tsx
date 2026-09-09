@@ -1,6 +1,7 @@
 import { Hr, Text } from "@react-email/components";
 import { formatOrderAmount } from "../../money";
 import { formatVariantLabel } from "../../variants";
+import { orderItemDisplayName } from "../../order-items";
 import type { Order, OrderItem } from "../../types";
 import type { MailBranding } from "../branding";
 import { MailButton, MailLayout } from "./_Layout";
@@ -46,7 +47,7 @@ export function AdminNewOrder({
 
       {items.map((item) => (
         <Text key={item.id} style={rowStyle}>
-          {item.quantity} × {item.product?.name ?? "Produkt"}
+          {item.quantity} × {orderItemDisplayName(item, "Produkt")}
           {item.variant_values ? ` — ${formatVariantLabel(item.variant_values, "pl")}` : ""}
           {item.notes ? ` — uwagi: ${item.notes}` : ""}
         </Text>

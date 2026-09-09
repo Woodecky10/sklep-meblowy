@@ -6,7 +6,7 @@ import { requireAdmin } from "@/app/_lib/admin";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { canTransition } from "@/app/_lib/order-status";
 import type { OrderStatus } from "@/app/_lib/types";
-import { notifyStatusChange } from "@/app/_lib/mail/notify-order";
+import { notifyExternalOrderAccepted, notifyStatusChange } from "@/app/_lib/mail/notify-order";
 import { requestReviews } from "@/app/_lib/mail/review-request";
 import { parseExternalOrderInput } from "@/app/_lib/external-order";
 
@@ -163,12 +163,25 @@ export type CreateExternalOrderResult =
   | { ok: true; orderId: string }
   | { ok: false; error: string };
 
-// Ręczne dodanie zamówienia spoza sklepu (Allegro, OLX, …) — spec 2026-09-02.
+// Ręczne dodanie zamówienia spoza sklepu (Allegro, OLX, …) — spec 2026-09-02
+// + aktualizacja 2026-09-09 (zgłoszenie pracownicy obsługującej panel).
 // Walidacja i suma w czystym parseExternalOrderInput; tu tylko zapis.
-// Zamówienie startuje jako `paid` (zapłacone na marketplace) z
-// status_updated_at = null, więc wpada do licznika „nowe zamówienia" jak zakup
-// ze sklepu i gaśnie przy „W realizacji" — a ta zmiana wysyła klientowi mail
-// „Dziękujemy za zamówienie" (notifyStatusChange). Tu maila NIE wysyłamy.
+//
+// STATUS zależy od sposobu płatności i jest DOKŁADNIE tą samą regułą, co
+// w sklepowym checkoucie (app/_lib/orders.ts, createOrder):
+// - „Opłacone w źródle" (online) → `paid`, bo pieniądze wziął marketplace;
+// - „Płatność przy odbiorze" (cod) → `processing`, bo pobranie NIE MA etapu
+//   płatności i nigdy nie udaje opłaconego.
+// W obu wypadkach `status_updated_at = null`, więc zamówienie wpada do licznika
+// „nowe zamówienia" (getNewOrdersCount liczy `paid` ORAZ `processing`
+// z pustym `status_updated_at`) i gaśnie przy pierwszej zmianie statusu —
+// identycznie jak zakup ze sklepu, odpowiednio online i za pobraniem.
+//
+// MAIL „Dziękujemy za zamówienie":
+// - online → przy ręcznym przestawieniu na „W realizacji" (notifyStatusChange);
+// - cod → OD RAZU tutaj, bo przejścia paid→processing dla takiego zamówienia
+//   nigdy nie będzie, a klient z Allegro nie dostał od nas żadnego innego
+//   potwierdzenia (decyzja właściciela 2026-09-09).
 export async function createExternalOrder(
   formData: FormData
 ): Promise<CreateExternalOrderResult> {
@@ -183,22 +196,30 @@ export async function createExternalOrder(
     postal_code: formData.get("postal_code"),
     city: formData.get("city"),
     items: formData.get("items"),
+    payment: formData.get("payment"),
   });
   if (!parsed.ok) return parsed;
   const input = parsed.value;
+  const cod = input.payment_method === "cod";
 
   const supabase = await createAdminClient();
 
   // Produkty muszą istnieć: FK i tak by odrzucił, ale komunikat ma być po
-  // polsku, a nie z Postgresa — i zanim zajmiemy numer zamówienia.
-  const ids = [...new Set(input.items.map((i) => i.product_id))];
-  const { data: found, error: prodErr } = await supabase
-    .from("products")
-    .select("id")
-    .in("id", ids);
-  if (prodErr) return { ok: false, error: prodErr.message };
-  if ((found ?? []).length !== ids.length) {
-    return { ok: false, error: "Któryś z produktów już nie istnieje — odśwież stronę" };
+  // polsku, a nie z Postgresa — i zanim zajmiemy numer zamówienia. Pozycje
+  // SPOZA KATALOGU (product_id null) świadomie pomijamy: nie ma czego szukać
+  // w `products`, a `in("id", [])` zwróciłoby pustą listę i wywróciło warunek.
+  const ids = [
+    ...new Set(input.items.map((i) => i.product_id).filter((id): id is string => !!id)),
+  ];
+  if (ids.length > 0) {
+    const { data: found, error: prodErr } = await supabase
+      .from("products")
+      .select("id")
+      .in("id", ids);
+    if (prodErr) return { ok: false, error: prodErr.message };
+    if ((found ?? []).length !== ids.length) {
+      return { ok: false, error: "Któryś z produktów już nie istnieje — odśwież stronę" };
+    }
   }
 
   const { data: order, error: orderErr } = await supabase
@@ -207,11 +228,13 @@ export async function createExternalOrder(
       user_id: null,
       guest_email: input.email,
       source: input.source,
-      status: "paid",
+      status: cod ? "processing" : "paid",
       total: input.total,
       shipping_address: input.address as unknown as Record<string, unknown>,
       // 'online' bez nowej wartości CHECK — rozróżnienie daje `source`.
-      payment_method: "online",
+      // 'cod' to ta sama wartość co w sklepie, więc plakietka „Pobranie"
+      // na liście i karcie zamówienia zapala się sama.
+      payment_method: input.payment_method,
       payment_provider: null,
       payment_ref: null,
       currency: "pln",
@@ -235,6 +258,11 @@ export async function createExternalOrder(
       price: it.price,
       notes: it.notes,
       variant_values: null,
+      // Pole dokładamy TYLKO pozycji spoza katalogu. Kolumna ma DEFAULT '',
+      // więc dla pozycji z katalogu nic to nie zmienia — a na bazie bez
+      // migracji 82 PostgREST odrzuciłby nieznaną kolumnę (PGRST204) i
+      // zablokował także zwykłe zamówienia zewnętrzne.
+      ...(it.custom_name ? { custom_name: it.custom_name } : {}),
     })) as never[]
   );
   if (itemsErr) {
@@ -256,6 +284,18 @@ export async function createExternalOrder(
       };
     }
     return { ok: false, error: itemsErr.message };
+  }
+
+  // Zamówienie ZA POBRANIEM rodzi się w `processing`, więc przejścia
+  // paid→processing (jedyny nadawca maila „Dziękujemy") nigdy nie będzie —
+  // wysyłamy go tutaj, po udanym zapisie kompletnego zamówienia.
+  //
+  // after(): wysyłka jest POST-response i nie może opóźnić ani zepsuć zapisu —
+  // ten sam wzorzec i to samo uzasadnienie co w updateOrderStatus wyżej.
+  // notifyExternalOrderAccepted nie rzuca, więc nieudany mail nie zamieni
+  // zapisanego zamówienia w błąd w panelu.
+  if (cod) {
+    after(() => notifyExternalOrderAccepted(orderId));
   }
 
   revalidatePath("/admin/zamowienia");

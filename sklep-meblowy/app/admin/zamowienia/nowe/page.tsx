@@ -42,8 +42,10 @@ export default async function AdminNewExternalOrderPage() {
         <h1 className="font-display text-3xl font-bold text-[var(--fg)]">Dodaj zamówienie</h1>
         <p className="text-sm text-[var(--muted)] mt-2 max-w-2xl">
           Zamówienie spoza sklepu (Allegro, OLX itp.). Cena to kwota z tamtego sklepu — może
-          się różnić od naszej. Po zapisaniu zamówienie ma status „Opłacone (zewn.)”; gdy
-          przestawisz je na „W realizacji”, klient dostanie mail „Dziękujemy za zamówienie”.
+          się różnić od naszej. Jeśli klient już zapłacił, zamówienie dostanie status
+          „Opłacone (zewn.)”, a mail „Dziękujemy za zamówienie” pójdzie, gdy przestawisz je na
+          „W realizacji”. Przy płatności za pobraniem zamówienie od razu jest „W realizacji”,
+          a ten mail wychodzi zaraz po zapisaniu.
         </p>
       </div>
       {productsError && (

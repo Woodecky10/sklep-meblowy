@@ -8,7 +8,7 @@ import { filterBySearch } from "@/app/_lib/search-normalize";
 import { effectivePrice } from "@/app/_lib/pricing";
 import { formatPrice } from "@/app/_lib/format";
 import { ORDER_SOURCES, OTHER_SOURCE, SOURCE_MAX_LENGTH } from "@/app/_lib/order-source";
-import { NOTES_MAX_LENGTH, parsePrice } from "@/app/_lib/external-order";
+import { CUSTOM_NAME_MAX_LENGTH, NOTES_MAX_LENGTH, parsePrice } from "@/app/_lib/external-order";
 import { createExternalOrder } from "../actions";
 
 // Minimalny kształt produktu do pickera (page.tsx nie ciągnie pełnych wierszy).
@@ -24,9 +24,12 @@ export type ProductOption = {
 // „1 299,50", a parsowanie robi parseExternalOrderInput po stronie serwera;
 // tu tylko podgląd sumy. `key` bo ten sam produkt może być dwa razy (dwa
 // warianty), więc product_id nie nadaje się na klucz Reacta.
+//
+// `product_id: null` = pozycja SPOZA KATALOGU (2026-09-09): nazwa jest wtedy
+// polem do wpisania, a nie etykietą wybranego produktu.
 type Row = {
   key: number;
-  product_id: string;
+  product_id: string | null;
   name: string;
   price: string;
   quantity: string;
@@ -36,6 +39,9 @@ type Row = {
 export default function ExternalOrderForm({ products }: { products: ProductOption[] }) {
   const router = useRouter();
   const [source, setSource] = useState<string>(ORDER_SOURCES[0]);
+  // Domyślnie „Opłacone w źródle" — tak działał formularz przed 2026-09-09
+  // i tak wygląda większość zamówień z marketplace'ów.
+  const [payment, setPayment] = useState<"online" | "cod">("online");
   const [rows, setRows] = useState<Row[]>([]);
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState<Toast>(null);
@@ -73,6 +79,16 @@ export default function ExternalOrderForm({ products }: { products: ProductOptio
     setQuery("");
   }
 
+  // Pozycja spoza katalogu: pusty wiersz, w którym nazwę wpisuje się ręcznie.
+  // Cena bez podpowiedzi — nie ma z czego jej wziąć.
+  function addCustomRow() {
+    setRows((prev) => [
+      ...prev,
+      { key: nextKey.current++, product_id: null, name: "", price: "", quantity: "1", notes: "" },
+    ]);
+    setQuery("");
+  }
+
   function updateRow(key: number, patch: Partial<Row>) {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   }
@@ -88,7 +104,9 @@ export default function ExternalOrderForm({ products }: { products: ProductOptio
       "items",
       JSON.stringify(
         rows.map((r) => ({
+          // Dokładnie jedno z dwóch — parseExternalOrderInput odrzuca oba naraz.
           product_id: r.product_id,
+          custom_name: r.product_id === null ? r.name : null,
           price: r.price,
           quantity: r.quantity,
           notes: r.notes,
@@ -158,6 +176,57 @@ export default function ExternalOrderForm({ products }: { products: ProductOptio
         </div>
       </Card>
 
+      {/* Płatność */}
+      <Card>
+        <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-1">Płatność</h3>
+        <p className="text-sm text-[var(--muted)] mb-4">
+          Czy klient już zapłacił za to zamówienie?
+        </p>
+        <fieldset className="flex flex-col gap-3">
+          <legend className="sr-only">Sposób płatności</legend>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="radio"
+              name="payment"
+              value="online"
+              checked={payment === "online"}
+              onChange={() => setPayment("online")}
+              className="mt-1 shrink-0 accent-[var(--color-gold)]"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-[var(--fg)]">
+                Opłacone w źródle
+              </span>
+              <span className="block text-xs text-[var(--muted)] leading-snug">
+                Klient zapłacił już na Allegro / OLX itp. Zamówienie dostanie status „Opłacone
+                (zewn.)”, a mail „Dziękujemy za zamówienie” pójdzie, gdy przestawisz je na
+                „W realizacji”.
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="radio"
+              name="payment"
+              value="cod"
+              checked={payment === "cod"}
+              onChange={() => setPayment("cod")}
+              className="mt-1 shrink-0 accent-[var(--color-gold)]"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-[var(--fg)]">
+                Płatność przy odbiorze
+              </span>
+              <span className="block text-xs text-[var(--muted)] leading-snug">
+                Klient zapłaci gotówką kurierowi. Zamówienie dostanie status „W realizacji”
+                z plakietką „Pobranie”, a mail „Dziękujemy za zamówienie” wyjdzie od razu po
+                zapisaniu.
+              </span>
+            </span>
+          </label>
+        </fieldset>
+      </Card>
+
       {/* Klient */}
       <Card>
         <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-4">Klient</h3>
@@ -187,15 +256,35 @@ export default function ExternalOrderForm({ products }: { products: ProductOptio
       <Card>
         <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-4">Pozycje</h3>
 
-        <Field label="Dodaj produkt" hint="Wpisz fragment nazwy, potem kliknij produkt na liście.">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Szukaj produktu…"
-            className={inputCls}
-            autoComplete="off"
-          />
-        </Field>
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+          <Field
+            label="Dodaj produkt"
+            hint="Wpisz fragment nazwy, potem kliknij produkt na liście."
+            className="flex-1 min-w-0"
+          >
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Szukaj produktu…"
+              className={inputCls}
+              autoComplete="off"
+            />
+          </Field>
+          {/* Mebel dogadany indywidualnie albo wycofany model — nie ma go
+              w katalogu i NIE zakładamy dla niego produktu w sklepie
+              (decyzja właściciela 2026-09-09). */}
+          <button
+            type="button"
+            onClick={addCustomRow}
+            className="shrink-0 px-4 py-2 border border-[var(--border)] text-[var(--fg)] font-sans text-sm rounded-lg hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
+          >
+            + Pozycja spoza katalogu
+          </button>
+        </div>
+        <p className="mt-1.5 text-xs text-[var(--muted)]">
+          Nie ma tego mebla w sklepie? Kliknij „+ Pozycja spoza katalogu” i wpisz nazwę ręcznie —
+          produkt nie zostanie dodany do sklepu.
+        </p>
         {query.trim() && (
           <ul
             aria-label="Wyniki wyszukiwania"
@@ -227,15 +316,35 @@ export default function ExternalOrderForm({ products }: { products: ProductOptio
         )}
 
         {rows.length === 0 ? (
-          <p className="mt-4 text-sm text-[var(--muted)]">Brak pozycji — wyszukaj produkt powyżej.</p>
+          <p className="mt-4 text-sm text-[var(--muted)]">
+            Brak pozycji — wyszukaj produkt powyżej albo dodaj pozycję spoza katalogu.
+          </p>
         ) : (
           <ul className="mt-4 flex flex-col divide-y divide-[var(--border)]" aria-label="Pozycje zamówienia">
             {rows.map((r, idx) => (
               <li key={r.key} className="py-4 first:pt-0 last:pb-0 flex flex-col gap-3">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="font-semibold text-[var(--fg)]">
-                    {idx + 1}. {r.name}
-                  </p>
+                <div className="flex items-start gap-3">
+                  <span className="font-semibold text-[var(--fg)] shrink-0">{idx + 1}.</span>
+                  <div className="flex-1 min-w-0">
+                    {r.product_id === null ? (
+                      <Field
+                        label="Nazwa pozycji"
+                        required
+                        hint="Wpisz, co klient kupił — ta nazwa trafi na kartę zamówienia. Produkt NIE zostanie dodany do sklepu."
+                      >
+                        <input
+                          value={r.name}
+                          onChange={(e) => updateRow(r.key, { name: e.target.value })}
+                          required
+                          maxLength={CUSTOM_NAME_MAX_LENGTH}
+                          placeholder="np. Pufa Vena, tkanina Rico 12"
+                          className={inputCls}
+                        />
+                      </Field>
+                    ) : (
+                      <p className="font-semibold text-[var(--fg)]">{r.name}</p>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={() => removeRow(r.key)}
@@ -265,7 +374,10 @@ export default function ExternalOrderForm({ products }: { products: ProductOptio
                       className={inputCls}
                     />
                   </Field>
-                  <Field label="Wariant / uwagi" hint="np. „Vena 12, narożnik lewy”.">
+                  <Field
+                    label="Wariant / uwagi"
+                    hint="np. „Vena 12, narożnik lewy” albo kolor ustalony z klientem."
+                  >
                     <input
                       value={r.notes}
                       onChange={(e) => updateRow(r.key, { notes: e.target.value })}

@@ -4,6 +4,7 @@ import { requireAdmin } from "@/app/_lib/admin";
 import { getOrderById, getProfilesByIds } from "@/app/_lib/orders";
 import { orderCustomerDisplay } from "@/app/_lib/admin-orders";
 import { adminStatusLabel, nextStatuses } from "@/app/_lib/order-status";
+import { orderItemDisplayName } from "@/app/_lib/order-items";
 import { formatOrderAmount } from "@/app/_lib/money";
 import { formatVariantLabel } from "@/app/_lib/variants";
 import { Card } from "@/app/admin/_shared";
@@ -93,12 +94,24 @@ export default async function AdminOrderDetailPage({
               {items.map((item) => (
                 <div key={item.id} className="flex justify-between gap-4 border-b border-[var(--border)] last:border-0 pb-4 last:pb-0">
                   <div className="min-w-0">
-                    <Link
-                      href={`/produkt/${item.product_id}`}
-                      className="font-semibold text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors"
-                    >
-                      {item.product?.name ?? "Produkt"}
-                    </Link>
+                    {/* Pozycja spoza katalogu (migracja 82) nie ma dokąd
+                        linkować — `/produkt/null` byłoby czystym 404. Nazwa
+                        idzie wtedy z custom_name, zwykłym tekstem. */}
+                    {item.product_id ? (
+                      <Link
+                        href={`/produkt/${item.product_id}`}
+                        className="font-semibold text-[var(--fg)] hover:text-[var(--color-gold)] transition-colors"
+                      >
+                        {orderItemDisplayName(item, "Produkt")}
+                      </Link>
+                    ) : (
+                      <p className="font-semibold text-[var(--fg)]">
+                        {orderItemDisplayName(item, "Produkt")}
+                        <span className="ml-2 text-xs font-normal text-[var(--muted)]">
+                          (spoza katalogu)
+                        </span>
+                      </p>
+                    )}
                     {item.bundle_label && (
                       <span className="text-xs text-[var(--color-gold-text)]"> (zestaw: {item.bundle_label})</span>
                     )}

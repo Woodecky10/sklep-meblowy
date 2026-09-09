@@ -68,4 +68,15 @@ describe("orderItemsSummary", () => {
   it("brak nazwy produktu → fallback", () => {
     expect(orderItemsSummary([{ product: null }]).label).toBe("produkt usunięty");
   });
+
+  it("pozycja spoza katalogu → nazwa wpisana ręcznie, NIE „produkt usunięty”", () => {
+    // Migracja 82: pozycja bez product_id ma nazwę w custom_name. Bez tego
+    // lista zamówień twierdziłaby, że pracownica sprzedała usunięty produkt.
+    const r = orderItemsSummary([
+      { custom_name: "Pufa na zamówienie", product: null },
+      { custom_name: "", product: { name: "Sofa Porto" } },
+    ]);
+    expect(r.label).toBe("Pufa na zamówienie +1");
+    expect(r.full).toBe("Pufa na zamówienie, Sofa Porto");
+  });
 });

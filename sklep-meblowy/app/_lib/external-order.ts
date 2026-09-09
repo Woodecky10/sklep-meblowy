@@ -2,11 +2,15 @@
 // CZYSTY — bez server-only i bez bazy — żeby reguły dało się przetestować
 // bez Supabase. Akcja serwerowa (app/admin/zamowienia/actions.ts) tylko
 // przekazuje tu pola z FormData i zapisuje wynik.
-import type { Address } from "./types";
+import type { Address, PaymentMethod } from "./types";
 import { resolveOrderSource } from "./order-source";
 
 export type ExternalOrderItemInput = {
-  product_id: string;
+  // DOKŁADNIE JEDNO z dwóch jest wypełnione (patrz parseExternalOrderInput):
+  // `product_id` = pozycja z naszego katalogu, `custom_name` = pozycja spoza
+  // katalogu wpisana wolnym tekstem (zgłoszenie pracownicy 2026-09-09).
+  product_id: string | null;
+  custom_name: string | null;
   // Cena ZEWNĘTRZNA (z Allegro itp.), nie sklepowa — dlatego wpisywana ręcznie.
   price: number;
   quantity: number;
@@ -21,6 +25,10 @@ export type ExternalOrderInput = {
   items: ExternalOrderItemInput[];
   // Σ cena × ilość, do grosza. Dostawa jak w sklepie — osobno, na karcie zamówienia.
   total: number;
+  // „Opłacone w źródle" (`online`) albo „Płatność przy odbiorze" (`cod`).
+  // Sterowanie statusem zamówienia zostaje w createExternalOrder — tu jest
+  // sama, przetestowana decyzja: którą z dwóch metod wybrała pracownica.
+  payment_method: PaymentMethod;
 };
 
 // Surowe pola z FormData. `items` to JSON z tablicą pozycji — formularz jest
@@ -36,6 +44,7 @@ export type RawExternalOrder = {
   postal_code?: unknown;
   city?: unknown;
   items?: unknown;
+  payment?: unknown;
 };
 
 export type ParseResult =
@@ -43,7 +52,23 @@ export type ParseResult =
   | { ok: false; error: string };
 
 export const NOTES_MAX_LENGTH = 500;
+// Zgodne z CHECK `order_items_custom_name_dlugosc` w migracji 82.
+export const CUSTOM_NAME_MAX_LENGTH = 200;
 export const MAX_ITEMS = 50;
+
+// Wartości pola „Płatność" w formularzu. Te same napisy co PaymentMethod, żeby
+// nie tłumaczyć jednego słownika na drugi w akcji serwerowej.
+function resolvePayment(v: unknown): { ok: true; value: PaymentMethod } | { ok: false; error: string } {
+  // Brak pola = zachowanie sprzed 2026-09-09 (wszystko było „opłacone w
+  // źródle"). Liczy się przy karcie formularza otwartej przed wdrożeniem —
+  // taki zapis ma przejść, a nie wywalić się na walidacji.
+  if (v === undefined || v === null || v === "") return { ok: true, value: "online" };
+  if (v === "online" || v === "cod") return { ok: true, value: v };
+  // Świadomie BŁĄD, nie cichy fallback na „online": zamówienie pobraniowe
+  // zapisane jako opłacone twierdziłoby, że pieniądze są, a kurier dopiero ma
+  // je pobrać.
+  return { ok: false, error: "Wybierz sposób płatności" };
+}
 
 function text(v: unknown, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
@@ -78,6 +103,9 @@ export function parseExternalOrderInput(raw: RawExternalOrder): ParseResult {
   const src = resolveOrderSource(raw.source, raw.source_name);
   if (!src.ok) return src;
 
+  const payment = resolvePayment(raw.payment);
+  if (!payment.ok) return payment;
+
   // Małe litery — spójne z checkoutem i z linkGuestOrders (ilike po e-mailu).
   const email = text(raw.email, 200).toLowerCase();
   if (!EMAIL_RE.test(email)) return { ok: false, error: "Podaj poprawny adres e-mail klienta" };
@@ -111,7 +139,22 @@ export function parseExternalOrderInput(raw: RawExternalOrder): ParseResult {
   for (const [i, it] of rawItems.entries()) {
     const row = (it ?? {}) as Record<string, unknown>;
     const product_id = text(row.product_id, 64);
-    if (!product_id) return { ok: false, error: `Pozycja ${i + 1}: brak produktu` };
+    const custom_name = text(row.custom_name, CUSTOM_NAME_MAX_LENGTH);
+    // Dokładnie jedno z dwóch. Baza dopuszcza oba naraz (CHECK w migracji 82
+    // jest OR-em), ale wtedy karta zamówienia musiałaby zgadywać, którą nazwę
+    // pokazać — odrzucamy na wejściu, żeby taki wiersz nigdy nie powstał.
+    if (product_id && custom_name) {
+      return {
+        ok: false,
+        error: `Pozycja ${i + 1}: wybierz produkt z katalogu ALBO wpisz własną nazwę, nie oba naraz`,
+      };
+    }
+    if (!product_id && !custom_name) {
+      return {
+        ok: false,
+        error: `Pozycja ${i + 1}: wybierz produkt z katalogu albo wpisz nazwę pozycji`,
+      };
+    }
     const price = parsePrice(row.price);
     if (price === null) {
       return { ok: false, error: `Pozycja ${i + 1}: cena musi być liczbą nie mniejszą od 0` };
@@ -121,7 +164,13 @@ export function parseExternalOrderInput(raw: RawExternalOrder): ParseResult {
       return { ok: false, error: `Pozycja ${i + 1}: ilość musi być liczbą całkowitą od 1` };
     }
     const notes = text(row.notes, NOTES_MAX_LENGTH);
-    items.push({ product_id, price, quantity, notes: notes || null });
+    items.push({
+      product_id: product_id || null,
+      custom_name: custom_name || null,
+      price,
+      quantity,
+      notes: notes || null,
+    });
   }
 
   const total = Math.round(items.reduce((s, it) => s + it.price * it.quantity, 0) * 100) / 100;
@@ -137,5 +186,8 @@ export function parseExternalOrderInput(raw: RawExternalOrder): ParseResult {
     ...(phone ? { phone } : {}),
   };
 
-  return { ok: true, value: { source: src.source, email, address, items, total } };
+  return {
+    ok: true,
+    value: { source: src.source, email, address, items, total, payment_method: payment.value },
+  };
 }

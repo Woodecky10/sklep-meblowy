@@ -225,3 +225,96 @@ Przycisk „Zapisz" w teście **nie jest klikany**.
 - lista źródeł edytowalna w panelu;
 - raport sprzedaży z bazy (osobny pomysł właściciela, ma tylko zyskać kolumnę
   do odróżnienia).
+
+## Aktualizacja 2026-09-09
+
+Pracownica obsługująca panel zgłosiła dwa braki po tygodniu używania formularza.
+Właściciel zatwierdził oba rozwiązania.
+
+### 1. Płatność przy odbiorze w zamówieniu zewnętrznym
+
+Formularz zapisywał na sztywno `status: "paid"` + `payment_method: "online"`,
+a część zamówień z Allegro/OLX idzie **za pobraniem** — pieniędzy jeszcze nie ma.
+
+Nowy blok **„Płatność"** (radio, domyślnie jak dotąd):
+
+| wybór | `payment_method` | `status` |
+|---|---|---|
+| **Opłacone w źródle** | `online` | `paid` |
+| **Płatność przy odbiorze** | `cod` | `processing` |
+
+Reguła statusu jest **dokładnie ta sama co w sklepowym checkoucie**
+(`createOrder` w `app/_lib/orders.ts`): pobranie nie ma etapu płatności, więc
+zamówienie od razu jest „W realizacji" i **nigdy nie udaje opłaconego**.
+Plakietka „Pobranie" na liście i karcie zapala się sama — czyta
+`payment_method === "cod"`, a wartość jest ta sama co w sklepie.
+
+**Mail.** Zamówienie pobraniowe rodzi się w `processing`, więc przejścia
+`paid → processing` — jedynego nadawcy maila „Dziękujemy za zamówienie" —
+nigdy nie będzie. Decyzja właściciela: przy zapisie takiego zamówienia mail
+idzie **od razu**, przez `after()` i istniejącą ścieżkę wysyłki
+(nowe wejście `notifyExternalOrderAccepted` w `notify-order.ts`, wspólny render
+i `sendMail` z gałęzią `processing` w `notifyStatusChange`). Mail nie może
+opóźnić ani zepsuć zapisu — ta sama zasada, co w `updateOrderStatus`.
+
+Drugiego maila nie ma z czego wysłać: `canTransition` przepuszcza wyłącznie ruch
+do przodu po osi, a `processing` już na niej stoi — nie da się ani na niego
+przejść z `processing`, ani do niego wrócić.
+
+**Etykiety i licznik — sprawdzone, bez zmian.** `adminStatusLabel` dokleja
+„(zewn.)" tylko do `paid`, więc pobraniowe zewnętrzne pokazuje czyste
+„W realizacji" i nic nie twierdzi o pieniądzach. `getNewOrdersCount` liczy
+`paid` **oraz** `processing` z `status_updated_at is null`, więc pobraniowe
+zewnętrzne wpada do licznika nowych zamówień dokładnie jak sklepowe COD.
+
+### 2. Pozycja spoza katalogu (wolny tekst)
+
+Każda pozycja wymagała `product_id` z katalogu, więc mebel dogadany
+indywidualnie (albo wycofany model) trzeba by najpierw założyć jako produkt
+w sklepie. Decyzja właściciela: **wolny tekst zamiast tworzenia produktu**.
+
+W bloku „Pozycje" obok wyszukiwarki jest przycisk **„+ Pozycja spoza katalogu"**
+— dodaje wiersz z polem „Nazwa pozycji" (wymagane, ≤ 200 znaków) i tymi samymi
+polami cena / ilość / „Wariant / uwagi" co zwykła pozycja. Produkt **nie**
+powstaje w sklepie.
+
+**Migracja 82** (`82_order_items_custom.sql`) — aplikowana **ręcznie PRZED
+mergem** (jak 78/79/80: bez niej PostgREST odrzuca nieznaną kolumnę):
+
+```sql
+alter table public.order_items alter column product_id drop not null;
+alter table public.order_items
+  add column if not exists custom_name text not null default '';
+-- + CHECK długości (<= 200) i CHECK spójności:
+--   product_id is not null or char_length(btrim(custom_name)) > 0
+```
+
+Snapshot nazwy wzorowany na `sample_order_items.fabric_name` (migracja 67).
+CHECK spójności waliduje istniejące wiersze — przechodzi, bo do dziś
+`product_id` było `not null`. RLS bez zmian: polityka odczytu filtruje po
+`order_id`, klienckich zapisów nie ma od migracji 26, a polityki „reviews:
+insert/update po zakupie" mają `oi.product_id = product_reviews.product_id` —
+NULL się nie dopasuje, więc pozycja spoza katalogu **nie** uprawnia do opinii
+(i dobrze: nie ma karty produktu, pod którą miałaby wisieć).
+
+Walidacja: pozycja to `product_id` **albo** `custom_name`, dokładnie jedno
+(baza dopuszcza oba — to reguła prezentacji, nie integralności). Suma bez zmian.
+`createExternalOrder` nie sprawdza istnienia produktu dla pozycji custom i
+dokłada `custom_name` do insertu tylko wtedy, gdy pozycja faktycznie ją ma.
+
+**Czytelnicy `order_items`** (przejrzani po kolei): nazwę wyprowadza wspólny,
+czysty helper `orderItemDisplayName` (`app/_lib/order-items.ts`) — używają go
+karta zamówienia w panelu (nazwa bez linku, z dopiskiem „(spoza katalogu)";
+`/produkt/null` byłoby 404), skrót pozycji na liście zamówień, karta zamówienia
+w koncie klienta wraz z listą pozycji w modalu reklamacji (zamówienie gościa
+podpina się do konta przez `linkGuestOrders`, więc klient realnie to zobaczy),
+lista reklamacji w panelu oraz szablony `OrderConfirmation` i `AdminNewOrder`.
+`OrderShipped`, `OrderCancelled` i `ExternalOrderAccepted` pozycji nie listują —
+potwierdzone. `ReorderButton` i tak pomijał pozycje bez joina z produktem;
+GA4/Meta mają guard `if (!item.productId) continue`. Sklepowy checkout
+(`/api/checkout`) pozycji custom nie dostaje — bez zmian.
+
+Dwa selecty musiały sięgnąć po nową kolumnę i celowo robią to przez
+`order_items(*)`, nie po nazwie: PostgREST na wymienioną wprost kolumnę, której
+w bazie nie ma, odpowiada błędem — zamieniłby brak migracji w awarię **całej**
+listy zamówień i listy reklamacji zamiast jednej funkcji.
