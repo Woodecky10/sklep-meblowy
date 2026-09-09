@@ -1,9 +1,9 @@
 import type { OrderStatus, PaymentMethod } from "../types";
 
-// Które przejścia statusu wysyłają mail do klienta. Reguła wyciągnięta
-// osobno, żeby dała się przetestować bez bazy i bez Resenda.
+// Które przejścia statusu wysyłają AUTOMATYCZNY mail do klienta. Reguła
+// wyciągnięta osobno, żeby dała się przetestować bez bazy i bez Resenda.
 //
-// Zamówienia ZE SKLEPU (source = null). Świadomie POZA listą:
+// Świadomie POZA listą:
 // - `processing` — ten status admin ustawia, żeby zabrać zamówienie do
 //   realizacji, czyli tym samym klikiem gasi licznik nowych zamówień
 //   (PR #100). Mail tutaj strzelałby do klienta przy każdym odhaczeniu.
@@ -11,34 +11,25 @@ import type { OrderStatus, PaymentMethod } from "../types";
 // - `paid` — webhook ustawia go sekundy po zakupie; potwierdzenie zakupu
 //   JEST powiadomieniem o tym statusie.
 // - `delivered` — przy meblach klient kwituje odbiór u kierowcy.
-const SHOP_NOTIFY_STATUSES: OrderStatus[] = ["shipped", "cancelled"];
+//
+// Ta sama lista dla zamówień ZE SKLEPU i ZEWNĘTRZNYCH. Do 2026-09-09 zamówienia
+// zewnętrzne miały tu dodatkowo `processing`: przejście na „W realizacji"
+// wysyłało klientowi z marketplace maila „Dziękujemy za zamówienie" (spec
+// 2026-09-02). Zgłoszenie pracownicy obsługującej panel: tego maila nie
+// widziała, nie mogła zmienić jego treści i nie wiedziała, czy w ogóle poszedł.
+// Decyzja właściciela: automat ZNIKA — ten mail wysyła teraz świadomym klikiem
+// z karty zamówienia (akcja sendExternalOrderMail), więc żaden status nie
+// wysyła go już sam. Maile „Wysłane" i „Anulowane" bez zmian, dla obu rodzajów
+// zamówień.
+const NOTIFY_STATUSES: OrderStatus[] = ["shipped", "cancelled"];
 
-// Zamówienia ZEWNĘTRZNE (source = „Allegro" itp., spec 2026-09-02). Tu
-// `processing` MAILUJE: takie zamówienie admin wpisuje ręcznie ze statusem
-// `paid` (zapłacone na marketplace) i nie przechodzi przez checkout, więc
-// klient nie dostał od nas żadnego potwierdzenia. Ręczne „W realizacji" jest
-// jedynym momentem, w którym dowiaduje się, że przyjęliśmy zamówienie —
-// stąd mail „Dziękujemy za zamówienie" właśnie tutaj.
-const EXTERNAL_NOTIFY_STATUSES: OrderStatus[] = ["processing", "shipped", "cancelled"];
-
-// Prawdziwościowość, NIE `source === null`: `select("*")` na `orders` bez
-// kolumny `source` (okno między wdrożeniem kodu a ręczną aplikacją migracji
-// 81) zwraca `undefined`, nie `null` — porównanie z `null` uznałoby wtedy
-// KAŻDE zamówienie ze sklepu za zewnętrzne. `if (source)` traktuje zarówno
-// `null`, jak i `undefined` (i pusty string) jako „ze sklepu".
-export function shouldNotifyCustomer(
-  status: OrderStatus,
-  source: string | null | undefined
-): boolean {
-  const list = source ? EXTERNAL_NOTIFY_STATUSES : SHOP_NOTIFY_STATUSES;
-  return list.includes(status);
-}
-
-// Tani filtr PRZED odczytem zamówienia z bazy: `source` znamy dopiero po
-// getOrderById, a nie chcemy odpytywać bazy przy każdym `delivered`. Musi być
-// nadzbiorem shouldNotifyCustomer dla obu rodzajów zamówień (test pilnuje).
-export function mayNotifyCustomer(status: OrderStatus): boolean {
-  return EXTERNAL_NOTIFY_STATUSES.includes(status);
+// Decyzja nie potrzebuje już ani bazy, ani `source` — dlatego notifyStatusChange
+// pyta RAZ, jeszcze przed odczytem zamówienia (dawniej: tani filtr
+// `mayNotifyCustomer` przed odczytem + `shouldNotifyCustomer(status, source)`
+// po nim; obie funkcje dawały ten sam wynik od chwili, gdy `processing`
+// przestało mailować).
+export function shouldNotifyCustomer(status: OrderStatus): boolean {
+  return NOTIFY_STATUSES.includes(status);
 }
 
 // Czy zamowienie bylo REALNIE oplacone przed anulowaniem — decyduje o tym, czy
@@ -59,9 +50,9 @@ export function mayNotifyCustomer(status: OrderStatus): boolean {
 // dopuszcza) i anulowac je dopiero potem — wtedy wyjdzie wasPaid=true. Dokladne
 // rozstrzygniecie wymagaloby oparcia sie o kolumne platnosci, ktora otwarty
 // PR #48 (migracja na Przelewy24) usuwa — nie wiazemy sie z nia teraz.
-// Prawdziwościowość, NIE `source !== null` — z tego samego powodu co w
-// shouldNotifyCustomer: przed aplikacją migracji 81 `select("*")` daje
-// `source === undefined` dla KAŻDEGO zamówienia, a `undefined !== null` jest
+// Prawdziwościowość (`if (source)`), NIE `source !== null`: `select("*")` na
+// `orders` bez kolumny `source` (okno między wdrożeniem kodu a ręczną aplikacją
+// migracji 81) zwraca `undefined`, nie `null` — a `undefined !== null` jest
 // prawdziwe, więc porównanie z `null` kazałoby traktować zwykłe zamówienie ze
 // sklepu jak zewnętrzne (mail o anulowaniu przestałby wspominać zwrot).
 export function wasOrderPaid(

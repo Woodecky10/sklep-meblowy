@@ -318,3 +318,101 @@ Dwa selecty musiały sięgnąć po nową kolumnę i celowo robią to przez
 `order_items(*)`, nie po nazwie: PostgREST na wymienioną wprost kolumnę, której
 w bazie nie ma, odpowiada błędem — zamieniłby brak migracji w awarię **całej**
 listy zamówień i listy reklamacji zamiast jednej funkcji.
+
+## Aktualizacja 2026-09-09 (wieczór) — ręczna wysyłka
+
+**Zgłoszenie pracownicy obsługującej panel.** Mail „Dziękujemy za zamówienie"
+wychodził do klienta AUTOMATYCZNIE — dla zamówień opłaconych przy przejściu
+`paid → processing`, a dla pobraniowych od razu przy zapisie. Trzy zarzuty,
+wszystkie trafione:
+
+1. **Nie widziała tej wiadomości.** Nigdzie w panelu nie dało się jej przeczytać.
+2. **Nie mogła jej dopasować.** Treść (z czasem realizacji „do 21 dni roboczych"
+   włącznie) była wpisana na sztywno w szablonie React Email.
+3. **Nie wiedziała, czy poszła.** „Nawet nie wiem, czy ją wysyłałam" — nic
+   w bazie ani na karcie zamówienia tego nie odnotowywało.
+
+**Decyzje właściciela:** automat **znika całkowicie** — mail idzie wyłącznie
+z przycisku; treść jest **w pełni edytowalna** (zwykły tekst, nie HTML —
+firmowa ramka zostaje).
+
+### Migracja 83 (`83_orders_accepted_mail.sql`)
+
+Aplikowana **ręcznie PRZED mergem**, jak 78/79/80/82:
+
+```sql
+alter table public.orders add column if not exists accepted_mail_sent_at timestamptz null;
+alter table public.orders add column if not exists accepted_mail_body text null;
+```
+
+`accepted_mail_body` to **snapshot wysłanej treści**, nie szablon: pracownica
+edytuje tekst przed wysyłką, więc wygenerowana propozycja nie jest tym, co
+zobaczył klient. Po wysyłce karta pokazuje dokładnie to, co poszło.
+Odczyt jest bezpieczny bez migracji (wszystkie selecty idą przez `select("*")`,
+pola w typie `Order` są opcjonalne) — bez niej pada dopiero ZAPIS po wysyłce,
+a wtedy mail jest już u klienta i komunikat mówi wprost „nie wysyłaj ponownie".
+RLS bez zmian; klient może odczytać te pola przy swoim zamówieniu — to treść,
+którą i tak dostał na skrzynkę.
+
+### Co znika
+
+- gałąź `processing` w `notifyStatusChange` (mail „Dziękujemy" ze zmiany statusu),
+- `notifyExternalOrderAccepted` wołane przez `after()` w `createExternalOrder`,
+- rozróżnienie list w `status-notify.ts`: `SHOP_/EXTERNAL_NOTIFY_STATUSES` →
+  jedna `NOTIFY_STATUSES = ["shipped", "cancelled"]`, a `shouldNotifyCustomer`
+  nie potrzebuje już `source` (tym samym znika `mayNotifyCustomer` — „tani filtr
+  przed odczytem bazy" i właściwa decyzja stały się jedną funkcją).
+  `wasOrderPaid(…, source)` **bez zmian** — dla zamówień zewnętrznych nadal
+  `false`, bo zwrot idzie przez marketplace.
+
+Maile `shipped` i `cancelled` — **bez zmian**, dla obu rodzajów zamówień.
+
+### Co dochodzi
+
+- **Generator propozycji treści** — `app/_lib/order-accepted-mail.ts`,
+  `buildAcceptedMailBody(order, items)`. Moduł czysty (wzorzec `order-items.ts`):
+  bez bazy, bez Reacta, liczony na serwerze karty zamówienia i w podglądzie
+  maili. Zwraca wieloakapitowy zwykły tekst: powitanie, „Dziękujemy za
+  zamówienie złożone przez {źródło}", lista pozycji (nazwa przez
+  `orderItemDisplayName`, więc i pozycje spoza katalogu; uwagi/kolor z `notes`
+  w nawiasie), ilość × cena = suma wiersza, `Razem`, przy pobraniu `Dostawa`
+  (gdy > 0) i **`Do zapłaty przy odbiorze: total + delivery_cost`** —
+  `orders.total` to Σ pozycji i dostawy NIE zawiera; kwoty przez
+  `formatOrderAmount`. Dalej: czas realizacji „do 21 dni roboczych" (już jako
+  tekst do zmiany, nie stała szablonu) i podpis.
+- **Szablon** `ExternalOrderAccepted.tsx` przyjmuje `body: string` zamiast
+  `order` i renderuje akapity (pusta linia = nowy `<Text>`, pojedyncze złamanie
+  = `<br />`). React Email escapuje, więc treść z panelu nie wstrzyknie HTML-a.
+  Temat, logo, przycisk „Odwiedź sklep Mollien" i stopka — bez zmian.
+- **Akcja** `sendExternalOrderMail(orderId, body)`
+  (`app/admin/zamowienia/actions.ts`): `requireAdmin`, zamówienie musi istnieć
+  i **mieć `source`**, treść niepusta i ≤ `ACCEPTED_MAIL_MAX_LENGTH`
+  (50 000 znaków — powyżej najgorszego przypadku samej propozycji: 50 pozycji ×
+  200 znaków nazwy + 500 znaków uwag). Wysyłka **synchroniczna, nie `after()`**,
+  i **błąd wraca do panelu** — inaczej niż w automacie, bo tu mail *jest*
+  czynnością, a nie jej skutkiem ubocznym. Po sukcesie zapis
+  `accepted_mail_sent_at = now()` + `accepted_mail_body` i `revalidatePath`
+  karty.
+- **Sekcja „Wiadomość do klienta"** na karcie zamówienia
+  (`[id]/CustomerMailCard.tsx`), **tylko dla zamówień ze `source`**, zaraz pod
+  pozycjami: głośny bursztynowy pasek „Jeszcze nie wysłano" albo zielone
+  „Wysłano 9 września 2026, 18:45 na adres …", pole tekstowe z treścią
+  (snapshot albo propozycja), adres odbiorcy, przycisk „Wyślij do klienta" /
+  „Wyślij ponownie" + potwierdzenie przy powtórce, „Przywróć poprzednią treść".
+  Podglądu HTML-a maila celowo NIE MA (YAGNI): w polu widać dokładnie to, co
+  przeczyta klient, a ramki i tak nie da się stąd zmienić.
+- **Po zapisie formularza** „Dodaj zamówienie" panel przechodzi na kartę nowego
+  zamówienia (`router.push('/admin/zamowienia/{id}')` — było już w #176), gdzie
+  sekcja maila czeka widoczna. Opisy przy wyborze płatności i wstęp nad
+  formularzem nie obiecują już automatycznego maila.
+
+### Testy
+
+`order-accepted-mail.test.ts` (pozycja katalogowa + spoza katalogu, uwagi,
+źródło, brak źródła, pobranie z dostawą i bez, opłacone bez linii o odbiorze,
+kształt tekstu, mieszczenie się w limicie dla maksymalnego zamówienia),
+przepisany `mail-external-order-accepted.test.ts` (akapity, `<br>`, escapowanie
+HTML-a, ramka, pusta treść), `mail-notify-order.test.ts`
+(`sendExternalOrderAcceptedMail`: treść 1:1 z panelu, błąd Resenda wraca,
+brak adresu, adres z profilu; `processing` nie wysyła już nic i nie czyta bazy)
+oraz `mail-status-notify.test.ts` po zmianie sygnatury.

@@ -199,8 +199,7 @@ export default function ExternalOrderForm({ products }: { products: ProductOptio
               </span>
               <span className="block text-xs text-[var(--muted)] leading-snug">
                 Klient zapłacił już na Allegro / OLX itp. Zamówienie dostanie status „Opłacone
-                (zewn.)”, a mail „Dziękujemy za zamówienie” pójdzie, gdy przestawisz je na
-                „W realizacji”.
+                (zewn.)”.
               </span>
             </span>
           </label>
@@ -219,8 +218,7 @@ export default function ExternalOrderForm({ products }: { products: ProductOptio
               </span>
               <span className="block text-xs text-[var(--muted)] leading-snug">
                 Klient zapłaci gotówką kurierowi. Zamówienie dostanie status „W realizacji”
-                z plakietką „Pobranie”, a mail „Dziękujemy za zamówienie” wyjdzie od razu po
-                zapisaniu.
+                z plakietką „Pobranie”.
               </span>
             </span>
           </label>

@@ -29,9 +29,9 @@ vi.mock("../mail/branding-server", async () => {
 });
 
 import {
-  notifyExternalOrderAccepted,
   notifyOrderPlaced,
   notifyStatusChange,
+  sendExternalOrderAcceptedMail,
 } from "../mail/notify-order";
 
 // Zamówienie minimalne, ale kompletne pod kątem pól, których faktycznie
@@ -150,15 +150,11 @@ describe("notifyOrderPlaced", () => {
   });
 });
 
-describe("notifyExternalOrderAccepted — mail przy zapisie zamówienia za pobraniem", () => {
-  // Zamówienie zewnętrzne ZA POBRANIEM rodzi się od razu w `processing`, więc
-  // przejścia paid→processing (jedynego nadawcy tego maila) nigdy nie będzie.
-  const COD_EXTERNAL = {
-    ...MINIMAL_ORDER,
-    source: "OLX",
-    status: "processing",
-    payment_method: "cod",
-  };
+// Ręczna wysyłka z karty zamówienia (decyzja właściciela 2026-09-09: automat
+// znika). Funkcja dostaje zamówienie i GOTOWĄ treść z panelu — nie czyta bazy
+// i nie zna szablonowych akapitów.
+describe("sendExternalOrderAcceptedMail — wysyłka z przycisku w panelu", () => {
+  const EXTERNAL = { guest_email: "klient@example.com", user_id: null };
 
   beforeEach(() => {
     getOrderByIdMock.mockReset();
@@ -167,31 +163,55 @@ describe("notifyExternalOrderAccepted — mail przy zapisie zamówienia za pobra
     sendMailMock.mockResolvedValue(true);
   });
 
-  it("wysyła „Dziękujemy” ze źródłem w treści, bez zmiany statusu", async () => {
-    getOrderByIdMock.mockResolvedValue(COD_EXTERNAL);
+  it("wysyła DOKŁADNIE treść wpisaną w panelu, pod temat „Dziękujemy za zamówienie”", async () => {
+    const res = await sendExternalOrderAcceptedMail(
+      EXTERNAL,
+      "Dzień dobry,\n\nzamówienie z Allegro przyjęte. Realizacja do 10 dni."
+    );
 
-    await notifyExternalOrderAccepted(COD_EXTERNAL.id);
-
+    expect(res).toEqual({ ok: true });
     expect(sendMailMock).toHaveBeenCalledTimes(1);
     const payload = sendMailMock.mock.calls[0][0];
-    expect(payload.to).toBe(COD_EXTERNAL.guest_email);
+    expect(payload.to).toBe(EXTERNAL.guest_email);
     expect(payload.subject).toBe("Dziękujemy za zamówienie – Mollien 🤍");
-    expect(payload.html).toContain("Źródło zamówienia: OLX");
+    expect(payload.html).toContain("zamówienie z Allegro przyjęte. Realizacja do 10 dni.");
+    // Stara, sztywna treść szablonu zniknęła razem z automatem.
+    expect(payload.html).not.toContain("21 dni roboczych");
   });
 
-  it("zamówienie BEZ źródła → nic nie wysyła (szablon drukowałby „undefined”)", async () => {
-    getOrderByIdMock.mockResolvedValue({ ...MINIMAL_ORDER, source: null });
+  it("nie czyta zamówienia z bazy — treść i adresat przychodzą z akcji", async () => {
+    await sendExternalOrderAcceptedMail(EXTERNAL, "Dzień dobry,");
 
-    await notifyExternalOrderAccepted(MINIMAL_ORDER.id);
+    expect(getOrderByIdMock).not.toHaveBeenCalled();
+  });
 
+  it("odmowa Resenda WRACA do panelu jako błąd — inaczej niż w automacie, który połykał wszystko", async () => {
+    sendMailMock.mockResolvedValue(false);
+
+    const res = await sendExternalOrderAcceptedMail(EXTERNAL, "Dzień dobry,");
+
+    expect(res.ok).toBe(false);
+    expect(res.ok === false && res.error).toMatch(/Nie udało się wysłać/);
+  });
+
+  it("zamówienie bez adresu e-mail → błąd, zero wysyłki", async () => {
+    const res = await sendExternalOrderAcceptedMail({ guest_email: null, user_id: null }, "Treść");
+
+    expect(res.ok).toBe(false);
+    expect(res.ok === false && res.error).toMatch(/adresu e-mail/);
     expect(sendMailMock).not.toHaveBeenCalled();
   });
 
-  it("błąd odczytu nie rzuca — wołane przez after() z akcji admina", async () => {
-    getOrderByIdMock.mockRejectedValue(new Error("DB nieosiągalna"));
+  it("klient zalogowany (bez guest_email) → adres z profilu", async () => {
+    getProfilesByIdsMock.mockResolvedValue({ "user-1": { email: "konto@example.com" } });
 
-    await expect(notifyExternalOrderAccepted("any-id")).resolves.toBeUndefined();
-    expect(sendMailMock).not.toHaveBeenCalled();
+    const res = await sendExternalOrderAcceptedMail(
+      { guest_email: null, user_id: "user-1" },
+      "Dzień dobry,"
+    );
+
+    expect(res).toEqual({ ok: true });
+    expect(sendMailMock.mock.calls[0][0].to).toBe("konto@example.com");
   });
 });
 
@@ -204,24 +224,30 @@ describe("notifyStatusChange — zamówienie zewnętrzne", () => {
     sendMailMock.mockResolvedValue(true);
   });
 
-  it("processing + źródło → mail „Dziękujemy” ze źródłem w treści", async () => {
+  it("processing + źródło → NIC nie wysyła (automat zniknął 2026-09-09) i nawet nie czyta bazy", async () => {
     getOrderByIdMock.mockResolvedValue(EXTERNAL_ORDER);
 
     await notifyStatusChange(EXTERNAL_ORDER.id, "processing", "paid");
 
-    expect(sendMailMock).toHaveBeenCalledTimes(1);
-    const payload = sendMailMock.mock.calls[0][0];
-    expect(payload.to).toBe(EXTERNAL_ORDER.guest_email);
-    expect(payload.subject).toBe("Dziękujemy za zamówienie – Mollien 🤍");
-    expect(payload.html).toContain("Źródło zamówienia: Allegro");
+    expect(sendMailMock).not.toHaveBeenCalled();
+    expect(getOrderByIdMock).not.toHaveBeenCalled();
   });
 
-  it("processing BEZ źródła (sklep) → nic nie wysyła i nie odpytuje bazy o nic więcej", async () => {
+  it("processing BEZ źródła (sklep) → nic nie wysyła, jak dotąd", async () => {
     getOrderByIdMock.mockResolvedValue({ ...MINIMAL_ORDER, source: null });
 
     await notifyStatusChange(MINIMAL_ORDER.id, "processing", "paid");
 
     expect(sendMailMock).not.toHaveBeenCalled();
+  });
+
+  it("shipped + źródło → mail „w drodze” bez zmian", async () => {
+    getOrderByIdMock.mockResolvedValue({ ...EXTERNAL_ORDER, status: "shipped" });
+
+    await notifyStatusChange(EXTERNAL_ORDER.id, "shipped", "processing");
+
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+    expect(sendMailMock.mock.calls[0][0].subject).toContain("jest w drodze");
   });
 
   it("delivered → nie czyta nawet zamówienia (tani filtr)", async () => {

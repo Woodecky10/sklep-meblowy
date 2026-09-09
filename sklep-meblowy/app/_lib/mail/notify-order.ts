@@ -1,11 +1,10 @@
 import { render } from "@react-email/components";
 import { getOrderById, getProfilesByIds } from "../orders";
 import type { Order, OrderStatus } from "../types";
-import type { MailBranding } from "./branding";
 import { getMailBranding } from "./branding-server";
 import { mailLocale } from "./locale";
 import { sendMail } from "./send";
-import { mayNotifyCustomer, shouldNotifyCustomer, wasOrderPaid } from "./status-notify";
+import { shouldNotifyCustomer, wasOrderPaid } from "./status-notify";
 import { OrderConfirmation } from "./templates/OrderConfirmation";
 import { AdminNewOrder } from "./templates/AdminNewOrder";
 import { OrderShipped } from "./templates/OrderShipped";
@@ -26,54 +25,43 @@ async function customerEmailOf(order: {
   return profiles[order.user_id]?.email ?? null;
 }
 
-// Mail „Dziękujemy za zamówienie" dla klienta z marketplace. Wydzielony, bo
-// wysyłają go DWA miejsca (patrz notifyExternalOrderAccepted niżej), a jedno
-// z nich ma już wczytane zamówienie i branding — refetch byłby marnotrawstwem.
-async function sendExternalOrderAccepted(
-  order: Order,
-  branding: MailBranding,
-  to: string,
-  shopUrl: string
-): Promise<void> {
-  const html = await render(ExternalOrderAccepted({ order, branding, shopUrl }));
-  await sendMail({ to, subject: EXTERNAL_ORDER_ACCEPTED_SUBJECT, html });
-}
-
-// Ten sam mail, ale wołany BEZ zmiany statusu — przy zapisie zamówienia
-// zewnętrznego ZA POBRANIEM (decyzja właściciela 2026-09-09).
+// Mail „Dziękujemy za zamówienie" dla klienta z marketplace — wysyłany
+// RĘCZNIE, przyciskiem na karcie zamówienia (akcja sendExternalOrderMail).
 //
-// Dlaczego osobne wejście: pobranie nie ma etapu płatności, więc takie
-// zamówienie rodzi się od razu w `processing` (ta sama reguła co w createOrder
-// dla sklepowego COD). Przejście paid→processing, które normalnie wysyła ten
-// mail, NIGDY więc nie nastąpi — bez tego wywołania klient z Allegro płacący
-// przy odbiorze nie dostałby od nas żadnego potwierdzenia.
+// Do 2026-09-09 szły stąd DWA automaty: przejście paid→processing i zapis
+// zamówienia za pobraniem. Oba usunięte — pracownica obsługująca panel nie
+// widziała tej wiadomości, nie mogła dopasować treści (czas realizacji był
+// wpisany na sztywno w szablonie) i nie wiedziała, czy klient ją dostał.
+// Treść przychodzi teraz w całości z panelu, jako zwykły tekst.
 //
-// DRUGIEGO maila nie ma z czego wysłać: canTransition pilnuje ruchu tylko do
-// przodu po osi, a `processing` jest już na niej — nie da się ani wrócić do
-// `processing`, ani przejść na `processing` z `processing`, więc notifyStatusChange
-// nie odpali tej gałęzi po raz drugi. (Skok processing→shipped wyśle „w drodze",
-// co jest osobnym, poprawnym mailem.)
-//
-// NIGDY nie rzuca — wołane przez after() z akcji admina, jak notifyStatusChange.
-export async function notifyExternalOrderAccepted(orderId: string): Promise<void> {
+// W ODRÓŻNIENIU od notify* poniżej ta funkcja NIE POŁYKA niepowodzenia:
+// zwraca powód, bo to świadoma czynność pracownicy i musi ona zobaczyć,
+// czy wiadomość poszła. Nie rzuca — akcja admina dostaje wynik, nie wyjątek.
+export async function sendExternalOrderAcceptedMail(
+  order: Pick<Order, "guest_email" | "user_id">,
+  body: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const order = await getOrderById(orderId);
-    // Zamówienie ze sklepu nie ma źródła, a szablon drukuje „Źródło zamówienia:
-    // {source}". Bez tej bramki błąd w wywołaniu wysłałby klientowi „undefined".
-    if (!order.source) {
-      console.error(`[mail] zamówienie ${orderId} bez źródła — pomijam mail „Dziękujemy"`);
-      return;
-    }
     const to = order.guest_email ?? (await customerEmailOf(order));
     if (!to) {
-      console.error(`[mail] zamówienie ${orderId} bez adresu e-mail — pomijam`);
-      return;
+      return { ok: false, error: "To zamówienie nie ma adresu e-mail klienta" };
     }
     const branding = await getMailBranding();
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://mollien.pl";
-    await sendExternalOrderAccepted(order, branding, to, base);
+    const shopUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://mollien.pl";
+    const html = await render(ExternalOrderAccepted({ body, branding, shopUrl }));
+    const sent = await sendMail({ to, subject: EXTERNAL_ORDER_ACCEPTED_SUBJECT, html });
+    // sendMail nie rzuca — `false` znaczy „Resend odmówił albo brak
+    // konfiguracji". Dla pracownicy jedno i drugie to „nie poszło".
+    if (!sent) {
+      return {
+        ok: false,
+        error: "Nie udało się wysłać wiadomości — spróbuj ponownie za chwilę",
+      };
+    }
+    return { ok: true };
   } catch (err) {
-    console.error("[mail] notifyExternalOrderAccepted nieudane:", err);
+    console.error("[mail] reczna wysylka maila Dziekujemy za zamowienie nieudana:", err);
+    return { ok: false, error: "Nie udało się wysłać wiadomości — spróbuj ponownie za chwilę" };
   }
 }
 
@@ -150,12 +138,12 @@ export async function notifyStatusChange(
   status: OrderStatus,
   previousStatus: OrderStatus
 ): Promise<void> {
-  // Tani filtr bez bazy; właściwa decyzja wymaga `order.source`, więc zapada
-  // dopiero po odczycie zamówienia.
-  if (!mayNotifyCustomer(status)) return;
+  // Decyzja zapada BEZ bazy: od 2026-09-09 lista statusów, które mailują, jest
+  // ta sama dla zamówień ze sklepu i zewnętrznych (patrz status-notify.ts),
+  // więc `source` nie jest już do niej potrzebne.
+  if (!shouldNotifyCustomer(status)) return;
   try {
     const order = await getOrderById(orderId);
-    if (!shouldNotifyCustomer(status, order.source)) return;
     const branding = await getMailBranding();
     const locale = mailLocale(order.currency);
     const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://mollien.pl";
@@ -179,16 +167,6 @@ export async function notifyStatusChange(
             : `Zamówienie #${order.order_number} jest w drodze`,
         html,
       });
-      return;
-    }
-
-    // processing przechodzi przez shouldNotifyCustomer TYLKO dla zamówień
-    // zewnętrznych — klient z marketplace dostaje tu jedyne od nas
-    // potwierdzenie przyjęcia (spec 2026-09-02). Zewnętrzne ZA POBRANIEM tędy
-    // nie przechodzi: rodzi się już w `processing`, więc mail leci przy zapisie
-    // (notifyExternalOrderAccepted).
-    if (status === "processing") {
-      await sendExternalOrderAccepted(order, branding, to, base);
       return;
     }
 

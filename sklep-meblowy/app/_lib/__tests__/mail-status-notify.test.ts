@@ -1,86 +1,46 @@
 import { describe, it, expect } from "vitest";
-import { shouldNotifyCustomer, mayNotifyCustomer, wasOrderPaid } from "../mail/status-notify";
+import { shouldNotifyCustomer, wasOrderPaid } from "../mail/status-notify";
 
-describe("shouldNotifyCustomer — zamówienie ze sklepu (source = null)", () => {
+describe("shouldNotifyCustomer — które statusy mailują automatycznie", () => {
   it("shipped wysyła — o tym klient musi wiedzieć", () => {
-    expect(shouldNotifyCustomer("shipped", null)).toBe(true);
+    expect(shouldNotifyCustomer("shipped")).toBe(true);
   });
 
   it("cancelled wysyła — dziś klient nie dowiedziałby się w żaden sposób", () => {
-    expect(shouldNotifyCustomer("cancelled", null)).toBe(true);
+    expect(shouldNotifyCustomer("cancelled")).toBe(true);
   });
 
   it("processing NIE wysyła — to klik gaszący licznik nowych zamowien (PR #100)", () => {
-    expect(shouldNotifyCustomer("processing", null)).toBe(false);
+    expect(shouldNotifyCustomer("processing")).toBe(false);
   });
 
   it("paid NIE wysyła — koliduje z mailem o zakupie z webhooka", () => {
-    expect(shouldNotifyCustomer("paid", null)).toBe(false);
+    expect(shouldNotifyCustomer("paid")).toBe(false);
   });
 
   it("delivered NIE wysyła — decyzja 2026-07-28", () => {
-    expect(shouldNotifyCustomer("delivered", null)).toBe(false);
+    expect(shouldNotifyCustomer("delivered")).toBe(false);
   });
 
   it("pending NIE wysyła", () => {
-    expect(shouldNotifyCustomer("pending", null)).toBe(false);
+    expect(shouldNotifyCustomer("pending")).toBe(false);
   });
 });
 
-describe("shouldNotifyCustomer — zamówienie zewnętrzne (source = „Allegro”)", () => {
-  it("processing WYSYŁA — to jedyny moment, w którym klient z Allegro dowiaduje się od nas o przyjęciu", () => {
-    expect(shouldNotifyCustomer("processing", "Allegro")).toBe(true);
+describe("shouldNotifyCustomer — zamówienie zewnętrzne nie ma już własnej reguły", () => {
+  // Do 2026-09-09 `processing` mailowało zamówieniom z `source` maila
+  // „Dziękujemy za zamówienie" (spec 2026-09-02). Zgłoszenie pracownicy: nie
+  // widziała tej wiadomości, nie mogła zmienić jej treści i nie wiedziała, czy
+  // poszła. Decyzja właściciela: automat znika — mail wysyła teraz świadomym
+  // klikiem z karty zamówienia (sendExternalOrderMail), więc lista statusów
+  // jest JEDNA dla wszystkich zamówień i funkcja nie potrzebuje już `source`.
+  it("przestawienie zewnętrznego na „W realizacji” nie wysyła nic samo z siebie", () => {
+    expect(shouldNotifyCustomer("processing")).toBe(false);
   });
 
-  it("shipped i cancelled wysyłają jak w sklepie (decyzja właściciela 2026-09-02)", () => {
-    expect(shouldNotifyCustomer("shipped", "Allegro")).toBe(true);
-    expect(shouldNotifyCustomer("cancelled", "Allegro")).toBe(true);
-  });
-
-  it("paid NIE wysyła — z tym statusem zamówienie jest zapisywane, mail idzie dopiero przy „W realizacji”", () => {
-    expect(shouldNotifyCustomer("paid", "Allegro")).toBe(false);
-  });
-
-  it("delivered i pending NIE wysyłają", () => {
-    expect(shouldNotifyCustomer("delivered", "Allegro")).toBe(false);
-    expect(shouldNotifyCustomer("pending", "Allegro")).toBe(false);
-  });
-});
-
-describe("shouldNotifyCustomer — source undefined (kolumna jeszcze nie istnieje w bazie)", () => {
-  // select("*") na `orders` bez kolumny `source` (okno między wdrożeniem kodu
-  // a ręczną aplikacją migracji 81) zwraca `source === undefined`, NIE `null`.
-  // `undefined` musi się zachowywać jak „zamówienie ze sklepu" — inaczej admin
-  // przestawiający zwykłe zamówienie na „W realizacji" wysłałby klientowi mail
-  // „Dziękujemy za zamówienie" z „Źródło zamówienia: undefined".
-  it('processing → false, tak jak dla source=null (undefined ma znaczyć "ze sklepu")', () => {
-    expect(shouldNotifyCustomer("processing", undefined)).toBe(false);
-  });
-
-  it("shipped → true, tak jak dla source=null", () => {
-    expect(shouldNotifyCustomer("shipped", undefined)).toBe(true);
-  });
-});
-
-describe("mayNotifyCustomer — tani filtr przed odczytem zamówienia", () => {
-  it("true dla każdego statusu, przy którym JAKIKOLWIEK rodzaj zamówienia mailuje", () => {
-    expect(mayNotifyCustomer("processing")).toBe(true);
-    expect(mayNotifyCustomer("shipped")).toBe(true);
-    expect(mayNotifyCustomer("cancelled")).toBe(true);
-  });
-
-  it("false tam, gdzie nikt nie mailuje — bez zbędnego zapytania do bazy", () => {
-    expect(mayNotifyCustomer("paid")).toBe(false);
-    expect(mayNotifyCustomer("delivered")).toBe(false);
-    expect(mayNotifyCustomer("pending")).toBe(false);
-  });
-
-  it("jest nadzbiorem shouldNotifyCustomer dla obu rodzajów zamówień", () => {
-    for (const s of ["pending", "paid", "processing", "shipped", "delivered", "cancelled"] as const) {
-      if (shouldNotifyCustomer(s, null) || shouldNotifyCustomer(s, "Allegro")) {
-        expect(mayNotifyCustomer(s)).toBe(true);
-      }
-    }
+  it("shipped i cancelled wysyłają tak samo jak w sklepie (decyzja właściciela 2026-09-02)", () => {
+    expect(shouldNotifyCustomer("shipped")).toBe(true);
+    expect(shouldNotifyCustomer("cancelled")).toBe(true);
   });
 });
 

@@ -315,6 +315,14 @@ export type Order = {
   // Zamówienia spoza sklepu (migracja 81): nazwa źródła („Allegro") pokazywana
   // klientowi w mailu. null = złożone przez stronę.
   source: string | null;
+  // Ręczna wysyłka maila „Dziękujemy za zamówienie" (migracja 83): kiedy
+  // pracownica ją wysłała i jaką treść dostał klient. NULL = jeszcze nie
+  // wysłano. OPCJONALNE w typie (a nie `| null`), bo `select("*")` na bazie bez
+  // tych kolumn po prostu ich nie zwraca — okno między wdrożeniem kodu a ręczną
+  // aplikacją migracji nie ma prawa wywrócić karty zamówienia (wzorzec z
+  // `custom_name` w OrderItem).
+  accepted_mail_sent_at?: string | null;
+  accepted_mail_body?: string | null;
   items?: OrderItem[];
   // Dołączane przez query — kod promo z joina. Null jeśli zamówienie bez kuponu
   // albo gdy admin usunął kod (FK ON DELETE SET NULL).
