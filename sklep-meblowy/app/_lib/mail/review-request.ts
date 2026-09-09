@@ -47,8 +47,14 @@ export async function requestReviews(orderId: string): Promise<void> {
     const maKonto = order.user_id !== null;
 
     // Bez duplikatów: zamówienie może mieć dwa wiersze tego samego produktu.
+    // Pozycje spoza katalogu (migracja 82, `product_id = null`) wypadają —
+    // i tak ma być: nie ma karty produktu, pod którą taka opinia miałaby
+    // wisieć, a polityka RLS „reviews: insert po zakupie" i tak by jej nie
+    // przepuściła (NULL nie dopasuje się do `oi.product_id = ...`).
     const productIds = Array.from(
-      new Set((order.items ?? []).map((i) => i.product_id).filter(Boolean))
+      new Set(
+        (order.items ?? []).map((i) => i.product_id).filter((id): id is string => !!id)
+      )
     );
 
     const admin = await createAdminClient();

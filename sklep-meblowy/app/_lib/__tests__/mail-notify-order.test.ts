@@ -28,7 +28,11 @@ vi.mock("../mail/branding-server", async () => {
   };
 });
 
-import { notifyOrderPlaced, notifyStatusChange } from "../mail/notify-order";
+import {
+  notifyExternalOrderAccepted,
+  notifyOrderPlaced,
+  notifyStatusChange,
+} from "../mail/notify-order";
 
 // Zamówienie minimalne, ale kompletne pod kątem pól, których faktycznie
 // dotykają OrderConfirmation i AdminNewOrder (patrz sekcja "pola wymagane
@@ -73,9 +77,27 @@ const MINIMAL_ORDER = {
       notes: null,
       bundle_id: null,
       bundle_label: null,
+      custom_name: "",
       product: { name: "Fotel testowy" },
     },
   ],
+};
+
+// Pozycja SPOZA KATALOGU (migracja 82): brak product_id, brak joina z products,
+// nazwa wyłącznie w custom_name. Szablony muszą pokazać właśnie ją, a nie
+// zastępcze „Produkt".
+const CUSTOM_ITEM = {
+  id: "item-custom-1",
+  order_id: "order-int-test-1",
+  product_id: null,
+  quantity: 2,
+  price: 250,
+  variant_values: null,
+  notes: null,
+  bundle_id: null,
+  bundle_label: null,
+  custom_name: "Pufa na zamówienie",
+  product: null,
 };
 
 describe("notifyOrderPlaced", () => {
@@ -112,6 +134,64 @@ describe("notifyOrderPlaced", () => {
 
     expect(adminCall.to).toBe("wlascicielka@mollien.pl");
     expect(adminCall.subject).toContain("Nowe zamówienie");
+  });
+
+  it("pozycja spoza katalogu → w obu mailach jej nazwa, nie zastępcze „Produkt”", async () => {
+    getOrderByIdMock.mockResolvedValue({ ...MINIMAL_ORDER, items: [CUSTOM_ITEM] });
+    sendMailMock.mockResolvedValue(true);
+    vi.stubEnv("MAIL_ADMIN_TO", "wlascicielka@mollien.pl");
+
+    await notifyOrderPlaced(MINIMAL_ORDER.id);
+
+    const [customerCall, adminCall] = sendMailMock.mock.calls.map((c) => c[0]);
+    expect(customerCall.html).toContain("Pufa na zamówienie");
+    expect(customerCall.html).not.toContain(">Produkt<");
+    expect(adminCall.html).toContain("Pufa na zamówienie");
+  });
+});
+
+describe("notifyExternalOrderAccepted — mail przy zapisie zamówienia za pobraniem", () => {
+  // Zamówienie zewnętrzne ZA POBRANIEM rodzi się od razu w `processing`, więc
+  // przejścia paid→processing (jedynego nadawcy tego maila) nigdy nie będzie.
+  const COD_EXTERNAL = {
+    ...MINIMAL_ORDER,
+    source: "OLX",
+    status: "processing",
+    payment_method: "cod",
+  };
+
+  beforeEach(() => {
+    getOrderByIdMock.mockReset();
+    getProfilesByIdsMock.mockReset();
+    sendMailMock.mockReset();
+    sendMailMock.mockResolvedValue(true);
+  });
+
+  it("wysyła „Dziękujemy” ze źródłem w treści, bez zmiany statusu", async () => {
+    getOrderByIdMock.mockResolvedValue(COD_EXTERNAL);
+
+    await notifyExternalOrderAccepted(COD_EXTERNAL.id);
+
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+    const payload = sendMailMock.mock.calls[0][0];
+    expect(payload.to).toBe(COD_EXTERNAL.guest_email);
+    expect(payload.subject).toBe("Dziękujemy za zamówienie – Mollien 🤍");
+    expect(payload.html).toContain("Źródło zamówienia: OLX");
+  });
+
+  it("zamówienie BEZ źródła → nic nie wysyła (szablon drukowałby „undefined”)", async () => {
+    getOrderByIdMock.mockResolvedValue({ ...MINIMAL_ORDER, source: null });
+
+    await notifyExternalOrderAccepted(MINIMAL_ORDER.id);
+
+    expect(sendMailMock).not.toHaveBeenCalled();
+  });
+
+  it("błąd odczytu nie rzuca — wołane przez after() z akcji admina", async () => {
+    getOrderByIdMock.mockRejectedValue(new Error("DB nieosiągalna"));
+
+    await expect(notifyExternalOrderAccepted("any-id")).resolves.toBeUndefined();
+    expect(sendMailMock).not.toHaveBeenCalled();
   });
 });
 

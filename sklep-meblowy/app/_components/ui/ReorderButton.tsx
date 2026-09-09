@@ -12,7 +12,9 @@ import type { OrderItem } from "@/app/_lib/types";
 // ceny zamrożonej w order_items — w przeciwnym razie klient mógłby
 // zapłacić starą (niższą) cenę za produkt który podrożał.
 //
-// Pominięte: produkty które admin usunął (item.product == null).
+// Pominięte: produkty które admin usunął ORAZ pozycje spoza katalogu
+// (migracja 82, `product_id = null`) — jednych i drugich nie da się włożyć
+// do koszyka, bo w sklepie nie ma czego kupić.
 export default function ReorderButton({ items }: { items: OrderItem[] }) {
   const { add } = useCart();
   const router = useRouter();
@@ -65,7 +67,10 @@ export default function ReorderButton({ items }: { items: OrderItem[] }) {
         continue;
       }
       add({
-        id: item.product_id,
+        // `item.product.id`, nie `item.product_id`: to samo id, ale niesie je
+        // obiekt, który guard wyżej już zawęził do nie-null (product_id jest
+        // od migracji 82 nullowalne).
+        id: item.product.id,
         name: item.product.name,
         price: Number(item.product.price),
         image: item.product.images?.[0] ?? "",

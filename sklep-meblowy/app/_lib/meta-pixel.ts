@@ -67,9 +67,11 @@ export function buildContents(items: PixelLineItem[]): PixelContents {
   const merged = new Map<string, { quantity: number; price: number }>();
 
   for (const item of items) {
-    // product_id ma FK ON DELETE SET NULL: po skasowaniu produktu z katalogu
-    // stara pozycja zostaje bez id. Lepiej wysłać zakup bez tej pozycji niż z
-    // `undefined` w content_ids.
+    // Pozycja bez id produktu: od migracji 82 `order_items.product_id` jest
+    // nullowalne (pozycja spoza katalogu, wpisana ręcznie w panelu przy
+    // zamówieniu zewnętrznym). Lepiej wysłać zakup bez tej pozycji niż
+    // z `undefined` w content_ids. (Wcześniejszy komentarz tłumaczył ten guard
+    // FK-iem ON DELETE SET NULL — to nieprawda: FK jest RESTRICT.)
     if (!item.productId) continue;
     const current = merged.get(item.productId);
     if (current) current.quantity += item.quantity;

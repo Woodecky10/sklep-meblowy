@@ -12,6 +12,7 @@ import CancelOrderButton from "../CancelOrderButton";
 import { deliveryView } from "@/app/_lib/delivery";
 import OrderIssueModal from "@/app/_components/ui/OrderIssueModal";
 import { orderItemLabel } from "@/app/_lib/order-issues";
+import { orderItemDisplayName } from "@/app/_lib/order-items";
 
 export async function generateMetadata() {
   const locale = await getLocale();
@@ -130,7 +131,14 @@ export default async function OrderDetailPage({
   const issueItems = (order.items ?? []).map((it) => ({
     id: it.id,
     label: orderItemLabel(
-      (it.product ? localizeProduct(it.product, locale) : null)?.name ?? c.product,
+      // Pozycja spoza katalogu (migracja 82) — zamówienie zewnętrzne wpisane
+      // w panelu potrafi trafić do konta klienta przez linkGuestOrders, więc
+      // ta ścieżka jest realna. Bez custom_name lista pozycji w modalu
+      // reklamacji pokazałaby kilka identycznych „Produkt".
+      orderItemDisplayName(
+        { custom_name: it.custom_name, product: it.product ? localizeProduct(it.product, locale) : null },
+        c.product
+      ),
       it.variant_values ?? null,
       locale
     ),
@@ -193,7 +201,7 @@ export default async function OrderDetailPage({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-[var(--fg)] truncate">
-                    {prod?.name ?? c.product}
+                    {orderItemDisplayName({ custom_name: item.custom_name, product: prod }, c.product)}
                   </p>
                   {item.bundle_label && (
                     <span className="text-xs text-[var(--color-gold-text)]">

@@ -76,6 +76,19 @@ describe("adminStatusLabel", () => {
     expect(adminStatusLabel("shipped", "OLX")).toEqual(ADMIN_STATUS_LABELS.shipped);
   });
 
+  // Zewnętrzne POBRANIOWE (2026-09-09) rodzi się od razu w `processing`, bo COD
+  // nie ma etapu płatności. Etykieta musi wtedy mówić „W realizacji" i NIC nie
+  // twierdzić o pieniądzach — dopisek „(zewn.)" należy wyłącznie do `paid`,
+  // gdzie znaczy „zapłacone na marketplace, nie przez P24". Gdyby wyciekł na
+  // `processing`, pracownica czytałaby „opłacone" tam, gdzie kurier dopiero
+  // ma pobrać gotówkę.
+  it("zewnętrzne pobraniowe (processing): „W realizacji”, zero słowa o zapłacie", () => {
+    const l = adminStatusLabel("processing", "Allegro");
+    expect(l.label).toBe("W realizacji");
+    expect(l.label).not.toContain("płacone");
+    expect(l.label).not.toContain("zewn.");
+  });
+
   // select("*") na `orders` bez kolumny `source` (okno między wdrożeniem kodu
   // a ręczną aplikacją migracji 81) zwraca `source === undefined`, NIE `null`.
   // undefined ma znaczyć „ze sklepu" — inaczej każde opłacone zamówienie ze

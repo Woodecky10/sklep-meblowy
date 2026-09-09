@@ -1,6 +1,7 @@
 import { Hr, Row, Column, Section, Text } from "@react-email/components";
 import { formatOrderAmount } from "../../money";
 import { formatVariantLabel } from "../../variants";
+import { orderItemDisplayName } from "../../order-items";
 import type { Order, OrderItem } from "../../types";
 import type { MailBranding } from "../branding";
 import { MailButton, MailLayout } from "./_Layout";
@@ -98,7 +99,7 @@ export function OrderConfirmation({
       {items.map((item) => (
         <Section key={item.id} style={{ margin: "0 0 12px" }}>
           <Text style={{ color: c.fg, fontSize: "14px", fontWeight: 600, margin: 0 }}>
-            {item.product?.name ?? "Produkt"}
+            {orderItemDisplayName(item, "Produkt")}
             {item.bundle_label ? ` (${item.bundle_label})` : ""}
           </Text>
           {item.variant_values && (

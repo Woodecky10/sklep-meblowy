@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseExternalOrderInput,
   parsePrice,
+  CUSTOM_NAME_MAX_LENGTH,
   NOTES_MAX_LENGTH,
   type RawExternalOrder,
 } from "../external-order";
@@ -60,8 +61,8 @@ describe("parseExternalOrderInput", () => {
       country: "Polska",
     });
     expect(res.value.items).toEqual([
-      { product_id: "prod-1", price: 1299.5, quantity: 2, notes: "Vena 12, lewy" },
-      { product_id: "prod-2", price: 400, quantity: 1, notes: null },
+      { product_id: "prod-1", custom_name: null, price: 1299.5, quantity: 2, notes: "Vena 12, lewy" },
+      { product_id: "prod-2", custom_name: null, price: 400, quantity: 1, notes: null },
     ]);
     // 2 × 1299.50 + 400 = 2999.00
     expect(res.value.total).toBe(2999);
@@ -133,11 +134,12 @@ describe("parseExternalOrderInput", () => {
     }
   });
 
-  it("pozycja bez product_id → błąd", () => {
+  it("pozycja bez product_id i bez nazwy własnej → błąd", () => {
     const res = parseExternalOrderInput(
       raw({ items: JSON.stringify([{ price: "10", quantity: 1 }]) })
     );
     expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toContain("Pozycja 1");
   });
 
   it("notatka ucinana do limitu", () => {
@@ -149,5 +151,132 @@ describe("parseExternalOrderInput", () => {
       })
     );
     expect(res.ok && res.value.items[0].notes?.length).toBe(NOTES_MAX_LENGTH);
+  });
+});
+
+// ============================================================
+// Sposób płatności (zgłoszenie pracownicy 2026-09-09)
+// ============================================================
+describe("parseExternalOrderInput — sposób płatności", () => {
+  it("brak pola → 'online', czyli dokładnie dotychczasowe zachowanie", () => {
+    // Zgodność wstecz jest tu WYMOGIEM, nie wygodą: formularz sprzed tej zmiany
+    // (otwarta karta w przeglądarce pracownicy) nie wysyła pola `payment`, a
+    // takie zamówienie ma się zapisać jak dotąd — opłacone w źródle.
+    const res = parseExternalOrderInput(raw({ payment: undefined }));
+    expect(res.ok && res.value.payment_method).toBe("online");
+  });
+
+  it("puste pole też → 'online'", () => {
+    const res = parseExternalOrderInput(raw({ payment: "" }));
+    expect(res.ok && res.value.payment_method).toBe("online");
+  });
+
+  it("„Opłacone w źródle” → payment_method 'online'", () => {
+    const res = parseExternalOrderInput(raw({ payment: "online" }));
+    expect(res.ok && res.value.payment_method).toBe("online");
+  });
+
+  it("„Płatność przy odbiorze” → payment_method 'cod'", () => {
+    const res = parseExternalOrderInput(raw({ payment: "cod" }));
+    expect(res.ok && res.value.payment_method).toBe("cod");
+  });
+
+  it("nieznana wartość → błąd, nie ciche 'online'", () => {
+    // Cichy fallback zapisałby POBRANIOWE zamówienie jako opłacone — pieniędzy
+    // by nie było, a panel twierdziłby, że są.
+    for (const payment of ["gotówka", "COD", "przelew", 1]) {
+      const res = parseExternalOrderInput(raw({ payment }));
+      expect(res.ok).toBe(false);
+    }
+  });
+});
+
+// ============================================================
+// Pozycja spoza katalogu (zgłoszenie pracownicy 2026-09-09)
+// ============================================================
+describe("parseExternalOrderInput — pozycja spoza katalogu", () => {
+  it("sama nazwa własna → pozycja bez product_id", () => {
+    const res = parseExternalOrderInput(
+      raw({
+        items: JSON.stringify([
+          { custom_name: "  Pufa na zamówienie  ", price: "250", quantity: "2", notes: " zieleń " },
+        ]),
+      })
+    );
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.value.items).toEqual([
+      {
+        product_id: null,
+        custom_name: "Pufa na zamówienie",
+        price: 250,
+        quantity: 2,
+        notes: "zieleń",
+      },
+    ]);
+    expect(res.value.total).toBe(500);
+  });
+
+  it("pozycje z katalogu i spoza katalogu obok siebie, suma liczy obie", () => {
+    const res = parseExternalOrderInput(
+      raw({
+        items: JSON.stringify([
+          { product_id: "prod-1", price: "1000", quantity: 1 },
+          { custom_name: "Poduszki dekoracyjne", price: "120", quantity: 2 },
+        ]),
+      })
+    );
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.value.items[0].product_id).toBe("prod-1");
+    expect(res.value.items[0].custom_name).toBeNull();
+    expect(res.value.items[1].product_id).toBeNull();
+    expect(res.value.items[1].custom_name).toBe("Poduszki dekoracyjne");
+    expect(res.value.total).toBe(1240);
+  });
+
+  it("product_id ORAZ nazwa własna naraz → błąd (dokładnie jedno z dwóch)", () => {
+    // Baza dopuszcza taki wiersz (CHECK jest OR-em), ale karta zamówienia
+    // musiałaby zgadywać, którą nazwę pokazać — lepiej odrzucić na wejściu.
+    const res = parseExternalOrderInput(
+      raw({
+        items: JSON.stringify([
+          { product_id: "prod-1", custom_name: "Pufa", price: "10", quantity: 1 },
+        ]),
+      })
+    );
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toContain("Pozycja 1");
+  });
+
+  it("sama spacja w nazwie własnej nie jest nazwą → błąd", () => {
+    const res = parseExternalOrderInput(
+      raw({ items: JSON.stringify([{ custom_name: "   ", price: "10", quantity: 1 }]) })
+    );
+    expect(res.ok).toBe(false);
+  });
+
+  it("nazwa własna ucinana do limitu (CHECK w migracji 82 odrzuciłby dłuższą)", () => {
+    const res = parseExternalOrderInput(
+      raw({
+        items: JSON.stringify([
+          { custom_name: "x".repeat(CUSTOM_NAME_MAX_LENGTH + 50), price: "10", quantity: 1 },
+        ]),
+      })
+    );
+    expect(res.ok && res.value.items[0].custom_name?.length).toBe(CUSTOM_NAME_MAX_LENGTH);
+  });
+
+  it("pozycja spoza katalogu podlega tym samym regułom ceny i ilości", () => {
+    expect(
+      parseExternalOrderInput(
+        raw({ items: JSON.stringify([{ custom_name: "Pufa", price: "-1", quantity: 1 }]) })
+      ).ok
+    ).toBe(false);
+    expect(
+      parseExternalOrderInput(
+        raw({ items: JSON.stringify([{ custom_name: "Pufa", price: "10", quantity: "0" }]) })
+      ).ok
+    ).toBe(false);
   });
 });

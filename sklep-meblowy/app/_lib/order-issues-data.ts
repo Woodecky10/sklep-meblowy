@@ -1,5 +1,6 @@
 // Server-owa warstwa danych order_issues (panel admina). Czyste helpery w order-issues.ts.
 import { createAdminClient } from "./supabase/server";
+import { orderItemDisplayName } from "./order-items";
 import type { OrderIssue } from "./order-issues";
 
 export type AdminOrderIssue = OrderIssue & {
@@ -10,7 +11,7 @@ export type AdminOrderIssue = OrderIssue & {
 
 type Row = OrderIssue & {
   order: { order_number: number | null; status: string | null } | null;
-  item: { product: { name: string } | null } | null;
+  item: { custom_name?: string | null; product: { name: string } | null } | null;
 };
 
 // Lista wszystkich zgłoszeń, najnowsze pierwsze, z kontekstem zamówienia + nazwą pozycji.
@@ -18,8 +19,12 @@ export async function getAllOrderIssues(): Promise<AdminOrderIssue[]> {
   const supabase = await createAdminClient();
   const { data } = await supabase
     .from("order_issues")
+    // `order_items(*)`, bo potrzebujemy też `custom_name` (migracja 82).
+    // Wymieniona z nazwy kolumna, której w bazie jeszcze nie ma, byłaby dla
+    // PostgREST błędem i wywaliłaby całą listę reklamacji; `*` jej po prostu
+    // nie zwraca.
     .select(
-      `*, order:orders(order_number, status), item:order_items(product:products(name))`
+      `*, order:orders(order_number, status), item:order_items(*, product:products(name))`
     )
     .order("created_at", { ascending: false });
 
@@ -37,7 +42,10 @@ export async function getAllOrderIssues(): Promise<AdminOrderIssue[]> {
     updated_at: r.updated_at,
     order_number: r.order?.order_number ?? null,
     order_status: r.order?.status ?? null,
-    item_name: r.item?.product?.name ?? null,
+    // null = zgłoszenie dotyczy całego zamówienia (tak je czyta ReklamacjeList).
+    // Pozycja spoza katalogu ma nazwę tylko w `custom_name` — bez tego panel
+    // twierdziłby, że reklamacja konkretnej pozycji dotyczy całego zamówienia.
+    item_name: r.item ? orderItemDisplayName(r.item, "") || null : null,
   }));
 }
 
