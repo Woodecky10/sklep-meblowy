@@ -6,9 +6,10 @@ import { requireAdmin } from "@/app/_lib/admin";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { canTransition } from "@/app/_lib/order-status";
 import type { OrderStatus } from "@/app/_lib/types";
-import { notifyExternalOrderAccepted, notifyStatusChange } from "@/app/_lib/mail/notify-order";
+import { notifyStatusChange, sendExternalOrderAcceptedMail } from "@/app/_lib/mail/notify-order";
 import { requestReviews } from "@/app/_lib/mail/review-request";
 import { parseExternalOrderInput } from "@/app/_lib/external-order";
+import { ACCEPTED_MAIL_MAX_LENGTH } from "@/app/_lib/order-accepted-mail";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -177,11 +178,11 @@ export type CreateExternalOrderResult =
 // z pustym `status_updated_at`) i gaśnie przy pierwszej zmianie statusu —
 // identycznie jak zakup ze sklepu, odpowiednio online i za pobraniem.
 //
-// MAIL „Dziękujemy za zamówienie":
-// - online → przy ręcznym przestawieniu na „W realizacji" (notifyStatusChange);
-// - cod → OD RAZU tutaj, bo przejścia paid→processing dla takiego zamówienia
-//   nigdy nie będzie, a klient z Allegro nie dostał od nas żadnego innego
-//   potwierdzenia (decyzja właściciela 2026-09-09).
+// MAIL „Dziękujemy za zamówienie" NIE WYCHODZI STĄD i nie wychodzi już z żadnej
+// zmiany statusu (decyzja właściciela 2026-09-09 po zgłoszeniu pracownicy).
+// Zapis zamówienia kończy się przejściem na jego kartę, gdzie sekcja
+// „Wiadomość do klienta" pokazuje gotową propozycję treści do sprawdzenia,
+// poprawienia i wysłania przyciskiem — patrz sendExternalOrderMail niżej.
 export async function createExternalOrder(
   formData: FormData
 ): Promise<CreateExternalOrderResult> {
@@ -286,18 +287,91 @@ export async function createExternalOrder(
     return { ok: false, error: itemsErr.message };
   }
 
-  // Zamówienie ZA POBRANIEM rodzi się w `processing`, więc przejścia
-  // paid→processing (jedyny nadawca maila „Dziękujemy") nigdy nie będzie —
-  // wysyłamy go tutaj, po udanym zapisie kompletnego zamówienia.
-  //
-  // after(): wysyłka jest POST-response i nie może opóźnić ani zepsuć zapisu —
-  // ten sam wzorzec i to samo uzasadnienie co w updateOrderStatus wyżej.
-  // notifyExternalOrderAccepted nie rzuca, więc nieudany mail nie zamieni
-  // zapisanego zamówienia w błąd w panelu.
-  if (cod) {
-    after(() => notifyExternalOrderAccepted(orderId));
-  }
-
   revalidatePath("/admin/zamowienia");
   return { ok: true, orderId };
+}
+
+// Ręczna wysyłka maila „Dziękujemy za zamówienie" do klienta z Allegro/OLX —
+// od 2026-09-09 JEDYNA droga, którą ta wiadomość opuszcza sklep.
+//
+// Zgłoszenie pracownicy obsługującej panel: maila nie widziała (szedł
+// automatem), nie mogła dopasować treści (czas realizacji wpisany na sztywno
+// w szablonie) i — jej słowami — „nawet nie wiem, czy ją wysyłałam".
+//
+// Trzy rzeczy, którymi ta akcja świadomie różni się od sąsiadów w tym pliku:
+// 1. WYSYŁA SYNCHRONICZNIE, nie przez after(). after() jest dla maili, które
+//    tylko TOWARZYSZĄ innej czynności (zmiana statusu) i nie mogą jej zepsuć.
+//    Tutaj mail JEST czynnością — nie ma czego chronić przed jego opóźnieniem.
+// 2. BŁĄD WYSYŁKI WRACA do panelu zamiast wylądować w logach. Pracownica klika
+//    świadomie i musi wiedzieć, czy klient dostał wiadomość.
+// 3. Po udanej wysyłce zapisuje ślad: KIEDY poszła i CO dokładnie zawierała
+//    (migracja 83) — to jest odpowiedź na „nie wiem, czy wysyłałam".
+export async function sendExternalOrderMail(
+  orderId: string,
+  body: string
+): Promise<ActionResult> {
+  await requireAdmin();
+  if (!orderId) return { ok: false, error: "Brak id zamówienia" };
+
+  const text = typeof body === "string" ? body.trim() : "";
+  if (!text) return { ok: false, error: "Wpisz treść wiadomości" };
+  if (text.length > ACCEPTED_MAIL_MAX_LENGTH) {
+    return {
+      ok: false,
+      error: `Wiadomość jest za długa — najwyżej ${ACCEPTED_MAIL_MAX_LENGTH} znaków`,
+    };
+  }
+
+  const supabase = await createAdminClient();
+  // `select("*")`, nie lista kolumn: gdyby ktoś zmergował kod przed migracją 83,
+  // wymieniona wprost `accepted_mail_body` byłaby błędem PostgREST już na
+  // ODCZYCIE — a chcemy, żeby do tego czasu padał najwyżej zapis po wysyłce.
+  const { data: row, error: readErr } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (readErr) return { ok: false, error: readErr.message };
+  if (!row) return { ok: false, error: "Zamówienie nie znalezione" };
+
+  const order = row as {
+    source?: string | null;
+    guest_email: string | null;
+    user_id: string | null;
+  };
+  // Zamówienie ZE SKLEPU dostało już potwierdzenie zakupu z checkoutu — ta
+  // wiadomość dotyczy wyłącznie zamówień wpisanych ręcznie. Bramka jest też
+  // zabezpieczeniem: panel pokazuje sekcję tylko dla zamówień ze źródłem, więc
+  // wywołanie bez niego znaczy, że coś poszło nie tak.
+  if (!order.source) {
+    return {
+      ok: false,
+      error: "Ta wiadomość dotyczy tylko zamówień spoza sklepu (Allegro, OLX itp.)",
+    };
+  }
+
+  const sent = await sendExternalOrderAcceptedMail(order, text);
+  if (!sent.ok) return { ok: false, error: sent.error };
+
+  const { error: saveErr } = await supabase
+    .from("orders")
+    .update({
+      accepted_mail_sent_at: new Date().toISOString(),
+      accepted_mail_body: text,
+    } as never)
+    .eq("id", orderId);
+  if (saveErr) {
+    // Mail JUŻ poszedł do klienta — komunikat nie może brzmieć jak „nie
+    // wysłano", bo pracownica kliknęłaby drugi raz i klient dostałby wiadomość
+    // podwójnie. (Najbardziej prawdopodobna przyczyna: kod na produkcji przed
+    // aplikacją migracji 83, czyli PGRST204 na nieznanej kolumnie.)
+    console.error("[zamowienia] zapis sladu wysylki maila nieudany:", saveErr.message);
+    return {
+      ok: false,
+      error: `Wiadomość ZOSTAŁA wysłana do klienta, ale nie udało się zapisać jej w zamówieniu (${saveErr.message}). Nie wysyłaj ponownie.`,
+    };
+  }
+
+  revalidatePath(`/admin/zamowienia/${orderId}`);
+  return { ok: true, message: "Wiadomość wysłana do klienta" };
 }

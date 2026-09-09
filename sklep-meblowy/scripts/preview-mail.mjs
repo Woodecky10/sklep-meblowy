@@ -18,6 +18,7 @@ import { SampleOrderSent } from "../app/_lib/mail/templates/SampleOrderSent.tsx"
 import { AdminNewReview } from "../app/_lib/mail/templates/AdminNewReview.tsx";
 import { ExternalOrderAccepted } from "../app/_lib/mail/templates/ExternalOrderAccepted.tsx";
 import { wasOrderPaid } from "../app/_lib/mail/status-notify.ts";
+import { buildAcceptedMailBody } from "../app/_lib/order-accepted-mail.ts";
 
 const OUT = "mail-preview";
 mkdirSync(OUT, { recursive: true });
@@ -223,9 +224,41 @@ const cases = [
     }),
   },
   {
+    // Od 2026-09-09 szablon dostaje samą TREŚĆ z panelu — tu podglądamy ją
+    // dokładnie taką, jaką pracownica zobaczy w polu tekstowym na karcie
+    // zamówienia (ta sama funkcja liczy propozycję). Zamówienie „opłacone
+    // w źródle": bez linii o płatności u kuriera.
     name: "external-order-accepted-pl",
     el: ExternalOrderAccepted({
-      order: { ...order, source: "Allegro" },
+      body: buildAcceptedMailBody(
+        {
+          source: "Allegro",
+          payment_method: "online",
+          total: order.total,
+          delivery_cost: null,
+          currency: order.currency,
+        },
+        items
+      ),
+      branding,
+      shopUrl: "https://www.mollien.pl",
+    }),
+  },
+  {
+    // Wariant ZA POBRANIEM z kosztem dostawy — jedyny, w którym mail podaje
+    // kwotę do zapłaty kurierowi (total pozycji + dostawa).
+    name: "external-order-accepted-cod",
+    el: ExternalOrderAccepted({
+      body: buildAcceptedMailBody(
+        {
+          source: "OLX",
+          payment_method: "cod",
+          total: order.total,
+          delivery_cost: 350,
+          currency: order.currency,
+        },
+        items
+      ),
       branding,
       shopUrl: "https://www.mollien.pl",
     }),

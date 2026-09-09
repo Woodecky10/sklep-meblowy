@@ -1,29 +1,47 @@
+import { Fragment } from "react";
 import { Text } from "@react-email/components";
-import type { Order } from "../../types";
 import type { MailBranding } from "../branding";
 import { MailButton, MailLayout } from "./_Layout";
 
-// Mail do klienta, który kupił POZA sklepem (Allegro, OLX, …), wysyłany gdy
-// admin ręcznie przestawia zamówienie zewnętrzne na „W realizacji" (spec
-// 2026-09-02). Treść 1:1 od właściciela; jedyna zmienna to nazwa źródła.
-// Tylko PL — zamówienia zewnętrzne są wyłącznie polskie.
+// Mail do klienta, który kupił POZA sklepem (Allegro, OLX, …). Od 2026-09-09
+// wysyła go WYŁĄCZNIE pracownica, przyciskiem na karcie zamówienia — automatu
+// (przejście na „W realizacji", zapis zamówienia za pobraniem) już nie ma.
 //
-// Świadomie bez numeru zamówienia i bez listy pozycji: klient zna numer
-// z marketplace, a nasz #N nic mu nie mówi.
+// Szablon nie zna zamówienia i niczego o nim nie twierdzi: CAŁA treść
+// przychodzi w `body` z pola tekstowego w panelu (propozycję generuje
+// buildAcceptedMailBody, app/_lib/order-accepted-mail.ts). Tutaj zostaje sama
+// ramka — nazwa firmy, nagłówek, przycisk do sklepu i stopka — bo to ona
+// robi z wiadomości mail od Mollien, a nie zwykłą notatkę.
+//
+// Tylko PL — zamówienia zewnętrzne są wyłącznie polskie.
 export const EXTERNAL_ORDER_ACCEPTED_SUBJECT = "Dziękujemy za zamówienie – Mollien 🤍";
 
+// Treść → akapity. Pusta linia (także z białymi znakami) zaczyna nowy akapit,
+// pojedyncze złamanie linii zostaje złamaniem WEWNĄTRZ akapitu — dzięki temu
+// lista pozycji trzyma się razem, a nie rozłazi na osobne bloki z odstępami.
+function toParagraphs(body: string): string[][] {
+  return body
+    .split(/\r?\n[ \t]*\r?\n/)
+    .map((block) => block.split(/\r?\n/))
+    .filter((lines) => lines.some((line) => line.trim() !== ""));
+}
+
 export function ExternalOrderAccepted({
-  order,
+  body,
   branding,
   shopUrl,
 }: {
-  order: Order;
+  // Zwykły TEKST wpisany w panelu. React Email escapuje go przy renderze,
+  // więc znaczniki HTML z pola tekstowego trafiają do maila jako napis —
+  // pracownica pisze treść, nie kod.
+  body: string;
   branding: MailBranding;
   // Strona główna sklepu (NEXT_PUBLIC_APP_URL) — cel przycisku „Odwiedź sklep".
   shopUrl: string;
 }) {
   const c = branding.colors;
   const p = { color: c.fg, fontSize: "14px", lineHeight: "1.6", margin: "0 0 16px" };
+  const paragraphs = toParagraphs(body);
 
   return (
     <MailLayout
@@ -32,37 +50,20 @@ export function ExternalOrderAccepted({
       preview="Dziękujemy za zakup i wybór Mollien"
       heading="Dziękujemy za zamówienie"
     >
-      <Text style={p}>Dzień dobry,</Text>
-      <Text style={p}>dziękujemy za zakup i wybór Mollien! 🤍</Text>
-      <Text style={p}>
-        Potwierdzamy, że Państwa zamówienie zostało przyjęte i przekazane do realizacji.
-      </Text>
-      {/* Celowo literał szablonowy, nie `Źródło zamówienia: {order.source}`:
-          React wstawia znacznik <!-- --> między sąsiadującym tekstem statycznym
-          a wyrażeniem, więc w źródle HTML napis rozciąłby się na dwa węzły i
-          test sprawdzający ciągły ciąg „Źródło zamówienia: Allegro” by nie
-          przeszedł. */}
-      <Text style={{ ...p, fontWeight: 600 }}>{`Źródło zamówienia: ${order.source}`}</Text>
-      <Text style={p}>Mebel zostanie przygotowany zgodnie z wybranym przez Państwa wariantem.</Text>
-      <Text style={p}>🛋️ Przewidywany czas realizacji: do 21 dni roboczych.</Text>
-      <Text style={p}>O kolejnych etapach realizacji będziemy informować na bieżąco.</Text>
-      <Text style={{ ...p, margin: "0 0 20px" }}>
-        Jeżeli chcą Państwo zobaczyć więcej naszych modeli, dostępne kolekcje, tkaniny oraz
-        pozostałe produkty znajdą Państwo w naszym sklepie:
-      </Text>
+      {paragraphs.map((lines, i) => (
+        <Text key={i} style={i === paragraphs.length - 1 ? { ...p, margin: "0 0 20px" } : p}>
+          {lines.map((line, j) => (
+            <Fragment key={j}>
+              {j > 0 && <br />}
+              {line}
+            </Fragment>
+          ))}
+        </Text>
+      ))}
       {/* Przycisk poza <Text>, jak w OrderShipped — <Button> ma własny blok. */}
       <MailButton branding={branding} href={shopUrl}>
         👉 Odwiedź sklep Mollien
       </MailButton>
-      <Text style={{ ...p, margin: "24px 0 16px" }}>Dziękujemy za zaufanie i wybór Mollien!</Text>
-      <Text style={p}>
-        Mamy nadzieję, że nowy mebel będzie pięknym elementem Państwa wnętrza. 🤍
-      </Text>
-      <Text style={{ ...p, margin: 0 }}>
-        Pozdrawiamy,
-        <br />
-        Zespół Mollien.
-      </Text>
     </MailLayout>
   );
 }

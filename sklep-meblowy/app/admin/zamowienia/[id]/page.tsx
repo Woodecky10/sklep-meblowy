@@ -5,10 +5,12 @@ import { getOrderById, getProfilesByIds } from "@/app/_lib/orders";
 import { orderCustomerDisplay } from "@/app/_lib/admin-orders";
 import { adminStatusLabel, nextStatuses } from "@/app/_lib/order-status";
 import { orderItemDisplayName } from "@/app/_lib/order-items";
+import { buildAcceptedMailBody } from "@/app/_lib/order-accepted-mail";
 import { formatOrderAmount } from "@/app/_lib/money";
 import { formatVariantLabel } from "@/app/_lib/variants";
 import { Card } from "@/app/admin/_shared";
 import OrderControls from "./OrderControls";
+import CustomerMailCard from "./CustomerMailCard";
 import type { Order, OrderItem } from "@/app/_lib/types";
 
 export const metadata = { title: "Zamówienie — Admin" };
@@ -41,6 +43,37 @@ export default async function AdminOrderDetailPage({
   const bundleDiscount = Number(order.bundle_discount ?? 0);
   const s = adminStatusLabel(order.status, order.source);
   const addr = order.shipping_address;
+
+  // Mail „Dziękujemy za zamówienie" — tylko dla zamówień spoza sklepu i tylko
+  // z przycisku (decyzja właściciela 2026-09-09; wcześniej szedł automatem).
+  // Propozycję treści liczymy TUTAJ, na serwerze: generator jest czysty, ale
+  // opiera się na pozycjach zamówienia, których komponent kliencki i tak nie
+  // ma. Po wysyłce pokazujemy snapshot z bazy — czyli to, co realnie poszło,
+  // a nie propozycję wyliczoną na nowo.
+  const acceptedMailBody =
+    order.accepted_mail_body ??
+    buildAcceptedMailBody(
+      {
+        source: order.source,
+        payment_method: order.payment_method,
+        total: Number(order.total),
+        delivery_cost: order.delivery_cost,
+        currency: order.currency,
+      },
+      items
+    );
+  // `accepted_mail_sent_at` bywa nieobecne (odczyt przez `select("*")` na bazie
+  // bez migracji 83) — `??` łapie i null, i undefined.
+  const acceptedMailSentAt = order.accepted_mail_sent_at ?? null;
+  const acceptedMailSentLabel = acceptedMailSentAt
+    ? new Date(acceptedMailSentAt).toLocaleString("pl-PL", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -170,6 +203,19 @@ export default async function AdminOrderDetailPage({
               </div>
             </dl>
           </Card>
+
+          {/* Wyłącznie zamówienia spoza sklepu: klient ze sklepu dostał
+              potwierdzenie zakupu automatem z checkoutu, więc nie ma tu czego
+              wysyłać. Sekcja stoi wysoko, zaraz pod pozycjami — pracownica ma
+              na nią trafić, a nie jej szukać (zgłoszenie 2026-09-09). */}
+          {order.source && (
+            <CustomerMailCard
+              orderId={order.id}
+              customerEmail={customer.email}
+              sentAtLabel={acceptedMailSentLabel}
+              defaultBody={acceptedMailBody}
+            />
+          )}
 
           <Card>
             <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-3">Klient</h3>
