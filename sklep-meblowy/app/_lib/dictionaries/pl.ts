@@ -30,6 +30,8 @@ export type PlShape = {
     seriesEyebrow: string;
     seriesHeading: string;
     seeCollection: string;
+    // Link ze slidera kolekcji na home do listy /kolekcje (2026-09-15).
+    collectionsSeeAll: string;
     productOne: string;
     productFew: string;
     productMany: string;
@@ -188,6 +190,13 @@ export type PlShape = {
     crossSellHeading: string;
     toastAdded: string;
     viewCart: string;
+  };
+  // Lista kolekcji /kolekcje (2026-09-15).
+  collectionsPage: {
+    eyebrow: string;
+    heading: string;
+    intro: string;
+    empty: string;
   };
   // Lista zestawów /zestawy (2026-09-15).
   bundlesPage: {
@@ -467,6 +476,7 @@ export const pl = {
     seriesEyebrow: "Serie mebli",
     seriesHeading: "Nasze kolekcje",
     seeCollection: "Zobacz kolekcję",
+    collectionsSeeAll: "Zobacz wszystkie kolekcje",
     productOne: "produkt",
     productFew: "produkty",
     productMany: "produktów",
@@ -635,6 +645,13 @@ export const pl = {
     crossSellHeading: "Może Cię zainteresować",
     toastAdded: "Dodano do koszyka",
     viewCart: "Zobacz koszyk",
+  },
+  collectionsPage: {
+    eyebrow: "Serie mebli",
+    heading: "Nasze kolekcje",
+    intro:
+      "Każda kolekcja to seria mebli w jednym stylu — narożnik, sofa, fotel i pufa, które można zestawiać ze sobą. Wybierz kolekcję, aby zobaczyć wszystkie jej meble w sklepie.",
+    empty: "Obecnie nie mamy żadnych kolekcji. Wszystkie meble znajdziesz w sklepie.",
   },
   bundlesPage: {
     eyebrow: "Zestawy",

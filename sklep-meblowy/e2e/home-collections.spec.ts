@@ -1,7 +1,9 @@
 import { test, expect } from "@playwright/test";
 
 // Kolekcje na stronie glownej jako slider (2026-09-15, decyzja wlasciciela:
-// „na kolekcjach tez tak" — jak zestawy). Wczesniej: siatka 6 + „Pokaz
+// „na kolekcjach tez tak" — jak zestawy) + link do nowej listy /kolekcje
+// (ten sam uklad, co przy zestawach: nad sliderem z prawej na desktopie,
+// przycisk pod sliderem na mobile — w DOM dwa, widoczny jeden). Wczesniej: siatka 6 + „Pokaz
 // wszystkie kolekcje" (spec 2026-07-31), stad w historii tego pliku asercje
 // o display:none — w sliderze nie ma juz zwijania.
 //
@@ -43,6 +45,7 @@ test("kolekcje na home: slider ze wszystkimi kafelkami i dzialajacymi strzalkami
   const next = section.locator('button[aria-label="Następne kolekcje"]');
   await expect(prev).toHaveCount(1);
   await expect(next).toHaveCount(1);
+  await expect(section.locator('a[href="/kolekcje"]:visible')).toHaveCount(1);
 
   // Na desktopie (viewport Playwrighta 1280px) widac 3 kafelki na ekran —
   // przewijanie ma sens dopiero przy 4+. Prod ma 15 kolekcji.
@@ -52,4 +55,22 @@ test("kolekcje na home: slider ze wszystkimi kafelkami i dzialajacymi strzalkami
 
   await next.click();
   await expect(prev).toBeEnabled();
+});
+
+test("lista /kolekcje: naglowek i te same kolekcje, co w sliderze na home", async ({ page }) => {
+  await page.goto("/");
+  const onHome = await page
+    .locator('#home-collections a[href*="kolekcja="]')
+    .count();
+  expect(onHome).toBeGreaterThan(0);
+
+  const res = await page.goto("/kolekcje");
+  expect(res?.status()).toBe(200);
+  await expect(page.locator("h1")).toHaveText("Nasze kolekcje");
+
+  // Lista i slider jedza z tej samej funkcji (getCollectionTilesForHome),
+  // wiec licza sie tak samo; kazdy kafelek prowadzi do filtra sklepu.
+  const tiles = page.locator('#collections-list a[href*="kolekcja="]');
+  await expect(tiles).toHaveCount(onHome);
+  await expect(tiles.first()).toContainText("Zobacz kolekcję");
 });
