@@ -30,8 +30,6 @@ export type PlShape = {
     seriesEyebrow: string;
     seriesHeading: string;
     seeCollection: string;
-    collectionsShowAll: string;
-    collectionsCollapse: string;
     productOne: string;
     productFew: string;
     productMany: string;
@@ -344,6 +342,11 @@ export type PlShape = {
     // mówić „poprzednie produkty".
     prevReviews: string;
     nextReviews: string;
+    // Slidery kolekcji i zestawów na home (2026-09-15).
+    prevCollections: string;
+    nextCollections: string;
+    prevBundles: string;
+    nextBundles: string;
     goToSlide: string;
     zoomImage: string;
     showImage: string;
@@ -464,8 +467,6 @@ export const pl = {
     seriesEyebrow: "Serie mebli",
     seriesHeading: "Nasze kolekcje",
     seeCollection: "Zobacz kolekcję",
-    collectionsShowAll: "Pokaż wszystkie kolekcje",
-    collectionsCollapse: "Zwiń",
     productOne: "produkt",
     productFew: "produkty",
     productMany: "produktów",
@@ -785,6 +786,10 @@ export const pl = {
     nextProducts: "Następne produkty",
     prevReviews: "Poprzednie opinie",
     nextReviews: "Następne opinie",
+    prevCollections: "Poprzednie kolekcje",
+    nextCollections: "Następne kolekcje",
+    prevBundles: "Poprzednie zestawy",
+    nextBundles: "Następne zestawy",
     goToSlide: "Przejdź do slajdu",
     zoomImage: "Powiększ zdjęcie",
     showImage: "Pokaż zdjęcie",

@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   buildBundleTiles,
-  HOME_BUNDLES_VISIBLE,
   TILE_COMPONENT_COLUMNS,
 } from "@/app/_lib/bundle-tiles";
 import type { BundleWithComponents, Product } from "@/app/_lib/types";
@@ -136,8 +135,3 @@ describe("TILE_COMPONENT_COLUMNS", () => {
   });
 });
 
-describe("HOME_BUNDLES_VISIBLE", () => {
-  it("pełny rząd siatki na desktopie (3 kolumny) — reszta za linkiem na /zestawy", () => {
-    expect(HOME_BUNDLES_VISIBLE).toBe(3);
-  });
-});

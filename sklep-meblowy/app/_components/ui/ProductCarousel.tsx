@@ -15,6 +15,7 @@ export default function ProductCarousel({
   children,
   prevLabel,
   nextLabel,
+  slideClassName,
 }: {
   children: ReactNode;
   // Karuzela wozi też opinie (sekcja customer_reviews na home) — czytnik
@@ -22,6 +23,11 @@ export default function ProductCarousel({
   // zostają dzisiejsze, więc karuzela produktów zachowuje się identycznie.
   prevLabel?: string;
   nextLabel?: string;
+  // Szerokość slajdu (klasy basis per breakpoint). Domyślnie 4 karty produktów
+  // na ekran; kafelki kolekcji i zestawów podają SLIDES_3_PER_ROW
+  // (carousel-slides.ts). Musi zawierać min-w-0 shrink-0 — bez tego flex
+  // rozciąga slajdy do treści i embla nie ma czego przewijać.
+  slideClassName?: string;
 }) {
   const t = getDictionary(useClientLocale());
   const [emblaRef, emblaApi] = useEmblaCarousel({
@@ -63,7 +69,10 @@ export default function ProductCarousel({
           {Children.map(children, (child, i) => (
             <div
               key={i}
-              className="min-w-0 shrink-0 basis-[78%] sm:basis-[calc(50%-1rem)] lg:basis-[calc(25%-1.5rem)]"
+              className={
+                slideClassName ??
+                "min-w-0 shrink-0 basis-[78%] sm:basis-[calc(50%-1rem)] lg:basis-[calc(25%-1.5rem)]"
+              }
             >
               {child}
             </div>

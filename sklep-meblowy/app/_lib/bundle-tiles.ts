@@ -23,12 +23,6 @@ export type BundleTileComponent = Pick<Product, "id" | "images" | "price" | "sal
 export const TILE_COMPONENT_COLUMNS = "id, images, price, sale_price";
 export type BundleTileSource = Bundle & { components: BundleTileComponent[] };
 
-// Ile kafelków widać na stronie głównej. 3 = pełny rząd na desktopie
-// (siatka 1/2/3 kolumny); reszta jest za linkiem „Zobacz wszystkie zestawy"
-// na /zestawy — inaczej niż kolekcje, które nie mają własnej listy i zwijają
-// nadwyżkę na miejscu.
-export const HOME_BUNDLES_VISIBLE = 3;
-
 // Mozaika ma miejsce na 4 zdjęcia (siatka 2×2, jak kafelek kolekcji).
 const MAX_THUMBNAILS = 4;
 

@@ -2,8 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   buildCollectionTiles,
   countActiveProductsByCollection,
-  foldAfterIndex,
-  HOME_COLLECTIONS_VISIBLE,
   type CollectionProductRow,
 } from "@/app/_lib/collection-tiles";
 import type { Collection } from "@/app/_lib/types";
@@ -148,41 +146,3 @@ describe("buildCollectionTiles", () => {
   });
 });
 
-describe("foldAfterIndex", () => {
-  const counts = new Map<string, number>();
-  const many = Array.from({ length: 9 }, (_, i) => {
-    counts.set(`c${i}`, 1);
-    return col({ id: `c${i}`, label: `K${i}`, sort_order: i });
-  });
-
-  it("zwraca indeks szóstej kolekcji, która realnie trafi na home", () => {
-    expect(foldAfterIndex(many, counts)).toBe(HOME_COLLECTIONS_VISIBLE - 1);
-  });
-
-  it("nie liczy kolekcji ukrytych ani pustych — kreska przesuwa się dalej", () => {
-    const mixed = [
-      col({ id: "hidden", label: "Ukryta", sort_order: 0, show_on_home: false }),
-      col({ id: "empty", label: "Pusta", sort_order: 1 }),
-      ...many,
-    ];
-    const c = new Map(counts);
-    c.set("hidden", 5); // ma produkty, ale jest ukryta
-    // "empty" celowo bez wpisu w liczniku
-    expect(foldAfterIndex(mixed, c)).toBe(HOME_COLLECTIONS_VISIBLE + 1);
-  });
-
-  it("zwraca null gdy widocznych kolekcji jest 6 lub mniej", () => {
-    const few = many.slice(0, 5);
-    expect(foldAfterIndex(few, counts)).toBeNull();
-  });
-
-  it("zwraca null przy dokładnie 6 widocznych kolekcjach — nie ma nic pod kreską", () => {
-    const exactlySix = many.slice(0, HOME_COLLECTIONS_VISIBLE);
-    expect(foldAfterIndex(exactlySix, counts)).toBeNull();
-  });
-
-  it("zwraca indeks szóstej kolekcji przy dokładnie 7 widocznych", () => {
-    const exactlySeven = many.slice(0, HOME_COLLECTIONS_VISIBLE + 1);
-    expect(foldAfterIndex(exactlySeven, counts)).toBe(HOME_COLLECTIONS_VISIBLE - 1);
-  });
-});
