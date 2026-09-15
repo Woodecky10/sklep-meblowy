@@ -279,7 +279,7 @@ export default async function HomePage() {
         // Zwijanie i markup kafelka: _components/blocks/HomeCollections.tsx
         if (collectionTiles.length === 0) return null;
         return (
-          <section className="max-w-7xl mx-auto px-6 py-24">
+          <section id="home-collections" className="max-w-7xl mx-auto px-6 py-24">
             {sectionHeader(b)}
             <HomeCollections tiles={collectionTiles} locale={locale} />
           </section>

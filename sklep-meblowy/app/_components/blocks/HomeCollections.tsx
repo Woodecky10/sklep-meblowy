@@ -1,31 +1,24 @@
-"use client";
-
-import { useState } from "react";
 import Image from "next/image";
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
+import ProductCarousel from "@/app/_components/ui/ProductCarousel";
+import { SLIDES_3_PER_ROW } from "@/app/_components/ui/carousel-slides";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { pluralForm } from "@/app/_lib/plural";
-// Uwaga: z "@/app/_lib/collection-tiles" (czysty moduł), NIE z
-// "@/app/_lib/collections" (ma `import "server-only"` i next/cache/next/headers
-// — import wartości stąd w komponencie "use client" wciągnąłby je do bundla
-// przeglądarki i wysadził build).
-import { HOME_COLLECTIONS_VISIBLE, type CollectionTile } from "@/app/_lib/collection-tiles";
-import type { Locale } from "@/app/_lib/i18n";
 import { mosaicTileClass } from "@/app/_lib/mosaic";
+import type { CollectionTile } from "@/app/_lib/collection-tiles";
+import type { Locale } from "@/app/_lib/i18n";
 
-// Mozaika: wspólna reguła z kafelkiem zestawu — app/_lib/mosaic.ts.
-
-const GRID = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6";
-const REST_ID = "home-collections-rest";
-// Uchwyt dla e2e (home-collections.spec.ts). Bez niego test liczyłby linki
-// `?kolekcja=` po całej stronie i łapał navbar, stopkę oraz bloki home
-// edytowalne z panelu (edytor podpowiada wprost "np. /sklep?kolekcja=lisbon")
-// — zawyżony wynik wywracał test przy samej zmianie treści w DB, a zerowy
-// (czyli ZNIKNIĘCIE sekcji — regresja) uciszał go skipem.
-const VISIBLE_ID = "home-collections-visible";
-
-// Sekcja "Nasze kolekcje". Pierwsze HOME_COLLECTIONS_VISIBLE kafelków widać od
-// razu, nadwyżka siedzi w drugim kontenerze do kliknięcia.
+// Sekcja „Nasze kolekcje" — slider ze WSZYSTKIMI kolekcjami z panelu, w
+// kolejności ustawionej przeciąganiem (decyzja właściciela 2026-09-15: „na
+// kolekcjach też tak", jak zestawy). Wcześniej: siatka 6 + „Pokaż wszystkie
+// kolekcje" (spec 2026-07-31) — zwijanie, kreska „poniżej dopiero po
+// rozwinięciu" w panelu i HOME_COLLECTIONS_VISIBLE poszły razem z nim.
+// Zdjęcia slajdów poza ekranem ładują się leniwie (next/image liczy
+// przecięcie z viewportem, a slajdy poza nim są za overflow-hidden karuzeli).
+// Komponent serwerowy: karty renderują się na serwerze i wjeżdżają do
+// klienckiej karuzeli jako children — ten sam układ, co opinie na home.
+// Uchwyt id="home-collections" (e2e/home-collections.spec.ts) stoi na
+// <section> w app/page.tsx.
 export default function HomeCollections({
   tiles,
   locale,
@@ -33,99 +26,63 @@ export default function HomeCollections({
   tiles: CollectionTile[];
   locale: Locale;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const t = getDictionary(locale);
 
-  const visible = tiles.slice(0, HOME_COLLECTIONS_VISIBLE);
-  const rest = tiles.slice(HOME_COLLECTIONS_VISIBLE);
-
-  function card({ collection, thumbnails, productCount }: CollectionTile) {
-    return (
-      <LocalizedLink
-        key={collection.id}
-        href={`/sklep?kolekcja=${collection.slug}`}
-        className="group flex flex-col bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl overflow-hidden hover:border-[var(--color-gold)] transition-colors"
-      >
-        {/* Mozaika do 4 zdjęć produktów z kolekcji */}
-        <div className="relative aspect-[4/3] grid grid-cols-2 gap-1 p-1 bg-stone-100 dark:bg-stone-900">
-          {thumbnails.map((src, i) => (
-            <div
-              key={src}
-              className={`relative bg-stone-200 dark:bg-stone-800 rounded-lg overflow-hidden ${mosaicTileClass(
-                thumbnails.length,
-                i
-              )}`}
-            >
-              <Image
-                src={src}
-                alt=""
-                fill
-                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                className="object-cover transition-transform group-hover:scale-105"
-              />
-            </div>
-          ))}
-        </div>
-        <div className="p-6 flex flex-col gap-2">
-          <h3 className="font-display text-2xl font-bold text-[var(--fg)] group-hover:text-[var(--color-gold)] transition-colors">
-            {collection.label}
-          </h3>
-          {collection.description && (
-            <p className="text-sm text-[var(--muted)] leading-snug line-clamp-2">
-              {collection.description}
-            </p>
-          )}
-          <span className="mt-2 text-xs font-sans uppercase tracking-widest text-[var(--color-gold)] flex items-center gap-1">
-            {t.home.seeCollection} ({productCount}{" "}
-            {pluralForm(productCount, {
-              one: t.home.productOne,
-              few: t.home.productFew,
-              many: t.home.productMany,
-            })})
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M5 12h14M12 5l7 7-7 7" />
-            </svg>
-          </span>
-        </div>
-      </LocalizedLink>
-    );
-  }
-
   return (
-    <>
-      <div id={VISIBLE_ID} className={GRID}>
-        {visible.map(card)}
-      </div>
-
-      {rest.length > 0 && (
-        <>
-          {/*
-            UKRYCIE MUSI BYĆ `hidden` (display: none), NIE opacity-0 ani
-            max-height: 0. Tylko wtedy przeglądarka nie pobiera leniwych zdjęć
-            (next/image domyślnie loading="lazy") ze schowanego kontenera.
-            Przy opacity-0 wszystkie zdjęcia ładują się normalnie i cały zysk
-            przepada — NIEWIDOCZNIE, bo wizualnie zachowanie jest identyczne.
-            Pilnuje tego e2e/home-collections.spec.ts.
-          */}
-          <div id={REST_ID} className={expanded ? `${GRID} mt-6` : "hidden"}>
-            {rest.map(card)}
+    <ProductCarousel
+      prevLabel={t.a11y.prevCollections}
+      nextLabel={t.a11y.nextCollections}
+      slideClassName={SLIDES_3_PER_ROW}
+    >
+      {tiles.map(({ collection, thumbnails, productCount }) => (
+        <LocalizedLink
+          key={collection.id}
+          href={`/sklep?kolekcja=${collection.slug}`}
+          className="group flex flex-col h-full bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl overflow-hidden hover:border-[var(--color-gold)] transition-colors"
+        >
+          {/* Mozaika do 4 zdjęć produktów z kolekcji — reguła w app/_lib/mosaic.ts */}
+          <div className="relative aspect-[4/3] grid grid-cols-2 gap-1 p-1 bg-stone-100 dark:bg-stone-900">
+            {thumbnails.map((src, i) => (
+              <div
+                key={src}
+                className={`relative bg-stone-200 dark:bg-stone-800 rounded-lg overflow-hidden ${mosaicTileClass(
+                  thumbnails.length,
+                  i
+                )}`}
+              >
+                <Image
+                  src={src}
+                  alt=""
+                  fill
+                  sizes="(max-width: 640px) 78vw, (max-width: 1024px) 50vw, 33vw"
+                  className="object-cover transition-transform group-hover:scale-105"
+                />
+              </div>
+            ))}
           </div>
-
-          <div className="flex justify-center mt-10">
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              aria-expanded={expanded}
-              aria-controls={REST_ID}
-              className="px-6 py-3 rounded-full border border-[var(--border)] text-sm font-sans uppercase tracking-widest text-[var(--color-gold)] hover:border-[var(--color-gold)] hover:bg-[var(--color-gold)]/5 transition-colors"
-            >
-              {expanded
-                ? t.home.collectionsCollapse
-                : `${t.home.collectionsShowAll} (+${rest.length})`}
-            </button>
+          <div className="p-6 flex flex-col gap-2">
+            <h3 className="font-display text-2xl font-bold text-[var(--fg)] group-hover:text-[var(--color-gold)] transition-colors">
+              {collection.label}
+            </h3>
+            {collection.description && (
+              <p className="text-sm text-[var(--muted)] leading-snug line-clamp-2">
+                {collection.description}
+              </p>
+            )}
+            <span className="mt-2 text-xs font-sans uppercase tracking-widest text-[var(--color-gold)] flex items-center gap-1">
+              {t.home.seeCollection} ({productCount}{" "}
+              {pluralForm(productCount, {
+                one: t.home.productOne,
+                few: t.home.productFew,
+                many: t.home.productMany,
+              })})
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </span>
           </div>
-        </>
-      )}
-    </>
+        </LocalizedLink>
+      ))}
+    </ProductCarousel>
   );
 }

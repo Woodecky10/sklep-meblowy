@@ -1,14 +1,14 @@
 import { test, expect } from "@playwright/test";
 
 // Zestawy mebli (2026-09-15): lista /zestawy + sekcja na stronie glownej.
-// Sekcja pokazuje najwyzej HOME_VISIBLE kafelkow i ZAWSZE link do pelnej listy
-// (inaczej niz kolekcje, ktore zwijaja nadwyzke na miejscu, bo nie maja
-// wlasnej podstrony).
+// Sekcja to slider ze WSZYSTKIMI widocznymi zestawami (strzalki na desktopie,
+// przewijanie palcem na mobile) i linkiem do pelnej listy /zestawy — link jest
+// w DOM dwa razy (wariant desktop nad sliderem i mobile pod nim), widoczny
+// zawsze dokladnie jeden.
 //
 // URUCHAMIANIE: E2E_BASE_URL=http://localhost:3000 na BUILDZIE
 // (npm run build && npm start) i --no-deps. Bez E2E_BASE_URL
 // playwright.config.ts celuje w PRODUKCJE (www.mollien.pl).
-const HOME_VISIBLE = 3;
 
 test.beforeEach(async ({ page }) => {
   // Zgoda cookie z gory - baner (fixed, bottom-0, z-50) nie zaslania niczego.
@@ -48,7 +48,7 @@ test("lista /zestawy: naglowek, kafelki z linkiem do strony zestawu i cena od", 
   expect(res?.status()).toBe(200);
 });
 
-test("sekcja zestawow na home: najwyzej 3 kafelki + link do pelnej listy", async ({ page }) => {
+test("sekcja zestawow na home: slider ze wszystkimi zestawami, strzalki i link do listy", async ({ page }) => {
   const total = await countListedBundles(page);
   test.skip(total === 0, "brak widocznych zestawow w bazie");
 
@@ -58,8 +58,15 @@ test("sekcja zestawow na home: najwyzej 3 kafelki + link do pelnej listy", async
   const section = page.locator("#home-bundles");
   await expect(section).toHaveCount(1);
 
-  await expect(section.locator('a[href^="/zestaw/"]')).toHaveCount(
-    Math.min(total, HOME_VISIBLE)
-  );
-  await expect(section.locator('a[href="/zestawy"]')).toHaveCount(1);
+  // Slider trzyma WSZYSTKIE zestawy w DOM (przewijanie, nie obcinanie).
+  await expect(section.locator('a[href^="/zestaw/"]')).toHaveCount(total);
+  await expect(section.locator('a[href="/zestawy"]:visible')).toHaveCount(1);
+
+  const prev = section.locator('button[aria-label="Poprzednie zestawy"]');
+  const next = section.locator('button[aria-label="Następne zestawy"]');
+  await expect(next).toHaveCount(1);
+  test.skip(total <= 3, "za malo zestawow, zeby przewijac");
+  await expect(prev).toBeDisabled();
+  await next.click();
+  await expect(prev).toBeEnabled();
 });

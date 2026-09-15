@@ -73,8 +73,11 @@ export default function BundleTileCard({
         <div className="mt-2 pt-3 border-t border-[var(--border)] flex flex-col gap-1">
           <p className="text-sm text-[var(--fg)]">
             {t.bundle.bundlePriceFrom}{" "}
-            <strong className="font-sans">{formatMoney(pricing.discounted, locale, rate)}</strong>{" "}
-            <span className="text-[var(--muted)] line-through">
+            <strong className="font-sans whitespace-nowrap">
+              {formatMoney(pricing.discounted, locale, rate)}
+            </strong>{" "}
+            {/* nowrap: w wąskim slajdzie mobilnym „3248 zł" łamało się przed „zł" */}
+            <span className="text-[var(--muted)] line-through whitespace-nowrap">
               {formatMoney(pricing.base, locale, rate)}
             </span>
           </p>

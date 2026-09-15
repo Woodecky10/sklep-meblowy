@@ -9,11 +9,6 @@ import { localizeCollection } from "./localize";
 import type { Locale } from "./i18n";
 import type { Collection } from "./types";
 
-// Ile kafelków widać przed rozwinięciem. 6 dzieli się bez resztki przez 1, 2
-// i 3 — tyle kolumn ma siatka na kolejnych szerokościach ekranu — więc granica
-// zwinięcia wypada na końcu pełnego rzędu na każdym urządzeniu.
-export const HOME_COLLECTIONS_VISIBLE = 6;
-
 // Minimalny wiersz produktu potrzebny do kafelka. Świadomie NIE `Product`:
 // mozaika ma alt="" i nie używa nazw ani opisów, więc nie ma po co ich pobierać.
 // is_active: SQL w getCollectionTilesForHome filtruje `.eq("is_active", true)`
@@ -64,9 +59,9 @@ export function byHomeOrder(a: Collection, b: Collection): number {
 }
 
 // Predykat "ta kolekcja trafia na stronę główną": widoczna (show_on_home) i ma
-// co najmniej jeden aktywny produkt. Współdzielony przez buildCollectionTiles
-// i foldAfterIndex, żeby definicja "kolekcja pokazuje się na home" istniała
-// w jednym miejscu.
+// co najmniej jeden aktywny produkt. Jedna definicja "kolekcja pokazuje się na
+// home" — od 2026-09-15 sekcja jest sliderem ze wszystkimi takimi kolekcjami
+// (dawne zwijanie do 6 i kreska w panelu usunięte).
 export function appearsOnHome(
   collection: Collection,
   counts: Map<string, number>
@@ -122,28 +117,3 @@ export function buildCollectionTiles(
     }));
 }
 
-// Indeks pozycji, PO której panel rysuje kreskę "poniżej dopiero po
-// rozwinięciu". Liczy tylko kolekcje, które realnie trafią na stronę —
-// liczenie wszystkich wierszy pokazywałoby granicę w złym miejscu.
-// null = kreski nie ma: albo widocznych kolekcji jest HOME_COLLECTIONS_VISIBLE
-// lub mniej (wszystko mieści się w jednym ekranie), albo (teoretycznie)
-// pętla nie znalazła dość elementów — w obu wypadkach nie ma nic do zwinięcia.
-// Warunek na totalVisible pilnuje granicy dokładnie na
-// HOME_COLLECTIONS_VISIBLE: bez niego przy dokładnie 6 widocznych kolekcjach
-// funkcja zwracała indeks ostatniej z nich, a strona główna i tak nie pokazuje
-// przycisku (bo `rest` jest puste) — więc panel rysowałby kreskę bez niczego
-// pod nią.
-export function foldAfterIndex(
-  collections: Collection[],
-  counts: Map<string, number>
-): number | null {
-  const totalVisible = collections.filter((c) => appearsOnHome(c, counts)).length;
-  if (totalVisible <= HOME_COLLECTIONS_VISIBLE) return null;
-
-  let shown = 0;
-  for (let i = 0; i < collections.length; i++) {
-    if (appearsOnHome(collections[i], counts)) shown++;
-    if (shown === HOME_COLLECTIONS_VISIBLE) return i;
-  }
-  return null; // nieosiągalne przy totalVisible > HOME_COLLECTIONS_VISIBLE
-}

@@ -36,7 +36,6 @@ import { byCollectionSortOrder } from "@/app/_lib/collection-order";
 // Czyste helpery — z collection-tiles, NIE z collections.ts: ten drugi ma
 // `import "server-only"` i ciągnie next/cache, więc import stąd ("use client")
 // wysypałby build.
-import { foldAfterIndex, HOME_COLLECTIONS_VISIBLE } from "@/app/_lib/collection-tiles";
 import type { Collection, Product } from "@/app/_lib/types";
 
 export default function CollectionsEditor({
@@ -109,16 +108,6 @@ export default function CollectionsEditor({
     });
   }
 
-  // Kreska liczy tylko kolekcje, które realnie trafią na home (widoczne
-  // i mające aktywne produkty) — inaczej pokazywałaby granicę w złym miejscu.
-  // foldAfterIndex iteruje podaną tablicę w podanej kolejności, więc dostaje
-  // DOKŁADNIE tę, którą renderujemy (posortowaną byHomeOrder w page.tsx
-  // i aktualizowaną przeciąganiem). null = nie ma czego zwijać.
-  const foldIndex = foldAfterIndex(
-    collections,
-    new Map(Object.entries(productCounts))
-  );
-
   return (
     <div className="flex flex-col gap-8">
       <div className="flex items-start justify-between gap-4">
@@ -131,8 +120,8 @@ export default function CollectionsEditor({
             Grupuj produkty które pasują wizualnie do siebie (np. seria mebli &bdquo;Lisbon&rdquo;
             zawierająca narożnik + fotel + pufę). Na karcie produktu klienta zobaczy
             sekcję &bdquo;Pełna kolekcja&rdquo; z resztą serii. Przeciągnij żeby zmienić
-            kolejność — na stronie głównej widać pierwsze {HOME_COLLECTIONS_VISIBLE}{" "}
-            kolekcji, reszta dopiero po kliknięciu przycisku.
+            kolejność — w tej samej kolejności jadą slajdy sekcji &bdquo;Nasze kolekcje&rdquo;
+            na stronie głównej.
           </p>
         </div>
         <button
@@ -191,7 +180,7 @@ export default function CollectionsEditor({
             strategy={verticalListSortingStrategy}
           >
             <div className="flex flex-col gap-3">
-              {collections.map((c, index) => (
+              {collections.map((c) => (
                 <Fragment key={c.id}>
                   <Row
                     collection={c}
@@ -235,15 +224,6 @@ export default function CollectionsEditor({
                       }
                     }}
                   />
-                  {foldIndex === index && (
-                    <div className="flex items-center gap-3 py-1" aria-hidden="true">
-                      <div className="h-px flex-1 bg-[var(--border)]" />
-                      <span className="text-[11px] font-sans uppercase tracking-widest text-[var(--muted)]">
-                        poniżej dopiero po rozwinięciu
-                      </span>
-                      <div className="h-px flex-1 bg-[var(--border)]" />
-                    </div>
-                  )}
                 </Fragment>
               ))}
             </div>
