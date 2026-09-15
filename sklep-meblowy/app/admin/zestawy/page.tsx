@@ -22,7 +22,9 @@ export default async function AdminZestawyPage() {
       <h1 className="font-display text-3xl font-bold text-[var(--fg)] mb-2">Zestawy</h1>
       <p className="text-sm text-[var(--muted)] mb-8">
         Połącz 2 lub więcej mebli (np. fotel + narożnik) w zestaw z rabatem.
-        Klient zobaczy ofertę zestawu na kartach tych produktów.
+        Klient zobaczy ofertę zestawu na kartach tych produktów. Przeciągnij, żeby
+        zmienić kolejność — w tej samej kolejności jadą slajdy sekcji &bdquo;Zestawy
+        mebli&rdquo; na stronie głównej i lista /zestawy.
       </p>
       <BundlesEditor
         bundles={bundles}

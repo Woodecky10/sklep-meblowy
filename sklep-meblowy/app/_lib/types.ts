@@ -185,6 +185,10 @@ export type Bundle = {
   discount_type: "percent" | "amount";
   discount_value: number;
   is_active: boolean;
+  // Kolejność ustawiana przeciąganiem w /admin/zestawy (migracja 83). Mniejsze =
+  // wyżej; przy remisie nowsze pierwsze (bundle-order.ts). Steruje sliderem na
+  // home, listą /zestawy i wyborem 3 zestawów do boxu na karcie produktu.
+  sort_order: number;
   created_at: string;
 };
 
