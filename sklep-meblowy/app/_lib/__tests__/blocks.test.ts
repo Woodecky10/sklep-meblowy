@@ -89,7 +89,23 @@ describe("DEFAULT_HOME_BLOCKS", () => {
     )!;
     expect(reviews.visible).toBe(false);
   });
-  it("localizeBlock traktuje customer_reviews generycznie (nagłówek + podnagłówek)", () => {
+  it("sekcja zestawów jest blokiem systemowym tuż po kolekcjach, widoczna od startu, z nagłówkami PL i DE", () => {
+    expect(isSystemBlockType("bundles")).toBe(true);
+    expect(SYSTEM_BLOCK_TYPES.indexOf("bundles")).toBe(
+      SYSTEM_BLOCK_TYPES.indexOf("collections") + 1
+    );
+    const bundles = DEFAULT_HOME_BLOCKS.find((b) => b.block_type === "bundles")!;
+    // Inaczej niż customer_reviews: sekcja jest zamówiona wprost przez
+    // właściciela (7 zestawów w bazie), więc default startuje jako widoczny —
+    // migracja 82 dokłada realny wiersz tylko po to, żeby panel mógł nią
+    // sterować.
+    expect(bundles.visible).toBe(true);
+    expect(bundles.content.heading).toBe("Zestawy mebli");
+    expect(bundles.content.heading_de).toBe("Möbel-Sets");
+    expect(bundles.content.subheading).toBe("W zestawie taniej");
+    expect(bundles.content.subheading_de).toBe("Im Set günstiger");
+  });
+    it("localizeBlock traktuje customer_reviews generycznie (nagłówek + podnagłówek)", () => {
     const r = row({
       block_type: "customer_reviews",
       content: { heading: "Co mówią klienci", heading_de: "Was unsere Kunden sagen" },

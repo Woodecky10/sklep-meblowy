@@ -63,6 +63,12 @@ export const de: DeepPartial<PlShape> = {
     reviewsEyebrow: "Kundenmeinungen",
     reviewsHeading: "Was unsere Kunden sagen",
     reviewsSeeAll: "Alle Bewertungen ansehen",
+    bundlesEyebrow: "Im Set günstiger",
+    bundlesHeading: "Möbel-Sets",
+    bundlesSeeAll: "Alle Sets ansehen",
+    furnitureOne: "Möbelstück",
+    furnitureFew: "Möbelstücke",
+    furnitureMany: "Möbelstücke",
   },
   reviewsPage: {
     eyebrow: "Kundenmeinungen",
@@ -190,6 +196,13 @@ export const de: DeepPartial<PlShape> = {
     crossSellHeading: "Das könnte Sie interessieren",
     toastAdded: "Zum Warenkorb hinzugefügt",
     viewCart: "Warenkorb ansehen",
+  },
+  bundlesPage: {
+    eyebrow: "Sets",
+    heading: "Möbel-Sets",
+    intro:
+      "Möbel-Sets aus einer Kollektion, günstiger als einzeln gekauft. Stoff und Optionen jedes Möbelstücks wählen Sie unabhängig, der Set-Rabatt wird im Warenkorb berechnet.",
+    empty: "Derzeit bieten wir keine Sets an. Einzelne Möbel finden Sie im Shop.",
   },
   bundle: {
     badge: "Im Set günstiger",

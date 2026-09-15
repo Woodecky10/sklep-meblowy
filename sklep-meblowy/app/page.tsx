@@ -8,6 +8,7 @@ import { getActiveTiles, DEFAULT_FALLBACK_TILES, localizeTile } from "./_lib/hom
 import { getFeaturedOrFallback } from "./_lib/featured";
 import { getCategories } from "./_lib/categories";
 import { getCollectionTilesForHome } from "./_lib/collections";
+import { getVisibleBundleTiles } from "./_lib/bundles-server";
 import { getUserWishlistIds } from "./_lib/wishlist";
 import { getLocale } from "./_lib/i18n-server";
 import { getEurRate } from "./_lib/store-settings";
@@ -24,6 +25,7 @@ import { localizeBlock, type LocalizedBlock } from "./_lib/blocks";
 import { getHomeBlocks } from "./_lib/blocks-server";
 import ContentBlock from "./_components/blocks/ContentBlock";
 import HomeCollections from "./_components/blocks/HomeCollections";
+import HomeBundles from "./_components/blocks/HomeBundles";
 import AboutStore from "./_components/blocks/AboutStore";
 import { getSiteTexts, siteText } from "./_lib/site-texts";
 
@@ -64,6 +66,7 @@ export default async function HomePage() {
     featured,
     allCategories,
     collectionTiles,
+    bundleTiles,
     wishlistIds,
     rate,
     dbBlocks,
@@ -75,6 +78,7 @@ export default async function HomePage() {
     getFeaturedOrFallback(locale),
     getCategories(locale),
     getCollectionTilesForHome(locale),
+    getVisibleBundleTiles(locale),
     getUserWishlistIds(),
     getEurRate(),
     getHomeBlocks(),
@@ -278,6 +282,19 @@ export default async function HomePage() {
           <section className="max-w-7xl mx-auto px-6 py-24">
             {sectionHeader(b)}
             <HomeCollections tiles={collectionTiles} locale={locale} />
+          </section>
+        );
+
+      case "bundles":
+        // Zestawy mebli — kafelki widocznych zestawów (pierwsze 3 + link do
+        // /zestawy). Markup kafelka: _components/ui/BundleTileCard.tsx (ten sam
+        // na liście). Zero zestawów → sekcja znika, jak kolekcje. id = uchwyt
+        // dla e2e/home-bundles.spec.ts.
+        if (bundleTiles.length === 0) return null;
+        return (
+          <section id="home-bundles" className="max-w-7xl mx-auto px-6 py-24">
+            {sectionHeader(b)}
+            <HomeBundles tiles={bundleTiles} locale={locale} rate={rate} />
           </section>
         );
 

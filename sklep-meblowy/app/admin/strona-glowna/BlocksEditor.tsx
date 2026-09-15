@@ -76,6 +76,13 @@ const SYSTEM_META: Record<
     contentCta: "Edytuj kolekcje",
     hasHeadings: true,
   },
+  bundles: {
+    name: "Zestawy mebli",
+    desc: "Automatyczne kafelki aktywnych zestawów (pierwsze 3 + link do listy /zestawy). Zestaw znika, gdy któryś składnik jest wyłączony.",
+    contentHref: "/admin/zestawy",
+    contentCta: "Edytuj zestawy",
+    hasHeadings: true,
+  },
   customer_reviews: {
     // Nazwa MUSI się różnić od CONTENT_BLOCK_DEFS.reviews.name („Opinie
     // klientów" — blok treściowy z ręcznie wpisywanymi cytatami). Bez tego

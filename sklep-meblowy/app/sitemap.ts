@@ -26,6 +26,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const homeAlts = sitemapAlternates("/", { hasDe: true }, BASE).languages;
   const sklepAlts = sitemapAlternates("/sklep", { hasDe: true }, BASE).languages;
   const tkaninyAlts = sitemapAlternates("/tkaniny", { hasDe: true }, BASE).languages;
+  const zestawyAlts = sitemapAlternates("/zestawy", { hasDe: true }, BASE).languages;
 
   // ⏸ Przy zamrożonym DE żaden URL '/de/...' nie może wyjść w sitemapie —
   // zgłaszalibyśmy Google'owi adresy, które odpowiadają redirectem.
@@ -42,6 +43,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...deEntry({ url: `${BASE}/de/sklep`,   lastModified: now, changeFrequency: "daily",  priority: 0.9, alternates: { languages: sklepAlts } }),
     { url: `${BASE}/tkaniny`,     lastModified: now, changeFrequency: "weekly",  priority: 0.7, alternates: { languages: tkaninyAlts } },
     ...deEntry({ url: `${BASE}/de/tkaniny`, lastModified: now, changeFrequency: "weekly", priority: 0.7, alternates: { languages: tkaninyAlts } }),
+    { url: `${BASE}/zestawy`,     lastModified: now, changeFrequency: "weekly",  priority: 0.7, alternates: { languages: zestawyAlts } },
+    ...deEntry({ url: `${BASE}/de/zestawy`, lastModified: now, changeFrequency: "weekly", priority: 0.7, alternates: { languages: zestawyAlts } }),
     { url: `${BASE}/o-nas`,       lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${BASE}/kontakt`,     lastModified: now, changeFrequency: "monthly", priority: 0.6 },
     { url: `${BASE}/opinie`,      lastModified: now, changeFrequency: "weekly",  priority: 0.5 },
