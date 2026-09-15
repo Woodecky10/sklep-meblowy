@@ -19,6 +19,7 @@ export const RESERVED_SLUGS: Set<string> = new Set([
   "feed.xml",
   "konto",
   "kontakt",
+  "kolekcje",
   "koszyk",
   "logowanie",
   "o-nas",
