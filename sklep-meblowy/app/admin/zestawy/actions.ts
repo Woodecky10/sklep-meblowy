@@ -5,6 +5,7 @@ import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
 import { invalidateBundlesCache } from "@/app/_lib/bundles-server";
 import { sanitizeRichHtml } from "@/app/_lib/product-html";
+import { validateReorderIds } from "@/app/_lib/bundle-order";
 
 export type ActionResult =
   | { ok: true; message?: string; data?: unknown }
@@ -94,10 +95,19 @@ export async function createBundle(
   if (!slug) return { ok: false, error: "Nie udało się wygenerować adresu (slug)" };
 
   const supabase = await createAdminClient();
+  // Nowy zestaw na KONIEC listy (migracja 83) — jak createCollection.
+  const { data: maxRow } = await supabase
+    .from("bundles")
+    .select("sort_order")
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const nextOrder = ((maxRow as { sort_order?: number } | null)?.sort_order ?? -1) + 1;
   const { data, error } = await supabase
     .from("bundles")
     .insert({
       slug,
+      sort_order: nextOrder,
       name: parsed.name,
       name_de: parsed.nameDe,
       description: parsed.description,
@@ -174,4 +184,26 @@ export async function deleteBundle(formData: FormData): Promise<ActionResult> {
 
   invalidateAll();
   return { ok: true, message: "Zestaw usunięty" };
+}
+
+// ============================================================
+// Kolejność zestawów (migracja 83) — przeciąganie w /admin/zestawy
+// ============================================================
+// Atomowy reorder przez RPC reorder_bundles — pętla UPDATE po jednym wierszu
+// przy padzie w połowie zostawia zestawy z pomieszanymi numerami (jak
+// reorderCollections). Walidacja id: bundle-order.ts (odrzuca całość, gdy
+// choć jedno id jest puste, nie-UUID albo powtórzone).
+export async function reorderBundles(
+  order: { id: string; sort_order: number }[]
+): Promise<ActionResult> {
+  await requireAdmin();
+  const v = validateReorderIds(order);
+  if (!v.ok) return v;
+
+  const supabase = await createAdminClient();
+  const { error } = await supabase.rpc("reorder_bundles", { p_ids: v.ids });
+  if (error) return { ok: false, error: `Reorder zawiódł: ${error.message}` };
+
+  invalidateAll();
+  return { ok: true, message: "Kolejność zapisana" };
 }

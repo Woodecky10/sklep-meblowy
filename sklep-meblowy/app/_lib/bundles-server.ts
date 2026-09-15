@@ -28,6 +28,8 @@ const fetchAllBundles = unstable_cache(
     const { data } = await supabase
       .from("bundles")
       .select("*, bundle_items(product_id, position)")
+      // Kolejność admina (migracja 83); remis → nowsze pierwsze, jak przed nią.
+      .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false });
     return (data ?? []) as BundleRow[];
   },
@@ -128,6 +130,7 @@ export async function getAllBundlesAdmin(): Promise<(Bundle & { product_ids: str
   const { data } = await supabase
     .from("bundles")
     .select("*, bundle_items(product_id, position)")
+    .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
   return ((data ?? []) as BundleRow[]).map((r) => {
     const { bundle_items, ...bundle } = r;

@@ -2,6 +2,23 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Image from "next/image";
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Card, EmptyState, Field, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
 import RichTextEditor from "@/app/admin/_shared/RichTextEditor";
 import { useConfirm } from "@/app/_context/ConfirmContext";
@@ -9,8 +26,9 @@ import type { Bundle } from "@/app/_lib/types";
 import { filterBySearch } from "@/app/_lib/search-normalize";
 import { effectivePrice } from "@/app/_lib/pricing";
 import { computeBundleDiscount, type BundleDiscountType } from "@/app/_lib/bundles";
+import { byBundleSortOrder } from "@/app/_lib/bundle-order";
 import { formatPrice } from "@/app/_lib/format";
-import { createBundle, saveBundle, deleteBundle } from "./actions";
+import { createBundle, saveBundle, deleteBundle, reorderBundles } from "./actions";
 
 // Minimalny kształt produktu do pickera (lista może mieć setki pozycji —
 // page.tsx nie ciągnie pełnych wierszy). Eksport stąd, NIE z page.tsx.
@@ -26,14 +44,29 @@ export type PickerProduct = {
 type AdminBundle = Bundle & { product_ids: string[] };
 
 export default function BundlesEditor({
-  bundles,
+  bundles: initialBundles,
   products,
 }: {
   bundles: AdminBundle[];
   products: PickerProduct[];
 }) {
+  // Lista w stanie lokalnym, żeby przeciąganie było natychmiastowe (migracja
+  // 83, wzorzec CollectionsEditor). Po zapisie formularza serwer odświeża RSC
+  // i przysyła nową tablicę — przepisujemy ją do stanu W TRAKCIE renderu
+  // (wzorzec „adjusting state when a prop changes" z dokumentacji Reacta;
+  // setState w useEffect łapie reguła lint o kaskadowych renderach). Bez tego
+  // nowy zestaw nie pojawiłby się na liście bez przeładowania strony.
+  const [bundles, setBundles] = useState<AdminBundle[]>(() =>
+    [...initialBundles].sort(byBundleSortOrder)
+  );
+  const [syncedFrom, setSyncedFrom] = useState(initialBundles);
+  if (initialBundles !== syncedFrom) {
+    setSyncedFrom(initialBundles);
+    setBundles([...initialBundles].sort(byBundleSortOrder));
+  }
   const [editing, setEditing] = useState<AdminBundle | "new" | null>(null);
   const [toast, setToast] = useState<Toast>(null);
+  const [, startTransition] = useTransition();
 
   function showToast(t: Toast) {
     setToast(t);
@@ -44,6 +77,40 @@ export default function BundlesEditor({
     () => new Map(products.map((p) => [p.id, p])),
     [products]
   );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  function onDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = bundles.findIndex((b) => b.id === active.id);
+    const newIndex = bundles.findIndex((b) => b.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(bundles, oldIndex, newIndex).map((b, i) => ({
+      ...b,
+      sort_order: i,
+    }));
+
+    // Cofnięcie wraca do OSTATNIEGO DOBREGO stanu, nie do initialBundles —
+    // inaczej nieudany zapis wymazuje wcześniejsze udane przestawienia
+    // (ten sam komentarz w CollectionsEditor i TilesEditor).
+    const prev = bundles;
+    setBundles(reordered);
+    startTransition(async () => {
+      const res = await reorderBundles(
+        reordered.map((b) => ({ id: b.id, sort_order: b.sort_order }))
+      );
+      if (!res.ok) {
+        setBundles(prev);
+        showToast({ type: "error", message: res.error });
+      }
+    });
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -61,52 +128,28 @@ export default function BundlesEditor({
           {bundles.length === 0 ? (
             <EmptyState message="Nie masz jeszcze żadnych zestawów. Dodaj pierwszy żeby zacząć." />
           ) : (
-            <ul className="flex flex-col gap-3">
-              {bundles.map((b) => (
-                <li
-                  key={b.id}
-                  className="flex items-center justify-between gap-4 p-4 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl"
-                >
-                  <div className="min-w-0">
-                    <p className="font-display text-base font-semibold text-[var(--fg)]">
-                      {b.name}{" "}
-                      {!b.is_active && (
-                        <span className="text-xs text-[var(--muted)]">(nieaktywny)</span>
-                      )}
-                      {b.product_ids.length < 2 && (
-                        <span className="text-xs text-red-600"> (niekompletny — min 2 produkty)</span>
-                      )}
-                    </p>
-                    <p className="text-xs text-[var(--muted)] truncate mt-0.5">
-                      {b.product_ids
-                        .map((id) => productById.get(id)?.name ?? "(produkt ukryty/usunięty)")
-                        .join(" + ")}{" "}
-                      · rabat{" "}
-                      {b.discount_type === "percent"
-                        ? `${b.discount_value}%`
-                        : `${b.discount_value} zł`}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <a
-                      href={`/zestaw/${b.slug}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)]"
-                    >
-                      Podgląd
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => setEditing(b)}
-                      className="px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--border)] text-[var(--fg)] rounded-full hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
-                    >
-                      Edytuj
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <DndContext
+              id="bundles-dnd"
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={onDragEnd}
+            >
+              <SortableContext
+                items={bundles.map((b) => b.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <ul className="flex flex-col gap-3">
+                  {bundles.map((b) => (
+                    <BundleRow
+                      key={b.id}
+                      bundle={b}
+                      productById={productById}
+                      onEdit={() => setEditing(b)}
+                    />
+                  ))}
+                </ul>
+              </SortableContext>
+            </DndContext>
           )}
         </>
       ) : (
@@ -122,6 +165,90 @@ export default function BundlesEditor({
         </Card>
       )}
     </div>
+  );
+}
+
+// Wiersz listy z uchwytem do przeciągania (dnd-kit). Wyszarzenie = zestaw
+// nie trafi na front (nieaktywny albo niekompletny) — ten sam warunek, co
+// buildWithComponents w bundles-server.ts, tyle że po stronie widoku.
+function BundleRow({
+  bundle: b,
+  productById,
+  onEdit,
+}: {
+  bundle: AdminBundle;
+  productById: Map<string, PickerProduct>;
+  onEdit: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: b.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+  const incomplete = b.product_ids.length < 2;
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-3 p-4 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl ${!b.is_active || incomplete ? "opacity-60" : ""}`}
+    >
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        aria-label="Przeciągnij żeby zmienić kolejność"
+        className="shrink-0 w-8 h-8 flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] cursor-grab active:cursor-grabbing"
+      >
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <circle cx="9" cy="6" r="1" fill="currentColor" />
+          <circle cx="9" cy="12" r="1" fill="currentColor" />
+          <circle cx="9" cy="18" r="1" fill="currentColor" />
+          <circle cx="15" cy="6" r="1" fill="currentColor" />
+          <circle cx="15" cy="12" r="1" fill="currentColor" />
+          <circle cx="15" cy="18" r="1" fill="currentColor" />
+        </svg>
+      </button>
+      <div className="min-w-0 flex-1">
+        <p className="font-display text-base font-semibold text-[var(--fg)]">
+          {b.name}{" "}
+          {!b.is_active && (
+            <span className="text-xs text-[var(--muted)]">(nieaktywny)</span>
+          )}
+          {incomplete && (
+            <span className="text-xs text-red-600"> (niekompletny — min 2 produkty)</span>
+          )}
+        </p>
+        <p className="text-xs text-[var(--muted)] truncate mt-0.5">
+          {b.product_ids
+            .map((id) => productById.get(id)?.name ?? "(produkt ukryty/usunięty)")
+            .join(" + ")}{" "}
+          · rabat{" "}
+          {b.discount_type === "percent"
+            ? `${b.discount_value}%`
+            : `${b.discount_value} zł`}
+        </p>
+      </div>
+      <div className="flex items-center gap-3 shrink-0">
+        <a
+          href={`/zestaw/${b.slug}`}
+          target="_blank"
+          rel="noreferrer"
+          className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] hover:text-[var(--color-gold)]"
+        >
+          Podgląd
+        </a>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--border)] text-[var(--fg)] rounded-full hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
+        >
+          Edytuj
+        </button>
+      </div>
+    </li>
   );
 }
 
