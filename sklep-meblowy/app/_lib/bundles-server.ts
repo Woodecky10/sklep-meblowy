@@ -10,19 +10,15 @@ import { createAdminClient } from "./supabase/server";
 import { localizeProduct, localizeBundle } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Bundle, BundleWithComponents, Product } from "./types";
-import { buildBundleTiles, type BundleTile } from "./bundle-tiles";
+import { buildBundleTiles, TILE_COMPONENT_COLUMNS, type BundleTile } from "./bundle-tiles";
 
 export const BUNDLES_CACHE_TAG = "bundles";
 
 type BundleRow = Bundle & { bundle_items: { product_id: string; position: number }[] };
 
-// Kolumny składników dla KAFELKA (bundle-tiles.ts): zdjęcie do mozaiki i ceny
-// do „od". Sekcja zestawów stoi na stronie głównej, więc ściąganie pełnych
-// wierszy produktów (opisy HTML po kilka KB) przy każdym renderze home to
-// realny transfer — a Supabase FREE zablokował już projekt za egress
-// (07.09.2026). Pełne produkty potrzebuje tylko konfigurator
-// (/zestaw/[slug], box na karcie produktu) — te ścieżki zostają na "*".
-const TILE_COMPONENT_COLUMNS = "id, images, price, sale_price";
+// Kolumny składników dla kafelków: TILE_COMPONENT_COLUMNS w bundle-tiles.ts,
+// obok typu, który karmią (i z uzasadnieniem egressowym). Pełne produkty ("*")
+// potrzebuje tylko konfigurator: /zestaw/[slug] i box na karcie produktu.
 // Sitemapa sprawdza tylko kompletność składu — same identyfikatory.
 const ID_ONLY_COLUMNS = "id";
 

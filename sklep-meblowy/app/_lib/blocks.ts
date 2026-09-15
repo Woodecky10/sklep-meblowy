@@ -105,8 +105,8 @@ export const DEFAULT_HOME_BLOCKS: PageBlockRow[] = [
   { id: "system:trust_bar", page_id: null, block_type: "trust_bar", sort_order: 3, visible: true, content: { heading: pl.trustBar.heading, heading_de: de.trustBar?.heading ?? pl.trustBar.heading, subheading: pl.trustBar.eyebrow, subheading_de: de.trustBar?.eyebrow ?? pl.trustBar.eyebrow } },
   { id: "system:collections", page_id: null, block_type: "collections", sort_order: 4, visible: true, content: { heading: pl.home.seriesHeading, heading_de: de.home?.seriesHeading ?? pl.home.seriesHeading, subheading: pl.home.seriesEyebrow, subheading_de: de.home?.seriesEyebrow ?? pl.home.seriesEyebrow } },
   // Zestawy mebli (2026-09-15) — tuż pod kolekcjami. Startuje jako WIDOCZNY,
-  // inaczej niż customer_reviews niżej: sekcję zamówił właściciel wprost (w bazie
-  // jest już 7 zestawów), więc ma się pokazać od pierwszego deployu; realny
+  // inaczej niż customer_reviews niżej: sekcję zamówił właściciel wprost (zestawy
+  // już są w bazie), więc ma się pokazać od pierwszego deployu; realny
   // wiersz page_blocks (migracja 82) dokłada tylko sterowanie z panelu.
   { id: "system:bundles", page_id: null, block_type: "bundles", sort_order: 5, visible: true, content: { heading: pl.home.bundlesHeading, heading_de: de.home?.bundlesHeading ?? pl.home.bundlesHeading, subheading: pl.home.bundlesEyebrow, subheading_de: de.home?.bundlesEyebrow ?? pl.home.bundlesEyebrow } },
   // Defaulty działają WYŁĄCZNIE przy pustej/niedostępnej tabeli — na produkcji

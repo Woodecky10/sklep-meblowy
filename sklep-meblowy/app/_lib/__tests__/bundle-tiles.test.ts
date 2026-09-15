@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { buildBundleTiles, HOME_BUNDLES_VISIBLE } from "@/app/_lib/bundle-tiles";
+import {
+  buildBundleTiles,
+  HOME_BUNDLES_VISIBLE,
+  TILE_COMPONENT_COLUMNS,
+} from "@/app/_lib/bundle-tiles";
 import type { BundleWithComponents, Product } from "@/app/_lib/types";
 
 // Fabryki — pełny typ przez cast (jak w collection-tiles.test.ts), żeby test
@@ -121,6 +125,14 @@ describe("buildBundleTiles", () => {
       bundle([product("c"), product("d")], { id: "b2", slug: "drugi" }),
     ]);
     expect(tiles.map((t) => t.bundle.slug)).toEqual(["pierwszy", "drugi"]);
+  });
+});
+
+describe("TILE_COMPONENT_COLUMNS", () => {
+  it("lista kolumn dla SQL = dokładnie pola BundleTileComponent (+ id do dopasowania składu)", () => {
+    // Wycięcie `price` dałoby NaN zł na kafelku bez błędu tsc, wycięcie `id`
+    // uznałoby każdy zestaw za niekompletny i sekcja cicho by znikła.
+    expect(TILE_COMPONENT_COLUMNS.split(", ").sort()).toEqual(["id", "images", "price", "sale_price"]);
   });
 });
 

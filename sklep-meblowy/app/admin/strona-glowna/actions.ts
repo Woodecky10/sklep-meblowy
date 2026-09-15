@@ -179,12 +179,13 @@ export async function updateSiteTexts(formData: FormData): Promise<ActionResult>
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Id syntetyczne ("system:hero") ma tylko stan sprzed migracji 52.
+// Id syntetyczne ("system:<typ>") ma blok, dla którego page_blocks nie ma jeszcze
+// wiersza: stan sprzed migracji 52 (sekcje pierwotne), 77 (opinie), 82 (zestawy).
 function requireBlockId(raw: unknown): string | null {
   return typeof raw === "string" && UUID_RE.test(raw) ? raw : null;
 }
 const NO_ROW_ERROR =
-  "Sekcja nie ma jeszcze wpisu w bazie (migracja 52 nie została uruchomiona)";
+  "Sekcja nie ma jeszcze wpisu w bazie — zaaplikuj brakującą migrację page_blocks (52 sekcje pierwotne, 77 opinie, 82 zestawy)";
 
 export async function updateSystemBlockHeadings(
   formData: FormData
