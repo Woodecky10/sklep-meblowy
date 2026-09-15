@@ -20,6 +20,7 @@ export const SYSTEM_BLOCK_TYPES = [
   "featured",
   "trust_bar",
   "collections",
+  "bundles",
   "customer_reviews",
 ] as const;
 export type SystemBlockType = (typeof SYSTEM_BLOCK_TYPES)[number];
@@ -103,6 +104,11 @@ export const DEFAULT_HOME_BLOCKS: PageBlockRow[] = [
   { id: "system:featured", page_id: null, block_type: "featured", sort_order: 2, visible: true, content: { heading: pl.home.featuredHeading, heading_de: de.home?.featuredHeading ?? pl.home.featuredHeading } },
   { id: "system:trust_bar", page_id: null, block_type: "trust_bar", sort_order: 3, visible: true, content: { heading: pl.trustBar.heading, heading_de: de.trustBar?.heading ?? pl.trustBar.heading, subheading: pl.trustBar.eyebrow, subheading_de: de.trustBar?.eyebrow ?? pl.trustBar.eyebrow } },
   { id: "system:collections", page_id: null, block_type: "collections", sort_order: 4, visible: true, content: { heading: pl.home.seriesHeading, heading_de: de.home?.seriesHeading ?? pl.home.seriesHeading, subheading: pl.home.seriesEyebrow, subheading_de: de.home?.seriesEyebrow ?? pl.home.seriesEyebrow } },
+  // Zestawy mebli (2026-09-15) — tuż pod kolekcjami. Startuje jako WIDOCZNY,
+  // inaczej niż customer_reviews niżej: sekcję zamówił właściciel wprost (zestawy
+  // już są w bazie), więc ma się pokazać od pierwszego deployu; realny
+  // wiersz page_blocks (migracja 82) dokłada tylko sterowanie z panelu.
+  { id: "system:bundles", page_id: null, block_type: "bundles", sort_order: 5, visible: true, content: { heading: pl.home.bundlesHeading, heading_de: de.home?.bundlesHeading ?? pl.home.bundlesHeading, subheading: pl.home.bundlesEyebrow, subheading_de: de.home?.bundlesEyebrow ?? pl.home.bundlesEyebrow } },
   // Defaulty działają WYŁĄCZNIE przy pustej/niedostępnej tabeli — na produkcji
   // page_blocks ma już swoje wiersze, a ten wstawia osobna migracja.
   //
@@ -117,7 +123,7 @@ export const DEFAULT_HOME_BLOCKS: PageBlockRow[] = [
   // przestawić ani zmienić nagłówków z panelu. visible: false trzyma ją
   // zgaszoną, aż osobna migracja wstawi realny wiersz (z visible: true) —
   // od tego momentu sekcja jest już sterowalna z panelu jak każda inna.
-  { id: "system:customer_reviews", page_id: null, block_type: "customer_reviews", sort_order: 5, visible: false, content: { heading: pl.home.reviewsHeading, heading_de: de.home?.reviewsHeading ?? pl.home.reviewsHeading, subheading: pl.home.reviewsEyebrow, subheading_de: de.home?.reviewsEyebrow ?? pl.home.reviewsEyebrow } },
+  { id: "system:customer_reviews", page_id: null, block_type: "customer_reviews", sort_order: 6, visible: false, content: { heading: pl.home.reviewsHeading, heading_de: de.home?.reviewsHeading ?? pl.home.reviewsHeading, subheading: pl.home.reviewsEyebrow, subheading_de: de.home?.reviewsEyebrow ?? pl.home.reviewsEyebrow } },
 ];
 
 // Scala wiersze z DB z gwarancjami: null (błąd) → defaulty; nieznane typy

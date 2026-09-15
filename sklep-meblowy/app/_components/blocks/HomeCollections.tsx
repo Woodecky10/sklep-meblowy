@@ -11,17 +11,9 @@ import { pluralForm } from "@/app/_lib/plural";
 // przeglądarki i wysadził build).
 import { HOME_COLLECTIONS_VISIBLE, type CollectionTile } from "@/app/_lib/collection-tiles";
 import type { Locale } from "@/app/_lib/i18n";
+import { mosaicTileClass } from "@/app/_lib/mosaic";
 
-// Klasa grid dla i-tego zdjęcia w mozaice kolekcji (do 4 zdjęć). Pojedyncze
-// zdjęcie wypełnia całość, dwa dzielą się na pół wysokości, przy trzech
-// pierwsze zajmuje cały górny wiersz, przy czterech siatka 2×2.
-// Przeniesione z app/page.tsx razem z markupem kafelka.
-function mosaicTileClass(total: number, index: number): string {
-  if (total === 1) return "col-span-2 row-span-2";
-  if (total === 2) return "col-span-1 row-span-2";
-  if (total === 3 && index === 0) return "col-span-2";
-  return "";
-}
+// Mozaika: wspólna reguła z kafelkiem zestawu — app/_lib/mosaic.ts.
 
 const GRID = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6";
 const REST_ID = "home-collections-rest";

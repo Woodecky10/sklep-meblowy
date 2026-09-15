@@ -10,10 +10,17 @@ import { createAdminClient } from "./supabase/server";
 import { localizeProduct, localizeBundle } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Bundle, BundleWithComponents, Product } from "./types";
+import { buildBundleTiles, TILE_COMPONENT_COLUMNS, type BundleTile } from "./bundle-tiles";
 
 export const BUNDLES_CACHE_TAG = "bundles";
 
 type BundleRow = Bundle & { bundle_items: { product_id: string; position: number }[] };
+
+// Kolumny składników dla kafelków: TILE_COMPONENT_COLUMNS w bundle-tiles.ts,
+// obok typu, który karmią (i z uzasadnieniem egressowym). Pełne produkty ("*")
+// potrzebuje tylko konfigurator: /zestaw/[slug] i box na karcie produktu.
+// Sitemapa sprawdza tylko kompletność składu — same identyfikatory.
+const ID_ONLY_COLUMNS = "id";
 
 const fetchAllBundles = unstable_cache(
   async (): Promise<BundleRow[]> => {
@@ -31,9 +38,12 @@ const fetchAllBundles = unstable_cache(
 const getAllBundlesRaw = cache(fetchAllBundles);
 
 // Dociąga aktywne produkty-składniki i odfiltrowuje niekompletne zestawy.
+// `columns` zawęża wiersz produktu (patrz TILE_COMPONENT_COLUMNS) — wynik jest
+// wtedy Product tylko nominalnie; konsument ma czytać wyłącznie to, o co prosił.
 async function buildWithComponents(
   rows: BundleRow[],
-  locale: Locale
+  locale: Locale,
+  columns: string = "*"
 ): Promise<BundleWithComponents[]> {
   if (rows.length === 0) return [];
   const productIds = Array.from(
@@ -43,11 +53,11 @@ async function buildWithComponents(
   const supabase = await createAdminClient();
   const { data } = await supabase
     .from("products")
-    .select("*")
+    .select(columns)
     .in("id", productIds)
     .eq("is_active", true);
   const byId = new Map(
-    ((data ?? []) as Product[]).map((p) => [p.id, localizeProduct(p, locale)])
+    ((data ?? []) as unknown as Product[]).map((p) => [p.id, localizeProduct(p, locale)])
   );
   const out: BundleWithComponents[] = [];
   for (const r of rows) {
@@ -88,11 +98,26 @@ export async function getBundleBySlug(
   return built[0] ?? null;
 }
 
+// Kafelki WSZYSTKICH widocznych zestawów — lista /zestawy i sekcja na stronie
+// głównej (ta pierwsze HOME_BUNDLES_VISIBLE). Kolejność: najnowsze pierwsze
+// (order z fetchAllBundles) — zestaw nie ma własnej kolejności ani zdjęcia.
+export async function getVisibleBundleTiles(
+  locale: Locale = DEFAULT_LOCALE
+): Promise<BundleTile[]> {
+  const all = await getAllBundlesRaw();
+  const built = await buildWithComponents(
+    all.filter((b) => b.is_active),
+    locale,
+    TILE_COMPONENT_COLUMNS
+  );
+  return buildBundleTiles(built);
+}
+
 // Slugi widocznych zestawów — do sitemapy.
 export async function getActiveBundleSlugs(): Promise<string[]> {
   const all = await getAllBundlesRaw();
   const active = all.filter((b) => b.is_active);
-  const built = await buildWithComponents(active, DEFAULT_LOCALE);
+  const built = await buildWithComponents(active, DEFAULT_LOCALE, ID_ONLY_COLUMNS);
   return built.map((b) => b.slug);
 }
 

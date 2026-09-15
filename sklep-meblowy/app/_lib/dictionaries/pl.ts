@@ -41,6 +41,14 @@ export type PlShape = {
     reviewsEyebrow: string;
     reviewsHeading: string;
     reviewsSeeAll: string;
+    // Sekcja zestawów mebli na home (blok systemowy bundles): kafelki jak
+    // kolekcje, pierwsze HOME_BUNDLES_VISIBLE, reszta za linkiem na /zestawy.
+    bundlesEyebrow: string;
+    bundlesHeading: string;
+    bundlesSeeAll: string;
+    furnitureOne: string;
+    furnitureFew: string;
+    furnitureMany: string;
     // Opis sklepu na stronie głównej — patrz AboutStore.tsx.
     // Eyebrow i nagłówek używane TYLKO w wariancie samodzielnym (gdy pasek
     // zaufania jest wyłączony); normalnie nagłówek daje pasek.
@@ -182,6 +190,13 @@ export type PlShape = {
     crossSellHeading: string;
     toastAdded: string;
     viewCart: string;
+  };
+  // Lista zestawów /zestawy (2026-09-15).
+  bundlesPage: {
+    eyebrow: string;
+    heading: string;
+    intro: string;
+    empty: string;
   };
   bundle: {
     badge: string;
@@ -458,6 +473,12 @@ export const pl = {
     reviewsEyebrow: "Opinie klientów",
     reviewsHeading: "Co mówią klienci",
     reviewsSeeAll: "Zobacz wszystkie opinie",
+    bundlesEyebrow: "W zestawie taniej",
+    bundlesHeading: "Zestawy mebli",
+    bundlesSeeAll: "Zobacz wszystkie zestawy",
+    furnitureOne: "mebel",
+    furnitureFew: "meble",
+    furnitureMany: "mebli",
     h1: "Sklep internetowy z meblami tapicerowanymi od polskiego producenta",
     // ⚠️ Bliźniak: `meta.description` (niżej w tym pliku) to to samo zdanie
     // „czym jest sklep", tylko krótsze, z inną listą kategorii (są tam pufy,
@@ -613,6 +634,13 @@ export const pl = {
     crossSellHeading: "Może Cię zainteresować",
     toastAdded: "Dodano do koszyka",
     viewCart: "Zobacz koszyk",
+  },
+  bundlesPage: {
+    eyebrow: "Zestawy",
+    heading: "Zestawy mebli",
+    intro:
+      "Komplety mebli z jednej kolekcji, tańsze niż kupowane osobno. Tkaninę i opcje każdego mebla wybierasz niezależnie, a rabat za zestaw naliczamy w koszyku.",
+    empty: "Obecnie nie mamy żadnych zestawów. Pojedyncze meble znajdziesz w sklepie.",
   },
   bundle: {
     badge: "W zestawie taniej",
