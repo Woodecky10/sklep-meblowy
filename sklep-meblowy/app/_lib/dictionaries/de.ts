@@ -153,6 +153,8 @@ export const de: DeepPartial<PlShape> = {
     detailsLink: "Details",
     otherGroupLabel: "Sonstige",
     notFoundTitle: "Stoff nicht gefunden",
+    orderSamplesCta: "Stoffmuster bestellen →",
+    orderThisSampleCta: "Muster dieses Stoffes bestellen →",
   },
   cart: {
     empty: "Ihr Warenkorb ist leer",
@@ -411,7 +413,7 @@ export const de: DeepPartial<PlShape> = {
     delivery: "Kostenlose Lieferung",
     deliveryScope: "in ganz Polen",
     warranty: "2 Jahre Garantie",
-    iconFree: "0 zł",
+    iconFree: "0 €",
     iconYears: "2",
     iconYearsWord: "JAHRE",
   },

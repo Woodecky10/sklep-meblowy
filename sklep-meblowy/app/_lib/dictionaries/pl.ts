@@ -149,6 +149,8 @@ export type PlShape = {
     detailsLink: string;
     otherGroupLabel: string;
     notFoundTitle: string;
+    orderSamplesCta: string;
+    orderThisSampleCta: string;
   };
   cart: {
     empty: string;
@@ -603,6 +605,8 @@ export const pl = {
     detailsLink: "szczegóły",
     otherGroupLabel: "Pozostałe",
     notFoundTitle: "Tkanina nie znaleziona",
+    orderSamplesCta: "Zamów próbki tkanin →",
+    orderThisSampleCta: "Zamów próbkę tej tkaniny →",
   },
   cart: {
     empty: "Koszyk jest pusty",
