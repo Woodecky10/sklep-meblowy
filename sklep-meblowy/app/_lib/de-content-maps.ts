@@ -62,28 +62,53 @@ export const WARRANTY_DE: Record<string, string> = {
 
 // ── Cechy produktu: klucze i (tłumaczalne) wartości ──
 export const FEATURE_KEY_DE: Record<string, string> = {
+  "Funkcja rozkładania": "Ausklappfunktion",
   "Głębokość mebla": "Möbeltiefe",
+  "Głębokość osadzenia materaca": "Einlegetiefe der Matratze",
+  "Głębokość siedziska": "Sitztiefe",
+  "Grubość boczka": "Armlehnenstärke",
+  "Grubość boku": "Seitenstärke",
   Kolekcja: "Kollektion",
   Kolor: "Farbe",
   "Kolor obicia": "Bezugsfarbe",
+  "Materac wbudowany": "Integrierte Matratze",
   Model: "Modell",
   "Pojemnik na pościel": "Bettkasten",
   "Powierzchnia spania": "Liegefläche",
   Powłoka: "Bezug",
+  // Ten sam klucz w dwóch pisowniach z panelu — obie muszą być w mapie.
   "Rodzaj Łóżka": "Bettart",
+  "Rodzaj łóżka": "Bettart",
+  "Ruchome zagłówki": "Verstellbare Kopfstützen",
   Styl: "Stil",
   "System Boxspring": "Boxspring-System",
+  "Szerokość boczka": "Armlehnenbreite",
+  "Szerokość dwójki": "Breite des Zweisitzer-Elements",
   "Szerokość mebla": "Möbelbreite",
+  "Szerokość otomany": "Breite der Ottomane",
+  "Szerokość siedziska": "Sitzbreite",
   Tkanina: "Stoff",
   "Tył mebla tapicerowany": "Gepolsterte Rückseite",
+  Typ: "Typ", // DE identyczne jak PL — wpis celowy, żeby test pokrycia je obejmował
   "Waga produktu z opakowaniem jednostkowym": "Produktgewicht mit Einzelverpackung",
+  "Wysokość boczka": "Armlehnenhöhe",
+  "Wysokość boku": "Seitenhöhe",
+  "Wysokość klapy": "Klappenhöhe",
+  "Wysokość materaca": "Matratzenhöhe",
   "Wysokość mebla": "Möbelhöhe",
   "Wysokość nóżek": "Fußhöhe",
+  "Wysokość poduszki": "Kissenhöhe",
+  "Wysokość siedziska": "Sitzhöhe",
+  "Wysokość siedziska od ziemi": "Sitzhöhe ab Boden",
+  "Wysokość skrzyni": "Kastenhöhe",
   "Wysokość zagłowia": "Kopfteilhöhe",
+  "Zagłówki regulowane": "Verstellbare Kopfstützen",
 };
 
-// Tylko tłumaczalne wartości tekstowe — kody (SISI, Marbella, Tiliao), liczby
-// i wymiary (180x200) celowo NIE są tu i przechodzą bez zmian.
+// Tylko tłumaczalne wartości tekstowe — liczby, wymiary (180x200) i kody spoza
+// katalogu (np. Tiliao) celowo NIE są tu i przechodzą bez zmian. Nazwy własne
+// modeli z bieżącego katalogu (Marbella, SISI, Vegas) mają wpisy o identycznym
+// DE — nie zmieniają wyniku, ale test pokrycia potwierdza, że były sprawdzone.
 export const FEATURE_VALUE_DE: Record<string, string> = {
   tapicerowane: "gepolstert",
   Sztruks: "Cord",
@@ -92,30 +117,53 @@ export const FEATURE_VALUE_DE: Record<string, string> = {
   Tak: "Ja",
   Nie: "Nein",
   Brązowy: "Braun",
+  Pojedyncze: "Einzel",
+  Rozkładany: "Ausklappbar",
+  Marbella: "Marbella",
+  SISI: "SISI",
+  Vegas: "Vegas",
 };
 
 // ── Warianty: nazwy opcji + tłumaczalne etykiety wartości (kolory/strony) ──
 export const VARIANT_OPTION_DE: Record<string, string> = {
   Kolor: "Farbe",
+  "Kolor nóg": "Fußfarbe",
+  "Kolor nóżek": "Fußfarbe",
+  Pianka: "Schaumstoff",
+  PIANKA: "SCHAUMSTOFF",
   "POWIERZCHNIA SPANIA": "LIEGEFLÄCHE",
   ROZMIAR: "GRÖSSE",
+  // Obie pisownie występują w panelu; tłumaczenia celowo różne (stary wpis
+  // GESTELL zostaje, nowy „Stelaż" = stelaż łóżka → Lattenrost).
   STELAŻ: "GESTELL",
+  Stelaż: "Lattenrost",
   STRONA: "SEITE",
   "STRONA MEBLA": "SEITE DES MÖBELS",
   Strona: "Seite",
   Tkanina: "Stoff",
   TKANINA: "STOFF",
+  Topper: "Topper", // DE identyczne jak PL — wpis celowy (patrz test pokrycia)
   Wariant: "Variante",
 };
 
-// Kody tkanin (MANILA/MONOLITH/POSO/QUELLE/TILIA/WOOLLY/CHILL ME …) i wymiary
-// przechodzą bez zmian — tu tylko kolory/strony/materiały po polsku.
+// Kody tkanin (MANILA/MONOLITH/POSO/QUELLE/TILIA/WOOLLY/CHILL ME …), ich
+// zestawienia („Monolith 15 + Solar 01") i wymiary przechodzą bez zmian — tu
+// tylko kolory/strony/materiały po polsku.
 export const VARIANT_VALUE_DE: Record<string, string> = {
+  "Bez toppera": "Ohne Topper",
   Beżowy: "Beige",
   beżowy: "beige",
+  Buk: "Buche",
+  Chromowane: "Verchromt",
   Ciemnoszary: "Dunkelgrau",
+  Czarne: "Schwarz",
+  Czarny: "Schwarz",
   DREWNIANY: "HOLZ",
-  Granatowy: "Marineblau",
+  Drewniany: "Holz",
+  "Drewniany- bez pojemnika na pościel": "Holz – ohne Bettkasten",
+  "Drewniany- brak pojemnika na pościel": "Holz – ohne Bettkasten",
+  // „dunkelblau" — spójnie z opisami produktów DE (nie „Marineblau").
+  Granatowy: "Dunkelblau",
   Kremowy: "Creme",
   kremowy: "creme",
   LEWOSTRONNY: "LINKS",
@@ -123,11 +171,25 @@ export const VARIANT_VALUE_DE: Record<string, string> = {
   Lewa: "Links",
   Lewostronny: "Links",
   METALOWY: "METALL",
+  Metalowy: "Metall",
+  "Metalowy- z pojemnikiem na pościel": "Metall – mit Bettkasten",
+  Naturalne: "Natur",
+  "Pianka HR": "HR-Schaumstoff",
+  // Kwota zostaje w PLN — dopłata jest w złotówkach, nie przeliczamy jej tutaj.
+  "Pianka HR (+200zł)": "HR-Schaumstoff (+200 PLN)",
+  "Pianka T30": "Schaumstoff T30",
   PRAWOSTRONNY: "RECHTS",
   Prawa: "Rechts",
   Prawostronny: "Rechts",
+  // „Srebre" i „Srebry" to literówki z panelu — mapujemy je razem z poprawną formą.
+  Srebre: "Silber",
+  Srebrny: "Silber",
+  Srebry: "Silber",
   Szary: "Grau",
   Terrakota: "Terrakotta",
+  "Z topperem": "Mit Topper",
+  Złote: "Gold",
+  Złoty: "Gold",
   biały: "weiß",
   brązowy: "braun",
   jasnobrązowy: "hellbraun",
@@ -217,10 +279,13 @@ export const PROMO_ERROR_DE: Record<string, string> = {
 };
 
 // Pomocnik: zwróć tłumaczenie DE jeśli istnieje, inaczej wartość bez zmian.
+// Czytamy WYŁĄCZNIE własne klucze mapy: wartości pochodzą z DB/panelu, więc
+// „constructor", „toString" czy „__proto__" to realne wejście, a zwykłe
+// `map[value]` trafiłoby w prototyp Object i zwróciło funkcję zamiast stringa.
 export function mapDe(
   map: Record<string, string>,
   value: string | null | undefined
 ): string | null | undefined {
   if (value == null) return value;
-  return map[value] ?? value;
+  return Object.prototype.hasOwnProperty.call(map, value) ? map[value] : value;
 }

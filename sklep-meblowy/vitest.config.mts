@@ -14,6 +14,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["app/**/__tests__/**/*.test.ts"],
+    // scripts/** dołożone dla pipeline'u tłumaczeń DE (scripts/de-translate/lib.mjs).
+    include: ["app/**/__tests__/**/*.test.ts", "scripts/**/__tests__/**/*.test.ts"],
   },
 });

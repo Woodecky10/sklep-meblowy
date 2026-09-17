@@ -1,0 +1,3 @@
+# Robocze JSON-y pipeline'u tłumaczeń (eksport z bazy, partie, wyniki agentów).
+# Nie wchodzą do repo: to zrzut żywej produkcji, regenerowalny w 10 sekund.
+work/
