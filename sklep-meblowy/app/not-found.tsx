@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
 import LocalizedLink from "@/app/_components/ui/LocalizedLink";
 import { getCategories } from "@/app/_lib/categories";
 import { buildTree } from "@/app/_lib/category-tree";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { getDictionary } from "@/app/_lib/dictionaries";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const t = getDictionary(await getLocale());
+  return { title: t.notFound.eyebrow };
+}
 
 // Globalny 404 — renderowany gdy URL nie pasuje do żadnej trasy
 // albo gdy w page.tsx wywołamy notFound() (np. produkt usunięty, zamówienie

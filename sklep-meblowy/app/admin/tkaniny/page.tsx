@@ -4,7 +4,7 @@ import { createAdminClient } from "@/app/_lib/supabase/server";
 import FabricsEditor, { type FabricPickerProduct } from "./FabricsEditor";
 import type { FabricPropertyDefRow } from "@/app/_lib/types";
 
-export const metadata = { title: "Tkaniny — Admin" };
+export const metadata = { title: "Tkaniny" };
 
 export default async function AdminFabricsPage() {
   await requireAdmin();

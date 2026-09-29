@@ -10,7 +10,7 @@ import { createAdminClient } from "@/app/_lib/supabase/server";
 import type { Product } from "@/app/_lib/types";
 import CollectionsEditor from "./CollectionsEditor";
 
-export const metadata = { title: "Kolekcje — Admin" };
+export const metadata = { title: "Kolekcje" };
 
 export default async function AdminCollectionsPage() {
   await requireAdmin();

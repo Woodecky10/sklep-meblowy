@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { localizeHref } from "@/app/_lib/i18n";
+import type { Metadata } from "next";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return { title: locale === "de" ? "Zahlung abgebrochen" : "Płatność przerwana" };
+}
 
 export default async function CancelPage() {
   const locale = await getLocale();

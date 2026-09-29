@@ -3,7 +3,7 @@ import { getCategories } from "@/app/_lib/categories";
 import { flattenForSelect } from "@/app/_lib/category-tree";
 import NewProductForm from "./NewProductForm";
 
-export const metadata = { title: "Nowy produkt — Admin" };
+export const metadata = { title: "Nowy produkt" };
 
 export default async function NewProductPage() {
   await requireAdmin();

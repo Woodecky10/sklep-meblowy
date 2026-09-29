@@ -9,6 +9,13 @@ import { shouldTrackPurchase } from "@/app/_lib/order-events";
 import PixelEventOnce from "@/app/_components/analytics/PixelEventOnce";
 import GaEventOnce from "@/app/_components/analytics/GaEventOnce";
 import ClearCart from "./ClearCart";
+import type { Metadata } from "next";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  // Neutralnie, bo ta sama strona obsługuje płatność potwierdzoną i w toku.
+  return { title: locale === "de" ? "Bestellbestätigung" : "Potwierdzenie zamówienia" };
+}
 
 export default async function SuccessPage({
   searchParams,

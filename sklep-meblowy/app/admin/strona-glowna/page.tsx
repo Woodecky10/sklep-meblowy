@@ -10,6 +10,8 @@ import { COMPANY } from "@/app/_lib/company";
 import BlocksEditor from "./BlocksEditor";
 import { getTopBarSettingsForAdmin } from "./actions";
 
+export const metadata = { title: "Strona główna" };
+
 // Panel admina jest PL-only. Guard admina w layoucie; akcje wołają requireAdmin().
 export default async function AdminHomePageSettings() {
   const [blocks, trustItems, siteTexts, products, collections, categories, topBar] =

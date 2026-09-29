@@ -5,7 +5,7 @@ import {
 } from "@/app/_lib/featured";
 import FeaturedEditor from "./FeaturedEditor";
 
-export const metadata = { title: "Polecane — Admin" };
+export const metadata = { title: "Polecane" };
 
 export default async function AdminFeaturedPage() {
   await requireAdmin();

@@ -3,7 +3,7 @@ import { requireAdmin } from "@/app/_lib/admin";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import ExternalOrderForm, { type ProductOption } from "./ExternalOrderForm";
 
-export const metadata = { title: "Dodaj zamówienie — Admin" };
+export const metadata = { title: "Dodaj zamówienie" };
 
 // Ręczne dodanie zamówienia spoza sklepu (Allegro, OLX, …) — spec 2026-09-02.
 // Lista produktów idzie raz, w całości: picker filtruje w przeglądarce
