@@ -14,7 +14,7 @@ import { getUserWishlistIds } from "@/app/_lib/wishlist";
 import { pluralForm } from "@/app/_lib/plural";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { getEurRate } from "@/app/_lib/store-settings";
-import { localizePath } from "@/app/_lib/i18n";
+import { localizePath, type Locale } from "@/app/_lib/i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import { baseOpenGraph } from "@/app/_lib/seo-og";
@@ -29,11 +29,22 @@ import Pagination from "@/app/_components/ui/Pagination";
 // /sklep jest w pełni przetłumaczone przez słownik UI → DE zawsze (hasDe: true).
 // canonical = self per locale, og:locale dopasowany. Relatywne URL-e rozwiązuje
 // metadataBase z app/layout.tsx.
-export async function generateMetadata(): Promise<Metadata> {
+//
+// Tytuł karty = nagłówek widoku (kategoria, kolekcja, wyszukiwanie) — te same
+// dane i ta sama funkcja co h1, więc karta i strona nie mogą się rozjechać.
+// Kategorie i kolekcje idą z cache (unstable_cache + cache()), bez nowych zapytań.
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}): Promise<Metadata> {
+  const sp = await searchParams;
   const locale = await getLocale();
   const t = getDictionary(locale);
+  const view = await resolveShopView(sp, locale);
   return {
-    title: t.shop.title,
+    // Goły /sklep zostaje „Sklep" (tak jak w menu), a nie „Wszystkie produkty".
+    title: resolveHeading(t, view, t.shop.title),
     alternates: {
       canonical: localizePath("/sklep", locale),
       languages: alternatesFor("/sklep", { hasDe: true }).languages,
@@ -76,6 +87,47 @@ function parsePositiveNumber(value: string | undefined) {
 // dostawał tablicę i po prostu nie znajdował wyników — bezpieczniej).
 function first(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;
+}
+
+type ShopView = {
+  collection: { label: string } | null;
+  search: string | undefined;
+  activeNode: { label: string } | null;
+};
+
+// Najbardziej szczegółowy filtr wygrywa: kolekcja > wyszukiwanie > kategoria
+// (dowolny poziom drzewa) > domyślny tytuł. Wspólne dla h1 i tytułu karty.
+function resolveHeading(
+  t: ReturnType<typeof getDictionary>,
+  { collection, search, activeNode }: ShopView,
+  fallback: string
+): string {
+  if (collection) return collection.label;
+  if (search) return `${t.shop.searchPrefix}: „${search}”`;
+  if (activeNode) return activeNode.label;
+  return fallback;
+}
+
+// Te same reguły odczytu parametrów co w SklepPage: `kategoria` wygrywa nad
+// legacy `sekcja`, etykieta działa też dla ukrytego węzła (getAllCategories).
+async function resolveShopView(
+  sp: Awaited<SearchParams>,
+  locale: Locale
+): Promise<ShopView> {
+  const category = first(sp.kategoria) || undefined;
+  const sectionSlug = !category && sp.sekcja ? first(sp.sekcja)?.trim() : undefined;
+  const collectionSlug = first(sp.kolekcja)?.trim() || undefined;
+  const activeSlug = category ?? sectionSlug;
+  const [allCategories, collection] = await Promise.all([
+    activeSlug ? getAllCategories(locale) : Promise.resolve([]),
+    collectionSlug ? getCollection(collectionSlug, locale) : Promise.resolve(null),
+  ]);
+  const trail = activeSlug ? pathTo(allCategories, activeSlug) : [];
+  return {
+    collection,
+    search: first(sp.q)?.trim() || undefined,
+    activeNode: trail.length > 0 ? trail[trail.length - 1] : null,
+  };
 }
 
 export default async function SklepPage({
@@ -214,15 +266,11 @@ export default async function SklepPage({
     (k) => !NIEZAWEZAJACE_PARAMY.has(k)
   );
 
-  // Najbardziej szczegółowy filtr wygrywa: kolekcja > wyszukiwanie > kategoria
-  // (dowolny poziom drzewa) > domyślny tytuł.
-  function resolveHeading(): string {
-    if (collection) return collection.label;
-    if (search) return `${t.shop.searchPrefix}: „${search}”`;
-    if (activeNode) return activeNode.label;
-    return t.shop.allProducts;
-  }
-  const heading = resolveHeading();
+  const heading = resolveHeading(
+    t,
+    { collection, search, activeNode },
+    t.shop.allProducts
+  );
 
   // Nadkreślenie musi opisywać TEN widok, nie zawsze „Kolekcja" — wcześniej nad
   // „Wszystkie produkty" i nad kategorią stało nieprawdziwe „KOLEKCJA".
