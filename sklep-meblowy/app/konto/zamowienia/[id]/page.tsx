@@ -14,11 +14,18 @@ import OrderIssueModal from "@/app/_components/ui/OrderIssueModal";
 import { orderItemLabel } from "@/app/_lib/order-issues";
 import { orderItemDisplayName } from "@/app/_lib/order-items";
 
-export async function generateMetadata() {
+// Ten sam skrót numeru, który stoi na stronie (#XXXXXXXX) — liczony z adresu,
+// bez zapytania do bazy; nie ujawnia nic ponad to, co już jest w URL-u.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
   const locale = await getLocale();
   const de = locale === "de";
   return {
-    title: de ? "Bestelldetails" : "Szczegóły zamówienia",
+    title: `${de ? "Bestellung" : "Zamówienie"} #${id.slice(0, 8).toUpperCase()}`,
   };
 }
 

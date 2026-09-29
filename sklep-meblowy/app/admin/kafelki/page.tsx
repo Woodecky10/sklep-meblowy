@@ -2,7 +2,7 @@ import { requireAdmin } from "@/app/_lib/admin";
 import { getAllTiles } from "@/app/_lib/home-tiles";
 import TilesEditor from "./TilesEditor";
 
-export const metadata = { title: "Kafelki — Admin" };
+export const metadata = { title: "Kafelki" };
 
 export default async function AdminTilesPage() {
   await requireAdmin();

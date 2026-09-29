@@ -3,6 +3,8 @@ import { getOgImageUrlUncached } from "@/app/_lib/og-image-settings";
 import ThemeEditor from "./ThemeEditor";
 import OgImageCard from "./OgImageCard";
 
+export const metadata = { title: "Wygląd" };
+
 // Panel admina jest PL-only. Guard w layoucie; akcje wołają requireAdmin().
 export default async function AdminThemePage() {
   const [settings, ogImageUrl] = await Promise.all([

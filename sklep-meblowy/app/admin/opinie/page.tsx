@@ -1,7 +1,7 @@
 import { getReviewsForBucket } from "@/app/_lib/reviews-admin";
 import OpinieList from "./OpinieList";
 
-export const metadata = { title: "Opinie — panel" };
+export const metadata = { title: "Opinie" };
 
 export default async function OpiniePage() {
   const [nowe, opublikowane, usuniete] = await Promise.all([

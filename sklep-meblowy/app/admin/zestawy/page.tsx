@@ -3,7 +3,7 @@ import { getAllBundlesAdmin } from "@/app/_lib/bundles-server";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import BundlesEditor, { type PickerProduct } from "./BundlesEditor";
 
-export const metadata = { title: "Zestawy — Admin" };
+export const metadata = { title: "Zestawy" };
 
 export default async function AdminZestawyPage() {
   await requireAdmin();

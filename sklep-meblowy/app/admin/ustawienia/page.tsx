@@ -1,6 +1,8 @@
 import { getEurRate } from "@/app/_lib/store-settings";
 import SettingsForm from "./SettingsForm";
 
+export const metadata = { title: "Ustawienia sklepu" };
+
 // Panel admina jest PL-only.
 export default async function AdminSettingsPage() {
   const rate = await getEurRate();

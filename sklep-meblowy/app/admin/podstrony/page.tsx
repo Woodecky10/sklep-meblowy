@@ -6,7 +6,7 @@ import CreatePageForm from "./CreatePageForm";
 import PagesList from "./PagesList";
 import MenuCard from "./MenuCard";
 
-export const metadata: Metadata = { title: "Podstrony — panel admina" };
+export const metadata: Metadata = { title: "Podstrony" };
 
 export default async function AdminPagesPage() {
   await requireAdmin();

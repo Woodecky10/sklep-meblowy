@@ -1,10 +1,32 @@
+import type { Metadata } from "next";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { findInviteByToken } from "@/app/_lib/review-invites-server";
 import { inviteState } from "@/app/_lib/review-tokens";
 import GuestReviewForm from "./GuestReviewForm";
 
-export const metadata = { title: "Wystaw opinię", robots: { index: false, follow: false } };
+// cache(): metadata i strona pytają o to samo zaproszenie w jednym renderze.
+const getInvite = cache(findInviteByToken);
+
+const TYTUL_UZYTE = "Opinia już wysłana";
+const TYTUL_WYGASLE = "Link wygasł";
+
+// Tytuł karty = to, co strona faktycznie pokaże. Zły token → notFound() już
+// tutaj, żeby karta dostała tytuł 404, a nie „Wystaw opinię" nad stroną błędu.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+  const { token } = await params;
+  const invite = await getInvite(token);
+  if (!invite) notFound();
+  const stan = inviteState(invite, new Date());
+  const title =
+    stan === "used" ? TYTUL_UZYTE : stan === "expired" ? TYTUL_WYGASLE : "Wystaw opinię";
+  return { title, robots: { index: false, follow: false } };
+}
 
 export default async function OpiniaPage({
   params,
@@ -12,15 +34,15 @@ export default async function OpiniaPage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
-  const invite = await findInviteByToken(token);
+  const invite = await getInvite(token);
   if (!invite) notFound();
 
   const stan = inviteState(invite, new Date());
   if (stan === "used") {
-    return <Komunikat tytul="Opinia już wysłana" tresc="Dziękujemy — Twoja opinia jest już na stronie." />;
+    return <Komunikat tytul={TYTUL_UZYTE} tresc="Dziękujemy — Twoja opinia jest już na stronie." />;
   }
   if (stan === "expired") {
-    return <Komunikat tytul="Link wygasł" tresc="Ten link do wystawienia opinii stracił ważność. Jeśli nadal chcesz podzielić się wrażeniami, napisz do nas." />;
+    return <Komunikat tytul={TYTUL_WYGASLE} tresc="Ten link do wystawienia opinii stracił ważność. Jeśli nadal chcesz podzielić się wrażeniami, napisz do nas." />;
   }
 
   const admin = await createAdminClient();

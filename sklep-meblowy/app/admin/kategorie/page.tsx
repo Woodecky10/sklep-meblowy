@@ -4,7 +4,7 @@ import { subtreeProductCounts } from "@/app/_lib/category-tree";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import KategorieEditor from "./KategorieEditor";
 
-export const metadata = { title: "Kategorie — Admin" };
+export const metadata = { title: "Kategorie" };
 
 export default async function AdminKategoriePage() {
   await requireAdmin();

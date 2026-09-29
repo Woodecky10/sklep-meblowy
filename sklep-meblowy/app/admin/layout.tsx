@@ -5,9 +5,15 @@ import { getNewOrdersCount } from "@/app/_lib/orders";
 import { getNewSampleOrdersCount } from "@/app/_lib/samples";
 import { getUnreviewedReviewsCount } from "@/app/_lib/reviews-admin";
 import AdminShell from "./AdminShell";
+import { COMPANY } from "@/app/_lib/company";
 
 export const metadata: Metadata = {
-  title: "Panel admina",
+  // Wspólny wzór kart panelu: nazwa ekranu pierwsza (tylko ona mieści się
+  // na wąskiej karcie), potem stały dopisek. Strony podają samą nazwę.
+  title: {
+    absolute: `Panel admina | ${COMPANY.brandName}`,
+    template: `%s | Panel ${COMPANY.brandName}`,
+  },
   robots: { index: false, follow: false },
 };
 

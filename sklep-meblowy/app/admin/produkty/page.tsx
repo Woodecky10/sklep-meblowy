@@ -6,7 +6,7 @@ import { hasVariants, totalProductStock } from "@/app/_lib/variants";
 import { promoChipLabel, warsawToday } from "@/app/_lib/sale-schedule";
 import ProductsList, { type AdminProductRow } from "./ProductsList";
 
-export const metadata = { title: "Produkty — Admin" };
+export const metadata = { title: "Produkty" };
 
 export default async function AdminProductsPage() {
   await requireAdmin();

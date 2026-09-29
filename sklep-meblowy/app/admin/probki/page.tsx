@@ -3,7 +3,7 @@ import { getFabricImageMap } from "@/app/_lib/fabrics";
 import { getSampleOrders } from "@/app/_lib/samples";
 import SampleOrdersList from "./SampleOrdersList";
 
-export const metadata = { title: "Próbki — Admin" };
+export const metadata = { title: "Próbki" };
 
 // ⚠️ ODCZYT MUSI IŚĆ PRZEZ WARSTWĘ DANYCH (createAdminClient / service role).
 // Na `sample_orders` jest polityka „owner read" (user_id = auth.uid()) i NIE MA

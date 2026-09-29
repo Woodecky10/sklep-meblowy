@@ -1,4 +1,6 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { createAdminClient } from "@/app/_lib/supabase/server";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/app/_lib/admin";
 import { getOrderById, getProfilesByIds } from "@/app/_lib/orders";
@@ -13,7 +15,21 @@ import OrderControls from "./OrderControls";
 import CustomerMailCard from "./CustomerMailCard";
 import type { Order, OrderItem } from "@/app/_lib/types";
 
-export const metadata = { title: "Zamówienie — Admin" };
+// Numer zamówienia na karcie — ten sam, który stoi w nagłówku strony.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await createAdminClient();
+  const { data } = await supabase
+    .from("orders")
+    .select("order_number")
+    .eq("id", id)
+    .maybeSingle();
+  return { title: data?.order_number ? `Zamówienie #${data.order_number}` : "Zamówienie" };
+}
 
 export default async function AdminOrderDetailPage({
   params,

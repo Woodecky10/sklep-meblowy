@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/app/_lib/admin";
 import {
@@ -17,7 +18,19 @@ import ProductEditor from "./ProductEditor";
 import type { ProductDeFields } from "./TranslationEditor";
 import type { ProductDescriptionSection } from "@/app/_lib/types";
 
-export const metadata = { title: "Edycja produktu — Admin" };
+// Nazwa produktu na karcie przeglądarki — przy kilku otwartych edycjach
+// widać, która jest która. Osobne lekkie zapytanie o samą nazwę zamiast
+// pełnego getProduct (to nie jest opakowane w cache()).
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await createAdminClient();
+  const { data } = await supabase.from("products").select("name").eq("id", id).maybeSingle();
+  return { title: data?.name ? `Edycja: ${data.name}` : "Edycja produktu" };
+}
 
 export default async function AdminProductEditPage({
   params,

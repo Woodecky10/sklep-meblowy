@@ -9,7 +9,7 @@ import Pagination from "@/app/_components/ui/Pagination";
 import OrderRow from "./OrderRow";
 import type { OrderStatus } from "@/app/_lib/types";
 
-export const metadata = { title: "Zamówienia — Admin" };
+export const metadata = { title: "Zamówienia" };
 
 type FilterValue = OrderStatus | "all" | "external";
 
