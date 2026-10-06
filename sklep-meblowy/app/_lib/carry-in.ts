@@ -42,6 +42,20 @@ export function isCarryInLine(item: {
   return item.product_id == null && item.custom_name === CARRY_IN_LINE_NAME;
 }
 
+// Zgoda na wniesienie: nowe pole formularza (carryIn === true) ALBO
+// stara karta checkoutu sprzed wdrożenia, która wysyła klucz „za sztukę”
+// przy meblu — wtedy liczymy wniesienie raz, nie więcej niż klient widział.
+export function carryInRequested(body: {
+  carryIn?: unknown;
+  items?: { variantValues?: Record<string, string> }[];
+}): boolean {
+  if (body.carryIn === true) return true;
+  return (
+    Array.isArray(body.items) &&
+    body.items.some((it) => it?.variantValues?.[LEGACY_ITEM_CARRY_IN_KEY] === "Tak")
+  );
+}
+
 // Serwer (/api/checkout): dopisuje pozycję i kwotę TYLKO przy requested ===
 // true — body to dowolny JSON z przeglądarki. Wołane PO rabatach, więc kod
 // rabatowy i rabat zestawu nie obejmują wniesienia (decyzja właściciela).

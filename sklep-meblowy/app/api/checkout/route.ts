@@ -10,7 +10,7 @@ import { getEurRate } from "@/app/_lib/store-settings";
 import { convertToEur } from "@/app/_lib/money";
 import { DE_ENABLED } from "@/app/_lib/i18n";
 import { priceCheckoutItem } from "@/app/_lib/checkout-pricing";
-import { applyCarryIn } from "@/app/_lib/carry-in";
+import { applyCarryIn, carryInRequested } from "@/app/_lib/carry-in";
 import {
   groupBundleUnits,
   verifyBundleGroup,
@@ -343,7 +343,7 @@ export async function POST(request: NextRequest) {
     const withCarryIn = applyCarryIn(
       orderItems,
       Math.max(0, total - bundleDiscount - promoDiscount),
-      body.carryIn
+      carryInRequested(body)
     );
     const finalTotal = toCharge(withCarryIn.total);
 

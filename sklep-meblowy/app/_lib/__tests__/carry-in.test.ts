@@ -5,6 +5,7 @@ import {
   LEGACY_ITEM_CARRY_IN_KEY,
   applyCarryIn,
   carryInOrderLine,
+  carryInRequested,
   isCarryInLine,
 } from "../carry-in";
 
@@ -50,5 +51,34 @@ describe("wniesienie raz na zamówienie — pozycja zamówienia", () => {
       expect(out.total).toBe(900);
       expect(out.items).toEqual(items);
     }
+  });
+});
+
+describe("carryInRequested — nowe pole albo stara karta checkoutu", () => {
+  it("true tylko dla dokładnego carryIn === true", () => {
+    expect(carryInRequested({ carryIn: true })).toBe(true);
+    for (const v of ["true", 1, false, null, undefined]) {
+      expect(carryInRequested({ carryIn: v })).toBe(false);
+    }
+    expect(carryInRequested({})).toBe(false);
+  });
+
+  it("stara karta: klucz „za sztukę” = Tak przy dowolnym meblu", () => {
+    expect(
+      carryInRequested({
+        items: [
+          { variantValues: { Tkanina: "X" } },
+          { variantValues: { [LEGACY_ITEM_CARRY_IN_KEY]: "Tak" } },
+        ],
+      })
+    ).toBe(true);
+  });
+
+  it("klucz „za sztukę” = Nie, brak items albo brak variantValues to brak zgody", () => {
+    expect(
+      carryInRequested({ items: [{ variantValues: { [LEGACY_ITEM_CARRY_IN_KEY]: "Nie" } }] })
+    ).toBe(false);
+    expect(carryInRequested({ items: [] })).toBe(false);
+    expect(carryInRequested({ items: [{}] })).toBe(false);
   });
 });
