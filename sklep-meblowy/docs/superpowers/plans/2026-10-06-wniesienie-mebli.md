@@ -872,9 +872,32 @@ git commit -m "docs(dostawa): wniesienie zamawia się przy produkcie, 250 zł za
 
 (uzupełniane w trakcie — jedyny nośnik stanu między komputerami, `.superpowers/sdd/` jest gitignorowany)
 
-- [ ] Task 1
-- [ ] Task 2
-- [ ] Task 3
-- [ ] Task 4
-- [ ] Task 5
-- [ ] Task 6
+- [x] Task 1 — commity 08f6c92..39ddea1, recenzja bez uwag.
+- [x] Task 2 — commity 39ddea1..9956351; 1 runda poprawek (brakujący trailer, amend samej wiadomości).
+- [x] Task 3 — commity 9956351..b86fc69, recenzja bez uwag.
+- [x] Task 4 — commity b86fc69..78c8ca1, recenzja bez uwag.
+- [x] Task 5 — commity 78c8ca1..eb3f8fc; 2 rundy poprawek (zakończenia linii i BOM, potem cudzysłowy PL/DE).
+- [ ] Task 6 — krok 1 (końcowa recenzja całej gałęzi) zrobiony: „With fixes", poprawione w tej fali (ReorderButton liczy cenę przez `getVariantEffectivePrice` + wniesienie, ta sekcja uzupełniona, kompletność wariantu sprawdzana na przefiltrowanych wartościach). OTWARTE kroki 2–4:
+  - decyzja o integracji gałęzi,
+  - produkcyjny przebieg e2e (ma raportować „passed", nie „skipped"),
+  - usunięcie starej opcji Vegas Twin „Dostawa z wniesieniem do 4-tego piętra" w panelu admina — edycja żywej bazy, wymaga potwierdzenia właściciela; do tego czasu Vegas Twin można zamówić z oboma wniesieniami (+500 zł).
+
+### Rozstrzygnięcia (Ruling)
+
+- Ruling 1 (pre-flight): Task 1 dodaje też `Tak: "Ja"` do `VARIANT_VALUE_DE` — test DE z planu bez tego nie przejdzie, a „Tak"→„Ja" jest poprawne wszędzie.
+- Ruling 2 (pre-flight): e2e z Task 4 klika `getByRole("button", { name: "Dodaj do koszyka", exact: true }).first()` — karty w sliderach też mają taki aria-label (strict mode); główny przycisk jest pierwszy w DOM.
+- Ruling 3 (pre-flight): każdy commit kończy się trailerem `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` — atrybucja wymagana przez sesję.
+- Ruling (Task 2): re-recenzja rundy 1 to mechaniczne sprawdzenie kontrolera (`git diff 3563648 9956351` puste, grep trailera = 1), bez dispatchu recenzenta — drzewo identyczne z zatwierdzonym.
+- Ruling (Task 5): recenzja rundy 1 objęła całość `78c8ca1..40f8ead` (commit amendowany, osobnego diffu poprawki nie ma).
+- Ruling (Task 5): uwaga re-recenzenta, że trailer ma mówić „Haiku 4.5", odrzucona — trailer to atrybucja sesji (Opus 5.5), recenzent pomylił go z własnym modelem.
+- Ruling (recenzja końcowa): fala poprawek obejmuje Important 1, Important 2 i Minor 3; Minor 4 idzie do właściciela jako decyzja (zmienia, co zapłacą stare koszyki); Minory 5–7 zostają jako follow-upy.
+
+### Follow-upy (świadomie niezrobione)
+
+- Checkout nie sprawdza, czy wybrana wartość ∈ `opt.values` (luka sprzed tej gałęzi — spreparowane żądanie może ominąć dopłaty).
+- Jeden wspólny helper ceny jednostkowej dla klienta i serwera (formuła zapisana 4×).
+- Komunikat o minimalnej kwocie promocji mógłby brzmieć „(bez wniesienia i zestawów)".
+- Helper `cartPromoBase(items)`, żeby podstawę promocji w koszyku objąć testem jednostkowym.
+- Decyzja właściciela: czy stare koszyki z kluczem Vegas Twin mapować na `CARRY_IN_KEY` (dziś po usunięciu opcji wniesienie z takiego koszyka znika po cichu).
+- Regulamin nie opisuje płatnej usługi wniesienia (właściciel/prawnik).
+- Etykieta DE to „Hineintragen bis zur 4. Etage" (plan), a spec ma „Hereintragen bis 4. Etage" — wygrywa plan, /de zamrożone.
