@@ -39,7 +39,7 @@ function fakeStore(initial: Row[], fail: Partial<Record<"insert" | "update" | "d
       return fail.order ?? null;
     },
   };
-  return { store, calls, orderPatches, rows: () => rows };
+  return { store, calls, orderPatches };
 }
 
 const fields = {
@@ -126,5 +126,47 @@ describe("applyOrderEdit", () => {
       now: at,
     });
     expect(res).toEqual({ ok: false, error: "Pozycje zapisane, ale nie udało się zapisać zamówienia: rls" });
+  });
+
+  it("błąd przy insert: update i delete pominięte, zamówienie zapisane z sumą z bazy", async () => {
+    const f = fakeStore([{ id: "a", price: 2650, quantity: 1 }, { id: "b", price: 500, quantity: 1 }], { insert: "dup" });
+    const res = await applyOrderEdit(f.store, { orderId: "o1", plan, fields, oldTotal: 3050, currency: "pln", adminNote: null, now: at });
+    expect(f.calls).toEqual(["insert:1", "read", "order"]);
+    expect(f.orderPatches[0]).toMatchObject({ total: 3050 });
+    expect(res).toEqual({
+      ok: false,
+      error: "Zapis pozycji przerwany: dup. Suma przeliczona z pozycji, które są w bazie — sprawdź zamówienie.",
+    });
+  });
+
+  it("błąd przy delete: insert i update zostają, suma z bazy", async () => {
+    const f = fakeStore([{ id: "a", price: 2650, quantity: 1 }, { id: "b", price: 500, quantity: 1 }], { delete: "fk" });
+    const res = await applyOrderEdit(f.store, { orderId: "o1", plan, fields, oldTotal: 3050, currency: "pln", adminNote: null, now: at });
+    expect(f.calls).toEqual(["insert:1", "update:a", "delete:b", "read", "order"]);
+    // w bazie: a=2400, b=500 (nieusunięte), wniesienie 250 → 3150 − 100
+    expect(f.orderPatches[0]).toMatchObject({ total: 3050 });
+    expect(res).toEqual({
+      ok: false,
+      error: "Zapis pozycji przerwany: fk. Suma przeliczona z pozycji, które są w bazie — sprawdź zamówienie.",
+    });
+  });
+
+  it("błąd pozycji I zapisu zamówienia: komunikat mówi, że suma i notatka NIE są zapisane", async () => {
+    const f = fakeStore([{ id: "a", price: 2650, quantity: 1 }, { id: "b", price: 500, quantity: 1 }], { update: "timeout", order: "rls" });
+    const res = await applyOrderEdit(f.store, { orderId: "o1", plan, fields, oldTotal: 3050, currency: "pln", adminNote: null, now: at });
+    expect(res).toEqual({
+      ok: false,
+      error: "Zapis pozycji przerwany: timeout. Nie udało się też zapisać zamówienia (rls) — suma i notatka NIE są zaktualizowane, sprawdź zamówienie.",
+    });
+  });
+
+  it("błąd pozycji, potem błąd odczytu: oba w komunikacie, zamówienie nietknięte", async () => {
+    const f = fakeStore([{ id: "a", price: 2650, quantity: 1 }, { id: "b", price: 500, quantity: 1 }], { update: "timeout", read: "down" });
+    const res = await applyOrderEdit(f.store, { orderId: "o1", plan, fields, oldTotal: 3050, currency: "pln", adminNote: null, now: at });
+    expect(f.calls).toEqual(["insert:1", "update:a", "read"]);
+    expect(res).toEqual({
+      ok: false,
+      error: "Zapis pozycji przerwany: timeout. Nie udało się odczytać pozycji zamówienia (down) — sprawdź zamówienie.",
+    });
   });
 });

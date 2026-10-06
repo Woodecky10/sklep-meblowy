@@ -58,9 +58,10 @@ export async function applyOrderEdit(
 
   const read = await store.readItems();
   if ("error" in read) {
+    const readError = `Nie udało się odczytać pozycji zamówienia (${read.error}) — sprawdź zamówienie.`;
     return {
       ok: false,
-      error: `Nie udało się odczytać pozycji zamówienia (${read.error}) — sprawdź zamówienie.`,
+      error: itemsError ? `Zapis pozycji przerwany: ${itemsError}. ${readError}` : readError,
     };
   }
 
@@ -71,6 +72,12 @@ export async function applyOrderEdit(
   );
   const orderError = await store.updateOrder({ ...args.fields, total, admin_note: note });
 
+  if (itemsError && orderError) {
+    return {
+      ok: false,
+      error: `Zapis pozycji przerwany: ${itemsError}. Nie udało się też zapisać zamówienia (${orderError}) — suma i notatka NIE są zaktualizowane, sprawdź zamówienie.`,
+    };
+  }
   if (itemsError) {
     return {
       ok: false,
