@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { requireAdmin } from "@/app/_lib/admin";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { canTransition } from "@/app/_lib/order-status";
+import { toOrderItemRows } from "@/app/_lib/order-items";
 import type { OrderStatus } from "@/app/_lib/types";
 import { notifyStatusChange, sendExternalOrderAcceptedMail } from "@/app/_lib/mail/notify-order";
 import { requestReviews } from "@/app/_lib/mail/review-request";
@@ -251,21 +252,25 @@ export async function createExternalOrder(
   }
   const orderId = (order as { id: string }).id;
 
-  const { error: itemsErr } = await supabase.from("order_items").insert(
-    input.items.map((it) => ({
-      order_id: orderId,
-      product_id: it.product_id,
-      quantity: it.quantity,
-      price: it.price,
-      notes: it.notes,
-      variant_values: null,
-      // Pole dokładamy TYLKO pozycji spoza katalogu. Kolumna ma DEFAULT '',
-      // więc dla pozycji z katalogu nic to nie zmienia — a na bazie bez
-      // migracji 82 PostgREST odrzuciłby nieznaną kolumnę (PGRST204) i
-      // zablokował także zwykłe zamówienia zewnętrzne.
-      ...(it.custom_name ? { custom_name: it.custom_name } : {}),
-    })) as never[]
-  );
+  // toOrderItemRows: wszystkie wiersze mają ten sam zestaw kluczy. DEFAULT ''
+  // kolumny custom_name NIE zadziała przy mieszanych pozycjach (postgrest-js
+  // wysyła brakujące klucze jako NULL, a kolumna jest NOT NULL). Gdy nie ma
+  // żadnej pozycji spoza katalogu, helper pomija custom_name całkiem — baza
+  // bez migracji 82 odrzuciłaby nieznaną kolumnę (PGRST204).
+  const { error: itemsErr } = await supabase
+    .from("order_items")
+    .insert(
+      toOrderItemRows(
+        input.items.map((it) => ({
+          product_id: it.product_id,
+          quantity: it.quantity,
+          price: it.price,
+          notes: it.notes,
+          custom_name: it.custom_name,
+        })),
+        orderId
+      ) as never[]
+    );
   if (itemsErr) {
     // Zamówienie bez pozycji to śmieć — sprzątamy, żeby na liście nie został
     // pusty wiersz. Numer (z sekwencji) i tak przepada — to sprzątanie nie

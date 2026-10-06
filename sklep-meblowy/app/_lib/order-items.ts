@@ -15,6 +15,55 @@ export type NamedOrderItem = {
   product?: { name: string } | null;
 };
 
+export type OrderItemInput = {
+  // null = pozycja spoza katalogu (migracja 82).
+  product_id: string | null;
+  quantity: number;
+  price: number;
+  variant_values?: Record<string, string> | null;
+  notes?: string | null;
+  bundle_id?: string | null;
+  bundle_label?: string | null;
+  custom_name?: string | null;
+};
+
+export type OrderItemRow = {
+  order_id: string;
+  product_id: string | null;
+  quantity: number;
+  price: number;
+  variant_values: Record<string, string> | null;
+  notes: string | null;
+  bundle_id: string | null;
+  bundle_label: string | null;
+  // Brak klucza (we WSZYSTKICH wierszach naraz) tylko gdy żadna pozycja nie
+  // jest spoza katalogu — patrz toOrderItemRows.
+  custom_name?: string;
+};
+
+// Wiersze order_items o IDENTYCZNYM zestawie kluczy. postgrest-js przy
+// insercie tablicy ustawia ?columns= na sumę kluczy wszystkich wierszy
+// i brakujące wysyła jako NULL (defaultToNull) — DEFAULT kolumny NIE
+// zadziała. custom_name jest NOT NULL (migracja 82), więc pozycja
+// z katalogu musi mieć jawne "".
+// Wyjątek: gdy ŻADNA pozycja nie ma custom_name (zwykłe zamówienie), klucza
+// nie ma we wszystkich wierszach — baza bez migracji 82 odrzuciłaby nieznaną
+// kolumnę (PGRST204) i zablokowała zwykłe zamówienia.
+export function toOrderItemRows(items: OrderItemInput[], orderId: string): OrderItemRow[] {
+  const withCustom = items.some((it) => !!it.custom_name);
+  return items.map((it) => ({
+    order_id: orderId,
+    product_id: it.product_id ?? null,
+    quantity: it.quantity,
+    price: it.price,
+    variant_values: it.variant_values ?? null,
+    notes: it.notes ?? null,
+    bundle_id: it.bundle_id ?? null,
+    bundle_label: it.bundle_label ?? null,
+    ...(withCustom ? { custom_name: it.custom_name ?? "" } : {}),
+  }));
+}
+
 export function orderItemDisplayName(item: NamedOrderItem, fallback: string): string {
   // custom_name PIERWSZE: wiersz ma dokładnie jedno z dwóch źródeł nazwy, a gdy
   // ktoś kiedyś wpisze oba, ręczna nazwa jest tą, którą widziała pracownica.
