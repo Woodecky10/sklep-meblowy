@@ -23,7 +23,8 @@ export type OrderEditStore = {
 
 export type OrderEditFields = {
   shipping_address: Address;
-  guest_email?: string;
+  // null = zamówienie wpisane ręcznie bez e-maila klienta (Task 9).
+  guest_email?: string | null;
   bundle_discount: number;
   promo_discount: number;
 };

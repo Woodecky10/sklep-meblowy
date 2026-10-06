@@ -18,6 +18,7 @@ export default function ExternalOrderForm({ products }: { products: EditorProduc
   // Domyślnie „Opłacone w źródle" — tak działał formularz przed 2026-09-09
   // i tak wygląda większość zamówień z marketplace'ów.
   const [payment, setPayment] = useState<"online" | "cod">("online");
+  const [noEmail, setNoEmail] = useState(false);
   const [rows, setRows] = useState<EditorRow[]>([]);
   const [toast, setToast] = useState<Toast>(null);
   const [pending, startTransition] = useTransition();
@@ -167,9 +168,19 @@ export default function ExternalOrderForm({ products }: { products: EditorProduc
           <Field label="Imię i nazwisko" required>
             <input name="fullname" required maxLength={200} className={inputCls} />
           </Field>
-          <Field label="E-mail" required hint="Na ten adres pójdą maile o zamówieniu.">
-            <input name="email" type="email" required maxLength={200} className={inputCls} />
-          </Field>
+          <div className="flex flex-col gap-2">
+            <Field
+              label="E-mail"
+              required={!noEmail}
+              hint={noEmail ? "Bez e-maila klient nie dostanie żadnej wiadomości ze sklepu." : "Na ten adres pójdą maile o zamówieniu."}
+            >
+              <input name="email" type="email" required={!noEmail} disabled={noEmail} maxLength={200} className={inputCls} />
+            </Field>
+            <label className="flex items-center gap-2 text-sm text-[var(--fg)]">
+              <input type="checkbox" name="no_email" value="1" checked={noEmail} onChange={(e) => setNoEmail(e.target.checked)} />
+              Klient nie podał e-maila
+            </label>
+          </div>
           <Field label="Telefon">
             <input name="phone" maxLength={40} className={inputCls} />
           </Field>

@@ -327,3 +327,21 @@ describe("orderEditFingerprint", () => {
     );
   });
 });
+
+describe("parseOrderEditInput — brak maila (zamówienie ręczne)", () => {
+  it("allowNoEmail + no_email → email null", () => {
+    const res = parseOrderEditInput(base({ email: "", no_email: "1" }), { emailEditable: true, allowNoEmail: true });
+    expect(res.ok && res.value.email).toBe(null);
+  });
+
+  it("bez allowNoEmail no_email jest ignorowane — e-mail wymagany", () => {
+    expect(parseOrderEditInput(base({ email: "", no_email: "1" }), { emailEditable: true })).toEqual({
+      ok: false,
+      error: "Podaj poprawny adres e-mail klienta",
+    });
+  });
+
+  it("allowNoEmail bez zaznaczenia → e-mail walidowany", () => {
+    expect(parseOrderEditInput(base({ email: "jan@" }), { emailEditable: true, allowNoEmail: true }).ok).toBe(false);
+  });
+});

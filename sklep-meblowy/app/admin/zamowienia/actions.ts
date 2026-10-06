@@ -205,6 +205,7 @@ export async function createExternalOrder(
     source: formData.get("source"),
     source_name: formData.get("source_name"),
     email: formData.get("email"),
+    no_email: formData.get("no_email"),
     fullname: formData.get("fullname"),
     phone: formData.get("phone"),
     street: formData.get("street"),
@@ -413,9 +414,13 @@ export async function updateOrder(formData: FormData): Promise<ActionResult> {
   // E-mail konta należy do konta — w zamówieniu z kontem pola nie ruszamy,
   // cokolwiek przyszło w formularzu.
   const emailEditable = order.user_id === null;
+  // Zamówienie wpisane ręcznie może nie mieć e-maila. Warunek prawdziwościowy:
+  // select("*") na bazie bez kolumny `source` daje undefined, nie null.
+  const allowNoEmail = emailEditable && !!order.source;
   const parsed = parseOrderEditInput(
     {
       email: formData.get("email"),
+      no_email: formData.get("no_email"),
       fullname: formData.get("fullname"),
       phone: formData.get("phone"),
       street: formData.get("street"),
@@ -428,7 +433,7 @@ export async function updateOrder(formData: FormData): Promise<ActionResult> {
       notify: formData.get("notify"),
       fingerprint: formData.get("fingerprint"),
     },
-    { emailEditable }
+    { emailEditable, allowNoEmail }
   );
   if (!parsed.ok) return parsed;
   const input = parsed.value;
@@ -459,7 +464,7 @@ export async function updateOrder(formData: FormData): Promise<ActionResult> {
     plan: planned.value,
     fields: {
       shipping_address: input.address,
-      ...(emailEditable && input.email ? { guest_email: input.email } : {}),
+      ...(emailEditable ? { guest_email: input.email } : {}),
       bundle_discount: input.bundle_discount,
       promo_discount: input.promo_discount,
     },
@@ -474,9 +479,11 @@ export async function updateOrder(formData: FormData): Promise<ActionResult> {
   revalidatePath(`/konto/zamowienia/${orderId}`);
   if (!res.ok) return res;
 
-  if (input.notify) after(() => notifyOrderUpdated(orderId));
+  // Bez adresu nie ma do kogo pisać — formularz blokuje pole, serwer też.
+  const notify = input.notify && !(emailEditable && input.email === null);
+  if (notify) after(() => notifyOrderUpdated(orderId));
   return {
     ok: true,
-    message: input.notify ? "Zamówienie zapisane, mail do klienta w drodze" : "Zamówienie zapisane",
+    message: notify ?"Zamówienie zapisane, mail do klienta w drodze" : "Zamówienie zapisane",
   };
 }

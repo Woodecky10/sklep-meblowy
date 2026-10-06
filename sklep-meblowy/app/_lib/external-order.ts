@@ -20,7 +20,8 @@ export type ExternalOrderItemInput = {
 
 export type ExternalOrderInput = {
   source: string;
-  email: string;
+  // null = klient nie podał e-maila (zaznaczone w panelu, Task 9 planu edycji).
+  email: string | null;
   address: Address;
   items: ExternalOrderItemInput[];
   // Σ cena × ilość, do grosza. Dostawa jak w sklepie — osobno, na karcie zamówienia.
@@ -38,6 +39,7 @@ export type RawExternalOrder = {
   source?: unknown;
   source_name?: unknown;
   email?: unknown;
+  no_email?: unknown;
   fullname?: unknown;
   phone?: unknown;
   street?: unknown;
@@ -107,8 +109,12 @@ export function parseExternalOrderInput(raw: RawExternalOrder): ParseResult {
   if (!payment.ok) return payment;
 
   // Małe litery — spójne z checkoutem i z linkGuestOrders (ilike po e-mailu).
-  const email = text(raw.email, 200).toLowerCase();
-  if (!EMAIL_RE.test(email)) return { ok: false, error: "Podaj poprawny adres e-mail klienta" };
+  // null tylko po jawnym zaznaczeniu „Klient nie podał e-maila" — puste pole
+  // bez zaznaczenia to pomyłka, nie brak adresu.
+  const email = raw.no_email === "1" ? null : text(raw.email, 200).toLowerCase();
+  if (email !== null && !EMAIL_RE.test(email)) {
+    return { ok: false, error: "Podaj poprawny adres e-mail klienta" };
+  }
 
   const fullname = text(raw.fullname, 200);
   const street = text(raw.street, 200);

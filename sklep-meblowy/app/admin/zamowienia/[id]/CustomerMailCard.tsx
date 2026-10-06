@@ -108,6 +108,10 @@ export default function CustomerMailCard({
         zwykły tekst — pusta linia robi odstęp między akapitami.
       </p>
 
+      {customerEmail === null && (
+        <p role="note" className="text-sm text-amber-700 dark:text-amber-400 mb-4">To zamówienie nie ma adresu e-mail klienta — wiadomości nie wyślesz. Dopisz adres w edycji zamówienia.</p>
+      )}
+
       <label className="flex flex-col gap-1.5">
         <span className="text-xs font-sans uppercase tracking-widest text-[var(--muted)]">
           Treść wiadomości
@@ -125,7 +129,7 @@ export default function CustomerMailCard({
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
           type="button"
-          disabled={isPending || body.trim() === ""}
+          disabled={isPending || body.trim() === "" || !customerEmail}
           onClick={send}
           className="px-5 py-2 bg-[var(--color-navy)] text-white font-sans text-sm uppercase tracking-widest rounded-lg hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >

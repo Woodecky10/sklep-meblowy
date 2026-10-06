@@ -251,7 +251,11 @@ export default async function AdminOrderDetailPage({
           <Card>
             <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-3">Klient</h3>
             <p className="text-sm text-[var(--fg)]">{customer.name ?? "—"}</p>
-            {customer.email && <p className="text-sm text-[var(--muted)]">{customer.email}</p>}
+            {customer.email ? (
+              <p className="text-sm text-[var(--muted)]">{customer.email}</p>
+            ) : order.source ? (
+              <p className="text-sm text-[var(--muted)]">brak e-maila</p>
+            ) : null}
             <p className="text-xs text-[var(--muted)] mt-1">
               {order.source
                 ? `Zamówienie zewnętrzne — ${order.source}`

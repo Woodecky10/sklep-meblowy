@@ -129,4 +129,18 @@ describe("updateOrder", () => {
     getOrderByIdMock.mockRejectedValue(new Error("not found"));
     expect(await updateOrder(fd())).toEqual({ ok: false, error: "Zamówienie nie znalezione" });
   });
+
+  it("zamówienie ręczne + brak maila → guest_email null, mail nie planowany mimo zaznaczenia", async () => {
+    getOrderByIdMock.mockResolvedValue({ ...ORDER, source: "Allegro" });
+    const res = await updateOrder(fd({ email: "", no_email: "1", notify: "1" }));
+    expect(res).toEqual({ ok: true, message: "Zamówienie zapisane" });
+    expect(orderPatches[0]).toMatchObject({ guest_email: null });
+    expect(afterTasks).toHaveLength(0);
+  });
+
+  it("zamówienie gościa ze sklepu: no_email ignorowane, e-mail wymagany", async () => {
+    const res = await updateOrder(fd({ email: "", no_email: "1" }));
+    expect(res).toEqual({ ok: false, error: "Podaj poprawny adres e-mail klienta" });
+    expect(storeCalls).toEqual([]);
+  });
 });

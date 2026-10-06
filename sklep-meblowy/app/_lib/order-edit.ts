@@ -45,6 +45,7 @@ export type OrderEditInput = {
 
 export type RawOrderEdit = {
   email?: unknown;
+  no_email?: unknown;
   fullname?: unknown;
   phone?: unknown;
   street?: unknown;
@@ -78,13 +79,16 @@ function parseDiscount(v: unknown): number | null {
 
 export function parseOrderEditInput(
   raw: RawOrderEdit,
-  opts: { emailEditable: boolean }
+  opts: { emailEditable: boolean; allowNoEmail?: boolean }
 ): Result<OrderEditInput> {
   const fingerprint = text(raw.fingerprint, 4000);
   if (!fingerprint) return { ok: false, error: "Brak stanu formularza — odśwież stronę edycji" };
 
   let email: string | null = null;
-  if (opts.emailEditable) {
+  // allowNoEmail = zamówienie wpisane ręcznie (Allegro, OLX…): klient mógł nie
+  // podać adresu. Zamówienie ze sklepu ma e-mail zawsze — tam no_email nic nie znaczy.
+  const noEmail = opts.allowNoEmail === true && raw.no_email === "1";
+  if (opts.emailEditable && !noEmail) {
     // Małe litery — spójne z checkoutem i z linkGuestOrders (ilike po e-mailu).
     email = text(raw.email, 200).toLowerCase();
     if (!EMAIL_RE.test(email)) return { ok: false, error: "Podaj poprawny adres e-mail klienta" };

@@ -22,6 +22,7 @@ export default function EditOrderForm({
   total,
   paidOnline,
   guestEmail,
+  allowNoEmail,
   accountEmail,
   address,
   bundleDiscount,
@@ -35,6 +36,7 @@ export default function EditOrderForm({
   total: number;
   paidOnline: boolean;
   guestEmail: string | null;
+  allowNoEmail: boolean;
   accountEmail: string | null;
   address: Address;
   bundleDiscount: number;
@@ -47,6 +49,7 @@ export default function EditOrderForm({
   const [bundle, setBundle] = useState(String(bundleDiscount));
   const [promo, setPromo] = useState(String(promoDiscount));
   const [toast, setToast] = useState<Toast>(null);
+  const [noEmail, setNoEmail] = useState(allowNoEmail && !guestEmail);
   const [pending, startTransition] = useTransition();
   // Wiersze z serwera mają klucze 1..N — nowe muszą zacząć od N+1.
   const nextKey = useRef(initialRows.length + 1);
@@ -119,16 +122,29 @@ export default function EditOrderForm({
             />
           </Field>
           {guestEmail !== null ? (
-            <Field label="E-mail" required hint="Na ten adres pójdą maile o zamówieniu.">
-              <input
-                name="email"
-                type="email"
-                required
-                maxLength={200}
-                defaultValue={guestEmail}
-                className={inputCls}
-              />
-            </Field>
+            <div className="flex flex-col gap-2">
+              <Field
+                label="E-mail"
+                required={!noEmail}
+                hint={noEmail ? "Bez e-maila klient nie dostanie żadnej wiadomości ze sklepu." : "Na ten adres pójdą maile o zamówieniu."}
+              >
+                <input
+                  name="email"
+                  type="email"
+                  required={!noEmail}
+                  disabled={noEmail}
+                  maxLength={200}
+                  defaultValue={guestEmail}
+                  className={inputCls}
+                />
+              </Field>
+              {allowNoEmail && (
+                <label className="flex items-center gap-2 text-sm text-[var(--fg)]">
+                  <input type="checkbox" name="no_email" value="1" checked={noEmail} onChange={(e) => setNoEmail(e.target.checked)} />
+                  Klient nie podał e-maila
+                </label>
+              )}
+            </div>
           ) : (
             <Field
               label="E-mail"
@@ -264,15 +280,21 @@ export default function EditOrderForm({
         )}
       </Card>
 
-      <label className="flex items-center gap-3 cursor-pointer text-sm text-[var(--fg)]">
-        <input
-          type="checkbox"
-          name="notify"
-          value="1"
-          className="shrink-0 accent-[var(--color-gold)]"
-        />
-        Powiadom klienta mailem o zmianach
-      </label>
+      <div className="flex flex-col gap-1">
+        <label className="flex items-center gap-3 cursor-pointer text-sm text-[var(--fg)]">
+          <input
+            type="checkbox"
+            name="notify"
+            value="1"
+            disabled={noEmail}
+            className="shrink-0 accent-[var(--color-gold)]"
+          />
+          Powiadom klienta mailem o zmianach
+        </label>
+        {noEmail && (
+          <span className="text-xs text-[var(--muted)]">Zamówienie bez e-maila — nie ma do kogo wysłać.</span>
+        )}
+      </div>
 
       <div className="flex items-center gap-3">
         <button

@@ -93,6 +93,7 @@ export default async function AdminEditOrderPage({ params }: { params: Promise<{
         total={Number(order.total)}
         paidOnline={order.payment_method === "online" && order.status !== "pending"}
         guestEmail={order.user_id === null ? order.guest_email ?? "" : null}
+        allowNoEmail={order.user_id === null && !!order.source}
         accountEmail={accountEmail}
         address={order.shipping_address}
         bundleDiscount={Number(order.bundle_discount ?? 0)}
