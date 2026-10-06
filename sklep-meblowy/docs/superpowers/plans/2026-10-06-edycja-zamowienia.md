@@ -1956,7 +1956,7 @@ git commit -m "feat(zamowienia): brak maila w zamówieniach wpisywanych ręcznie
 
 (uzupełniane w trakcie — jedyny trwały nośnik stanu, `.superpowers/sdd/` jest gitignorowany)
 
-**Przerwane 2026-10-06 na prośbę właściciela po Task 7** („zapisz tak, żebym na innym komputerze mógł lecieć dalej"). Gałąź `feat/edycja-zamowienia` wypchnięta na origin, NIE zmergowana, bez PR-a. Nic z tej gałęzi nie jest na produkcji.
+**Wznowione 2026-10-06 na drugim komputerze: Task 9, recenzja całej gałęzi i fala poprawek zrobione; gałąź czeka na decyzję o Task 8.** Wcześniej: **przerwane 2026-10-06 na prośbę właściciela po Task 7** („zapisz tak, żebym na innym komputerze mógł lecieć dalej"). Gałąź `feat/edycja-zamowienia` wypchnięta na origin, NIE zmergowana, bez PR-a. Nic z tej gałęzi nie jest na produkcji.
 
 - [x] Task 1 — `210d1a7..6f75c73`, recenzja czysta
 - [x] Task 2 — `6f75c73..ee1467c`, recenzja czysta
@@ -1965,9 +1965,20 @@ git commit -m "feat(zamowienia): brak maila w zamówieniach wpisywanych ręcznie
 - [x] Task 5 — `19ff303..1888a49`, recenzja czysta
 - [x] Task 6 — `1888a49..6dcfeca`, recenzja czysta; e2e „Dodaj zamówienie" 3/3 przed i po
 - [x] Task 7 — `0344a2f..9493797`, recenzja czysta; e2e na buildzie 4/4, zrzut strony edycji (zamówienie #57) obejrzany
-- [ ] **Task 9 (brak maila) — NASTĘPNY.** Opis wyżej w planie; dopisany w trakcie (`0344a2f`), spec ma „Dodatek — brak maila"
-- [ ] Recenzja całej gałęzi (najmocniejszy model) → jedna fala poprawek (w niej „Odroczone" niżej) → krótka ponowna recenzja
-- [ ] Task 8 — decyzja właściciela o mergu, wdrożenie, e2e na prodzie, test na żywo TYLKO za zgodą
+- [x] Task 9 (brak maila) — `8cf05c7..ee0baec`, recenzja czysta (wznowione 2026-10-06 na drugim komputerze); dodatkowo `order-edit-apply.ts`: `OrderEditFields.guest_email: string | null`. **e2e NIEURUCHOMIONE** — na tym komputerze brak `.env.e2e`, a `e2e/.auth/admin.json` pusty; do Task 8 krok 3
+- [x] Recenzja całej gałęzi (Fable 5.1): „With fixes", 0 krytycznych, 3 ważne, Review Focus 1–5 trzyma; fala poprawek `ee0baec..8b22c5e` (2 commity), ponowna recenzja: wszystko poprawione, bez nowych błędów. Pełna suita 127 plików / 1930 testów, tsc, eslint, build czyste
+- [ ] **Task 8 — NASTĘPNY:** decyzja właściciela o mergu, wdrożenie, e2e na prodzie, test na żywo TYLKO za zgodą
+
+**Fala poprawek po recenzji całej gałęzi (2026-10-06):**
+
+- Ostrzeżenie P24 w edycji tylko dla zamówień rozliczonych przez P24 (`payment_provider === "p24"`, nie `pending`) — wcześniej odpalało na każdym zamówieniu Allegro/OLX „opłacone w źródle”.
+- Nowa notka dla zamówienia ze sklepu czekającego na płatność online: zmiana sumy przed zapłatą sprawi, że `api/p24/status` nie rozliczy płatności (porównuje kwotę z `orders.total`).
+- `status` w `orderEditFingerprint` — zapis edycji otwartej przed zmianą statusu jest odrzucany jak przy zmianie pozycji (odstępstwo od specu, który definiował odcisk jako pozycje + suma).
+- Mail „Zaktualizowaliśmy Twoje zamówienie": suma jako „Razem”/„Gesamt” zamiast „Zapłacono”, neutralne zdanie końcowe zamiast „ustalimy termin dostawy” (odstępstwo od „reszta szablonu bez zmian” — mail nie może podawać klientowi zapłaconej kwoty, której nie zapłacił).
+- Edycja zamówienia w EUR nie wstawia ceny katalogowej PLN do pola „Cena (EUR)” (prop `suggestCatalogPrice` w `OrderItemsEditor`).
+- Wiersz wniesienia: nazwa jako tekst, ilość zablokowana; zapis bez zmian nie dopisuje śladu do notatki; wspólny limit kraju `COUNTRY_MAX_LENGTH = 60`; „Klient nie podał e-maila” odznacza „Powiadom klienta”; ceny z cennika zaokrąglone do groszy; `items` jako tablica (i brak pola) → „Nieczytelna lista pozycji…”.
+- Nowe testy: adapter `order-edit-store` filtruje `order_id` przy update i delete; `after()` nie leci, gdy zapis się nie uda; limity MAX_ITEMS i ilość 99/100.
+- Odłożone świadomie: wpisanie ręcznie dokładnej nazwy wniesienia w wiersz spoza katalogu blokuje nazwę i ilość (odwracalne „Usuń”); szerszy odcisk (adres, rabaty, e-mail, uwagi); odchudzenie listy produktów przekazywanej do edytora; limit 2000 znaków notatki vs rosnący ślad; strażnik niezapisanych zmian ślepy na dodanie/usunięcie wiersza; `?edytowano=1` zostaje w adresie. Pozostałe pozycje „Odroczone” niżej: recenzent ocenił wszystkie jako „może poczekać”.
 
 **Rozstrzygnięcia (z dziennika wykonania — nie „naprawiać" z powrotem):**
 
