@@ -33,11 +33,14 @@ export async function generateMetadata({
 
 export default async function AdminOrderDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ edytowano?: string }>;
 }) {
   await requireAdmin();
   const { id } = await params;
+  const { edytowano } = await searchParams;
 
   let order: (Order & { items: OrderItem[] }) | null = null;
   try {
@@ -132,7 +135,19 @@ export default async function AdminOrderDetailPage({
             Pobranie
           </span>
         )}
+        <Link
+          href={`/admin/zamowienia/${order.id}/edytuj`}
+          className="px-3 py-1 rounded-full text-xs font-sans uppercase tracking-widest self-start border border-[var(--border)] text-[var(--fg)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors"
+        >
+          Edytuj zamówienie
+        </Link>
       </div>
+
+      {edytowano === "1" && (
+        <p role="status" className="text-sm text-emerald-700 dark:text-emerald-400">
+          Zmiany w zamówieniu zapisane.
+        </p>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Lewa kolumna: pozycje + podsumowanie + klient + adres + płatność */}
