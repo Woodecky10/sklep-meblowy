@@ -866,10 +866,30 @@ git commit -m "refactor(wniesienie): koniec wersji „za sztukę”; /dostawa �
 
 (uzupełniane w trakcie — jedyny trwały nośnik stanu, `.superpowers/sdd/` jest gitignorowany)
 
-- [ ] Task 1
-- [ ] Task 2
-- [ ] Task 3
-- [ ] Task 4
-- [ ] Task 5
-- [ ] Task 6
-- [ ] Task 7
+- [x] Task 1 — commity 57a0805..785292c, recenzja czysta
+- [x] Task 2 — 785292c..28d036c; runda poprawek 1/5 (komentarz pętli w route.ts, scalenie bloków komentarzy)
+- [x] Task 3 — 28d036c..dab90bd
+- [x] Task 4 — dab90bd..bf33df7
+- [x] Task 5 — bf33df7..2e494b8
+- [x] Task 6 — 2e494b8..a0f7060
+- [ ] Task 7 — krok 1 (recenzja całej gałęzi) WYKONANY, wynik „With fixes"; poprawki tej fali: normalizator wierszy `order_items`, sprzątanie osieroconego zamówienia, klucz „za sztukę” ze starej karty checkoutu, ten zapis. Kroki 2–3 OTWARTE.
+
+**Rozstrzygnięcia (z dziennika wykonania):**
+
+- Wzorce grep w planie (Task 4 krok 6, Task 6 krok 4) zawierają `setCarryIn`, który jest też prawowitym setterem koszyka (CartContext, używany przez CheckoutForm) — trafienia w tych plikach są oczekiwane i NIE wolno ich usuwać.
+- Task 5: bramkowanie przekierowania pustego koszyka flagą `hydrated` w CheckoutForm zaakceptowane — bez tego odświeżenie `/checkout` odsyłało do `/koszyk` przed odczytem localStorage, a wybór wniesienia ma przetrwać powrót (spec, rozstrzygnięcie E). Był to błąd istniejący na produkcji.
+- Fala końcowa po recenzji: (1) czysty normalizator wierszy dla `createOrder` i zamówień zewnętrznych, (2) usuwanie osieroconego zamówienia przy błędzie pozycji, (3) stary klucz „za sztukę” w `items` liczy się jako zgoda na wniesienie (nigdy więcej niż klient widział), (4) ten zapis. Scalanie notatek przy migracji koszyka zostaje odroczone.
+
+**Przyczyna poprawki krytycznej:** postgrest-js przy insercie tablicy ustawia `?columns=` na sumę kluczy wszystkich wierszy i brakujące wysyła jako NULL (`defaultToNull`), więc DEFAULT kolumny nie działa; `custom_name` jest NOT NULL (migracja 82), a pozycje z katalogu nie miały tego klucza. Produkcja nie miała dotąd żadnego zamówienia z pozycją bez produktu, więc nic nie mogło tego obalić — traktowane jako potwierdzone.
+
+**Otwarte:**
+
+- [ ] Task 7 krok 2: decyzja właściciela o integracji (push/PR/merge z Woodecky10).
+- [ ] Task 7 krok 3: po statusie Vercela „success" e2e na produkcji — muszą zgłosić „passed".
+- [ ] NOWE: jedno żywe zamówienie próbne za pobraniem (COD) z wniesieniem, na jednorazowy adres e-mail, po wdrożeniu; sprawdzić w panelu admina i usunąć. Tylko za potwierdzeniem właściciela — żaden automatyczny test nie składa zamówienia, więc ścieżka zapisu pozycji nie była sprawdzona na żywo.
+
+**Odroczone (follow-upy):**
+
+- Migracja koszyka scala duplikaty i gubi `notes` drugiego wiersza (zostaje pierwszego); brak testu scalania pozycji zestawu, limit 99 z `clampQty`.
+- Brak testu trasy dla ścieżki pieniężnej `carryIn: true` (projekt nie ma testów tras); e2e: `boundingBox()!` i `.last()` zależne od kolejności DOM; teksty DE nietestowane (`/de` zamrożone).
+- Token MCP Supabase zwraca 401 — odnowić.
