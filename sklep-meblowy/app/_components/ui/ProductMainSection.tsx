@@ -166,6 +166,7 @@ export default function ProductMainSection({
           onChange={setSelected}
           addToCartLabel={t.product.addToCart}
           selectVariantLabel={t.product.selectVariant}
+          buyNowLabel={t.product.buyNow}
         />
 
         <BundleOffer bundles={bundles} currentProduct={product} selected={selected} />
