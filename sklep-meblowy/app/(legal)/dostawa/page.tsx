@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { localizeHref } from "@/app/_lib/i18n";
+import { CARRY_IN_PRICE } from "@/app/_lib/carry-in";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
@@ -53,7 +54,7 @@ export default async function DostawaPage() {
           "Bei der Annahme empfehlen wir, den Zustand der Verpackung im Beisein des Kuriers zu prüfen. Bei sichtbaren Schäden erleichtert die Erstellung eines Schadensprotokolls eine eventuelle Reklamation.",
         h2Carry: "Was ist mit dem Hineintragen der Möbel?",
         carry:
-          "Die Standardlieferung umfasst den Transport bis zur ersten Tür des Gebäudes. Das Hineintragen der Möbel in eine bestimmte Etage oder in die Wohnung kann zusätzlich bestellt werden – die Einzelheiten geben Sie bei der telefonischen Terminvereinbarung an.",
+          "Die Standardlieferung umfasst den Transport bis zur ersten Tür des Gebäudes. Das Hineintragen der Möbel bis zur 4. Etage können Sie direkt beim Produkt bestellen – markieren Sie „Hineintragen der Möbel“ vor dem Hinzufügen zum Warenkorb (Aufpreis pro Stück beim Produkt angegeben).",
         h2Damage: "Transportschaden",
         damageBefore:
           "Wurde das Produkt beim Transport beschädigt, bitten wir um unverzügliche Kontaktaufnahme unter der im Bereich ",
@@ -90,8 +91,7 @@ export default async function DostawaPage() {
         process4:
           "Podczas odbioru zalecamy sprawdzenie stanu opakowania w obecności kuriera. W razie widocznych uszkodzeń – sporządzenie protokołu szkody ułatwi ewentualną reklamację.",
         h2Carry: "Co z wniesieniem mebli?",
-        carry:
-          "Standardowa dostawa obejmuje transport pod pierwsze drzwi budynku. Wniesienie mebli na konkretne piętro lub do mieszkania można zamówić dodatkowo – szczegóły podaj przy telefonicznym ustalaniu terminu dostawy.",
+        carry: `Standardowa dostawa obejmuje transport pod pierwsze drzwi budynku. Wniesienie mebli do 4. piętra możesz zamówić przy produkcie – zaznacz „Wniesienie mebli” przed dodaniem do koszyka (${CARRY_IN_PRICE} zł za sztukę).`,
         h2Damage: "Uszkodzenie w transporcie",
         damageBefore:
           "Jeżeli produkt został uszkodzony w transporcie, prosimy o niezwłoczny kontakt pod adresem wskazanym w zakładce ",
