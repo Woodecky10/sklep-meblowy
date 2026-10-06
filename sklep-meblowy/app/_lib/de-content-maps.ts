@@ -106,9 +106,6 @@ export const VARIANT_OPTION_DE: Record<string, string> = {
   Tkanina: "Stoff",
   TKANINA: "STOFF",
   Wariant: "Variante",
-  // Klucz wniesienia — MUSI być identyczny z CARRY_IN_KEY w carry-in.ts
-  // (test carry-in.test.ts pilnuje zgodności).
-  "Wniesienie mebli do 4. piętra": "Hineintragen bis zur 4. Etage",
 };
 
 // Kody tkanin (MANILA/MONOLITH/POSO/QUELLE/TILIA/WOOLLY/CHILL ME …) i wymiary
