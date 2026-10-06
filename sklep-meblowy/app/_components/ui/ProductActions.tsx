@@ -21,6 +21,7 @@ export default function ProductActions({
   onChange,
   addToCartLabel,
   selectVariantLabel,
+  buyNowLabel,
 }: {
   product: Product;
   selected: Record<string, string>;
@@ -29,6 +30,7 @@ export default function ProductActions({
   // bo komponenty "use client" nie wołają getLocale().
   addToCartLabel?: string;
   selectVariantLabel?: string;
+  buyNowLabel?: string;
 }) {
   const showVariants = hasVariants(product);
   const complete = isVariantSelectionComplete(product, selected);
@@ -55,6 +57,15 @@ export default function ProductActions({
         needsVariant={showVariants && !complete}
         addToCartLabel={addToCartLabel}
         selectVariantLabel={selectVariantLabel}
+      />
+
+      <AddToCartButton
+        product={product}
+        selectedValues={selected}
+        currentPrice={price}
+        needsVariant={showVariants && !complete}
+        buyNow
+        buyNowLabel={buyNowLabel}
       />
     </div>
   );

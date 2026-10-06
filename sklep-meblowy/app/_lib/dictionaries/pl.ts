@@ -81,6 +81,7 @@ export type PlShape = {
   };
   product: {
     addToCart: string;
+    buyNow: string;
     selectVariant: string;
     cornerSideHint: string;
     sizeLabel: string;
@@ -532,6 +533,7 @@ export const pl = {
   },
   product: {
     addToCart: "Dodaj do koszyka",
+    buyNow: "Kup teraz",
     selectVariant: "Wybierz wariant",
     cornerSideHint: "Strony pokazane patrząc od frontu",
     sizeLabel: "Rozmiar",
