@@ -17,6 +17,7 @@ Komendy z katalogu `sklep-meblowy/` (tam `package.json`; korzeń repo piętro wy
 - Bez migracji bazy. Status, `delivery_*`, `promo_code_id`, `payment_*` edycja NIE zmienia.
 - `orders.total = max(0, round2(Σ cena × ilość − bundle_discount − promo_discount))`; ceny w walucie zamówienia (`pln`/`eur`).
 - E-mail edytowalny tylko gdy `order.user_id === null` (zapis do `guest_email`, małe litery); przy koncie — tylko odczyt, wartość z formularza ignorowana.
+- Brak e-maila (`guest_email: null`) tylko w zamówieniu wpisanym ręcznie (`source`) i tylko po jawnym zaznaczeniu „Klient nie podał e-maila" (Task 9).
 - Limity jak w „Dodaj zamówienie": `MAX_ITEMS = 50`, `NOTES_MAX_LENGTH = 500`, `CUSTOM_NAME_MAX_LENGTH = 200`, `parsePrice`; ilość całkowita 1–99; co najmniej 1 pozycja.
 - Pozycja ma ALBO `product_id` ALBO `custom_name`. Istniejąca pozycja nie zmienia `product_id`, `bundle_id`, `bundle_label`.
 - Wstawianie pozycji wyłącznie przez `toOrderItemRows` (`app/_lib/order-items.ts`).
@@ -1745,6 +1746,203 @@ git commit -m "feat(zamowienia): strona „Edytuj zamówienie” w panelu" -m "C
 
 ---
 
+### Task 9: „Brak maila" w zamówieniach ręcznych (dopisane 2026-10-06 — wykonywane po Task 7, przed Task 8)
+
+Prośba właściciela w trakcie realizacji: zamówienia zewnętrzne (Allegro, OLX…) wpisywane ręcznie mogą nie mieć e-maila klienta. Spec: sekcja „Dodatek — brak maila".
+
+**Files:**
+- Modify: `app/_lib/external-order.ts` (`RawExternalOrder.no_email`, `ExternalOrderInput.email: string | null`)
+- Modify: `app/_lib/order-edit.ts` (`RawOrderEdit.no_email`, opcja `allowNoEmail`)
+- Modify: `app/admin/zamowienia/actions.ts` (`createExternalOrder`, `updateOrder`)
+- Modify: `app/admin/zamowienia/nowe/ExternalOrderForm.tsx`
+- Modify: `app/admin/zamowienia/[id]/edytuj/page.tsx`, `app/admin/zamowienia/[id]/edytuj/EditOrderForm.tsx`
+- Modify: `app/admin/zamowienia/[id]/CustomerMailCard.tsx`, `app/admin/zamowienia/[id]/page.tsx`
+- Test: `app/_lib/__tests__/external-order.test.ts`, `app/_lib/__tests__/order-edit.test.ts`, `app/admin/zamowienia/__tests__/update-order.test.ts`, `e2e/zamowienie-zewnetrzne-form.spec.ts`
+
+**Zasady:**
+- Brak e-maila tylko JAWNIE: pole `no_email = "1"` (checkbox „Klient nie podał e-maila"). Bez niego e-mail wymagany jak dotąd — zapomniane pole nie przechodzi po cichu.
+- „Dodaj zamówienie": zawsze dostępne. Edycja: tylko gdy `order.user_id === null && !!order.source` (zamówienie ręczne; warunek prawdziwościowy — `select("*")` bez kolumny daje `undefined`). Zamówienie gościa ze sklepu: `no_email` ignorowane, e-mail wymagany.
+- Brak e-maila = `guest_email: null`. Bez migracji: w bazie nie ma CHECK na `guest_email`, a polityka RLS „orders: guest insert" dotyczy tylko roli `anon` (panel pisze kluczem serwisowym).
+- Maile automatyczne (zmiana statusu, prośba o opinię) już pomijają zamówienie bez adresu (`customerEmailOf` → null). W edycji przy braku e-maila pole „Powiadom klienta" jest nieaktywne, a serwer nie planuje maila.
+
+**Interfaces:**
+- Consumes: `parseExternalOrderInput`, `RawExternalOrder`, `ExternalOrderInput` (istniejące); `parseOrderEditInput`, `RawOrderEdit` (Task 1); `updateOrder` (Task 5); `EditOrderForm` + `edytuj/page.tsx` (Task 7).
+- Produces: `RawExternalOrder.no_email?: unknown`; `ExternalOrderInput.email: string | null`; `RawOrderEdit.no_email?: unknown`; `parseOrderEditInput(raw, { emailEditable: boolean; allowNoEmail?: boolean })`; prop `allowNoEmail: boolean` w `EditOrderForm`.
+
+- [ ] **Step 1: Write the failing tests**
+
+`app/_lib/__tests__/external-order.test.ts`, w `describe("parseExternalOrderInput", …)`:
+```ts
+  it("brak maila zaznaczony → email null, pole e-mail ignorowane", () => {
+    const pusty = parseExternalOrderInput(raw({ no_email: "1", email: "" }));
+    expect(pusty.ok && pusty.value.email).toBe(null);
+    const zSmieciem = parseExternalOrderInput(raw({ no_email: "1", email: "jan@" }));
+    expect(zSmieciem.ok && zSmieciem.value.email).toBe(null);
+  });
+
+  it("bez zaznaczenia pusty e-mail nadal odrzucony", () => {
+    expect(parseExternalOrderInput(raw({ email: "", no_email: "" }))).toEqual({
+      ok: false,
+      error: "Podaj poprawny adres e-mail klienta",
+    });
+  });
+```
+
+`app/_lib/__tests__/order-edit.test.ts` (helper `base` z początku pliku), na końcu:
+```ts
+describe("parseOrderEditInput — brak maila (zamówienie ręczne)", () => {
+  it("allowNoEmail + no_email → email null", () => {
+    const res = parseOrderEditInput(base({ email: "", no_email: "1" }), { emailEditable: true, allowNoEmail: true });
+    expect(res.ok && res.value.email).toBe(null);
+  });
+
+  it("bez allowNoEmail no_email jest ignorowane — e-mail wymagany", () => {
+    expect(parseOrderEditInput(base({ email: "", no_email: "1" }), { emailEditable: true })).toEqual({
+      ok: false,
+      error: "Podaj poprawny adres e-mail klienta",
+    });
+  });
+
+  it("allowNoEmail bez zaznaczenia → e-mail walidowany", () => {
+    expect(parseOrderEditInput(base({ email: "jan@" }), { emailEditable: true, allowNoEmail: true }).ok).toBe(false);
+  });
+});
+```
+
+`app/admin/zamowienia/__tests__/update-order.test.ts`, w `describe("updateOrder", …)`:
+```ts
+  it("zamówienie ręczne + brak maila → guest_email null, mail nie planowany mimo zaznaczenia", async () => {
+    getOrderByIdMock.mockResolvedValue({ ...ORDER, source: "Allegro" });
+    const res = await updateOrder(fd({ email: "", no_email: "1", notify: "1" }));
+    expect(res).toEqual({ ok: true, message: "Zamówienie zapisane" });
+    expect(orderPatches[0]).toMatchObject({ guest_email: null });
+    expect(afterTasks).toHaveLength(0);
+  });
+
+  it("zamówienie gościa ze sklepu: no_email ignorowane, e-mail wymagany", async () => {
+    const res = await updateOrder(fd({ email: "", no_email: "1" }));
+    expect(res).toEqual({ ok: false, error: "Podaj poprawny adres e-mail klienta" });
+    expect(storeCalls).toEqual([]);
+  });
+```
+
+`e2e/zamowienie-zewnetrzne-form.spec.ts`, nowy test (NIE klika „Zapisz"; `getByLabel("E-mail")` łapie też etykietę checkboxa i podpowiedź — stąd lokator po `name`):
+```ts
+test("brak maila wyłącza pole e-mail, „Zapisz” NIE jest klikane", async ({ page }) => {
+  await page.goto("/admin/zamowienia/nowe");
+  const email = page.locator('input[name="email"]');
+  const brak = page.getByRole("checkbox", { name: "Klient nie podał e-maila" });
+  await expect(email).toBeEnabled();
+  await brak.check();
+  await expect(email).toBeDisabled();
+  await brak.uncheck();
+  await expect(email).toBeEnabled();
+});
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `npx vitest run app/_lib/__tests__/external-order.test.ts app/_lib/__tests__/order-edit.test.ts app/admin/zamowienia/__tests__/update-order.test.ts` → FAIL (nowe przypadki).
+
+- [ ] **Step 3: Parsery**
+
+`app/_lib/external-order.ts`:
+- w `ExternalOrderInput`: `email: string | null;` z komentarzem `// null = klient nie podał e-maila (zaznaczone w panelu, Task 9 planu edycji).`;
+- w `RawExternalOrder`: `no_email?: unknown;`;
+- zamiast dwóch linii z e-mailem:
+```ts
+  // Małe litery — spójne z checkoutem i z linkGuestOrders (ilike po e-mailu).
+  // null tylko po jawnym zaznaczeniu „Klient nie podał e-maila" — puste pole
+  // bez zaznaczenia to pomyłka, nie brak adresu.
+  const email = raw.no_email === "1" ? null : text(raw.email, 200).toLowerCase();
+  if (email !== null && !EMAIL_RE.test(email)) {
+    return { ok: false, error: "Podaj poprawny adres e-mail klienta" };
+  }
+```
+
+`app/_lib/order-edit.ts`:
+- w `RawOrderEdit`: `no_email?: unknown;`;
+- sygnatura: `opts: { emailEditable: boolean; allowNoEmail?: boolean }`;
+- blok e-maila:
+```ts
+  let email: string | null = null;
+  // allowNoEmail = zamówienie wpisane ręcznie (Allegro, OLX…): klient mógł nie
+  // podać adresu. Zamówienie ze sklepu ma e-mail zawsze — tam no_email nic nie znaczy.
+  const noEmail = opts.allowNoEmail === true && raw.no_email === "1";
+  if (opts.emailEditable && !noEmail) {
+    // Małe litery — spójne z checkoutem i z linkGuestOrders (ilike po e-mailu).
+    email = text(raw.email, 200).toLowerCase();
+    if (!EMAIL_RE.test(email)) return { ok: false, error: "Podaj poprawny adres e-mail klienta" };
+  }
+```
+
+- [ ] **Step 4: Akcje (`app/admin/zamowienia/actions.ts`)**
+
+- `createExternalOrder`: do wywołania `parseExternalOrderInput({...})` dopisz `no_email: formData.get("no_email"),` (reszta bez zmian; `guest_email: input.email` przyjmuje `null`). Jeśli `tsc` wskaże inne miejsce, które zakłada `email: string`, obsłuż `null` jawnie.
+- `updateOrder`:
+```ts
+  const emailEditable = order.user_id === null;
+  // Zamówienie wpisane ręcznie może nie mieć e-maila. Warunek prawdziwościowy:
+  // select("*") na bazie bez kolumny `source` daje undefined, nie null.
+  const allowNoEmail = emailEditable && !!order.source;
+```
+  w `parseOrderEditInput({...}, { emailEditable, allowNoEmail })` dopisz `no_email: formData.get("no_email"),`; w `fields` zamień `...(emailEditable && input.email ? { guest_email: input.email } : {})` na `...(emailEditable ? { guest_email: input.email } : {})`; przed `after`:
+```ts
+  // Bez adresu nie ma do kogo pisać — formularz blokuje pole, serwer też.
+  const notify = input.notify && !(emailEditable && input.email === null);
+```
+  i użyj `notify` zamiast `input.notify` w `after(…)` i w komunikacie.
+
+- [ ] **Step 5: Formularze**
+
+`ExternalOrderForm.tsx`: stan `const [noEmail, setNoEmail] = useState(false);`; pole e-mail:
+```tsx
+          <div className="flex flex-col gap-2">
+            <Field
+              label="E-mail"
+              required={!noEmail}
+              hint={noEmail ? "Bez e-maila klient nie dostanie żadnej wiadomości ze sklepu." : "Na ten adres pójdą maile o zamówieniu."}
+            >
+              <input name="email" type="email" required={!noEmail} disabled={noEmail} maxLength={200} className={inputCls} />
+            </Field>
+            <label className="flex items-center gap-2 text-sm text-[var(--fg)]">
+              <input type="checkbox" name="no_email" value="1" checked={noEmail} onChange={(e) => setNoEmail(e.target.checked)} />
+              Klient nie podał e-maila
+            </label>
+          </div>
+```
+(checkbox POZA `<Field>` — `Field` to `<label>`, który aktywuje pierwszy element w środku).
+
+`edytuj/page.tsx`: do `<EditOrderForm>` dopisz `allowNoEmail={order.user_id === null && !!order.source}`.
+
+`EditOrderForm.tsx`: prop `allowNoEmail: boolean`; stan `const [noEmail, setNoEmail] = useState(allowNoEmail && !guestEmail);`; przy `guestEmail !== null` pole e-mail jak w `ExternalOrderForm` powyżej, ale z `defaultValue={guestEmail}`, a checkbox renderowany tylko gdy `allowNoEmail`; checkbox „Powiadom klienta mailem o zmianach" dostaje `disabled={noEmail}`, a gdy `noEmail` — pod nim `<span className="text-xs text-[var(--muted)]">Zamówienie bez e-maila — nie ma do kogo wysłać.</span>`.
+
+- [ ] **Step 6: Karta zamówienia**
+
+`CustomerMailCard.tsx`: gdy `customerEmail === null` — nad polem treści `<p role="note" className="text-sm text-amber-700 dark:text-amber-400 mb-4">To zamówienie nie ma adresu e-mail klienta — wiadomości nie wyślesz. Dopisz adres w edycji zamówienia.</p>`; przycisk wysyłki `disabled={isPending || body.trim() === "" || !customerEmail}`.
+
+`[id]/page.tsx`, karta „Klient": zamiast `{customer.email && <p …>{customer.email}</p>}`:
+```tsx
+            {customer.email ? (
+              <p className="text-sm text-[var(--muted)]">{customer.email}</p>
+            ) : order.source ? (
+              <p className="text-sm text-[var(--muted)]">brak e-maila</p>
+            ) : null}
+```
+
+- [ ] **Step 7: Verify**
+
+`npx vitest run` (całość) → PASS; `npx tsc --noEmit`, `npx eslint` na zmienionych plikach → czyste. Porty wolne; `npm run build`; w tle `PORT=3100 npm start`; `E2E_BASE_URL=http://localhost:3100 npx playwright test e2e/zamowienie-zewnetrzne-form.spec.ts e2e/edycja-zamowienia.spec.ts --project=chromium` → PASS. Zatrzymaj serwer.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add app/_lib/external-order.ts app/_lib/order-edit.ts app/admin/zamowienia/actions.ts app/admin/zamowienia/nowe/ExternalOrderForm.tsx "app/admin/zamowienia/[id]/edytuj/page.tsx" "app/admin/zamowienia/[id]/edytuj/EditOrderForm.tsx" "app/admin/zamowienia/[id]/CustomerMailCard.tsx" "app/admin/zamowienia/[id]/page.tsx" app/_lib/__tests__/external-order.test.ts app/_lib/__tests__/order-edit.test.ts app/admin/zamowienia/__tests__/update-order.test.ts e2e/zamowienie-zewnetrzne-form.spec.ts
+git commit -m "feat(zamowienia): brak maila w zamówieniach wpisywanych ręcznie" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
 ### Task 8: Integracja i weryfikacja na żywo
 
 - [ ] **Step 1:** Recenzja całej gałęzi (`git diff origin/main..feat/edycja-zamowienia`) pod kątem Review Focus.
@@ -1765,4 +1963,5 @@ git commit -m "feat(zamowienia): strona „Edytuj zamówienie” w panelu" -m "C
 - [ ] Task 5
 - [ ] Task 6
 - [ ] Task 7
+- [ ] Task 9 (brak maila — dopisane 2026-10-06, przed Task 8)
 - [ ] Task 8

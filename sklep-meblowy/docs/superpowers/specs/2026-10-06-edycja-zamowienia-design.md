@@ -158,6 +158,24 @@ Status zamówienia, `delivery_*`, `promo_code_id`, `payment_*` — bez zmian.
   e-mail), edycja (e-mail, wariant, cena, dodanie wniesienia, mail
   zaznaczony), sprawdzenie bazy i karty, usunięcie zamówienia.
 
+## Dodatek — brak maila (2026-10-06, w trakcie realizacji)
+
+Prośba właściciela: „dodaj opcję »brak maila« dla tych, co są ręcznie
+dodawane" — chodzi o zamówienia zewnętrzne (Allegro, OLX…) wpisywane
+w panelu, gdzie klient nie zawsze podaje adres.
+
+- „Dodaj zamówienie": pod polem e-mail checkbox „Klient nie podał e-maila";
+  zaznaczony wyłącza pole, zamówienie zapisuje się z `guest_email = null`.
+  Bez zaznaczenia e-mail wymagany jak dotąd.
+- Edycja zamówienia ręcznego (`source` ustawione, bez konta): ten sam
+  checkbox — gdy klient poda adres później, odznacza się go i wpisuje e-mail.
+  Zamówienie ze sklepu: bez tej opcji.
+- Przy braku e-maila: na karcie „brak e-maila", karta „Wiadomość do klienta"
+  z informacją i nieaktywnym przyciskiem, w edycji nieaktywne „Powiadom
+  klienta". Maile automatyczne już dziś pomijają zamówienie bez adresu.
+- Bez migracji: `guest_email` nie ma CHECK, polityka „guest insert" dotyczy
+  tylko roli `anon`.
+
 ## Poza zakresem (świadomie)
 
 - Zapamiętywanie kwoty pobranej przez Przelewy24 i automatyczne
