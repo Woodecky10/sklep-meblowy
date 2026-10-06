@@ -6,6 +6,8 @@ const getOrderByIdMock = vi.fn();
 const notifyUpdatedMock = vi.fn();
 const storeCalls: string[] = [];
 const orderPatches: Record<string, unknown>[] = [];
+// Błąd zwracany przez magazyn przy aktualizacji pozycji (null = sukces).
+let updateItemError: string | null = null;
 
 vi.mock("@/app/_lib/admin", () => ({ requireAdmin: (...a: unknown[]) => requireAdminMock(...a) }));
 vi.mock("@/app/_lib/orders", () => ({ getOrderById: (...a: unknown[]) => getOrderByIdMock(...a) }));
@@ -25,7 +27,7 @@ vi.mock("next/server", async (importOriginal) => {
 vi.mock("@/app/_lib/order-edit-store", () => ({
   makeOrderEditStore: (): OrderEditStore => ({
     insertItems: async () => (storeCalls.push("insert"), null),
-    updateItem: async () => (storeCalls.push("update"), null),
+    updateItem: async () => (storeCalls.push("update"), updateItemError),
     deleteItems: async () => (storeCalls.push("delete"), null),
     readItems: async () => (storeCalls.push("read"), { items: [{ price: 2400, quantity: 1 }] }),
     updateOrder: async (patch) => (storeCalls.push("order"), orderPatches.push(patch), null),
@@ -51,12 +53,13 @@ const ORDER = {
   id: "o1",
   user_id: null,
   guest_email: "stary@example.com",
+  status: "paid",
   total: 2650,
   currency: "pln",
   admin_note: null,
   items: [ITEM],
 };
-const FP = orderEditFingerprint(2650, [ITEM]);
+const FP = orderEditFingerprint(2650, [ITEM], "paid");
 
 function fd(over: Record<string, string> = {}) {
   const f = new FormData();
@@ -80,6 +83,7 @@ beforeEach(() => {
   storeCalls.length = 0;
   orderPatches.length = 0;
   afterTasks.length = 0;
+  updateItemError = null;
   requireAdminMock.mockResolvedValue(undefined);
   getOrderByIdMock.mockResolvedValue(ORDER);
 });
@@ -108,6 +112,25 @@ describe("updateOrder", () => {
       error: "Zamówienie zmieniło się w międzyczasie — odśwież stronę i wprowadź zmiany ponownie",
     });
     expect(storeCalls).toEqual([]);
+  });
+
+  it("status zmienił się w międzyczasie (np. klient zapłacił) → odmowa, magazyn nietknięty", async () => {
+    getOrderByIdMock.mockResolvedValue({ ...ORDER, status: "processing" });
+    const res = await updateOrder(fd({ notify: "1" }));
+    expect(res).toEqual({
+      ok: false,
+      error: "Zamówienie zmieniło się w międzyczasie — odśwież stronę i wprowadź zmiany ponownie",
+    });
+    expect(storeCalls).toEqual([]);
+    expect(afterTasks).toHaveLength(0);
+  });
+
+  it("błąd zapisu w magazynie → ok:false i mail NIE planowany mimo zaznaczenia", async () => {
+    updateItemError = "timeout";
+    const res = await updateOrder(fd({ notify: "1" }));
+    expect(res).toMatchObject({ ok: false });
+    expect(storeCalls).toEqual(["update", "read", "order"]);
+    expect(afterTasks).toHaveLength(0);
   });
 
   it("zamówienie z kontem: e-mail z formularza NIE trafia do guest_email", async () => {

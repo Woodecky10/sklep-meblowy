@@ -84,6 +84,43 @@ describe("applyOrderEdit", () => {
     expect(f.calls).toEqual(["read", "order"]);
   });
 
+  it("zapis bez żadnej zmiany → bez linii śladu w notatce", async () => {
+    const f = fakeStore([{ id: "a", price: 1000, quantity: 1 }]);
+    const res = await applyOrderEdit(f.store, {
+      orderId: "o1",
+      plan: { inserts: [], updates: [], deletes: [] },
+      fields,
+      // Ten sam adres w innej kolejności kluczy to nadal ten sam adres.
+      currentFields: {
+        ...fields,
+        shipping_address: { fullname: "Jan", country: "Polska", postal_code: "00-001", city: "Warszawa", street: "Testowa 1" },
+      },
+      oldTotal: 900,
+      currency: "pln",
+      adminNote: "stara",
+      now: at,
+    });
+    expect(res).toEqual({ ok: true, total: 900 });
+    expect(f.orderPatches[0]).toMatchObject({ total: 900, admin_note: "stara" });
+  });
+
+  it("pusty plan, ale zmienione pole zamówienia → linia śladu jest", async () => {
+    const f = fakeStore([{ id: "a", price: 1000, quantity: 1 }]);
+    await applyOrderEdit(f.store, {
+      orderId: "o1",
+      plan: { inserts: [], updates: [], deletes: [] },
+      fields,
+      currentFields: { ...fields, guest_email: "stary@example.com" },
+      oldTotal: 900,
+      currency: "pln",
+      adminNote: "stara",
+      now: at,
+    });
+    expect(f.orderPatches[0]).toMatchObject({
+      admin_note: "stara\n06.10.2026, 14:22 — edycja zamówienia: suma 900 zł → 900 zł",
+    });
+  });
+
   it("błąd przy update: delete pominięty, suma przeliczona z bazy, notatka z dopiskiem, wynik = błąd", async () => {
     const f = fakeStore([{ id: "a", price: 2650, quantity: 1 }, { id: "b", price: 500, quantity: 1 }], { update: "timeout" });
     const res = await applyOrderEdit(f.store, { orderId: "o1", plan, fields, oldTotal: 3050, currency: "pln", adminNote: null, now: at });

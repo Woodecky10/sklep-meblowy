@@ -88,10 +88,16 @@ export default async function AdminEditOrderPage({ params }: { params: Promise<{
       )}
       <EditOrderForm
         orderId={order.id}
-        fingerprint={orderEditFingerprint(Number(order.total), order.items ?? [])}
+        fingerprint={orderEditFingerprint(Number(order.total), order.items ?? [], order.status)}
         currency={order.currency}
         total={Number(order.total)}
-        paidOnline={order.payment_method === "online" && order.status !== "pending"}
+        // Tylko zamówienia, które Przelewy24 faktycznie rozliczyły — zamówienie
+        // z Allegro/OLX opłacone w źródle też ma payment_method "online".
+        paidOnline={order.payment_provider === "p24" && order.status !== "pending"}
+        // Zamówienie ze sklepu czekające na P24: webhook porównuje kwotę z sumą.
+        pendingOnline={
+          order.payment_method === "online" && !order.source && order.status === "pending"
+        }
         guestEmail={order.user_id === null ? order.guest_email ?? "" : null}
         allowNoEmail={order.user_id === null && !!order.source}
         accountEmail={accountEmail}

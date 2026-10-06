@@ -16,6 +16,8 @@ import {
 } from "./external-order";
 
 export const EDIT_MAX_QUANTITY = 99;
+// Jeden limit długości kraju dla formularza (maxLength) i serwera.
+export const COUNTRY_MAX_LENGTH = 60;
 
 const VARIANT_MAX_ENTRIES = 20;
 const VARIANT_KEY_MAX = 100;
@@ -98,20 +100,21 @@ export function parseOrderEditInput(
   const street = text(raw.street, 200);
   const postal_code = text(raw.postal_code, 20);
   const city = text(raw.city, 120);
-  const country = text(raw.country, 60) || "Polska";
+  const country = text(raw.country, COUNTRY_MAX_LENGTH) || "Polska";
   const phone = text(raw.phone, 40);
   if (!fullname) return { ok: false, error: "Podaj imię i nazwisko klienta" };
   if (!street || !postal_code || !city) {
     return { ok: false, error: "Uzupełnij adres: ulica, kod pocztowy i miasto" };
   }
 
-  let rawItems: unknown = raw.items;
-  if (typeof raw.items === "string") {
-    try {
-      rawItems = JSON.parse(raw.items);
-    } catch {
-      return { ok: false, error: "Nieczytelna lista pozycji — odśwież stronę i spróbuj ponownie" };
-    }
+  // Formularz wysyła pozycje jako tekst JSON — cokolwiek innego to nie on.
+  const unreadableItems = "Nieczytelna lista pozycji — odśwież stronę i spróbuj ponownie";
+  if (typeof raw.items !== "string") return { ok: false, error: unreadableItems };
+  let rawItems: unknown;
+  try {
+    rawItems = JSON.parse(raw.items);
+  } catch {
+    return { ok: false, error: unreadableItems };
   }
   if (!Array.isArray(rawItems) || rawItems.length === 0) {
     return { ok: false, error: "Zamówienie musi mieć co najmniej jedną pozycję" };
@@ -307,10 +310,13 @@ export function appendAdminNote(existing: string | null, line: string): string {
 
 // Skrót stanu zamówienia z chwili otwarcia edycji — formularz go niesie,
 // akcja porównuje z bazą. Inny skrót = ktoś zmienił zamówienie w międzyczasie.
+// Status też: zamówienie, które w międzyczasie zostało opłacone (pending → paid),
+// trzeba otworzyć od nowa — inaczej ostrzeżenie o płatności byłoby nieaktualne.
 export function orderEditFingerprint(
   total: number,
-  items: { id: string; quantity: number; price: number }[]
+  items: { id: string; quantity: number; price: number }[],
+  status: string
 ): string {
   const parts = items.map((i) => `${i.id}:${i.quantity}:${Number(i.price)}`).sort();
-  return `${Math.round(Number(total) * 100) / 100}|${parts.join(",")}`;
+  return `${status}|${Math.round(Number(total) * 100) / 100}|${parts.join(",")}`;
 }

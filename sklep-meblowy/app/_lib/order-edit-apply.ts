@@ -29,12 +29,38 @@ export type OrderEditFields = {
   promo_discount: number;
 };
 
+// Adres porównywany bez kolejności kluczy; puste wartości = brak klucza
+// (formularz pomija pusty telefon).
+function sameAddress(a: Address | null | undefined, b: Address | null | undefined): boolean {
+  const norm = (v: Address | null | undefined) =>
+    JSON.stringify(
+      Object.entries(v ?? {})
+        .filter(([, x]) => x !== undefined && x !== null && x !== "")
+        .sort(([x], [y]) => x.localeCompare(y))
+    );
+  return norm(a) === norm(b);
+}
+
+function sameFields(next: OrderEditFields, current: OrderEditFields): boolean {
+  if ("guest_email" in next && (next.guest_email ?? null) !== (current.guest_email ?? null)) {
+    return false;
+  }
+  return (
+    next.bundle_discount === current.bundle_discount &&
+    next.promo_discount === current.promo_discount &&
+    sameAddress(next.shipping_address, current.shipping_address)
+  );
+}
+
 export async function applyOrderEdit(
   store: OrderEditStore,
   args: {
     orderId: string;
     plan: OrderEditPlan;
     fields: OrderEditFields;
+    // Stan zamówienia sprzed edycji. Podany i identyczny z `fields` przy
+    // pustym planie i tej samej sumie = zapis bez zmian → bez linii śladu.
+    currentFields?: OrderEditFields;
     oldTotal: number;
     currency: "pln" | "eur";
     adminNote: string | null;
@@ -67,10 +93,20 @@ export async function applyOrderEdit(
   }
 
   const total = orderEditTotal(read.items, args.fields.bundle_discount, args.fields.promo_discount);
-  const note = appendAdminNote(
-    args.adminNote,
-    orderEditNoteLine(args.now, args.oldTotal, total, args.currency, itemsError !== null)
-  );
+  const unchanged =
+    itemsError === null &&
+    plan.inserts.length === 0 &&
+    plan.updates.length === 0 &&
+    plan.deletes.length === 0 &&
+    total === args.oldTotal &&
+    args.currentFields !== undefined &&
+    sameFields(args.fields, args.currentFields);
+  const note = unchanged
+    ? args.adminNote
+    : appendAdminNote(
+        args.adminNote,
+        orderEditNoteLine(args.now, args.oldTotal, total, args.currency, itemsError !== null)
+      );
   const orderError = await store.updateOrder({ ...args.fields, total, admin_note: note });
 
   if (itemsError && orderError) {

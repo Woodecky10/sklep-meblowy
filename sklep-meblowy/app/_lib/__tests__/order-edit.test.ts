@@ -11,6 +11,7 @@ import {
   type CurrentOrderItem,
   type OrderEditItem,
 } from "../order-edit";
+import { MAX_ITEMS } from "../external-order";
 
 const base = (over: Partial<RawOrderEdit> = {}): RawOrderEdit => ({
   email: "Klient@Example.com",
@@ -176,6 +177,55 @@ describe("parseOrderEditInput", () => {
       error: "Nieczytelna lista pozycji — odśwież stronę i spróbuj ponownie",
     });
   });
+
+  it("więcej niż MAX_ITEMS pozycji → błąd", () => {
+    const one = { id: null, product_id: "p-1", custom_name: null, price: "10", quantity: "1" };
+    expect(
+      parseOrderEditInput(base({ items: JSON.stringify(Array.from({ length: MAX_ITEMS + 1 }, () => one)) }), {
+        emailEditable: true,
+      })
+    ).toEqual({ ok: false, error: `Najwyżej ${MAX_ITEMS} pozycji w jednym zamówieniu` });
+    expect(
+      parseOrderEditInput(base({ items: JSON.stringify(Array.from({ length: MAX_ITEMS }, () => one)) }), {
+        emailEditable: true,
+      }).ok
+    ).toBe(true);
+  });
+
+  it("items jako tablica zamiast tekstu JSON → błąd (formularz zawsze wysyła tekst)", () => {
+    expect(
+      parseOrderEditInput(
+        base({ items: [{ id: null, product_id: "p-1", custom_name: null, price: "10", quantity: "1" }] }),
+        { emailEditable: true }
+      )
+    ).toEqual({
+      ok: false,
+      error: "Nieczytelna lista pozycji — odśwież stronę i spróbuj ponownie",
+    });
+  });
+
+  it("variant_values jako tablica → pozycja przyjęta, warianty pominięte (null)", () => {
+    const res = parseOrderEditInput(
+      base({
+        items: JSON.stringify([
+          { id: "it-1", product_id: "p-1", custom_name: null, price: "1", quantity: "1", variant_values: ["Riviera 16"] },
+        ]),
+      }),
+      { emailEditable: true }
+    );
+    expect(res.ok && res.value.items[0].variant_values).toBeNull();
+  });
+
+  it("ilość 99 przyjęta, 100 odrzucona", () => {
+    const item = (quantity: string) =>
+      JSON.stringify([{ id: null, product_id: "p-1", custom_name: null, price: "10", quantity }]);
+    const ok = parseOrderEditInput(base({ items: item("99") }), { emailEditable: true });
+    expect(ok.ok && ok.value.items[0].quantity).toBe(99);
+    expect(parseOrderEditInput(base({ items: item("100") }), { emailEditable: true })).toEqual({
+      ok: false,
+      error: "Pozycja 1: ilość musi być liczbą całkowitą od 1 do 99",
+    });
+  });
 });
 
 const cur = (over: Partial<CurrentOrderItem> = {}): CurrentOrderItem => ({
@@ -313,17 +363,23 @@ describe("orderEditFingerprint", () => {
     const a = orderEditFingerprint(2900, [
       { id: "a", quantity: 1, price: 2650 },
       { id: "b", quantity: 1, price: 250 },
-    ]);
+    ], "paid");
     const b = orderEditFingerprint(2900, [
       { id: "b", quantity: 1, price: 250 },
       { id: "a", quantity: 1, price: 2650 },
-    ]);
+    ], "paid");
     expect(a).toBe(b);
-    expect(orderEditFingerprint(2900, [{ id: "a", quantity: 2, price: 2650 }])).not.toBe(
-      orderEditFingerprint(2900, [{ id: "a", quantity: 1, price: 2650 }])
+    expect(orderEditFingerprint(2900, [{ id: "a", quantity: 2, price: 2650 }], "paid")).not.toBe(
+      orderEditFingerprint(2900, [{ id: "a", quantity: 1, price: 2650 }], "paid")
     );
-    expect(orderEditFingerprint(2901, [{ id: "a", quantity: 1, price: 2650 }])).not.toBe(
-      orderEditFingerprint(2900, [{ id: "a", quantity: 1, price: 2650 }])
+    expect(orderEditFingerprint(2901, [{ id: "a", quantity: 1, price: 2650 }], "paid")).not.toBe(
+      orderEditFingerprint(2900, [{ id: "a", quantity: 1, price: 2650 }], "paid")
+    );
+  });
+
+  it("zmiana statusu zamówienia zmienia skrót", () => {
+    expect(orderEditFingerprint(2900, [{ id: "a", quantity: 1, price: 2650 }], "pending")).not.toBe(
+      orderEditFingerprint(2900, [{ id: "a", quantity: 1, price: 2650 }], "paid")
     );
   });
 });

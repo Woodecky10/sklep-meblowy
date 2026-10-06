@@ -207,6 +207,7 @@ export default function ExternalOrderForm({ products }: { products: EditorProduc
           newKey={() => nextKey.current++}
           priceLabel="Cena (zł)"
           priceHint="Cena z tamtego sklepu."
+          suggestCatalogPrice
         />
 
         <p className="mt-4 pt-4 border-t border-[var(--border)] flex justify-between text-base font-bold text-[var(--fg)]">

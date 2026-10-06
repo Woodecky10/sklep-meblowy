@@ -57,6 +57,7 @@ export default function OrderItemsEditor({
   priceHint,
   withVariants,
   catalogHint,
+  suggestCatalogPrice,
   withCarryIn,
 }: {
   products: EditorProduct[];
@@ -67,6 +68,9 @@ export default function OrderItemsEditor({
   priceHint?: string;
   withVariants?: boolean;
   catalogHint?: boolean;
+  // Cena katalogowa (zł) jako startowa cena nowej pozycji. false dla
+  // zamówienia w EUR — złotówki w polu "Cena (EUR)" to zła kwota.
+  suggestCatalogPrice: boolean;
   withCarryIn?: boolean;
 }) {
   const [query, setQuery] = useState("");
@@ -79,8 +83,9 @@ export default function OrderItemsEditor({
 
   // getVariantEffectivePrice czyta tylko price, sale_price i variants, ale
   // przyjmuje pełny Product — stąd zawężone rzutowanie zamiast `any`.
+  // Do grosza — dopłaty wariantów potrafią dać szum zmiennoprzecinkowy.
   function catalogPrice(p: EditorProduct, values: Record<string, string>): number {
-    return getVariantEffectivePrice(
+    const price = getVariantEffectivePrice(
       {
         price: Number(p.price),
         sale_price: p.sale_price,
@@ -88,6 +93,7 @@ export default function OrderItemsEditor({
       } as unknown as Product,
       values
     );
+    return Math.round(price * 100) / 100;
   }
 
   function addProduct(p: EditorProduct) {
@@ -99,7 +105,9 @@ export default function OrderItemsEditor({
         product_id: p.id,
         name: p.name,
         // Podpowiedź: cena sklepowa. Admin nadpisuje ją ceną z marketplace.
-        price: String(effectivePrice(Number(p.price), p.sale_price)),
+        price: suggestCatalogPrice
+          ? String(Math.round(effectivePrice(Number(p.price), p.sale_price) * 100) / 100)
+          : "",
         quantity: "1",
         notes: "",
         variant_values: null,
@@ -240,12 +248,15 @@ export default function OrderItemsEditor({
             const product =
               r.product_id !== null ? products.find((p) => p.id === r.product_id) : undefined;
             const options = withVariants ? (product?.variants?.options ?? []) : [];
+            // Wniesienie reszta systemu rozpoznaje po nazwie (carry-in.ts) —
+            // nazwa nieedytowalna, ilość zawsze 1. Cenę da się zmienić, usunąć też.
+            const isCarryIn = r.product_id === null && r.name === CARRY_IN_LINE_NAME;
             return (
               <li key={r.key} className="py-4 first:pt-0 last:pb-0 flex flex-col gap-3">
                 <div className="flex items-start gap-3">
                   <span className="font-semibold text-[var(--fg)] shrink-0">{idx + 1}.</span>
                   <div className="flex-1 min-w-0">
-                    {r.product_id === null ? (
+                    {r.product_id === null && !isCarryIn ? (
                       <Field
                         label="Nazwa pozycji"
                         required
@@ -318,6 +329,7 @@ export default function OrderItemsEditor({
                       type="number"
                       min={1}
                       step={1}
+                      disabled={isCarryIn}
                       required
                       className={inputCls}
                     />

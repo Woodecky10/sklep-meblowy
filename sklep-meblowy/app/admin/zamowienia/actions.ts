@@ -439,7 +439,7 @@ export async function updateOrder(formData: FormData): Promise<ActionResult> {
   const input = parsed.value;
 
   const items = order.items ?? [];
-  if (orderEditFingerprint(Number(order.total), items) !== input.fingerprint) {
+  if (orderEditFingerprint(Number(order.total), items, order.status) !== input.fingerprint) {
     return {
       ok: false,
       error: "Zamówienie zmieniło się w międzyczasie — odśwież stronę i wprowadź zmiany ponownie",
@@ -468,6 +468,13 @@ export async function updateOrder(formData: FormData): Promise<ActionResult> {
       bundle_discount: input.bundle_discount,
       promo_discount: input.promo_discount,
     },
+    // Stan sprzed edycji — zapis bez żadnej zmiany nie dopisuje śladu do notatki.
+    currentFields: {
+      shipping_address: order.shipping_address,
+      ...(emailEditable ? { guest_email: order.guest_email } : {}),
+      bundle_discount: Number(order.bundle_discount ?? 0),
+      promo_discount: Number(order.promo_discount ?? 0),
+    },
     oldTotal: Number(order.total),
     currency: order.currency,
     adminNote: order.admin_note,
@@ -484,6 +491,6 @@ export async function updateOrder(formData: FormData): Promise<ActionResult> {
   if (notify) after(() => notifyOrderUpdated(orderId));
   return {
     ok: true,
-    message: notify ?"Zamówienie zapisane, mail do klienta w drodze" : "Zamówienie zapisane",
+    message: notify ? "Zamówienie zapisane, mail do klienta w drodze" : "Zamówienie zapisane",
   };
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, Field, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
 import { parsePrice } from "@/app/_lib/external-order";
+import { COUNTRY_MAX_LENGTH } from "@/app/_lib/order-edit";
 import { formatOrderAmount } from "@/app/_lib/money";
 import type { Address } from "@/app/_lib/types";
 import { updateOrder } from "../../actions";
@@ -21,6 +22,7 @@ export default function EditOrderForm({
   currency,
   total,
   paidOnline,
+  pendingOnline,
   guestEmail,
   allowNoEmail,
   accountEmail,
@@ -35,6 +37,7 @@ export default function EditOrderForm({
   currency: "pln" | "eur";
   total: number;
   paidOnline: boolean;
+  pendingOnline: boolean;
   guestEmail: string | null;
   allowNoEmail: boolean;
   accountEmail: string | null;
@@ -50,6 +53,7 @@ export default function EditOrderForm({
   const [promo, setPromo] = useState(String(promoDiscount));
   const [toast, setToast] = useState<Toast>(null);
   const [noEmail, setNoEmail] = useState(allowNoEmail && !guestEmail);
+  const [notify, setNotify] = useState(false);
   const [pending, startTransition] = useTransition();
   // Wiersze z serwera mają klucze 1..N — nowe muszą zacząć od N+1.
   const nextKey = useRef(initialRows.length + 1);
@@ -140,7 +144,18 @@ export default function EditOrderForm({
               </Field>
               {allowNoEmail && (
                 <label className="flex items-center gap-2 text-sm text-[var(--fg)]">
-                  <input type="checkbox" name="no_email" value="1" checked={noEmail} onChange={(e) => setNoEmail(e.target.checked)} />
+                  <input
+                    type="checkbox"
+                    name="no_email"
+                    value="1"
+                    checked={noEmail}
+                    onChange={(e) => {
+                      setNoEmail(e.target.checked);
+                      // Bez e-maila nie ma do kogo pisać — nie zostawiaj
+                      // zaznaczonego, a zablokowanego powiadomienia.
+                      if (e.target.checked) setNotify(false);
+                    }}
+                  />
                   Klient nie podał e-maila
                 </label>
               )}
@@ -202,7 +217,7 @@ export default function EditOrderForm({
           <Field label="Kraj">
             <input
               name="country"
-              maxLength={80}
+              maxLength={COUNTRY_MAX_LENGTH}
               defaultValue={address.country || "Polska"}
               className={inputCls}
             />
@@ -220,6 +235,7 @@ export default function EditOrderForm({
           priceLabel={currency === "eur" ? "Cena (EUR)" : "Cena (zł)"}
           withVariants
           catalogHint={currency === "pln"}
+          suggestCatalogPrice={currency === "pln"}
           withCarryIn
         />
       </Card>
@@ -278,6 +294,16 @@ export default function EditOrderForm({
             pobranej kwoty — dopłatę lub zwrot rozlicz ręcznie.
           </p>
         )}
+        {pendingOnline && (
+          <p
+            role="note"
+            className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
+          >
+            Zamówienie czeka na płatność online. Jeśli zmienisz sumę, a klient zapłaci starą kwotę
+            przez Przelewy24, płatność NIE zostanie rozliczona automatycznie. Zmieniaj sumę dopiero
+            po zapłacie.
+          </p>
+        )}
       </Card>
 
       <div className="flex flex-col gap-1">
@@ -286,6 +312,8 @@ export default function EditOrderForm({
             type="checkbox"
             name="notify"
             value="1"
+            checked={notify}
+            onChange={(e) => setNotify(e.target.checked)}
             disabled={noEmail}
             className="shrink-0 accent-[var(--color-gold)]"
           />
