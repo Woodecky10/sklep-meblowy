@@ -10,6 +10,10 @@ const COPY = {
   pl: {
     preview: (nr: number) => `Zamówienie #${nr} przyjęte`,
     heading: "Dziękujemy za zamówienie",
+    previewUpdated: (nr: number) => `Zaktualizowaliśmy zamówienie #${nr}`,
+    headingUpdated: "Zaktualizowaliśmy Twoje zamówienie",
+    introUpdated: (nr: number) =>
+      `Zmieniliśmy Twoje zamówienie numer #${nr}. Poniżej aktualne podsumowanie.`,
     intro: (nr: number) =>
       `Przyjęliśmy Twoje zamówienie numer #${nr}. Poniżej podsumowanie.`,
     items: "Zamówione produkty",
@@ -29,6 +33,10 @@ const COPY = {
   de: {
     preview: (nr: number) => `Bestellung #${nr} angenommen`,
     heading: "Vielen Dank für Ihre Bestellung",
+    previewUpdated: (nr: number) => `Bestellung #${nr} aktualisiert`,
+    headingUpdated: "Wir haben Ihre Bestellung aktualisiert",
+    introUpdated: (nr: number) =>
+      `Wir haben Ihre Bestellung Nummer #${nr} geändert. Hier ist die aktuelle Zusammenfassung.`,
     intro: (nr: number) =>
       `Wir haben Ihre Bestellung Nummer #${nr} erhalten. Hier ist die Zusammenfassung.`,
     items: "Bestellte Produkte",
@@ -54,6 +62,7 @@ export function OrderConfirmation({
   locale,
   orderUrl,
   hasAccount,
+  kind = "placed",
 }: {
   order: Order;
   items: OrderItem[];
@@ -64,6 +73,8 @@ export function OrderConfirmation({
   // /konto/zamowienia/<id> wymaga sesji i filtruje po user_id, więc
   // niezalogowany klik ląduje na gołym /logowanie. Przycisk tylko dla kont.
   hasAccount: boolean;
+  // "updated" = mail po edycji zamówienia w panelu (spec 2026-10-06).
+  kind?: "placed" | "updated";
 }) {
   const t = COPY[locale];
   const c = branding.colors;
@@ -88,11 +99,11 @@ export function OrderConfirmation({
     <MailLayout
       branding={branding}
       locale={locale}
-      preview={t.preview(order.order_number)}
-      heading={t.heading}
+      preview={kind === "updated" ? t.previewUpdated(order.order_number) : t.preview(order.order_number)}
+      heading={kind === "updated" ? t.headingUpdated : t.heading}
     >
       <Text style={{ color: c.fg, fontSize: "14px", lineHeight: "1.6", margin: "0 0 24px" }}>
-        {t.intro(order.order_number)}
+        {kind === "updated" ? t.introUpdated(order.order_number) : t.intro(order.order_number)}
       </Text>
 
       <Text style={labelStyle}>{t.items}</Text>

@@ -130,6 +130,47 @@ export async function notifyOrderPlaced(orderId: string): Promise<void> {
   }
 }
 
+// Mail po edycji zamówienia w panelu (spec 2026-10-06) — wysyłany tylko, gdy
+// admin zaznaczył „Powiadom klienta". Tylko do klienta: admin sam edytował.
+// Jak notifyOrderPlaced: nigdy nie rzuca (wołany przez after()).
+export async function notifyOrderUpdated(orderId: string): Promise<void> {
+  try {
+    const order = await getOrderById(orderId);
+    const items = order.items ?? [];
+    const branding = await getMailBranding();
+    const locale = mailLocale(order.currency);
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://mollien.pl";
+    const prefix = locale === "de" ? "/de" : "";
+
+    const to = await customerEmailOf(order);
+    if (!to) {
+      console.error(`[mail] zamówienie ${orderId} bez adresu e-mail — pomijam mail o zmianach`);
+      return;
+    }
+    const html = await render(
+      OrderConfirmation({
+        order,
+        items,
+        branding,
+        locale,
+        orderUrl: `${base}${prefix}/konto/zamowienia/${order.id}`,
+        hasAccount: order.user_id !== null,
+        kind: "updated",
+      })
+    );
+    await sendMail({
+      to,
+      subject:
+        locale === "de"
+          ? `Ihre Bestellung #${order.order_number} wurde aktualisiert`
+          : `Zaktualizowaliśmy Twoje zamówienie #${order.order_number}`,
+      html,
+    });
+  } catch (err) {
+    console.error("[mail] notifyOrderUpdated nieudane:", err);
+  }
+}
+
 // Mail po zmianie statusu. `previousStatus` służy tylko do rozpoznania, czy
 // anulowane zamówienie było wcześniej opłacone — po CAS-ie status w bazie to
 // już "cancelled". Nigdy nie rzuca.
