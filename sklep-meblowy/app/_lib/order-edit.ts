@@ -3,6 +3,8 @@
 // Limity i parsowanie cen/ilości wspólne z „Dodaj zamówienie"
 // (app/_lib/external-order.ts).
 import type { Address } from "./types";
+import type { OrderItemInput } from "./order-items";
+import { formatOrderAmount } from "./money";
 import {
   CUSTOM_NAME_MAX_LENGTH,
   EMAIL_RE,
@@ -180,4 +182,131 @@ export function parseOrderEditInput(
       fingerprint,
     },
   };
+}
+
+export type CurrentOrderItem = {
+  id: string;
+  product_id: string | null;
+  custom_name: string;
+  price: number;
+  quantity: number;
+  notes: string | null;
+  variant_values: Record<string, string> | null;
+};
+
+export type OrderItemPatch = Partial<{
+  price: number;
+  quantity: number;
+  notes: string | null;
+  variant_values: Record<string, string> | null;
+  custom_name: string;
+}>;
+
+export type OrderEditPlan = {
+  inserts: OrderItemInput[];
+  updates: { id: string; patch: OrderItemPatch }[];
+  deletes: string[];
+};
+
+function sameVariants(
+  a: Record<string, string> | null,
+  b: Record<string, string> | null
+): boolean {
+  const norm = (v: Record<string, string> | null) =>
+    JSON.stringify(Object.entries(v ?? {}).sort(([x], [y]) => x.localeCompare(y)));
+  return norm(a) === norm(b);
+}
+
+// Porównanie stanu z bazy z formularzem → co dodać, co zmienić, co usunąć.
+// Istniejąca pozycja nie zmienia produktu (ani znacznika zestawu) — żeby
+// zamienić mebel, usuwa się pozycję i dodaje nową.
+export function planOrderEdit(
+  current: CurrentOrderItem[],
+  edited: OrderEditItem[]
+): { ok: true; value: OrderEditPlan } | { ok: false; error: string } {
+  const byId = new Map(current.map((c) => [c.id, c]));
+  const seen = new Set<string>();
+  const plan: OrderEditPlan = { inserts: [], updates: [], deletes: [] };
+
+  for (const e of edited) {
+    if (e.id === null) {
+      plan.inserts.push({
+        product_id: e.product_id,
+        custom_name: e.custom_name,
+        price: e.price,
+        quantity: e.quantity,
+        notes: e.notes,
+        variant_values: e.variant_values,
+        bundle_id: null,
+        bundle_label: null,
+      });
+      continue;
+    }
+    const c = byId.get(e.id);
+    if (!c) return { ok: false, error: "Pozycja nie należy do tego zamówienia — odśwież stronę" };
+    if (seen.has(e.id)) return { ok: false, error: "Ta sama pozycja występuje dwa razy — odśwież stronę" };
+    seen.add(e.id);
+    if ((c.product_id ?? null) !== (e.product_id ?? null)) {
+      return {
+        ok: false,
+        error: "Nie można zmienić produktu w istniejącej pozycji — usuń ją i dodaj nową",
+      };
+    }
+    const patch: OrderItemPatch = {};
+    if (Number(c.price) !== e.price) patch.price = e.price;
+    if (c.quantity !== e.quantity) patch.quantity = e.quantity;
+    if ((c.notes ?? null) !== (e.notes ?? null)) patch.notes = e.notes;
+    if (c.product_id && !sameVariants(c.variant_values, e.variant_values)) {
+      patch.variant_values = e.variant_values;
+    }
+    if (!c.product_id && (c.custom_name ?? "") !== (e.custom_name ?? "")) {
+      patch.custom_name = e.custom_name ?? "";
+    }
+    if (Object.keys(patch).length > 0) plan.updates.push({ id: e.id, patch });
+  }
+
+  for (const c of current) if (!seen.has(c.id)) plan.deletes.push(c.id);
+  return { ok: true, value: plan };
+}
+
+export function orderEditTotal(
+  items: { price: number; quantity: number }[],
+  bundleDiscount: number,
+  promoDiscount: number
+): number {
+  const sum = items.reduce((s, i) => s + Number(i.price) * i.quantity, 0);
+  return Math.max(0, Math.round((sum - bundleDiscount - promoDiscount) * 100) / 100);
+}
+
+export function orderEditNoteLine(
+  at: Date,
+  oldTotal: number,
+  newTotal: number,
+  currency: "pln" | "eur",
+  interrupted = false
+): string {
+  const when = at.toLocaleString("pl-PL", {
+    timeZone: "Europe/Warsaw",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const line = `${when} — edycja zamówienia: suma ${formatOrderAmount(oldTotal, currency)} → ${formatOrderAmount(newTotal, currency)}`;
+  return interrupted ? `${line} (zapis przerwany — sprawdź pozycje)` : line;
+}
+
+export function appendAdminNote(existing: string | null, line: string): string {
+  return existing && existing.trim() ? `${existing}\n${line}` : line;
+}
+
+// Skrót stanu zamówienia z chwili otwarcia edycji — formularz go niesie,
+// akcja porównuje z bazą. Inny skrót = ktoś zmienił zamówienie w międzyczasie.
+export function orderEditFingerprint(
+  total: number,
+  items: { id: string; quantity: number; price: number }[]
+): string {
+  const parts = items.map((i) => `${i.id}:${i.quantity}:${Number(i.price)}`).sort();
+  return `${Math.round(Number(total) * 100) / 100}|${parts.join(",")}`;
 }
