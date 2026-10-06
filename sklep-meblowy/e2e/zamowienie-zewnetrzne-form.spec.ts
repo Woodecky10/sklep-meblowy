@@ -95,3 +95,14 @@ test("pobranie i pozycja spoza katalogu — formularz przyjmuje oba, „Zapisz�
     fullPage: true,
   });
 });
+
+test("brak maila wyłącza pole e-mail, „Zapisz” NIE jest klikane", async ({ page }) => {
+  await page.goto("/admin/zamowienia/nowe");
+  const email = page.locator('input[name="email"]');
+  const brak = page.getByRole("checkbox", { name: "Klient nie podał e-maila" });
+  await expect(email).toBeEnabled();
+  await brak.check();
+  await expect(email).toBeDisabled();
+  await brak.uncheck();
+  await expect(email).toBeEnabled();
+});

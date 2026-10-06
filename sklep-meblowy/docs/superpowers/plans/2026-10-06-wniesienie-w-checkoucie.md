@@ -884,9 +884,9 @@ git commit -m "refactor(wniesienie): koniec wersji „za sztukę”; /dostawa �
 
 **Otwarte:**
 
-- [ ] Task 7 krok 2: decyzja właściciela o integracji (push/PR/merge z Woodecky10).
-- [ ] Task 7 krok 3: po statusie Vercela „success" e2e na produkcji — muszą zgłosić „passed".
-- [ ] NOWE: jedno żywe zamówienie próbne za pobraniem (COD) z wniesieniem, na jednorazowy adres e-mail, po wdrożeniu; sprawdzić w panelu admina i usunąć. Tylko za potwierdzeniem właściciela — żaden automatyczny test nie składa zamówienia, więc ścieżka zapisu pozycji nie była sprawdzona na żywo.
+- [x] Task 7 krok 2: zmergowane i wdrożone — PR #187 (merge `a38c42a`), status Vercela „success".
+- [x] Task 7 krok 3: e2e na produkcji `wniesienie.spec.ts` + `kup-teraz.spec.ts` — 5/5 „passed".
+- [x] Żywe zamówienie próbne (za zgodą właściciela, 2026-10-06): gość, za pobraniem, topper 299 zł + wniesienie → suma 549 zł; w bazie dwie pozycje (mebel z `custom_name: ""`, wniesienie z `product_id: null`), wiersz widoczny na karcie w panelu; zamówienie usunięte (204, brak pozycji).
 
 **Odroczone (follow-upy):**
 

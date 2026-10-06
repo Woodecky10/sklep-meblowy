@@ -30,6 +30,7 @@ vi.mock("../mail/branding-server", async () => {
 
 import {
   notifyOrderPlaced,
+  notifyOrderUpdated,
   notifyStatusChange,
   sendExternalOrderAcceptedMail,
 } from "../mail/notify-order";
@@ -264,5 +265,89 @@ describe("notifyStatusChange — zamówienie zewnętrzne", () => {
 
     expect(sendMailMock).toHaveBeenCalledTimes(1);
     expect(sendMailMock.mock.calls[0][0].html).not.toContain("zwrotu środków");
+  });
+});
+
+describe("notifyOrderUpdated — mail po edycji w panelu", () => {
+  let errorSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    getOrderByIdMock.mockReset();
+    getProfilesByIdsMock.mockReset();
+    sendMailMock.mockReset();
+    errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    errorSpy.mockRestore();
+    vi.unstubAllEnvs();
+  });
+
+  it("idzie TYLKO do klienta (nie do admina), z tytułem o aktualizacji i nagłówkiem", async () => {
+    getOrderByIdMock.mockResolvedValue(MINIMAL_ORDER);
+    sendMailMock.mockResolvedValue(true);
+    vi.stubEnv("MAIL_ADMIN_TO", "wlascicielka@mollien.pl");
+
+    await notifyOrderUpdated(MINIMAL_ORDER.id);
+
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+    const call = sendMailMock.mock.calls[0][0];
+    expect(call.to).toBe(MINIMAL_ORDER.guest_email);
+    expect(call.subject).toBe(`Zaktualizowaliśmy Twoje zamówienie #${MINIMAL_ORDER.order_number}`);
+    expect(call.html).toContain("Zaktualizowaliśmy Twoje zamówienie");
+    expect(call.html).not.toContain("Dziękujemy za zamówienie");
+  });
+
+  it("zamówienie w EUR → tytuł po niemiecku", async () => {
+    getOrderByIdMock.mockResolvedValue({ ...MINIMAL_ORDER, currency: "eur", fx_rate: 4.3 });
+    sendMailMock.mockResolvedValue(true);
+    await notifyOrderUpdated(MINIMAL_ORDER.id);
+    expect(sendMailMock.mock.calls[0][0].subject).toBe(
+      `Ihre Bestellung #${MINIMAL_ORDER.order_number} wurde aktualisiert`
+    );
+  });
+
+  it("treść neutralna: suma jako Razem, bez Zapłacono i bez zdania o terminie dostawy", async () => {
+    getOrderByIdMock.mockResolvedValue(MINIMAL_ORDER);
+    sendMailMock.mockResolvedValue(true);
+    await notifyOrderUpdated(MINIMAL_ORDER.id);
+    const html: string = sendMailMock.mock.calls[0][0].html;
+    expect(html).toContain("Razem");
+    expect(html).not.toContain("Zapłacono");
+    expect(html).not.toContain("ustalić termin dostawy");
+    expect(html).toContain("W razie pytań odpowiedz na tę wiadomość.");
+  });
+
+  it("po niemiecku: Gesamt, bez Bezahlt i bez zdania o terminie", async () => {
+    getOrderByIdMock.mockResolvedValue({ ...MINIMAL_ORDER, currency: "eur", fx_rate: 4.3 });
+    sendMailMock.mockResolvedValue(true);
+    await notifyOrderUpdated(MINIMAL_ORDER.id);
+    const html: string = sendMailMock.mock.calls[0][0].html;
+    expect(html).toContain("Gesamt");
+    expect(html).not.toContain("Bezahlt");
+    expect(html).not.toContain("Liefertermin");
+    expect(html).toContain("Bei Fragen antworten Sie einfach auf diese E-Mail.");
+  });
+
+  it("pobranie: zostaje Do zapłaty przy odbiorze", async () => {
+    getOrderByIdMock.mockResolvedValue({ ...MINIMAL_ORDER, payment_method: "cod" });
+    sendMailMock.mockResolvedValue(true);
+    await notifyOrderUpdated(MINIMAL_ORDER.id);
+    expect(sendMailMock.mock.calls[0][0].html).toContain("Do zapłaty przy odbiorze");
+  });
+
+  it("mail potwierdzenia zamówienia bez zmian: nadal Zapłacono i zdanie o terminie", async () => {
+    getOrderByIdMock.mockResolvedValue(MINIMAL_ORDER);
+    sendMailMock.mockResolvedValue(true);
+    await notifyOrderPlaced(MINIMAL_ORDER.id);
+    const html: string = sendMailMock.mock.calls[0][0].html;
+    expect(html).toContain("Zapłacono");
+    expect(html).toContain("Skontaktujemy się telefonicznie, aby ustalić termin dostawy.");
+  });
+
+  it("błąd odczytu nie rzuca; brak e-maila → nic nie wysyła", async () => {
+    getOrderByIdMock.mockRejectedValue(new Error("DB"));
+    await expect(notifyOrderUpdated("x")).resolves.toBeUndefined();
+    getOrderByIdMock.mockResolvedValue({ ...MINIMAL_ORDER, guest_email: null, user_id: null });
+    await notifyOrderUpdated(MINIMAL_ORDER.id);
+    expect(sendMailMock).not.toHaveBeenCalled();
   });
 });

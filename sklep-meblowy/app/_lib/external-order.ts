@@ -20,7 +20,8 @@ export type ExternalOrderItemInput = {
 
 export type ExternalOrderInput = {
   source: string;
-  email: string;
+  // null = klient nie podał e-maila (zaznaczone w panelu, Task 9 planu edycji).
+  email: string | null;
   address: Address;
   items: ExternalOrderItemInput[];
   // Σ cena × ilość, do grosza. Dostawa jak w sklepie — osobno, na karcie zamówienia.
@@ -38,6 +39,7 @@ export type RawExternalOrder = {
   source?: unknown;
   source_name?: unknown;
   email?: unknown;
+  no_email?: unknown;
   fullname?: unknown;
   phone?: unknown;
   street?: unknown;
@@ -70,7 +72,7 @@ function resolvePayment(v: unknown): { ok: true; value: PaymentMethod } | { ok: 
   return { ok: false, error: "Wybierz sposób płatności" };
 }
 
-function text(v: unknown, max: number): string {
+export function text(v: unknown, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
 }
 
@@ -89,7 +91,7 @@ export function parsePrice(v: unknown): number | null {
   return Math.round(n * 100) / 100;
 }
 
-function parseQuantity(v: unknown): number | null {
+export function parseQuantity(v: unknown): number | null {
   const n =
     typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN;
   if (!Number.isInteger(n) || n < 1) return null;
@@ -97,7 +99,7 @@ function parseQuantity(v: unknown): number | null {
 }
 
 // Celowo luźne: chodzi o złapanie literówki („jan@"), nie o pełny RFC.
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function parseExternalOrderInput(raw: RawExternalOrder): ParseResult {
   const src = resolveOrderSource(raw.source, raw.source_name);
@@ -107,8 +109,12 @@ export function parseExternalOrderInput(raw: RawExternalOrder): ParseResult {
   if (!payment.ok) return payment;
 
   // Małe litery — spójne z checkoutem i z linkGuestOrders (ilike po e-mailu).
-  const email = text(raw.email, 200).toLowerCase();
-  if (!EMAIL_RE.test(email)) return { ok: false, error: "Podaj poprawny adres e-mail klienta" };
+  // null tylko po jawnym zaznaczeniu „Klient nie podał e-maila" — puste pole
+  // bez zaznaczenia to pomyłka, nie brak adresu.
+  const email = raw.no_email === "1" ? null : text(raw.email, 200).toLowerCase();
+  if (email !== null && !EMAIL_RE.test(email)) {
+    return { ok: false, error: "Podaj poprawny adres e-mail klienta" };
+  }
 
   const fullname = text(raw.fullname, 200);
   const street = text(raw.street, 200);

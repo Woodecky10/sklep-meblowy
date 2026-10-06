@@ -96,6 +96,20 @@ describe("parseExternalOrderInput", () => {
     expect(parseExternalOrderInput(raw({ email: "jan kowalski@example.com" })).ok).toBe(false);
   });
 
+  it("brak maila zaznaczony → email null, pole e-mail ignorowane", () => {
+    const pusty = parseExternalOrderInput(raw({ no_email: "1", email: "" }));
+    expect(pusty.ok && pusty.value.email).toBe(null);
+    const zSmieciem = parseExternalOrderInput(raw({ no_email: "1", email: "jan@" }));
+    expect(zSmieciem.ok && zSmieciem.value.email).toBe(null);
+  });
+
+  it("bez zaznaczenia pusty e-mail nadal odrzucony", () => {
+    expect(parseExternalOrderInput(raw({ email: "", no_email: "" }))).toEqual({
+      ok: false,
+      error: "Podaj poprawny adres e-mail klienta",
+    });
+  });
+
   it("brak nazwiska albo adresu → błąd", () => {
     expect(parseExternalOrderInput(raw({ fullname: " " })).ok).toBe(false);
     expect(parseExternalOrderInput(raw({ street: "" })).ok).toBe(false);
