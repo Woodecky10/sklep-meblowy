@@ -68,7 +68,7 @@ describe("etykieta w koszyku, zamówieniu i mailach", () => {
 });
 
 describe("koszyk", () => {
-  const empty: CartState = { items: [], appliedPromo: null, hydrated: true };
+  const empty: CartState = { items: [], appliedPromo: null, hydrated: true, carryIn: false };
   const base = { id: "p1", name: "Fotel", image: "", quantity: 1 };
   it("ten sam mebel z wniesieniem i bez to dwie osobne pozycje", () => {
     let s = cartReducer(empty, { type: "ADD", item: { ...base, price: 1000 } });
