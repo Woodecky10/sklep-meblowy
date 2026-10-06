@@ -84,6 +84,7 @@ export const de: DeepPartial<PlShape> = {
   product: {
     addToCart: "In den Warenkorb",
     buyNow: "Jetzt kaufen",
+    carryInLabel: "Hineintragen der Möbel (bis zur 4. Etage)",
     selectVariant: "Variante wählen",
     cornerSideHint: "Seiten von vorne betrachtet",
     sizeLabel: "Größe",

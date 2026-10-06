@@ -6,6 +6,7 @@ import { useCart } from "@/app/_context/CartContext";
 import { localizeHref } from "@/app/_lib/i18n";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import type { OrderItem } from "@/app/_lib/types";
+import { carryInSurcharge } from "@/app/_lib/carry-in";
 
 // Dodaje wszystkie pozycje z historycznego zamówienia do bieżącego koszyka.
 // Ważne: używamy *aktualnej* ceny produktu (z `item.product.price`), nie
@@ -72,7 +73,9 @@ export default function ReorderButton({ items }: { items: OrderItem[] }) {
         // od migracji 82 nullowalne).
         id: item.product.id,
         name: item.product.name,
-        price: Number(item.product.price),
+        // Wniesienie z poprzedniego zamówienia — koszyk ma pokazać tyle,
+        // ile policzy checkout (spec 2026-10-06).
+        price: Number(item.product.price) + carryInSurcharge(item.variant_values),
         image: item.product.images?.[0] ?? "",
         quantity: item.quantity,
         variantValues: item.variant_values ?? undefined,

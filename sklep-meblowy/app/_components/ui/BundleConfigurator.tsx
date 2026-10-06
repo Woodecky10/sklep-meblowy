@@ -16,6 +16,8 @@ import {
 } from "@/app/_lib/variants";
 import { bundleUnitKey, computeBundleDiscount } from "@/app/_lib/bundles";
 import VariantSelector from "./VariantSelector";
+import CarryInOption from "./CarryInOption";
+import { carryInSurcharge, hasCarryIn, setCarryIn } from "@/app/_lib/carry-in";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { formatMoney } from "@/app/_lib/money";
@@ -49,7 +51,9 @@ export default function BundleConfigurator({
     isVariantSelectionComplete(p, selections[p.id] ?? {})
   );
 
-  const base = useMemo(
+  // Rabat zestawu liczy się od cen BEZ wniesienia (spec 2026-10-06);
+  // wniesienie doliczamy do kwot wyświetlanych w pełnej wysokości.
+  const discountBase = useMemo(
     () =>
       bundle.components.reduce(
         (s, p) => s + getVariantEffectivePrice(p, selections[p.id] ?? {}),
@@ -57,8 +61,13 @@ export default function BundleConfigurator({
       ),
     [bundle.components, selections]
   );
+  const carryInTotal = bundle.components.reduce(
+    (s, p) => s + carryInSurcharge(selections[p.id]),
+    0
+  );
+  const base = discountBase + carryInTotal;
   const discount = computeBundleDiscount(
-    base,
+    discountBase,
     1,
     bundle.discount_type,
     Number(bundle.discount_value)
@@ -76,10 +85,13 @@ export default function BundleConfigurator({
     const items: CartItem[] = bundle.components.map((p) => ({
       id: p.id,
       name: p.name,
-      price: getVariantEffectivePrice(p, selections[p.id] ?? {}),
+      price:
+        getVariantEffectivePrice(p, selections[p.id] ?? {}) + carryInSurcharge(selections[p.id]),
       image: p.images?.[0] ?? "",
       quantity: 1,
-      variantValues: hasVariants(p) ? selections[p.id] : undefined,
+      // Niepusty wybór — także samo wniesienie przy elemencie bez wariantów.
+      variantValues:
+        Object.keys(selections[p.id] ?? {}).length > 0 ? selections[p.id] : undefined,
       category: p.category,
       bundle: {
         id: bundle.id,
@@ -105,7 +117,11 @@ export default function BundleConfigurator({
             <div>
               <p className="font-display font-semibold text-[var(--fg)]">{p.name}</p>
               <p className="text-sm text-[var(--muted)]">
-                {formatMoney(getVariantEffectivePrice(p, selections[p.id] ?? {}), locale, rate)}
+                {formatMoney(
+                  getVariantEffectivePrice(p, selections[p.id] ?? {}) + carryInSurcharge(selections[p.id]),
+                  locale,
+                  rate
+                )}
               </p>
             </div>
           </div>
@@ -117,6 +133,12 @@ export default function BundleConfigurator({
               onChange={(next) => setSelections((prev) => ({ ...prev, [p.id]: next }))}
             />
           )}
+          <CarryInOption
+            checked={hasCarryIn(selections[p.id])}
+            onChange={(on) =>
+              setSelections((prev) => ({ ...prev, [p.id]: setCarryIn(prev[p.id] ?? {}, on) }))
+            }
+          />
         </div>
       ))}
 
