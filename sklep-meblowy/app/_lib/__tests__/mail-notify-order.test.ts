@@ -305,6 +305,44 @@ describe("notifyOrderUpdated — mail po edycji w panelu", () => {
     );
   });
 
+  it("treść neutralna: suma jako Razem, bez Zapłacono i bez zdania o terminie dostawy", async () => {
+    getOrderByIdMock.mockResolvedValue(MINIMAL_ORDER);
+    sendMailMock.mockResolvedValue(true);
+    await notifyOrderUpdated(MINIMAL_ORDER.id);
+    const html: string = sendMailMock.mock.calls[0][0].html;
+    expect(html).toContain("Razem");
+    expect(html).not.toContain("Zapłacono");
+    expect(html).not.toContain("ustalić termin dostawy");
+    expect(html).toContain("W razie pytań odpowiedz na tę wiadomość.");
+  });
+
+  it("po niemiecku: Gesamt, bez Bezahlt i bez zdania o terminie", async () => {
+    getOrderByIdMock.mockResolvedValue({ ...MINIMAL_ORDER, currency: "eur", fx_rate: 4.3 });
+    sendMailMock.mockResolvedValue(true);
+    await notifyOrderUpdated(MINIMAL_ORDER.id);
+    const html: string = sendMailMock.mock.calls[0][0].html;
+    expect(html).toContain("Gesamt");
+    expect(html).not.toContain("Bezahlt");
+    expect(html).not.toContain("Liefertermin");
+    expect(html).toContain("Bei Fragen antworten Sie einfach auf diese E-Mail.");
+  });
+
+  it("pobranie: zostaje Do zapłaty przy odbiorze", async () => {
+    getOrderByIdMock.mockResolvedValue({ ...MINIMAL_ORDER, payment_method: "cod" });
+    sendMailMock.mockResolvedValue(true);
+    await notifyOrderUpdated(MINIMAL_ORDER.id);
+    expect(sendMailMock.mock.calls[0][0].html).toContain("Do zapłaty przy odbiorze");
+  });
+
+  it("mail potwierdzenia zamówienia bez zmian: nadal Zapłacono i zdanie o terminie", async () => {
+    getOrderByIdMock.mockResolvedValue(MINIMAL_ORDER);
+    sendMailMock.mockResolvedValue(true);
+    await notifyOrderPlaced(MINIMAL_ORDER.id);
+    const html: string = sendMailMock.mock.calls[0][0].html;
+    expect(html).toContain("Zapłacono");
+    expect(html).toContain("Skontaktujemy się telefonicznie, aby ustalić termin dostawy.");
+  });
+
   it("błąd odczytu nie rzuca; brak e-maila → nic nie wysyła", async () => {
     getOrderByIdMock.mockRejectedValue(new Error("DB"));
     await expect(notifyOrderUpdated("x")).resolves.toBeUndefined();

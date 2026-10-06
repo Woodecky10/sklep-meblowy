@@ -22,9 +22,13 @@ const COPY = {
     promoDiscount: "Rabat",
     totalPaid: "Zapłacono",
     totalCod: "Do zapłaty przy odbiorze",
+    // Po edycji suma mogła się zmienić względem tego, co klient zapłacił —
+    // etykieta nie może twierdzić, że ta kwota jest zapłacona.
+    totalUpdated: "Razem",
     address: "Adres dostawy",
     cta: "Zobacz zamówienie",
     next: "Skontaktujemy się telefonicznie, aby ustalić termin dostawy.",
+    nextUpdated: "W razie pytań odpowiedz na tę wiadomość.",
     variantsFor: "Wybrane opcje",
     notes: "Uwagi",
     noAccount:
@@ -45,9 +49,11 @@ const COPY = {
     promoDiscount: "Rabatt",
     totalPaid: "Bezahlt",
     totalCod: "Bei Lieferung zu zahlen",
+    totalUpdated: "Gesamt",
     address: "Lieferadresse",
     cta: "Bestellung ansehen",
     next: "Wir rufen Sie an, um den Liefertermin zu vereinbaren.",
+    nextUpdated: "Bei Fragen antworten Sie einfach auf diese E-Mail.",
     variantsFor: "Gewählte Optionen",
     notes: "Anmerkungen",
     noAccount:
@@ -184,7 +190,7 @@ export function OrderConfirmation({
       <Row>
         <Column>
           <Text style={{ color: c.fg, fontSize: "15px", fontWeight: 700, margin: "8px 0 0" }}>
-            {isCod ? t.totalCod : t.totalPaid}
+            {isCod ? t.totalCod : kind === "updated" ? t.totalUpdated : t.totalPaid}
           </Text>
         </Column>
         <Column align="right">
@@ -203,7 +209,7 @@ export function OrderConfirmation({
       </Text>
 
       <Text style={{ color: c.muted, fontSize: "13px", lineHeight: "1.6", margin: "0 0 24px" }}>
-        {t.next}
+        {kind === "updated" ? t.nextUpdated : t.next}
       </Text>
 
       {hasAccount ? (
