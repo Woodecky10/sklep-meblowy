@@ -8,6 +8,8 @@ import {
 } from "@/app/_lib/variants";
 import VariantSelector from "./VariantSelector";
 import AddToCartButton from "./AddToCartButton";
+import CarryInOption from "./CarryInOption";
+import { carryInSurcharge, hasCarryIn, setCarryIn } from "@/app/_lib/carry-in";
 
 // Produkty robione na zamówienie — bez limitów magazynowych.
 // Walidujemy tylko kompletność wyboru wariantu i liczymy dynamiczną cenę
@@ -34,7 +36,9 @@ export default function ProductActions({
 }) {
   const showVariants = hasVariants(product);
   const complete = isVariantSelectionComplete(product, selected);
-  const price = getVariantEffectivePrice(product, selected);
+  // Cena do koszyka = wariant (z promocją) + wniesienie. Cena WYŚWIETLANA
+  // w ProductMainSection celowo bez wniesienia (Omnibus dotyczy mebla).
+  const price = getVariantEffectivePrice(product, selected) + carryInSurcharge(selected);
 
   return (
     <div className="flex flex-col gap-6">
@@ -49,6 +53,11 @@ export default function ProductActions({
           onChange={onChange}
         />
       )}
+
+      <CarryInOption
+        checked={hasCarryIn(selected)}
+        onChange={(on) => onChange(setCarryIn(selected, on))}
+      />
 
       <AddToCartButton
         product={product}

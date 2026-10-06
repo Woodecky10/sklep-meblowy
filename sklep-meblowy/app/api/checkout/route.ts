@@ -5,16 +5,12 @@ import { createOrder } from "@/app/_lib/orders";
 import { notifyOrderPlaced } from "@/app/_lib/mail/notify-order";
 import { validatePromoCode, incrementPromoUsage } from "@/app/_lib/promo";
 import { isValidCodPhone } from "@/app/_lib/cod";
-import {
-  hasVariants,
-  isVariantSelectionComplete,
-  sumValueSurcharges,
-} from "@/app/_lib/variants";
 import type { Address, Product } from "@/app/_lib/types";
 import { getEurRate } from "@/app/_lib/store-settings";
 import { convertToEur } from "@/app/_lib/money";
 import { DE_ENABLED } from "@/app/_lib/i18n";
-import { effectivePrice } from "@/app/_lib/pricing";
+import { priceCheckoutItem } from "@/app/_lib/checkout-pricing";
+import { discountableSubtotal } from "@/app/_lib/carry-in";
 import {
   groupBundleUnits,
   verifyBundleGroup,
@@ -185,36 +181,22 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      let unitPrice = effectivePrice(Number(product.price), product.sale_price);
-      let variantValues: Record<string, string> | null = null;
-
-      // Meble robione na zamówienie — walidujemy tylko kompletność wyboru
-      // wariantu (nie stany magazynowe).
-      if (hasVariants(product)) {
-        if (
-          !item.variantValues ||
-          !isVariantSelectionComplete(product, item.variantValues)
-        ) {
-          return NextResponse.json(
-            {
-              error: tr(
-                `Brak wyboru wariantu dla: ${product.name}`,
-                `Keine Variante ausgewählt für: ${product.name}`
-              ),
-            },
-            { status: 400 }
-          );
-        }
-        const surcharge = sumValueSurcharges(
-          product.variants?.options ?? [],
-          item.variantValues
+      // Cena sztuki = baza + dopłaty wariantu (+ promocja) + wniesienie —
+      // wszystko z danych serwera (app/_lib/checkout-pricing.ts).
+      const priced = priceCheckoutItem(product, item.variantValues);
+      if (!priced.ok) {
+        return NextResponse.json(
+          {
+            error: tr(
+              `Brak wyboru wariantu dla: ${product.name}`,
+              `Keine Variante ausgewählt für: ${product.name}`
+            ),
+          },
+          { status: 400 }
         );
-        const regular = Number(product.price) + surcharge;
-        const sale =
-          product.sale_price != null ? Number(product.sale_price) + surcharge : null;
-        unitPrice = effectivePrice(regular, sale);
-        variantValues = item.variantValues;
       }
+      const unitPrice = priced.unitPrice;
+      const variantValues = priced.variantValues;
 
       total += unitPrice * item.quantity;
       orderItems.push({
@@ -228,10 +210,16 @@ export async function POST(request: NextRequest) {
 
     // ── Zestawy (spec 2026-07-16): klient przysyła tylko {id, unitKey} —
     // skład i rabat weryfikujemy/liczymy wyłącznie z danych serwerowych.
+    // Podstawa rabatu zestawu i kodu rabatowego — BEZ wniesienia (usługa
+    // zawsze kosztuje pełne CARRY_IN_PRICE). `total` wyżej liczy pełną kwotę.
     const computedItems = body.items.map((it, idx) => ({
       productId: it.id,
       quantity: it.quantity,
-      subtotal: orderItems[idx].price * it.quantity,
+      subtotal: discountableSubtotal(
+        orderItems[idx].price,
+        it.quantity,
+        orderItems[idx].variant_values
+      ),
       bundle: it.bundle ?? null,
     }));
     const bundleGroups = groupBundleUnits(computedItems);

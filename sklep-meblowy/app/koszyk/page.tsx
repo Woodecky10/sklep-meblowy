@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useCart, cartItemKey } from "@/app/_context/CartContext";
 import { formatVariantLabel } from "@/app/_lib/variants";
 import { groupCartBundles, eligiblePromoBase } from "@/app/_lib/bundles";
+import { discountableSubtotal } from "@/app/_lib/carry-in";
 import {
   applyPromoCodeAction,
   getCartCrossSellAction,
@@ -49,10 +50,13 @@ export default function KoszykPage() {
   const soloItems = items.filter((i) => !i.bundle);
   const bundleGroups = groupCartBundles(items);
   const bundleDiscount = bundleGroups.reduce((s, g) => s + g.discount, 0);
-  // Kod rabatowy NIE obejmuje pozycji z zestawów (decyzja użytkownika) — jego
-  // podstawą jest suma subtotali pozycji spoza zestawów.
+  // Kod rabatowy NIE obejmuje pozycji z zestawów (decyzja użytkownika) ani
+  // wniesienia (spec 2026-10-06) — podstawą są pozycje spoza zestawów, bez 250 zł.
   const eligibleBase = eligiblePromoBase(
-    items.map((i) => ({ subtotal: i.price * i.quantity, bundle: i.bundle ?? null }))
+    items.map((i) => ({
+      subtotal: discountableSubtotal(i.price, i.quantity, i.variantValues),
+      bundle: i.bundle ?? null,
+    }))
   );
 
   // Koszt dostawy ustalany indywidualnie per zamówienie po kontakcie z klientem
