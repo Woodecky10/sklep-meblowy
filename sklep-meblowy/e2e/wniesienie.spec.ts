@@ -1,9 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
-import { CARRY_IN_KEY, CARRY_IN_PRICE } from "../app/_lib/carry-in";
+import { CARRY_IN_PRICE } from "../app/_lib/carry-in";
 
-// Wniesienie mebli (spec 2026-10-06): pole przy produkcie, domyślnie
-// odznaczone. Sprawdzamy koszyk w localStorage (cena sztuki, klucz) i dopisek
-// na /koszyk. Nic nie zapisujemy w bazie — checkoutu nie składamy.
+// Wniesienie mebli raz na zamówienie (spec, aktualizacja 2026-10-06): pole
+// w checkoucie między „Adres dostawy" a „Metoda płatności", przy produkcie
+// go nie ma. Zamówienia NIE składamy — baza jest wspólna z produkcją.
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -20,13 +20,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-type StoredItem = { id: string; price: number; variantValues?: Record<string, string> };
-const cartItems = (page: Page) =>
-  page.evaluate(
-    () => JSON.parse(localStorage.getItem("mollien-cart-items") ?? "[]") as StoredItem[]
-  );
-
-test("wniesienie: odznaczone domyślnie, zaznaczone dolicza 250 zł i dopisek", async ({ page }) => {
+async function openPlainProduct(page: Page) {
   // Produkt bez wariantów — materace nawierzchniowe (jak w kup-teraz.spec.ts).
   await page.goto("/sklep?q=nawierzchniowy");
   const href = await page
@@ -39,23 +33,44 @@ test("wniesienie: odznaczone domyślnie, zaznaczone dolicza 250 zł i dopisek", 
     .catch(() => null);
   test.skip(!href, "brak produktu bez wariantów w wynikach 'nawierzchniowy'");
   await page.goto(href!);
+}
 
-  const checkbox = page.getByRole("checkbox", { name: /Wniesienie mebli/ });
+const money = (s: string) => Number(s.replace(/[^\d,]/g, "").replace(",", "."));
+
+test("przy produkcie nie ma już pola wniesienia", async ({ page }) => {
+  await openPlainProduct(page);
+  await expect(page.getByRole("button", { name: "Kup teraz" })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: /wniesieni/i })).toHaveCount(0);
+});
+
+test("checkout: sekcja między adresem a płatnością, +250 zł raz, wybór przeżywa odświeżenie", async ({
+  page,
+}) => {
+  await openPlainProduct(page);
+  await page.getByRole("button", { name: "Dodaj do koszyka", exact: true }).first().click();
+  await page.goto("/checkout");
+
+  const address = page.getByRole("heading", { name: "Adres dostawy", exact: true });
+  const carry = page.getByRole("heading", { name: "Wniesienie mebli", exact: true });
+  const payment = page.getByRole("heading", { name: "Metoda płatności", exact: true });
+  const [ya, yc, yp] = await Promise.all(
+    [address, carry, payment].map(async (h) => (await h.boundingBox())!.y)
+  );
+  expect(ya).toBeLessThan(yc);
+  expect(yc).toBeLessThan(yp);
+
+  const checkbox = page.getByRole("checkbox", { name: /Dostawa z wniesieniem do 4\. piętra/ });
   await expect(checkbox).not.toBeChecked();
+  const total = page.getByTestId("checkout-total");
+  const before = money(await total.innerText());
 
-  // Slidery na stronie produktu mają karty z tym samym aria-label; główny
-  // przycisk jest w DOM przed nimi.
-  const add = page.getByRole("button", { name: "Dodaj do koszyka", exact: true }).first();
-  await add.click();
   await checkbox.check();
-  await add.click();
+  await expect.poll(async () => money(await total.innerText())).toBe(before + CARRY_IN_PRICE);
+  await expect(page.getByText("Wniesienie mebli", { exact: true }).last()).toBeVisible();
 
-  await expect.poll(async () => (await cartItems(page)).length).toBe(2);
-  const [plain, carried] = await cartItems(page);
-  expect(plain.variantValues).toBeUndefined();
-  expect(carried.variantValues).toEqual({ [CARRY_IN_KEY]: "Tak" });
-  expect(carried.price).toBe(plain.price + CARRY_IN_PRICE);
-
-  await page.goto("/koszyk");
-  await expect(page.getByText(`${CARRY_IN_KEY}: Tak`)).toHaveCount(1);
+  await page.reload();
+  await expect(page.getByRole("checkbox", { name: /Dostawa z wniesieniem do 4\. piętra/ })).toBeChecked();
+  await expect.poll(async () => money(await page.getByTestId("checkout-total").innerText())).toBe(
+    before + CARRY_IN_PRICE
+  );
 });

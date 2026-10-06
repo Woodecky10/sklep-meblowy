@@ -1,19 +1,20 @@
 import { createAdminClient } from "./supabase/server";
+import { toOrderItemRows } from "./order-items";
 import type { Address, Order, OrderItem, OrderStatus, PaymentMethod } from "./types";
 
 type CreateOrderInput = {
   userId: string | null;
   guestEmail: string | null;
   items: {
-    // Checkout sklepu ZAWSZE ma produkt z katalogu — pozycje spoza katalogu
-    // (migracja 82) powstają wyłącznie w panelu, przez createExternalOrder.
-    product_id: string;
+    // null = pozycja spoza katalogu (migracja 82) — np. wniesienie mebli.
+    product_id: string | null;
     quantity: number;
     price: number;
     variant_values?: Record<string, string> | null;
     notes?: string | null;
     bundle_id?: string | null;
     bundle_label?: string | null;
+    custom_name?: string;
   }[];
   total: number;
   shippingAddress: Address;
@@ -65,13 +66,25 @@ export async function createOrder({
 
   if (orderErr || !order) throw orderErr ?? new Error("Failed to create order");
 
+  const orderId = (order as unknown as Order).id;
   const { error: itemsErr } = await supabase
     .from("order_items")
-    .insert(
-      items.map((item) => ({ ...item, order_id: (order as unknown as Order).id })) as never[]
-    );
+    .insert(toOrderItemRows(items, orderId) as never[]);
 
-  if (itemsErr) throw itemsErr;
+  if (itemsErr) {
+    // Zamówienie bez pozycji to śmieć (przy COD wisiałoby w panelu jako
+    // „processing") — sprzątamy best-effort, jak akcja zamówień zewnętrznych,
+    // i oddajemy ORYGINALNY błąd.
+    const { error: cleanupErr } = await supabase.from("orders").delete().eq("id", orderId);
+    if (cleanupErr) {
+      console.error(
+        "[orders] sprzatanie po nieudanym zapisie pozycji nieudane:",
+        orderId,
+        cleanupErr.message
+      );
+    }
+    throw itemsErr;
+  }
 
   return order as unknown as Order;
 }

@@ -54,7 +54,7 @@ export default async function DostawaPage() {
           "Bei der Annahme empfehlen wir, den Zustand der Verpackung im Beisein des Kuriers zu prüfen. Bei sichtbaren Schäden erleichtert die Erstellung eines Schadensprotokolls eine eventuelle Reklamation.",
         h2Carry: "Was ist mit dem Hineintragen der Möbel?",
         carry:
-          "Die Standardlieferung umfasst den Transport bis zur ersten Tür des Gebäudes. Das Hineintragen der Möbel bis zur 4. Etage können Sie direkt beim Produkt bestellen – markieren Sie „Hineintragen der Möbel“ vor dem Hinzufügen zum Warenkorb (Aufpreis pro Stück beim Produkt angegeben).",
+          "Die Standardlieferung umfasst den Transport bis zur ersten Tür des Gebäudes. Das Hineintragen der Möbel bis zur 4. Etage können Sie in der Bestellübersicht hinzubuchen, einmal pro Bestellung.",
         h2Damage: "Transportschaden",
         damageBefore:
           "Wurde das Produkt beim Transport beschädigt, bitten wir um unverzügliche Kontaktaufnahme unter der im Bereich ",
@@ -91,7 +91,7 @@ export default async function DostawaPage() {
         process4:
           "Podczas odbioru zalecamy sprawdzenie stanu opakowania w obecności kuriera. W razie widocznych uszkodzeń – sporządzenie protokołu szkody ułatwi ewentualną reklamację.",
         h2Carry: "Co z wniesieniem mebli?",
-        carry: `Standardowa dostawa obejmuje transport pod pierwsze drzwi budynku. Wniesienie mebli do 4. piętra możesz zamówić przy produkcie – zaznacz „Wniesienie mebli” przed dodaniem do koszyka (${CARRY_IN_PRICE} zł za sztukę).`,
+        carry: `Standardowa dostawa obejmuje transport pod pierwsze drzwi budynku. Wniesienie mebli do 4. piętra możesz zamówić w podsumowaniu zamówienia: ${CARRY_IN_PRICE} zł za całe zamówienie.`,
         h2Damage: "Uszkodzenie w transporcie",
         damageBefore:
           "Jeżeli produkt został uszkodzony w transporcie, prosimy o niezwłoczny kontakt pod adresem wskazanym w zakładce ",

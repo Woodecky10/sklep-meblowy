@@ -10,7 +10,6 @@ import {
   minBundlePricing,
   groupCartBundles,
 } from "../bundles";
-import { CARRY_IN_KEY, discountableSubtotal } from "../carry-in";
 
 describe("computeBundleDiscount", () => {
   it("percent: liczy od bazy i zaokrągla do groszy", () => {
@@ -161,13 +160,6 @@ describe("groupCartBundles", () => {
     expect(groups[0].discount).toBe(1040);
     expect(groups[0].items).toHaveLength(2);
   });
-  it("rabat liczy się od ceny bez wniesienia, base pokazuje pełną kwotę", () => {
-    const withCarry = { ...mk("p1", 3250, 1, "k1"), variantValues: { [CARRY_IN_KEY]: "Tak" } };
-    const groups = groupCartBundles([withCarry, mk("p2", 2000, 1, "k1")]);
-    expect(groups[0].base).toBe(5250);
-    expect(groups[0].discountBase).toBe(5000);
-    expect(groups[0].discount).toBe(500);
-  });
 });
 
 describe("minBundlePricing", () => {
@@ -198,18 +190,5 @@ describe("minBundlePricing", () => {
     expect(minBundlePricing([3000, 2200], "percent", 10).savings).toBe(
       minBundleSavings([3000, 2200], "percent", 10)
     );
-  });
-});
-
-describe("eligiblePromoBase + wniesienie (podstawa kodu w koszyku)", () => {
-  it("zaznaczenie wniesienia nie podnosi podstawy kodu rabatowego", () => {
-    const items = [
-      { price: 1250, quantity: 2, variantValues: { [CARRY_IN_KEY]: "Tak" } },
-      { price: 400, quantity: 1, variantValues: undefined },
-    ];
-    const base = eligiblePromoBase(
-      items.map((i) => ({ subtotal: discountableSubtotal(i.price, i.quantity, i.variantValues), bundle: null }))
-    );
-    expect(base).toBe(1000 * 2 + 400);
   });
 });

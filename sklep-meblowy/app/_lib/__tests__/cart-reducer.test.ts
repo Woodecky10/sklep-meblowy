@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { cartReducer, type CartState } from "@/app/_context/CartContext";
 import type { CartItem } from "@/app/_context/CartContext";
 
-const empty: CartState = { items: [], appliedPromo: null, hydrated: true };
+const empty: CartState = { items: [], appliedPromo: null, hydrated: true, carryIn: false };
 
 const bundleMeta = {
   id: "b1",
@@ -148,6 +148,7 @@ describe("cartReducer — zestawy", () => {
       type: "HYDRATE",
       items: [{ id: "old", name: "Stary", price: 100, image: "", quantity: 1 }],
       appliedPromo: null,
+      carryIn: false,
     });
     expect(s.items).toHaveLength(1);
     expect(s.hydrated).toBe(true);

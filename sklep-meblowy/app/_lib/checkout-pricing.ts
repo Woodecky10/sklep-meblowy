@@ -1,11 +1,11 @@
 // Autorytatywna cena sztuki w /api/checkout (spec 2026-10-06). Czysta — bez
 // Supabase, żeby dało się ją przetestować bez składania zamówień w żywej bazie.
 // Z klienta bierzemy tylko WYBÓR (variantValues); ceny wyłącznie z danych
-// produktu i ze stałej CARRY_IN_PRICE.
+// produktu. Wniesienie liczy się raz na zamówienie w /api/checkout (applyCarryIn),
+// nie tutaj.
 import type { Product } from "./types";
 import { hasVariants, isVariantSelectionComplete, sumValueSurcharges } from "./variants";
 import { effectivePrice } from "./pricing";
-import { CARRY_IN_KEY, carryInSurcharge, hasCarryIn } from "./carry-in";
 
 export type CheckoutItemPrice =
   | { ok: true; unitPrice: number; variantValues: Record<string, string> | null }
@@ -16,9 +16,9 @@ export function priceCheckoutItem(
   rawValues: Record<string, string> | null | undefined
 ): CheckoutItemPrice {
   const raw = rawValues ?? {};
-  // Do zamówienia trafiają tylko znane klucze: opcje produktu + wniesienie
-  // (wyłącznie z wartością "Tak"). Wcześniej przy produkcie z wariantami szło
-  // wszystko, co przysłała przeglądarka.
+  // Do zamówienia trafiają tylko znane klucze — opcje produktu. Wcześniej przy
+  // produkcie z wariantami szło wszystko, co przysłała przeglądarka (m.in. klucz
+  // wniesienia z wersji "za sztukę").
   const options = product.variants?.options ?? [];
   const values: Record<string, string> = {};
   for (const opt of options) {
@@ -31,14 +31,12 @@ export function priceCheckoutItem(
   if (hasVariants(product) && !isVariantSelectionComplete(product, values)) {
     return { ok: false, reason: "variant_incomplete" };
   }
-  if (hasCarryIn(raw)) values[CARRY_IN_KEY] = raw[CARRY_IN_KEY];
 
-  // Dopłaty wariantu wchodzą do ceny regularnej i promocyjnej (jak dotąd);
-  // wniesienie dochodzi PO effectivePrice, więc promocja go nie obniża.
+  // Dopłaty wariantu wchodzą do ceny regularnej i promocyjnej (jak dotąd).
   const surcharge = sumValueSurcharges(options, values);
   const regular = Number(product.price) + surcharge;
   const sale = product.sale_price != null ? Number(product.sale_price) + surcharge : null;
-  const unitPrice = effectivePrice(regular, sale) + carryInSurcharge(values);
+  const unitPrice = effectivePrice(regular, sale);
 
   return {
     ok: true,

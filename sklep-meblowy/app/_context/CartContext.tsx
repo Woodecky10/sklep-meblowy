@@ -6,6 +6,7 @@ import { buildCartEventPayload } from "@/app/_lib/meta-pixel";
 import { trackPixel } from "@/app/_lib/meta-pixel-client";
 import { buildGaCartPayload } from "@/app/_lib/ga-ecommerce";
 import { trackGaEvent } from "@/app/_lib/ga-client";
+import { CARRY_IN_PRICE, LEGACY_ITEM_CARRY_IN_KEY } from "@/app/_lib/carry-in";
 
 export type CartItem = {
   id: string;
@@ -50,6 +51,9 @@ type CartState = {
   items: CartItem[];
   appliedPromo: AppliedPromo | null;
   hydrated: boolean;
+  // Wniesienie mebli raz na zamówienie (spec, aktualizacja 2026-10-06) —
+  // wybór z checkoutu; pamiętany do złożenia zamówienia (CLEAR zeruje).
+  carryIn: boolean;
 };
 
 type CartAction =
@@ -78,7 +82,8 @@ type CartAction =
       discountValue: number;
     }
   | { type: "CLEAR" }
-  | { type: "HYDRATE"; items: CartItem[]; appliedPromo: AppliedPromo | null }
+  | { type: "HYDRATE"; items: CartItem[]; appliedPromo: AppliedPromo | null; carryIn: boolean }
+  | { type: "SET_CARRY_IN"; on: boolean }
   | { type: "APPLY_PROMO"; promo: AppliedPromo }
   | { type: "CLEAR_PROMO" };
 
@@ -107,6 +112,39 @@ function itemKey(
   bundleUnitKey?: string
 ): string {
   return id + "::" + variantKey(values) + "::" + (bundleUnitKey ?? "");
+}
+
+// Koszyki z wersji „za sztukę" (PR #185, kilka godzin na produkcji): klucz
+// wniesienia znika z pozycji, cena wraca do ceny mebla, a carryIn mówi, czy
+// klient gdziekolwiek je zaznaczył (checkout startuje wtedy z zaznaczonym
+// polem). Pozycje, które po zdjęciu klucza są identyczne (ten sam mebel
+// z wniesieniem i bez), scalamy — inaczej koszyk miałby dwa wiersze pod
+// jednym kluczem.
+export function migrateLegacyCarryIn(items: CartItem[]): { items: CartItem[]; carryIn: boolean } {
+  let carryIn = false;
+  const out: CartItem[] = [];
+  for (const item of items) {
+    let next = item;
+    const vv = item.variantValues;
+    if (vv && LEGACY_ITEM_CARRY_IN_KEY in vv) {
+      const had = vv[LEGACY_ITEM_CARRY_IN_KEY] === "Tak";
+      if (had) carryIn = true;
+      const rest = { ...vv };
+      delete rest[LEGACY_ITEM_CARRY_IN_KEY];
+      next = {
+        ...item,
+        price: had ? item.price - CARRY_IN_PRICE : item.price,
+        variantValues: Object.keys(rest).length > 0 ? rest : undefined,
+      };
+    }
+    const key = itemKey(next.id, next.variantValues, next.bundle?.unitKey);
+    const existing = out.find((i) => itemKey(i.id, i.variantValues, i.bundle?.unitKey) === key);
+    if (existing) existing.quantity = clampQty(existing.quantity + next.quantity);
+    // Zawsze kopia — scalanie zmienia `quantity` obiektu w `out`, a wejście
+    // (stan z localStorage) ma zostać nietknięte.
+    else out.push({ ...next });
+  }
+  return { items: out, carryIn };
 }
 
 export type { CartState, CartAction };
@@ -223,13 +261,21 @@ export function cartReducer(state: CartState, action: CartAction): CartState {
         ),
       };
     case "CLEAR":
-      // Czyści też promo — rabat bez koszyka nie ma sensu (wcześniej robił
-      // to osobny setAppliedPromo(null) w callbacku clear()).
-      return state.items.length === 0 && state.appliedPromo === null
+      // Czyści też promo i wniesienie — po złożeniu zamówienia nic z niego
+      // nie przechodzi na następne (wcześniej promo czyścił osobny
+      // setAppliedPromo(null) w callbacku clear()).
+      return state.items.length === 0 && state.appliedPromo === null && !state.carryIn
         ? state
-        : { ...state, items: [], appliedPromo: null };
+        : { ...state, items: [], appliedPromo: null, carryIn: false };
     case "HYDRATE":
-      return { items: action.items, appliedPromo: action.appliedPromo, hydrated: true };
+      return {
+        items: action.items,
+        appliedPromo: action.appliedPromo,
+        carryIn: action.carryIn,
+        hydrated: true,
+      };
+    case "SET_CARRY_IN":
+      return state.carryIn === action.on ? state : { ...state, carryIn: action.on };
     case "APPLY_PROMO":
       return { ...state, appliedPromo: action.promo };
     case "CLEAR_PROMO":
@@ -242,6 +288,7 @@ export function cartReducer(state: CartState, action: CartAction): CartState {
 // localStorage keys
 const LS_ITEMS = "mollien-cart-items";
 const LS_PROMO = "mollien-cart-promo";
+const LS_CARRY_IN = "mollien-cart-carry-in";
 
 type CartContextValue = {
   items: CartItem[];
@@ -254,6 +301,8 @@ type CartContextValue = {
   // hydrated=true — inaczej clear leci na pustym stanie a HYDRATE potem
   // przywraca koszyk z localStorage.
   hydrated: boolean;
+  carryIn: boolean;
+  setCarryIn: (on: boolean) => void;
   add: (item: CartItem) => void;
   remove: (id: string, variantValues?: Record<string, string>) => void;
   updateQty: (
@@ -288,6 +337,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     items: [],
     appliedPromo: null,
     hydrated: false,
+    carryIn: false,
   });
   const [notification, setNotification] = useState<CartNotification | null>(null);
   const appliedPromo = state.appliedPromo;
@@ -298,12 +348,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let items: CartItem[] = [];
     let promo: AppliedPromo | null = null;
+    let carryIn = false;
     try {
       const rawItems = localStorage.getItem(LS_ITEMS);
       if (rawItems) {
         const parsed = JSON.parse(rawItems) as CartItem[];
         if (Array.isArray(parsed)) items = parsed;
       }
+      // Zmigrowane pozycje zapisze efekt „Persist items".
+      const migrated = migrateLegacyCarryIn(items);
+      items = migrated.items;
+      carryIn = migrated.carryIn || localStorage.getItem(LS_CARRY_IN) === "1";
       const rawPromo = localStorage.getItem(LS_PROMO);
       if (rawPromo) {
         const parsed = JSON.parse(rawPromo) as AppliedPromo;
@@ -314,7 +369,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Uszkodzony JSON — ignorujemy.
     }
-    dispatch({ type: "HYDRATE", items, appliedPromo: promo });
+    dispatch({ type: "HYDRATE", items, appliedPromo: promo, carryIn });
   }, []);
 
   // Persist items
@@ -333,6 +388,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       else localStorage.removeItem(LS_PROMO);
     } catch {}
   }, [appliedPromo, hydrated]);
+
+  // Persist wniesienia
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      if (state.carryIn) localStorage.setItem(LS_CARRY_IN, "1");
+      else localStorage.removeItem(LS_CARRY_IN);
+    } catch {}
+  }, [state.carryIn, hydrated]);
 
   // Dodanie do koszyka siedzi tu, a nie w przyciskach: dodać do koszyka da się
   // z karty produktu, z listingu i z cross-sellu w koszyku. Jedno miejsce = brak
@@ -422,8 +486,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.removeItem(LS_ITEMS);
       localStorage.removeItem(LS_PROMO);
+      localStorage.removeItem(LS_CARRY_IN);
     } catch {}
   }, []);
+  const setCarryIn = useCallback((on: boolean) => dispatch({ type: "SET_CARRY_IN", on }), []);
   const dismissNotification = useCallback(() => setNotification(null), []);
   const applyPromo = useCallback(
     (promo: AppliedPromo) => dispatch({ type: "APPLY_PROMO", promo }),
@@ -441,6 +507,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       notification,
       appliedPromo,
       hydrated,
+      carryIn: state.carryIn,
+      setCarryIn,
       add,
       remove,
       updateQty,
@@ -454,7 +522,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       applyPromo,
       clearPromo,
     };
-  }, [state.items, notification, appliedPromo, hydrated, add, remove, updateQty, updateNotes, addBundle, removeBundle, updateBundleQty, updateBundleTerms, clear, dismissNotification, applyPromo, clearPromo]);
+  }, [state.items, notification, appliedPromo, hydrated, state.carryIn, setCarryIn, add, remove, updateQty, updateNotes, addBundle, removeBundle, updateBundleQty, updateBundleTerms, clear, dismissNotification, applyPromo, clearPromo]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
