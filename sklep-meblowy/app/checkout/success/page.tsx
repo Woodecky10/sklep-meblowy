@@ -8,6 +8,7 @@ import { buildGaPurchasePayload, type GaPurchasePayload } from "@/app/_lib/ga-ec
 import { shouldTrackPurchase } from "@/app/_lib/order-events";
 import PixelEventOnce from "@/app/_components/analytics/PixelEventOnce";
 import GaEventOnce from "@/app/_components/analytics/GaEventOnce";
+import { isCarryInLine } from "@/app/_lib/carry-in";
 import ClearCart from "./ClearCart";
 import type { Metadata } from "next";
 
@@ -89,12 +90,16 @@ export default async function SuccessPage({
         // ignoruje — dlatego wspólny kształt jest tym szerszym z dwóch.
         // `product` to join z products: znika razem z produktem (FK SET NULL),
         // więc nazwa bywa pusta na starych zamówieniach.
-        const lines = (order.items ?? []).map((item) => ({
-          productId: item.product_id ?? "",
-          name: item.product?.name ?? "",
-          quantity: item.quantity,
-          price: Number(item.price),
-        }));
+        // Wiersz wniesienia (pozycja spoza katalogu) nie jest produktem —
+        // bez niego na liście, ale `total` (wartość zakupu) go zawiera.
+        const lines = (order.items ?? [])
+          .filter((item) => !isCarryInLine(item))
+          .map((item) => ({
+            productId: item.product_id ?? "",
+            name: item.product?.name ?? "",
+            quantity: item.quantity,
+            price: Number(item.price),
+          }));
 
         purchase = buildPurchasePayload({
           total: Number(order.total),

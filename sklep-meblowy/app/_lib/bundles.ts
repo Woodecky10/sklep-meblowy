@@ -2,8 +2,6 @@
 // Używana przez klienta (koszyk, konfigurator) i serwer (/api/checkout), więc
 // wszystko tutaj musi być deterministyczne i wolne od Supabase/next-server.
 
-import { discountableSubtotal } from "./carry-in";
-
 export type BundleDiscountType = "percent" | "amount";
 
 // Znacznik zestawu na pozycji koszyka. discountType/Value zdublowane z DB,
@@ -168,9 +166,6 @@ export type CartBundleGroup<T> = {
   discountValue: number;
   qty: number;
   base: number;
-  // Podstawa rabatu — suma BEZ wniesienia (spec 2026-10-06). `base` zostaje
-  // pełną kwotą do wyświetlania („razem" przekreślone w koszyku).
-  discountBase: number;
   discount: number;
   items: T[];
 };
@@ -178,12 +173,7 @@ export type CartBundleGroup<T> = {
 // Grupowanie pozycji koszyka do UI + rabat client-side. Generic, żeby koszyk
 // dostał z powrotem swoje pełne CartItem-y (zdjęcia, notes itd.).
 export function groupCartBundles<
-  T extends {
-    price: number;
-    quantity: number;
-    bundle?: CartItemBundle | null;
-    variantValues?: Record<string, string>;
-  }
+  T extends { price: number; quantity: number; bundle?: CartItemBundle | null }
 >(items: T[]): CartBundleGroup<T>[] {
   const map = new Map<string, CartBundleGroup<T>>();
   for (const it of items) {
@@ -199,19 +189,17 @@ export function groupCartBundles<
       discountValue: it.bundle.discountValue,
       qty: it.quantity,
       base: 0,
-      discountBase: 0,
       discount: 0,
       items: [],
     };
     g.base += it.price * it.quantity;
-    g.discountBase += discountableSubtotal(it.price, it.quantity, it.variantValues);
     g.qty = it.quantity;
     g.items.push(it);
     map.set(mapKey, g);
   }
   const groups = Array.from(map.values());
   for (const g of groups) {
-    g.discount = computeBundleDiscount(g.discountBase, g.qty, g.discountType, g.discountValue);
+    g.discount = computeBundleDiscount(g.base, g.qty, g.discountType, g.discountValue);
   }
   return groups;
 }

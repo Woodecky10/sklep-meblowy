@@ -6,7 +6,7 @@ import { useCart } from "@/app/_context/CartContext";
 import { localizeHref } from "@/app/_lib/i18n";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import type { OrderItem } from "@/app/_lib/types";
-import { carryInSurcharge } from "@/app/_lib/carry-in";
+import { isCarryInLine } from "@/app/_lib/carry-in";
 import { getVariantEffectivePrice } from "@/app/_lib/variants";
 
 // Dodaje wszystkie pozycje z historycznego zamówienia do bieżącego koszyka.
@@ -17,7 +17,11 @@ import { getVariantEffectivePrice } from "@/app/_lib/variants";
 // Pominięte: produkty które admin usunął ORAZ pozycje spoza katalogu
 // (migracja 82, `product_id = null`) — jednych i drugich nie da się włożyć
 // do koszyka, bo w sklepie nie ma czego kupić.
-export default function ReorderButton({ items }: { items: OrderItem[] }) {
+export default function ReorderButton({ items: orderItems }: { items: OrderItem[] }) {
+  // Wniesienie to usługa zamówienia, nie mebel: „Zamów ponownie" go nie
+  // przenosi i nie liczy jako niedostępnej pozycji — klient zaznacza je
+  // ponownie w checkoucie (spec, aktualizacja 2026-10-06).
+  const items = orderItems.filter((i) => !isCarryInLine(i));
   const { add } = useCart();
   const router = useRouter();
   const locale = useClientLocale();
@@ -74,11 +78,9 @@ export default function ReorderButton({ items }: { items: OrderItem[] }) {
         // od migracji 82 nullowalne).
         id: item.product.id,
         name: item.product.name,
-        // Koszyk ma pokazać tyle, ile policzy checkout: dopłaty wariantów,
-        // cena promocyjna i wniesienie z poprzedniego zamówienia (spec 2026-10-06).
-        price:
-          getVariantEffectivePrice(item.product, item.variant_values ?? {}) +
-          carryInSurcharge(item.variant_values),
+        // Koszyk ma pokazać tyle, ile policzy checkout: dopłaty wariantów
+        // i cena promocyjna.
+        price: getVariantEffectivePrice(item.product, item.variant_values ?? {}),
         image: item.product.images?.[0] ?? "",
         quantity: item.quantity,
         variantValues: item.variant_values ?? undefined,
