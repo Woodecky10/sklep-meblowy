@@ -15,6 +15,7 @@ import { useFabricLabels } from "@/app/_lib/fabric-context";
 import { groupCartBundles } from "@/app/_lib/bundles";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { isValidCodPhone } from "@/app/_lib/cod";
+import { CARRY_IN_PRICE } from "@/app/_lib/carry-in";
 import type { Address } from "@/app/_lib/types";
 
 export default function CheckoutForm({
@@ -34,7 +35,7 @@ export default function CheckoutForm({
   const fabricMap = useFabricLabels();
   const de = locale === "de";
   const t = getDictionary(locale);
-  const { items, total, count, appliedPromo } = useCart();
+  const { items, total, count, appliedPromo, carryIn, setCarryIn, hydrated } = useCart();
 
   const c = de
     ? {
@@ -73,6 +74,10 @@ export default function CheckoutForm({
         phone: "Telefon",
         phoneCodNote: "Bei Nachnahme erforderlich — der Kurier braucht Ihre Nummer.",
         paymentMethod: "Zahlungsart",
+        carryInHeading: "Hineintragen der Möbel",
+        carryInLabel: "Lieferung mit Hineintragen bis zur 4. Etage",
+        carryInDesc: "Wir tragen die Möbel bis zur 4. Etage hinein, einmal pro Bestellung.",
+        carryInLine: "Hineintragen der Möbel",
         payOnline: "Online-Zahlung",
         payOnlineDesc: "Karte, BLIK, Überweisung — sichere Zahlung über Przelewy24",
         payCod: "Nachnahme",
@@ -117,6 +122,10 @@ export default function CheckoutForm({
         phone: "Telefon",
         phoneCodNote: "Wymagany przy pobraniu — kurier musi mieć kontakt.",
         paymentMethod: "Metoda płatności",
+        carryInHeading: "Wniesienie mebli",
+        carryInLabel: "Dostawa z wniesieniem do 4. piętra",
+        carryInDesc: "Wniesiemy meble do 4. piętra. Opłata raz za całe zamówienie.",
+        carryInLine: "Wniesienie mebli",
         payOnline: "Płatność online",
         payOnlineDesc: "Karta, BLIK, przelew — bezpieczna płatność Przelewy24",
         payCod: "Za pobraniem",
@@ -143,11 +152,13 @@ export default function CheckoutForm({
   // Wymóg art. 17 ustawy o prawach konsumenta + kryteria weryfikacji Przelewy24.
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
+  // Dopiero po wczytaniu koszyka z localStorage — inaczej odświeżenie /checkout
+  // widzi pusty koszyk i odsyła do /koszyk.
   useEffect(() => {
-    if (items.length === 0) {
+    if (hydrated && items.length === 0) {
       router.replace(localizeHref("/koszyk", locale));
     }
-  }, [items.length, router, locale]);
+  }, [hydrated, items.length, router, locale]);
 
   // Wysyłka darmowa na terenie całej Polski — do płatności doliczamy tylko
   // cenę produktów (minus rabat). Pole delivery_cost w panelu admina zostaje
@@ -156,7 +167,10 @@ export default function CheckoutForm({
   // Rabat zestawów liczony client-side jak w koszyku (Task 6); serwer i tak
   // weryfikuje skład i przelicza kwotę autorytatywnie w /api/checkout.
   const bundleDiscount = groupCartBundles(items).reduce((s, g) => s + g.discount, 0);
-  const grandTotal = Math.max(0, total - bundleDiscount - discount);
+  // Wniesienie raz na zamówienie, PO rabatach — serwer liczy tak samo
+  // (applyCarryIn w /api/checkout).
+  const carryInAmount = carryIn ? CARRY_IN_PRICE : 0;
+  const grandTotal = Math.max(0, total - bundleDiscount - discount) + carryInAmount;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -204,6 +218,7 @@ export default function CheckoutForm({
           promoCode: appliedPromo?.code ?? null,
           locale: de ? "de" : "pl",
           paymentMethod,
+          carryIn,
         }),
       });
 
@@ -324,6 +339,33 @@ export default function CheckoutForm({
               required
             />
           </div>
+        </div>
+
+        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8">
+          <h2 className="font-display text-xl font-bold text-[var(--fg)] mb-6">
+            {c.carryInHeading}
+          </h2>
+          <label
+            className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${
+              carryIn
+                ? "border-[var(--color-gold)] bg-[var(--bg)]"
+                : "border-[var(--border)] hover:border-[var(--color-gold)]"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={carryIn}
+              onChange={(e) => setCarryIn(e.target.checked)}
+              className="mt-1 w-4 h-4 accent-[var(--color-gold)] shrink-0"
+            />
+            <span className="flex flex-1 flex-col gap-0.5">
+              <span className="font-semibold text-sm text-[var(--fg)]">{c.carryInLabel}</span>
+              <span className="text-xs text-[var(--muted)]">{c.carryInDesc}</span>
+            </span>
+            <span className="shrink-0 font-semibold text-sm text-[var(--fg)]">
+              +{formatMoney(CARRY_IN_PRICE, locale, rate)}
+            </span>
+          </label>
         </div>
 
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8">
@@ -475,6 +517,12 @@ export default function CheckoutForm({
                 <span>−{formatMoney(discount, locale, rate)}</span>
               </div>
             )}
+            {carryIn && (
+              <div className="flex justify-between text-[var(--muted)]">
+                <span>{c.carryInLine}</span>
+                <span>+{formatMoney(CARRY_IN_PRICE, locale, rate)}</span>
+              </div>
+            )}
             <div className="flex justify-between items-start text-[var(--muted)] gap-3">
               <span className="shrink-0">{c.shipping}</span>
               <span className="text-right text-xs leading-snug">
@@ -491,7 +539,7 @@ export default function CheckoutForm({
             </p>
             <div className="border-t border-[var(--border)] pt-2 flex justify-between font-bold text-base text-[var(--fg)]">
               <span>{c.total}</span>
-              <span>{formatMoney(grandTotal, locale, rate)}</span>
+              <span data-testid="checkout-total">{formatMoney(grandTotal, locale, rate)}</span>
             </div>
           </div>
 
