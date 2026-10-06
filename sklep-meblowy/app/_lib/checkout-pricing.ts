@@ -16,12 +16,6 @@ export function priceCheckoutItem(
   rawValues: Record<string, string> | null | undefined
 ): CheckoutItemPrice {
   const raw = rawValues ?? {};
-  // Meble robione na zamówienie — walidujemy tylko kompletność wyboru
-  // wariantu (nie stany magazynowe).
-  if (hasVariants(product) && !isVariantSelectionComplete(product, raw)) {
-    return { ok: false, reason: "variant_incomplete" };
-  }
-
   // Do zamówienia trafiają tylko znane klucze: opcje produktu + wniesienie
   // (wyłącznie z wartością "Tak"). Wcześniej przy produkcie z wariantami szło
   // wszystko, co przysłała przeglądarka.
@@ -30,6 +24,12 @@ export function priceCheckoutItem(
   for (const opt of options) {
     const v = raw[opt.name];
     if (typeof v === "string" && v) values[opt.name] = v;
+  }
+  // Meble robione na zamówienie — walidujemy tylko kompletność wyboru
+  // wariantu (nie stany magazynowe). Sprawdzamy już PO przefiltrowaniu, żeby
+  // wartość nie-tekstowa z przeglądarki nie zaliczała opcji.
+  if (hasVariants(product) && !isVariantSelectionComplete(product, values)) {
+    return { ok: false, reason: "variant_incomplete" };
   }
   if (hasCarryIn(raw)) values[CARRY_IN_KEY] = raw[CARRY_IN_KEY];
 

@@ -62,6 +62,10 @@ describe("priceCheckoutItem — produkt z wariantami", () => {
     });
     expect(priceCheckoutItem(sofa, undefined)).toEqual({ ok: false, reason: "variant_incomplete" });
   });
+  it("wartość nie-tekstowa z przeglądarki nie zalicza wyboru wariantu", () => {
+    const crafted = { Tkanina: 123, Strona: "Lewa" } as unknown as Record<string, string>;
+    expect(priceCheckoutItem(sofa, crafted)).toEqual({ ok: false, reason: "variant_incomplete" });
+  });
   it("promocja nie obniża wniesienia: effectivePrice(2800, 2550) + 250", () => {
     expect(priceCheckoutItem(sofaOnSale, { ...complete, [CARRY_IN_KEY]: "Tak" })).toMatchObject({
       ok: true,
