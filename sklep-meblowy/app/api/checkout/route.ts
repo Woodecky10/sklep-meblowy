@@ -184,8 +184,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Cena sztuki = baza + dopłaty wariantu (+ promocja) + wniesienie —
-      // wszystko z danych serwera (app/_lib/checkout-pricing.ts).
+      // Cena sztuki = baza + dopłaty wariantu (+ promocja) — wszystko z danych
+      // serwera (app/_lib/checkout-pricing.ts).
       const priced = priceCheckoutItem(product, item.variantValues);
       if (!priced.ok) {
         return NextResponse.json(
@@ -337,7 +337,6 @@ export async function POST(request: NextRequest) {
     // Pola delivery_cost / delivery_price w panelu admina zostają do rozliczeń
     // wewnętrznych. Bez kuponów — P24 dostaje jedną kwotę końcową, a rozbicie
     // rabatów siedzi w orders.bundle_discount / promo_discount.
-
     // Wniesienie (aktualizacja specu 2026-10-06): raz na zamówienie, PO
     // rabatach — kod i zestawy go nie obniżają. Pozycja spoza katalogu
     // (custom_name) idzie do order_items, kwota ze stałej serwera.
