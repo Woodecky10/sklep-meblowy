@@ -70,7 +70,7 @@ function resolvePayment(v: unknown): { ok: true; value: PaymentMethod } | { ok: 
   return { ok: false, error: "Wybierz sposób płatności" };
 }
 
-function text(v: unknown, max: number): string {
+export function text(v: unknown, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
 }
 
@@ -89,7 +89,7 @@ export function parsePrice(v: unknown): number | null {
   return Math.round(n * 100) / 100;
 }
 
-function parseQuantity(v: unknown): number | null {
+export function parseQuantity(v: unknown): number | null {
   const n =
     typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN;
   if (!Number.isInteger(n) || n < 1) return null;
@@ -97,7 +97,7 @@ function parseQuantity(v: unknown): number | null {
 }
 
 // Celowo luźne: chodzi o złapanie literówki („jan@"), nie o pełny RFC.
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function parseExternalOrderInput(raw: RawExternalOrder): ParseResult {
   const src = resolveOrderSource(raw.source, raw.source_name);
