@@ -1956,12 +1956,47 @@ git commit -m "feat(zamowienia): brak maila w zamówieniach wpisywanych ręcznie
 
 (uzupełniane w trakcie — jedyny trwały nośnik stanu, `.superpowers/sdd/` jest gitignorowany)
 
-- [ ] Task 1
-- [ ] Task 2
-- [ ] Task 3
-- [ ] Task 4
-- [ ] Task 5
-- [ ] Task 6
-- [ ] Task 7
-- [ ] Task 9 (brak maila — dopisane 2026-10-06, przed Task 8)
-- [ ] Task 8
+**Przerwane 2026-10-06 na prośbę właściciela po Task 7** („zapisz tak, żebym na innym komputerze mógł lecieć dalej"). Gałąź `feat/edycja-zamowienia` wypchnięta na origin, NIE zmergowana, bez PR-a. Nic z tej gałęzi nie jest na produkcji.
+
+- [x] Task 1 — `210d1a7..6f75c73`, recenzja czysta
+- [x] Task 2 — `6f75c73..ee1467c`, recenzja czysta
+- [x] Task 3 — `ee1467c..818e3b9`; runda poprawek 1/5: podwójny błąd (pozycje + zapis zamówienia) dawał fałszywe „suma przeliczona"; dopisane testy błędu insert/delete
+- [x] Task 4 — `818e3b9..19ff303`, recenzja czysta
+- [x] Task 5 — `19ff303..1888a49`, recenzja czysta
+- [x] Task 6 — `1888a49..6dcfeca`, recenzja czysta; e2e „Dodaj zamówienie" 3/3 przed i po
+- [x] Task 7 — `0344a2f..9493797`, recenzja czysta; e2e na buildzie 4/4, zrzut strony edycji (zamówienie #57) obejrzany
+- [ ] **Task 9 (brak maila) — NASTĘPNY.** Opis wyżej w planie; dopisany w trakcie (`0344a2f`), spec ma „Dodatek — brak maila"
+- [ ] Recenzja całej gałęzi (najmocniejszy model) → jedna fala poprawek (w niej „Odroczone" niżej) → krótka ponowna recenzja
+- [ ] Task 8 — decyzja właściciela o mergu, wdrożenie, e2e na prodzie, test na żywo TYLKO za zgodą
+
+**Rozstrzygnięcia (z dziennika wykonania — nie „naprawiać" z powrotem):**
+
+- Task 3: przy błędzie pozycji I błędzie zapisu zamówienia komunikat brzmi „Zapis pozycji przerwany: X. Nie udało się też zapisać zamówienia (Y) — suma i notatka NIE są zaktualizowane, sprawdź zamówienie."; przy błędzie pozycji i potem błędzie odczytu — „Zapis pozycji przerwany: X. " + komunikat odczytu. Spec milczał o podwójnych błędach; adminowi trzeba powiedzieć prawdę.
+- Task 4: w nowym bloku testów maila `console.error` wyciszony zapamiętanym szpiegiem (ścieżka błędu loguje celowo) — czyste wyjście testów.
+- Task 7: licznik kluczy wierszy w formularzu startuje od `initialRows.length + 1` (wczytane wiersze mają klucze 1..N).
+- Task 9 — zakres „brak maila": odpowiedź właściciela „głównie chodzi o ręczne dodawanie zamówienia w panelu admina dla tych zewnętrznych zamówień" = opcja przy „Dodaj zamówienie" + w edycji TYLKO zamówień ręcznych (`source`), żeby dało się dopisać e-mail później. Zamówienia ze sklepu bez zmian.
+
+**Odroczone (do fali poprawek po recenzji całej gałęzi):**
+
+- Task 1: `parseVariants` tnie do 20 wpisów PRZED odrzuceniem pustych; `id` i fingerprint obcinane po cichu (64/4000); testy ALBO-ALBO sprawdzają tylko `ok: false`; brak testów > MAX_ITEMS, `items` jako tablica, `variant_values` jako tablica, ilość = 99.
+- Task 2: tytuły testów obiecują więcej niż sprawdzają (`{}` vs `null` w wariantach; zmiana ceny w fingerprincie); test daty tylko CEST (dodać CET i przejście doby); duplikat `id` sprawdza tylko `ok: false`; brak testu zmiany samych uwag; `appendAdminNote` przy notatce kończącej się `\n` robi pustą linię.
+- Task 4: rzutowania `as never` w adapterze (z planu); test 3 łączy dwa scenariusze; nieasertowane intro/podgląd „updated" i HTML po niemiecku.
+- Task 5: nieprzetestowana ścieżka częściowej porażki i `revalidatePath`; brak asercji, że `after()` nie leci przy błędzie.
+- Task 6: „wstaw z cennika" może wstawić szum zmiennoprzecinkowy (zaokrąglić do 2 miejsc); wiersz, którego produktu nie ma na liście, nie pozwala edytować wariantów.
+- Task 7: Enter zablokowany też na przycisku „Zapisz" (jak w „Dodaj zamówienie"); `router.refresh()` po `push` zbędne; `?edytowano=1` zostaje w adresie.
+
+**Nie sprawdzone na żywo (do Task 8):** ciemny motyw strony edycji (zrzut „dark" wyszedł jasny — panel nie bierze `prefers-color-scheme`, trzeba przełączyć motyw w panelu); stare zamówienia z `variant_values = null` (selecty pokazują „— wybierz —"; nietknięte zostają `null`, bo plan zmian porównuje warianty — potwierdzić na jednym starym zamówieniu bez zapisu); ostrzeżenie P24; zamówienie w EUR; mail „Zaktualizowaliśmy Twoje zamówienie".
+
+**Jak kontynuować na innym komputerze:**
+
+1. `git fetch origin && git checkout feat/edycja-zamowienia` (repo `Woodecky10/sklep-meblowy`; komendy npm z katalogu `sklep-meblowy/`), `npm ci`.
+2. Pliki spoza gita, które trzeba mieć lokalnie: `sklep-meblowy/.env.local` (Supabase, Resend…), `sklep-meblowy/.env.e2e` + `sklep-meblowy/e2e/.auth/admin.json` (sesja admina do e2e; projekt `setup` w Playwright ją odświeża z `.env.e2e`), `sklep-meblowy/.mcp.json` (token MCP Supabase — dziś zwraca 401, do odnowienia).
+3. Agent: „kontynuuj plan `docs/superpowers/plans/2026-10-06-edycja-zamowienia.md` od Task 9, subagent-driven". Ledger SDD (`.superpowers/sdd/…/progress.md`) jest gitignorowany i go tam NIE BĘDZIE — ta sekcja go zastępuje; nowy ledger zaczyna się od „Task 1–7: complete" wg listy wyżej.
+4. Zasady, które kosztowały w tym projekcie: baza wspólna z produkcją — e2e NIGDY nie klika „Zapisz"; Playwright na buildzie (`npm run build`, `PORT=3100 npm start`, `E2E_BASE_URL=http://localhost:3100`), nie na `next dev`; bez `E2E_BASE_URL` testy idą na produkcję; pliki CRLF w kopii roboczej — istniejące edytować narzędziem Edit, nie `sed -i`/`perl -pi`; tani model (haiku) psuje CRLF i cudzysłowy „” — przy edycji istniejących plików dawać sonnet.
+5. Push: konto gh **Woodecky10** (domyślne mwlo1403 dostaje 403). Działało: `gh auth switch -u Woodecky10`, potem `git -c credential.helper='!gh auth git-credential' push origin feat/edycja-zamowienia`; po pracy `gh auth switch -u mwlo1403`. Przed mergem: `git fetch origin <gałąź>` i `git log --oneline FETCH_HEAD..<gałąź>` puste.
+
+**Zgłoszone przy okazji, poza planem (właściciel 2026-10-06: „nie teraz"):**
+
+- „Nie ma kategorii… teraz chyba są": `app/_lib/categories.ts` nie sprawdza `error` z Supabase, zwraca `[]`, a `unstable_cache` (300 s) zapamiętuje pustą listę → chwilowa awaria bazy = strona bez kategorii ~5 min, bez śladu w logach. Ten sam wzorzec w ~20 loaderach `app/_lib/*` z `unstable_cache`. Naprawa: w środku cache rzucać przy błędzie (Next nie zapisze wyjątku i zostawi stary wpis), na zewnątrz `console.error` + `[]` tylko dla tego żądania.
+- `/feed.xml`: 31 ofert bez `google_product_category` (`meble-modulowe`, `fotele-tapicerowane-do-salonu`) — dopisać do `_lib/gpc.ts` z oficjalnej taksonomii.
+- CSP blokuje tag Google Ads `AW-18385749236` (`pagead2.googlesyndication.com` poza `connect-src`/`img-src`).
