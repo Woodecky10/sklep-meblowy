@@ -7,7 +7,20 @@ import { createAdminClient } from "@/app/_lib/supabase/server";
 import { canTransition } from "@/app/_lib/order-status";
 import { toOrderItemRows } from "@/app/_lib/order-items";
 import type { OrderStatus } from "@/app/_lib/types";
-import { notifyStatusChange, sendExternalOrderAcceptedMail } from "@/app/_lib/mail/notify-order";
+import {
+  notifyOrderUpdated,
+  notifyStatusChange,
+  sendExternalOrderAcceptedMail,
+} from "@/app/_lib/mail/notify-order";
+import { getOrderById } from "@/app/_lib/orders";
+import {
+  orderEditFingerprint,
+  parseOrderEditInput,
+  planOrderEdit,
+  type CurrentOrderItem,
+} from "@/app/_lib/order-edit";
+import { applyOrderEdit } from "@/app/_lib/order-edit-apply";
+import { makeOrderEditStore } from "@/app/_lib/order-edit-store";
 import { requestReviews } from "@/app/_lib/mail/review-request";
 import { parseExternalOrderInput } from "@/app/_lib/external-order";
 import { ACCEPTED_MAIL_MAX_LENGTH } from "@/app/_lib/order-accepted-mail";
@@ -379,4 +392,91 @@ export async function sendExternalOrderMail(
 
   revalidatePath(`/admin/zamowienia/${orderId}`);
   return { ok: true, message: "Wiadomość wysłana do klienta" };
+}
+
+// Edycja zamówienia z panelu (spec 2026-10-06). Walidacja i plan w czystym
+// order-edit.ts, kolejność zapisu w order-edit-apply.ts; tu tylko odczyt,
+// strażnik „ktoś zmienił w międzyczasie" i wywołanie. Status, płatność,
+// dostawa i kod rabatowy — bez zmian.
+export async function updateOrder(formData: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  const orderId = String(formData.get("orderId") ?? "");
+  if (!orderId) return { ok: false, error: "Brak id zamówienia" };
+
+  let order: Awaited<ReturnType<typeof getOrderById>>;
+  try {
+    order = await getOrderById(orderId);
+  } catch {
+    return { ok: false, error: "Zamówienie nie znalezione" };
+  }
+
+  // E-mail konta należy do konta — w zamówieniu z kontem pola nie ruszamy,
+  // cokolwiek przyszło w formularzu.
+  const emailEditable = order.user_id === null;
+  const parsed = parseOrderEditInput(
+    {
+      email: formData.get("email"),
+      fullname: formData.get("fullname"),
+      phone: formData.get("phone"),
+      street: formData.get("street"),
+      postal_code: formData.get("postal_code"),
+      city: formData.get("city"),
+      country: formData.get("country"),
+      items: formData.get("items"),
+      bundle_discount: formData.get("bundle_discount"),
+      promo_discount: formData.get("promo_discount"),
+      notify: formData.get("notify"),
+      fingerprint: formData.get("fingerprint"),
+    },
+    { emailEditable }
+  );
+  if (!parsed.ok) return parsed;
+  const input = parsed.value;
+
+  const items = order.items ?? [];
+  if (orderEditFingerprint(Number(order.total), items) !== input.fingerprint) {
+    return {
+      ok: false,
+      error: "Zamówienie zmieniło się w międzyczasie — odśwież stronę i wprowadź zmiany ponownie",
+    };
+  }
+
+  const current: CurrentOrderItem[] = items.map((i) => ({
+    id: i.id,
+    product_id: i.product_id,
+    custom_name: i.custom_name ?? "",
+    price: Number(i.price),
+    quantity: i.quantity,
+    notes: i.notes,
+    variant_values: i.variant_values,
+  }));
+  const planned = planOrderEdit(current, input.items);
+  if (!planned.ok) return planned;
+
+  const supabase = await createAdminClient();
+  const res = await applyOrderEdit(makeOrderEditStore(supabase, orderId), {
+    orderId,
+    plan: planned.value,
+    fields: {
+      shipping_address: input.address,
+      ...(emailEditable && input.email ? { guest_email: input.email } : {}),
+      bundle_discount: input.bundle_discount,
+      promo_discount: input.promo_discount,
+    },
+    oldTotal: Number(order.total),
+    currency: order.currency,
+    adminNote: order.admin_note,
+    now: new Date(),
+  });
+
+  revalidatePath("/admin/zamowienia");
+  revalidatePath(`/admin/zamowienia/${orderId}`);
+  revalidatePath(`/konto/zamowienia/${orderId}`);
+  if (!res.ok) return res;
+
+  if (input.notify) after(() => notifyOrderUpdated(orderId));
+  return {
+    ok: true,
+    message: input.notify ? "Zamówienie zapisane, mail do klienta w drodze" : "Zamówienie zapisane",
+  };
 }
