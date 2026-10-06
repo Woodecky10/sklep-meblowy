@@ -7,6 +7,7 @@ import { localizeHref } from "@/app/_lib/i18n";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import type { OrderItem } from "@/app/_lib/types";
 import { carryInSurcharge } from "@/app/_lib/carry-in";
+import { getVariantEffectivePrice } from "@/app/_lib/variants";
 
 // Dodaje wszystkie pozycje z historycznego zamówienia do bieżącego koszyka.
 // Ważne: używamy *aktualnej* ceny produktu (z `item.product.price`), nie
@@ -73,9 +74,11 @@ export default function ReorderButton({ items }: { items: OrderItem[] }) {
         // od migracji 82 nullowalne).
         id: item.product.id,
         name: item.product.name,
-        // Wniesienie z poprzedniego zamówienia — koszyk ma pokazać tyle,
-        // ile policzy checkout (spec 2026-10-06).
-        price: Number(item.product.price) + carryInSurcharge(item.variant_values),
+        // Koszyk ma pokazać tyle, ile policzy checkout: dopłaty wariantów,
+        // cena promocyjna i wniesienie z poprzedniego zamówienia (spec 2026-10-06).
+        price:
+          getVariantEffectivePrice(item.product, item.variant_values ?? {}) +
+          carryInSurcharge(item.variant_values),
         image: item.product.images?.[0] ?? "",
         quantity: item.quantity,
         variantValues: item.variant_values ?? undefined,
