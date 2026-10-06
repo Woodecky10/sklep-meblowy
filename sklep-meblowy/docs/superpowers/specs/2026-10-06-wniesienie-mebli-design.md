@@ -152,3 +152,144 @@ klient tego nie odczuje.
 - Wniesienie raz na zamówienie zamiast za sztukę.
 - Wyłączanie kategorii (np. materace nawierzchniowe).
 - Cena wniesienia edytowalna w panelu — stała w kodzie.
+
+---
+
+## Aktualizacja 2026-10-06 — wniesienie raz na zamówienie, w checkoucie
+
+Kilka godzin po wdrożeniu powyższego (PR #185) właściciel zmienił zdanie:
+wniesienie ma być wybierane **w podsumowaniu zamówienia, między „Adres
+dostawy" a „Metoda płatności"**, i kosztować **250 zł raz na zamówienie**,
+niezależnie od liczby mebli. Pole przy produkcie i w zestawach **znika**.
+Ta sekcja ZASTĘPUJE rozstrzygnięcia 1, 3 i 5 oraz Sekcje 1–3 powyżej tam,
+gdzie się z nimi kłóci; rozstrzygnięcie 4 (rabaty nie obejmują wniesienia)
+i 6 (Vegas Twin — zrobione) zostają.
+
+### Stan wyjściowy (odczytany 2026-10-06)
+
+- Checkout (`app/checkout/CheckoutForm.tsx`), lewa kolumna: Kontakt →
+  Adres dostawy → Metoda płatności; prawa: podsumowanie (Produkty, rabat
+  zestawu, kod, Dostawa, Razem). Formularz wysyła do `/api/checkout`
+  `items`, dane klienta, `promoCode`, `locale`, `paymentMethod`.
+- Pozycja zamówienia spoza katalogu istnieje od migracji 82
+  (`order_items.product_id` nullable + `custom_name`, CHECK „produkt ALBO
+  nazwa"); na produkcji kolumna jest (PostgREST 200). Panel, oba maile,
+  mail „przyjęte", konto klienta i lista zamówień nazywają pozycje przez
+  `orderItemDisplayName`, więc taki wiersz pokażą bez zmian.
+- `createOrder` wstawia pozycje tak, jak je dostanie (`custom_name` przejdzie).
+- Zdarzenie zakupu (`app/checkout/success/page.tsx`) buduje listę pozycji
+  z `order.items` (`productId: item.product_id ?? ""`), wartość = `order.total`.
+- „Zamów ponownie" liczy pozycję bez produktu jako niedostępną.
+- W bazie **0 zamówień** z kluczem wniesienia przy meblu (sprawdzone przez
+  PostgREST). Koszyki w przeglądarkach mogą go mieć (kilka godzin na prodzie).
+
+### Rozstrzygnięcia z właścicielem
+
+A. Jedno pole w checkoucie, nowa sekcja między „Adres dostawy" a „Metoda
+   płatności": „Dostawa z wniesieniem do 4. piętra +250 zł", domyślnie
+   odznaczone.
+B. 250 zł **raz na zamówienie**.
+C. Pole przy produkcie i przy elementach zestawu znika.
+D. W podsumowaniu wiersz „Wniesienie mebli +250 zł" (tylko gdy zaznaczone),
+   suma +250 zł.
+E. Wybór pamięta koszyk (powrót na checkout = pole nadal zaznaczone),
+   czyści się po złożeniu zamówienia.
+F. Koszyki z kluczem przy meblu: przy wczytaniu klucz znika z pozycji, cena
+   pozycji −250 zł, a pole w checkoucie startuje zaznaczone.
+G. Rabaty (kod, zestaw, próg kodu) nie obejmują wniesienia.
+H. Analityka: wartość zakupu z wniesieniem; na liście produktów zdarzenia
+   zakupu tylko meble (bez wiersza bez `product_id`).
+I. „Zamów ponownie" pomija wiersz wniesienia po cichu (nie jako „niedostępny").
+J. `/dostawa`: wniesienie zaznacza się w podsumowaniu zamówienia, 250 zł za
+   zamówienie.
+
+### Model
+
+`app/_lib/carry-in.ts` po zmianie:
+
+```ts
+export const CARRY_IN_PRICE = 250;
+// Nazwa pozycji zamówienia (order_items.custom_name) — klucz zapisu w
+// zamówieniach, nie zmieniać (filtrowanie w „Zamów ponownie" i analityce).
+export const CARRY_IN_LINE_NAME = "Wniesienie mebli do 4. piętra";
+// Klucz z wersji „za sztukę" (PR #185) — zostaje WYŁĄCZNIE do migracji
+// koszyków z localStorage.
+export const LEGACY_ITEM_CARRY_IN_KEY = "Wniesienie mebli do 4. piętra";
+
+carryInOrderLine(): { product_id: null; custom_name: string; quantity: 1;
+  price: number; variant_values: null; notes: null }
+isCarryInLine(item: { product_id?: string | null; custom_name?: string | null }): boolean
+  // product_id == null && custom_name === CARRY_IN_LINE_NAME
+migrateLegacyCarryIn<T extends { price: number; variantValues?: Record<string, string> }>(items: T[]):
+  { items: T[]; carryIn: boolean }
+  // usuwa klucz z variantValues (pusty słownik → undefined), price −250,
+  // carryIn = czy którakolwiek pozycja miała klucz z wartością "Tak"
+```
+
+Znika: `CARRY_IN_KEY`/`CARRY_IN_VALUE` jako klucz pozycji, `hasCarryIn`,
+`carryInSurcharge`, `setCarryIn`, `discountableSubtotal` (podstawy rabatów
+wracają do `price × qty`), `discountBase` w `groupCartBundles`, wpis
+`VARIANT_OPTION_DE` dla klucza. `Tak: "Ja"` w `VARIANT_VALUE_DE` zostaje
+(poprawny niezależnie).
+
+### Koszyk (stan)
+
+- `CartState` dostaje `carryIn: boolean`; akcja `SET_CARRY_IN`; `HYDRATE`
+  niesie `carryIn`; `CLEAR` zeruje. Persist w `localStorage`
+  (`mollien-cart-carry-in`), czyszczony w `clear()` razem z resztą.
+- Hydratacja: `migrateLegacyCarryIn(parsedItems)`; `carryIn` = zapisane
+  `|| migracja`. Zmigrowane pozycje zapisują się z powrotem przy pierwszym
+  persist.
+
+### Checkout (UI)
+
+- Nowa sekcja (nagłówek jak pozostałe, np. „Wniesienie mebli" /
+  „Hineintragen") z checkboxem: etykieta „Dostawa z wniesieniem do 4. piętra"
+  + „+250 zł" (`formatMoney`, EUR na `/de`). Stan z `useCart().carryIn`.
+- Podsumowanie: wiersz „Wniesienie mebli" `+250 zł` pod rabatami, nad
+  „Dostawa"; `grandTotal = max(0, total − bundleDiscount − discount) +
+  (carryIn ? CARRY_IN_PRICE : 0)`.
+- Payload: `carryIn: carryIn === true`.
+- `CarryInOption` znika ze strony produktu i z `BundleConfigurator`
+  (komponent można przerobić na checkout albo usunąć — bez martwego kodu).
+
+### Serwer
+
+- `/api/checkout` czyta `body.carryIn === true` (wszystko inne = brak).
+- Pozycje i rabaty liczone jak przed PR #185 (`priceCheckoutItem` bez
+  wniesienia; filtr kluczy zostaje: opcje produktu, kompletność na
+  przefiltrowanych wartościach). Klucz z wersji „za sztukę" jest teraz
+  obcym kluczem → odpada, nic nie dolicza.
+- Po rabatach: gdy `carryIn`, `orderItems.push(carryInOrderLine())` i
+  `total += CARRY_IN_PRICE` — przed przeliczeniem na EUR i przed P24/COD.
+  Pozycja NIE wchodzi do `computedItems` (rabaty) ani do `body.items`.
+
+### Inne miejsca
+
+- Zakup (GA/Meta, `checkout/success/page.tsx`): lista pozycji bez
+  `isCarryInLine`, wartość nadal `order.total`.
+- „Zamów ponownie": `isCarryInLine` → pomiń bez liczenia do „niedostępnych";
+  cena pozycji = `getVariantEffectivePrice` (poprawka z końcowej recenzji
+  zostaje), bez dopłaty wniesienia.
+- `/dostawa` PL/DE: „zaznacz w podsumowaniu zamówienia" + „250 zł za
+  zamówienie" (PL z `CARRY_IN_PRICE`).
+
+### Testy
+
+- Jednostkowe: `carryInOrderLine`, `isCarryInLine`, `migrateLegacyCarryIn`
+  (cena −250, klucz znika, pusty słownik → undefined, inne opcje zostają,
+  flaga); reducer: `SET_CARRY_IN`, `HYDRATE` z `carryIn`, `CLEAR` zeruje;
+  `priceCheckoutItem` — stary klucz wniesienia odpada i nie dolicza;
+  `groupCartBundles` — rabat od pełnej ceny pozycji (powrót).
+- Funkcja czysta dla serwera, jeśli route ma logikę ponad push/+= (np.
+  `applyCarryIn(orderItems, total, requested)`), z testem.
+- E2E (lokalny build, bez składania zamówienia): na stronie produktu brak
+  pola wniesienia; na `/checkout` sekcja między adresem a płatnością,
+  zaznaczenie → wiersz „Wniesienie mebli" i suma +250 zł; odświeżenie
+  strony → pole nadal zaznaczone.
+
+### Poza zakresem
+
+- Wniesienie przełączane w `/koszyk` (tylko checkout).
+- Różna cena zależnie od liczby mebli / piętra.
+- Opis usługi w Regulaminie (decyzja właściciela/prawnika — bez zmian).
