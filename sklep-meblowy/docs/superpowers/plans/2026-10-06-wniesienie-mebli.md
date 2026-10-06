@@ -877,10 +877,11 @@ git commit -m "docs(dostawa): wniesienie zamawia się przy produkcie, 250 zł za
 - [x] Task 3 — commity 9956351..b86fc69, recenzja bez uwag.
 - [x] Task 4 — commity b86fc69..78c8ca1, recenzja bez uwag.
 - [x] Task 5 — commity 78c8ca1..eb3f8fc; 2 rundy poprawek (zakończenia linii i BOM, potem cudzysłowy PL/DE).
-- [ ] Task 6 — krok 1 (końcowa recenzja całej gałęzi) zrobiony: „With fixes", poprawione w tej fali (ReorderButton liczy cenę przez `getVariantEffectivePrice` + wniesienie, ta sekcja uzupełniona, kompletność wariantu sprawdzana na przefiltrowanych wartościach). OTWARTE kroki 2–4:
-  - decyzja o integracji gałęzi,
-  - produkcyjny przebieg e2e (ma raportować „passed", nie „skipped"),
-  - usunięcie starej opcji Vegas Twin „Dostawa z wniesieniem do 4-tego piętra" w panelu admina — edycja żywej bazy, wymaga potwierdzenia właściciela; do tego czasu Vegas Twin można zamówić z oboma wniesieniami (+500 zł).
+- [x] Task 6 — DOMKNIĘTE 2026-10-06:
+  - krok 1: końcowa recenzja całej gałęzi „With fixes", poprawione w tej samej gałęzi (ReorderButton liczy cenę przez `getVariantEffectivePrice` + wniesienie, ta sekcja uzupełniona, kompletność wariantu sprawdzana na przefiltrowanych wartościach);
+  - krok 2: zmergowane i wdrożone — PR #185 (merge `0f28ed4`), status Vercela „success";
+  - krok 3: e2e na produkcji `wniesienie.spec.ts` + `kup-teraz.spec.ts` — 4/4 „passed" (żaden „skipped");
+  - krok 4: za zgodą właściciela usunięta stara opcja Vegas Twin „Dostawa z wniesieniem do 4-tego piętra" (panel admina, „Zapisz warianty"); pozostałe opcje i overrides identyczne z kopią sprzed zmiany; strona produktu pokazuje jedno pole wniesienia. Starych koszyków z tym kluczem NIE mapujemy na `CARRY_IN_KEY` (brak decyzji właściciela — zostaje w follow-upach).
 
 ### Rozstrzygnięcia (Ruling)
 
