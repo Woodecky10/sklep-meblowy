@@ -5,15 +5,15 @@ type CreateOrderInput = {
   userId: string | null;
   guestEmail: string | null;
   items: {
-    // Checkout sklepu ZAWSZE ma produkt z katalogu — pozycje spoza katalogu
-    // (migracja 82) powstają wyłącznie w panelu, przez createExternalOrder.
-    product_id: string;
+    // null = pozycja spoza katalogu (migracja 82) — np. wniesienie mebli.
+    product_id: string | null;
     quantity: number;
     price: number;
     variant_values?: Record<string, string> | null;
     notes?: string | null;
     bundle_id?: string | null;
     bundle_label?: string | null;
+    custom_name?: string;
   }[];
   total: number;
   shippingAddress: Address;

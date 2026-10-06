@@ -10,7 +10,7 @@ import { getEurRate } from "@/app/_lib/store-settings";
 import { convertToEur } from "@/app/_lib/money";
 import { DE_ENABLED } from "@/app/_lib/i18n";
 import { priceCheckoutItem } from "@/app/_lib/checkout-pricing";
-import { discountableSubtotal } from "@/app/_lib/carry-in";
+import { applyCarryIn } from "@/app/_lib/carry-in";
 import {
   groupBundleUnits,
   verifyBundleGroup,
@@ -40,6 +40,9 @@ type CheckoutBody = {
   promoCode?: string | null;
   locale?: "pl" | "de";
   paymentMethod?: "online" | "cod";
+  // Wniesienie mebli raz na zamówienie (spec, aktualizacja 2026-10-06).
+  // Liczy się wyłącznie dokładne true — patrz applyCarryIn.
+  carryIn?: boolean;
 };
 
 export async function POST(request: NextRequest) {
@@ -210,16 +213,10 @@ export async function POST(request: NextRequest) {
 
     // ── Zestawy (spec 2026-07-16): klient przysyła tylko {id, unitKey} —
     // skład i rabat weryfikujemy/liczymy wyłącznie z danych serwerowych.
-    // Podstawa rabatu zestawu i kodu rabatowego — BEZ wniesienia (usługa
-    // zawsze kosztuje pełne CARRY_IN_PRICE). `total` wyżej liczy pełną kwotę.
     const computedItems = body.items.map((it, idx) => ({
       productId: it.id,
       quantity: it.quantity,
-      subtotal: discountableSubtotal(
-        orderItems[idx].price,
-        it.quantity,
-        orderItems[idx].variant_values
-      ),
+      subtotal: orderItems[idx].price * it.quantity,
       bundle: it.bundle ?? null,
     }));
     const bundleGroups = groupBundleUnits(computedItems);
@@ -336,13 +333,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Wysyłka darmowa na terenie całej Polski — nie doliczamy kosztu dostawy.
-    // Do P24 idzie tylko cena produktów (minus rabaty: zestawy + kod). Pola
-    // delivery_cost / delivery_price w panelu admina zostają do rozliczeń
+    // Do P24 idzie cena produktów (minus rabaty: zestawy + kod) plus ewentualne wniesienie.
+    // Pola delivery_cost / delivery_price w panelu admina zostają do rozliczeń
     // wewnętrznych. Bez kuponów — P24 dostaje jedną kwotę końcową, a rozbicie
     // rabatów siedzi w orders.bundle_discount / promo_discount.
-    const finalTotal = toCharge(
-      Math.max(0, total - bundleDiscount - promoDiscount)
+
+    // Wniesienie (aktualizacja specu 2026-10-06): raz na zamówienie, PO
+    // rabatach — kod i zestawy go nie obniżają. Pozycja spoza katalogu
+    // (custom_name) idzie do order_items, kwota ze stałej serwera.
+    const withCarryIn = applyCarryIn(
+      orderItems,
+      Math.max(0, total - bundleDiscount - promoDiscount),
+      body.carryIn
     );
+    const finalTotal = toCharge(withCarryIn.total);
 
     // Użytkownik zalogowany?
     const {
@@ -353,7 +357,7 @@ export async function POST(request: NextRequest) {
     const order = await createOrder({
       userId: user?.id ?? null,
       guestEmail: user ? null : body.email.trim().toLowerCase(),
-      items: orderItems.map((it) => ({ ...it, price: toCharge(it.price) })),
+      items: withCarryIn.items.map((it) => ({ ...it, price: toCharge(it.price) })),
       total: finalTotal,
       shippingAddress: body.address,
       promoCodeId,
