@@ -10,6 +10,12 @@ import {
   FEATURE_PARAM_SEPARATOR,
 } from "@/app/_lib/feature-filter";
 import type { MenuNode } from "@/app/_lib/category-tree";
+import {
+  DEFAULT_PER_PAGE,
+  PER_PAGE_OPTIONS,
+  PER_PAGE_PARAM,
+  parsePerPage,
+} from "@/app/_lib/per-page";
 
 export type FilterBarCollection = {
   slug: string;
@@ -126,6 +132,7 @@ export default function FilterBar({
   const category = effectiveParams.get("kategoria") ?? "";
   const collection = effectiveParams.get("kolekcja") ?? "";
   const sort = effectiveParams.get("sortuj") ?? "alphabetic";
+  const perPage = parsePerPage(effectiveParams.get(PER_PAGE_PARAM) ?? undefined);
   const inStockOnly = effectiveParams.get("dostepne") === "1";
 
   // Wybrane wartości per opcja (z URL).
@@ -298,6 +305,8 @@ export default function FilterBar({
     if (q) params.set("q", q);
     // Sortowanie zachowujemy jeśli różne od default (alphabetic).
     if (sort && sort !== "alphabetic") params.set("sortuj", sort);
+    // Liczba produktów na stronę to też widok, nie filtr — zostaje jak sortowanie.
+    if (perPage !== DEFAULT_PER_PAGE) params.set(PER_PAGE_PARAM, String(perPage));
     setPriceMin("");
     setPriceMax("");
     setDims(Object.fromEntries(DIM_KEYS.map((k) => [k, ""])));
@@ -388,8 +397,16 @@ export default function FilterBar({
         )}
 
         {/* Sort pill — po prawej, ten sam styl co inne. Specjalny pill bo
-            dropdown ma checkmark + zamykanie po kliknięciu. */}
-        <div className="ml-auto shrink-0">
+            dropdown ma checkmark + zamykanie po kliknięciu.
+            „Pokaż” obok jest przełącznikiem, nie dropdownem: panele tego paska
+            wyrównują się do prawej krawędzi, więc lista „Pokaż” otwierałaby się
+            pod „Sortuj”. Trzy wartości mieszczą się w jednej pigułce. */}
+        <div className="ml-auto shrink-0 flex items-center gap-2">
+          <PerPageSwitch
+            label={t.filter.perPageLabel}
+            current={perPage}
+            onSelect={(n) => update(PER_PAGE_PARAM, n === DEFAULT_PER_PAGE ? "" : String(n))}
+          />
           <SortPill
             label={t.filter.sortLabel}
             current={activeSort.label}
@@ -840,6 +857,47 @@ function SortPill({
         <polyline points="6 9 12 15 18 9" />
       </svg>
     </button>
+  );
+}
+
+// Wysokość jak SortPill (32 px): py-1 pigułki + py-1 przycisku + linia text-xs.
+function PerPageSwitch({
+  label,
+  current,
+  onSelect,
+}: {
+  label: string;
+  current: number;
+  onSelect: (n: number) => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className="shrink-0 flex items-center gap-0.5 pl-4 pr-1 py-1 rounded-full border border-[var(--border)] text-xs font-sans whitespace-nowrap"
+    >
+      <span className="text-[var(--muted)] uppercase tracking-widest mr-1.5">{label}</span>
+      {PER_PAGE_OPTIONS.map((n) => {
+        const active = n === current;
+        return (
+          <button
+            key={n}
+            type="button"
+            aria-pressed={active}
+            onClick={() => {
+              if (!active) onSelect(n);
+            }}
+            className={`px-2.5 py-1 rounded-full font-medium transition-colors ${
+              active
+                ? "bg-[var(--color-navy)] text-white"
+                : "text-[var(--fg)] hover:text-[var(--color-gold)]"
+            }`}
+          >
+            {n}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

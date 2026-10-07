@@ -277,6 +277,7 @@ export const de: DeepPartial<PlShape> = {
     sortPriceAsc: "Preis: aufsteigend",
     sortPriceDesc: "Preis: absteigend",
     sortLabel: "Sortieren:",
+    perPageLabel: "Anzeigen:",
     category: "Kategorie",
     collection: "Kollektion",
     color: "Farbe",
