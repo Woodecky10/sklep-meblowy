@@ -13,6 +13,8 @@ import { deliveryView } from "@/app/_lib/delivery";
 import OrderIssueModal from "@/app/_components/ui/OrderIssueModal";
 import { orderItemLabel } from "@/app/_lib/order-issues";
 import { orderItemDisplayName } from "@/app/_lib/order-items";
+import { productsToReview } from "@/app/_lib/order-reviews";
+import StarRating from "@/app/_components/ui/StarRating";
 
 // Ten sam skrót numeru, który stoi na stronie (#XXXXXXXX) — liczony z adresu,
 // bez zapytania do bazy; nie ujawnia nic ponad to, co już jest w URL-u.
@@ -73,6 +75,12 @@ export default async function OrderDetailPage({
           "Sie können dieselbe Bestellung erneut aufgeben — alle Positionen (mit den gewählten Varianten) landen sofort im Warenkorb. Die Preise werden auf die aktuellen aktualisiert.",
         issueHeading: "Stimmt etwas mit der Bestellung nicht?",
         issueDesc: "Melden Sie ein Problem — wir melden uns und helfen bei der Lösung.",
+        reviewHeading: "Bewerten Sie die gekauften Produkte",
+        reviewDesc:
+          "Ihre Bewertung hilft anderen bei der Auswahl — Sie können auch Fotos hinzufügen.",
+        reviewWrite: "Bewertung schreiben",
+        reviewYours: "Ihre Bewertung",
+        reviewEdit: "Bearbeiten",
         priceLocale: "de-DE",
       }
     : {
@@ -98,6 +106,11 @@ export default async function OrderDetailPage({
           "Możesz złożyć identyczne zamówienie ponownie — wszystkie pozycje (z wybranymi wariantami) trafią od razu do koszyka. Ceny zostaną zaktualizowane do aktualnych.",
         issueHeading: "Coś nie tak z zamówieniem?",
         issueDesc: "Zgłoś problem — odezwiemy się i pomożemy go rozwiązać.",
+        reviewHeading: "Oceń zakupione produkty",
+        reviewDesc: "Twoja opinia pomoże innym w wyborze — możesz dodać też zdjęcia.",
+        reviewWrite: "Wystaw opinię",
+        reviewYours: "Twoja opinia",
+        reviewEdit: "Edytuj",
         priceLocale: "pl-PL",
       };
   const supabase = await createClient();
@@ -150,6 +163,24 @@ export default async function OrderDetailPage({
       locale
     ),
   }));
+
+  // Opinie dodaje się na karcie produktu (#opinie) — tam jest pełny formularz
+  // ze zdjęciami, edycją i usuwaniem. Panel tylko do niego prowadzi.
+  const toReview = productsToReview(order.status, order.items ?? []);
+  // Klient sesyjny, nie administracyjny: ten sam odczyt co getReviewStatus na
+  // karcie produktu, więc „Twoja opinia" tu i formularz edycji tam widzą to samo.
+  const myRatings = new Map<string, number>();
+  if (toReview.length > 0) {
+    const { data: myReviews } = await supabase
+      .from("product_reviews")
+      .select("product_id, rating")
+      .eq("user_id", user.id)
+      .in(
+        "product_id",
+        toReview.map((it) => it.product_id)
+      );
+    for (const r of myReviews ?? []) myRatings.set(r.product_id, r.rating);
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -345,6 +376,58 @@ export default async function OrderDetailPage({
             {c.pendingDesc}
           </p>
           <CancelOrderButton orderId={order.id} />
+        </div>
+      )}
+
+      {toReview.length > 0 && (
+        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8">
+          <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-1">
+            {c.reviewHeading}
+          </h3>
+          <p className="text-sm text-[var(--muted)] mb-5">{c.reviewDesc}</p>
+          <ul className="flex flex-col gap-4">
+            {toReview.map((item) => {
+              const prod = localizeProduct(item.product, locale);
+              const rating = myRatings.get(item.product_id);
+              return (
+                <li key={item.product_id} className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-stone-100 dark:bg-stone-800 shrink-0">
+                      {prod.images?.[0] && (
+                        <Image
+                          src={prod.images[0]}
+                          alt={prod.name}
+                          fill
+                          className="object-cover"
+                          sizes="56px"
+                        />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-[var(--fg)] line-clamp-2">
+                        {prod.name}
+                      </p>
+                      {rating && (
+                        <p className="flex items-center gap-2 text-xs text-[var(--muted)]">
+                          {c.reviewYours} <StarRating value={rating} size={14} />
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <LocalizedLink
+                    href={`/produkt/${item.product_id}#opinie`}
+                    className={
+                      rating
+                        ? "self-start sm:self-auto px-6 py-2.5 border border-[var(--border)] text-[var(--fg)] font-sans font-semibold text-xs uppercase tracking-widest rounded-full hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors whitespace-nowrap"
+                        : "self-start sm:self-auto px-6 py-2.5 bg-[var(--color-navy)] text-white font-sans font-semibold text-xs uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors whitespace-nowrap"
+                    }
+                  >
+                    {rating ? c.reviewEdit : c.reviewWrite}
+                  </LocalizedLink>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
 
