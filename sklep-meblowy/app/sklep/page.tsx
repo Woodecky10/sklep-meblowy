@@ -5,6 +5,7 @@ import { getProducts, getFilterFacets, jestStronaZaZakresem } from "@/app/_lib/p
 import { usesCollectionOrder } from "@/app/_lib/collection-order";
 import { parseOptionFilterParams } from "@/app/_lib/option-filter";
 import { parseFeatureFilterParams } from "@/app/_lib/feature-filter";
+import { DEFAULT_PER_PAGE, PER_PAGE_PARAM, parsePerPage } from "@/app/_lib/per-page";
 import { getRatingsForProducts } from "@/app/_lib/reviews";
 import { getCategories, getAllCategories } from "@/app/_lib/categories";
 import { menuProjection, pathTo } from "@/app/_lib/category-tree";
@@ -61,6 +62,7 @@ type SearchParams = Promise<
     sekcja?: string;
     sortuj?: string;
     strona?: string;
+    na_stronie?: string;
     q?: string;
     cena_od?: string;
     cena_do?: string;
@@ -146,6 +148,7 @@ export default async function SklepPage({
     (sp.sortuj as "alphabetic" | "price_asc" | "price_desc" | "newest") ??
     "alphabetic";
   const page = Number(sp.strona ?? 1);
+  const perPage = parsePerPage(sp.na_stronie);
   const search = first(sp.q)?.trim() || undefined;
   const priceMin = parsePositiveNumber(sp.cena_od);
   const priceMax = parsePositiveNumber(sp.cena_do);
@@ -176,6 +179,7 @@ export default async function SklepPage({
       category,
       sort,
       page,
+      limit: perPage,
       search,
       priceMin,
       priceMax,
@@ -235,6 +239,9 @@ export default async function SklepPage({
   if (sp.kategoria) rawParams.kategoria = sp.kategoria;
   if (sp.sekcja && !sp.kategoria) rawParams.sekcja = sp.sekcja;
   if (sp.sortuj) rawParams.sortuj = sp.sortuj;
+  // Znormalizowana wartość, nie surowa z adresu: śmieć w ?na_stronie= daje 12
+  // i nie powinien wędrować dalej w linkach stronicowania.
+  if (perPage !== DEFAULT_PER_PAGE) rawParams[PER_PAGE_PARAM] = String(perPage);
   if (sp.q) rawParams.q = sp.q;
   if (sp.cena_od) rawParams.cena_od = sp.cena_od;
   if (sp.cena_do) rawParams.cena_do = sp.cena_do;
@@ -261,7 +268,7 @@ export default async function SklepPage({
   // EmptySearchState). Liczy zachowawczo — parametr obecny, ale niepoprawny
   // (np. `cena_od=abc`) też uznaje za zawężenie, a to spycha komunikat do
   // wariantu, który niczego nie obiecuje.
-  const NIEZAWEZAJACE_PARAMY = new Set(["q", "sortuj"]);
+  const NIEZAWEZAJACE_PARAMY = new Set(["q", "sortuj", PER_PAGE_PARAM]);
   const hasOtherFilters = Object.keys(rawParams).some(
     (k) => !NIEZAWEZAJACE_PARAMY.has(k)
   );

@@ -283,6 +283,7 @@ export type PlShape = {
     sortPriceAsc: string;
     sortPriceDesc: string;
     sortLabel: string;
+    perPageLabel: string;
     category: string;
     collection: string;
     color: string;
@@ -737,6 +738,7 @@ export const pl = {
     sortPriceAsc: "Cena: rosnąco",
     sortPriceDesc: "Cena: malejąco",
     sortLabel: "Sortuj:",
+    perPageLabel: "Pokaż:",
     category: "Kategoria",
     collection: "Kolekcja",
     color: "Kolor",
