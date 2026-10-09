@@ -12,6 +12,7 @@ import "server-only";
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
+import { withFallback } from "./cache-fallback";
 import { localizeProduct, localizeCollection } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Collection, Product } from "./types";
@@ -30,17 +31,26 @@ export const COLLECTIONS_CACHE_TAG = "collections";
 const fetchAllCollections = unstable_cache(
   async (): Promise<Collection[]> => {
     const supabase = await createAdminClient();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("collections")
       .select("*")
       .order("label", { ascending: true });
+    // Rzuca zamiast [] — patrz cache-fallback.ts.
+    if (error) throw error;
     return (data ?? []) as Collection[];
   },
   ["collections-all"],
   { tags: [COLLECTIONS_CACHE_TAG], revalidate: 300 }
 );
 
-export const getAllCollections = cache(fetchAllCollections);
+export const getAllCollections = cache(
+  (): Promise<Collection[]> => withFallback("collections", fetchAllCollections, [])
+);
+
+// Jak getAllCollections, ale błąd bazy RZUCA — dla sitemap.xml (trasa ISR).
+export function getAllCollectionsOrThrow(): Promise<Collection[]> {
+  return fetchAllCollections();
+}
 
 // ============================================================
 // Pobierz pojedynczą kolekcję po slug lub id

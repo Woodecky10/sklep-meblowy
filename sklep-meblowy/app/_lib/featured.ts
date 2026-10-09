@@ -4,6 +4,7 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
+import { withFallback } from "./cache-fallback";
 import { localizeProduct } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import { BADGE_DE, mapDe } from "./de-content-maps";
@@ -36,20 +37,24 @@ const fetchFeaturedItems = unstable_cache(
   async (): Promise<FeaturedItem[]> => {
     const supabase = await createAdminClient();
 
+    // Oba zapytania rzucają zamiast [] — patrz cache-fallback.ts. Zapisana pusta
+    // lista przełączyłaby stronę główną na „4 najnowsze" na całe okno revalidate.
     const { data: rows, error } = await supabase
       .from("featured_products")
       .select("*")
       .order("sort_order", { ascending: true });
 
-    if (error || !rows || rows.length === 0) return [];
+    if (error) throw error;
+    if (!rows || rows.length === 0) return [];
 
     const featured = rows as FeaturedRow[];
     const productIds = featured.map((f) => f.product_id);
 
-    const { data: products } = await supabase
+    const { data: products, error: productsError } = await supabase
       .from("products")
       .select("*")
       .in("id", productIds);
+    if (productsError) throw productsError;
 
     const byId = new Map<string, Product>(
       ((products ?? []) as Product[]).map((p) => [p.id, p])
@@ -67,7 +72,9 @@ const fetchFeaturedItems = unstable_cache(
   { tags: [FEATURED_CACHE_TAG], revalidate: 60 }
 );
 
-export const getFeaturedItems = cache(fetchFeaturedItems);
+export const getFeaturedItems = cache(
+  (): Promise<FeaturedItem[]> => withFallback("featured", fetchFeaturedItems, [])
+);
 
 // ============================================================
 // Admin read: surowy fetch + JOIN, bez cache

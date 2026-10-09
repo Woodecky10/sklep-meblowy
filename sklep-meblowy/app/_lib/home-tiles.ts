@@ -4,6 +4,7 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
+import { withFallback } from "./cache-fallback";
 import type { Locale } from "./i18n";
 import { HOME_TEXT_DE, mapDe } from "./de-content-maps";
 
@@ -39,14 +40,17 @@ const fetchActiveTiles = unstable_cache(
       .eq("active", true)
       .order("sort_order", { ascending: true });
 
-    if (error || !data) return [];
-    return data as TileRow[];
+    // Rzuca zamiast [] — patrz cache-fallback.ts.
+    if (error) throw error;
+    return (data ?? []) as TileRow[];
   },
   ["home-tiles-active"],
   { tags: [TILES_CACHE_TAG], revalidate: 60 }
 );
 
-export const getActiveTiles = cache(fetchActiveTiles);
+export const getActiveTiles = cache(
+  (): Promise<TileRow[]> => withFallback("home-tiles", fetchActiveTiles, [])
+);
 
 // Tłumaczy kafelek na DE: priorytet kolumna _de (z panelu), potem statyczna mapa
 // HOME_TEXT_DE (treść sprzed migracji 30), na końcu fallback do PL.

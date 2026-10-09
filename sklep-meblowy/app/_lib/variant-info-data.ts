@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
+import { withFallback } from "./cache-fallback";
 import { buildVariantInfoMap, type VariantInfoEntry, type VariantInfoRow } from "./variant-info";
 
 export const VARIANT_INFO_CACHE_TAG = "variant_info";
@@ -8,9 +9,11 @@ export const VARIANT_INFO_CACHE_TAG = "variant_info";
 const fetchVariantInfoRows = unstable_cache(
   async (): Promise<VariantInfoRow[]> => {
     const supabase = await createAdminClient();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("variant_info")
       .select("option_name, value, info, info_de");
+    // Rzuca zamiast [] — patrz cache-fallback.ts.
+    if (error) throw error;
     return (data ?? []) as VariantInfoRow[];
   },
   ["variant-info-all"],
@@ -20,7 +23,7 @@ const fetchVariantInfoRows = unstable_cache(
 // Globalna mapa (opcja+wartość) → {info, info_de}. Tabela mała → jeden odczyt.
 export const getVariantInfoMap = cache(
   async (): Promise<Record<string, VariantInfoEntry>> =>
-    buildVariantInfoMap(await fetchVariantInfoRows())
+    buildVariantInfoMap(await withFallback("variant-info", fetchVariantInfoRows, []))
 );
 
 export function invalidateVariantInfoCache(): void {

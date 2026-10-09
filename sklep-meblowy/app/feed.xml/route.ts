@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/app/_lib/supabase/server";
-import { getCategories } from "@/app/_lib/categories";
+import { getCategoriesOrThrow } from "@/app/_lib/categories";
+import { isBuildPhase } from "@/app/_lib/cache-fallback";
 import { productPlainText, type ProductTextSource } from "@/app/_lib/product-text";
 import { buildProductFeedXml, selectFeedItems, type FeedProduct } from "@/app/_lib/product-feed";
 import { resolveGpc } from "@/app/_lib/gpc";
@@ -17,7 +18,7 @@ import { resolveGpc } from "@/app/_lib/gpc";
 
 // `revalidate` włącza prerender trasy (bez tego route handler jest renderowany
 // przy każdym żądaniu). Efektywny czas odświeżania to 300 s, nie 3600: Next
-// zacieśnia go do najkrótszego revalidate z zależności, a getCategories używa
+// zacieśnia go do najkrótszego revalidate z zależności, a getCategoriesOrThrow używa
 // `unstable_cache` z 300 s — sprawdzone w .next/prerender-manifest.json
 // (initialRevalidateSeconds: 300). Merchant Center czyta feed raz na dobę, więc
 // 5 minut świeżości jest z dużym zapasem.
@@ -28,7 +29,7 @@ export async function GET() {
   // prerenderu cookies() rzuca kontrolny DynamicServerError. Jawny is_active=true
   // odtwarza publiczną politykę RLS: feed nie wystawia ukrytych produktów.
   const supabase = await createAdminClient();
-  const [{ data: rows, error }, categories] = await Promise.all([
+  const [{ data: rows, error }, categoriesRead] = await Promise.all([
     supabase
       .from("products")
       .select(
@@ -36,18 +37,31 @@ export async function GET() {
       )
       .eq("is_active", true)
       .order("created_at", { ascending: false }),
-    getCategories("pl"),
+    // OrThrow, nie getCategories: tamta przy błędzie bazy oddaje pustą listę
+    // i feed wyszedłby bez kategorii i google_product_category.
+    // Błąd PostgREST bywa zwykłym obiektem (nie Error), stąd jawne ok/err.
+    getCategoriesOrThrow("pl").then(
+      (list) => ({ ok: true as const, list }),
+      (err: unknown) => ({ ok: false as const, err })
+    ),
   ]);
 
-  if (error) {
-    // Lepiej oddać 503 niż pusty feed: Merchant Center przy pustym pliku
+  if (error || !categoriesRead.ok) {
+    // Nigdy pusty ani okrojony feed: Merchant Center przy pustym pliku
     // dezaktywuje WSZYSTKIE oferty, a przy błędzie pobrania zachowuje poprzednie.
-    console.error("[feed.xml] błąd pobierania produktów z Supabase:", error);
-    return new Response("Feed niedostępny — błąd pobierania produktów.", {
+    const cause = error ?? (categoriesRead.ok ? null : categoriesRead.err);
+    console.error("[feed.xml] błąd pobierania danych z Supabase:", cause);
+    // W działającym sklepie rzucamy: zwrócone 503 zapisałoby się w cache ISR
+    // zamiast ostatniego dobrego feedu (patrz isBuildPhase w cache-fallback.ts).
+    if (!isBuildPhase()) {
+      throw new Error("[feed.xml] Supabase niedostępny — zostaje poprzedni feed", { cause });
+    }
+    return new Response("Feed niedostępny — błąd pobierania danych.", {
       status: 503,
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
   }
+  const categories = categoriesRead.list;
 
   const categoryLabels = new Map(categories.map((c) => [c.slug, c.label]));
 

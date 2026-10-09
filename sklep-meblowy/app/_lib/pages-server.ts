@@ -4,6 +4,7 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
+import { withFallback } from "./cache-fallback";
 import type { PageRow } from "./pages";
 
 export const PAGES_CACHE_TAG = "pages";
@@ -21,14 +22,19 @@ const fetchPageBySlug = unstable_cache(
       .select(PAGE_COLUMNS)
       .eq("slug", slug)
       .maybeSingle();
-    if (error || !data) return null;
-    return data as PageRow;
+    // Błąd rzuca: zapisany null to 404 istniejącej podstrony przez całe okno
+    // revalidate. Brak wiersza (data === null bez błędu) to prawdziwe „nie ma".
+    if (error) throw error;
+    return (data as PageRow | null) ?? null;
   },
   ["page-by-slug"],
   { tags: [PAGES_CACHE_TAG], revalidate: 60 }
 );
 
-export const getPageBySlug = cache(fetchPageBySlug);
+export const getPageBySlug = cache(
+  (slug: string): Promise<PageRow | null> =>
+    withFallback("page-by-slug", () => fetchPageBySlug(slug), null)
+);
 
 // Admin: świeże odczyty bez cache (po mutacji router.refresh() widzi zmiany).
 export async function getAllPagesAdmin(): Promise<PageRow[]> {
@@ -64,8 +70,10 @@ export async function getPagesForSitemap(): Promise<
     .from("pages")
     .select("slug, updated_at, title_de")
     .eq("published", true);
-  if (error || !data) return [];
-  return data as { slug: string; updated_at: string; title_de: string | null }[];
+  // Rzuca: sitemap.xml jest ISR i pusta lista zapisałaby się w niej jako
+  // sitemapa bez podstron (patrz isBuildPhase w cache-fallback.ts).
+  if (error) throw error;
+  return (data ?? []) as { slug: string; updated_at: string; title_de: string | null }[];
 }
 
 export function invalidatePagesCache(): void {

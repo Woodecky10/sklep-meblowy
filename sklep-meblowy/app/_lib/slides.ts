@@ -4,6 +4,7 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
+import { withFallback } from "./cache-fallback";
 import type { HeroSlide } from "../_components/layout/HomeHeroSlider";
 import type { Locale } from "./i18n";
 import { HOME_TEXT_DE, mapDe } from "./de-content-maps";
@@ -110,14 +111,17 @@ const fetchActiveSlides = unstable_cache(
       .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
       .order("sort_order", { ascending: true });
 
-    if (error || !data) return [];
-    return (data as SlideRow[]).map(rowToSlide);
+    // Rzuca zamiast [] — patrz cache-fallback.ts.
+    if (error) throw error;
+    return ((data ?? []) as SlideRow[]).map(rowToSlide);
   },
   ["home-slides-active"],
   { tags: [SLIDES_CACHE_TAG], revalidate: 60 }
 );
 
-export const getActiveSlides = cache(fetchActiveSlides);
+export const getActiveSlides = cache(
+  (): Promise<HeroSlide[]> => withFallback("home-slides", fetchActiveSlides, [])
+);
 
 // ============================================================
 // Admin read: WSZYSTKIE slajdy (też ukryte i poza datami) — do edycji
