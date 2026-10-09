@@ -9,6 +9,7 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
+import { withFallback } from "./cache-fallback";
 import { isContentBlockType, mergeHomeBlocks, type PageBlockRow } from "./blocks";
 
 // ── Fetch z cache ────────────────────────────────────────────────────────
@@ -16,8 +17,9 @@ export const PAGE_BLOCKS_CACHE_TAG = "page-blocks";
 
 // Cross-request cache (wzorzec home-sections/trust-items). Wewnątrz
 // unstable_cache nie wolno cookies() — createAdminClient jest bez cookies.
-// Błąd/brak tabeli → null → mergeHomeBlocks zwraca defaulty (fail-open,
-// sklep nigdy nie pada przez brak migracji 52).
+// Błąd bazy RZUCA (nie null — patrz cache-fallback.ts), a dopiero zapas per
+// żądanie daje null → mergeHomeBlocks zwraca defaulty (fail-open, sklep nigdy
+// nie pada przez brak migracji 52).
 const fetchHomeBlocks = unstable_cache(
   async (): Promise<PageBlockRow[] | null> => {
     const supabase = await createAdminClient();
@@ -26,7 +28,8 @@ const fetchHomeBlocks = unstable_cache(
       .select("id, page_id, block_type, sort_order, visible, content")
       .is("page_id", null)
       .order("sort_order", { ascending: true });
-    if (error || !data) return null;
+    if (error) throw error;
+    if (!data) return null;
     return data as PageBlockRow[];
   },
   ["home-blocks"],
@@ -34,7 +37,7 @@ const fetchHomeBlocks = unstable_cache(
 );
 
 export const getHomeBlocks = cache(async (): Promise<PageBlockRow[]> =>
-  mergeHomeBlocks(await fetchHomeBlocks())
+  mergeHomeBlocks(await withFallback("home-blocks", fetchHomeBlocks, null))
 );
 
 // Admin: świeży odczyt bez cache (po mutacji router.refresh() widzi zmiany).
@@ -86,14 +89,18 @@ const fetchPageBlocks = unstable_cache(
       .select("id, page_id, block_type, sort_order, visible, content")
       .eq("page_id", pageId)
       .order("sort_order", { ascending: true });
-    if (error || !data) return [];
+    if (error) throw error;
+    if (!data) return [];
     return (data as PageBlockRow[]).filter((b) => isContentBlockType(b.block_type));
   },
   ["page-blocks-by-page"],
   { tags: [PAGE_BLOCKS_CACHE_TAG], revalidate: 60 }
 );
 
-export const getPageBlocks = cache(fetchPageBlocks);
+export const getPageBlocks = cache(
+  (pageId: string): Promise<PageBlockRow[]> =>
+    withFallback("page-blocks", () => fetchPageBlocks(pageId), [])
+);
 
 export async function getPageBlocksAdmin(pageId: string): Promise<PageBlockRow[]> {
   const supabase = await createAdminClient();

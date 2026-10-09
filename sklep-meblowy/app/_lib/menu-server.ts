@@ -5,6 +5,7 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
+import { withFallback } from "./cache-fallback";
 import type { MenuItemRow } from "./menu";
 
 export const MENU_CACHE_TAG = "menu";
@@ -19,14 +20,19 @@ const fetchMenuItems = unstable_cache(
       .from("menu_items")
       .select(MENU_SELECT)
       .order("sort_order", { ascending: true });
-    if (error || !data) return null;
+    // Rzuca zamiast null — patrz cache-fallback.ts. Zapisany null to menu
+    // zastępcze na całe okno revalidate mimo zdrowej bazy.
+    if (error) throw error;
+    if (!data) return null;
     return data as unknown as MenuItemRow[];
   },
   ["menu-items"],
   { tags: [MENU_CACHE_TAG], revalidate: 60 }
 );
 
-export const getMenuItems = cache(fetchMenuItems);
+export const getMenuItems = cache(
+  (): Promise<MenuItemRow[] | null> => withFallback("menu", fetchMenuItems, null)
+);
 
 // Admin: świeży odczyt, bez filtrów — edytor pokazuje też ukryte pozycje
 // i pozycje szkiców (z oznaczeniem).

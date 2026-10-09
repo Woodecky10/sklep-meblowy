@@ -12,6 +12,7 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
+import { withFallback } from "./cache-fallback";
 import { localizeCategory } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import { CATEGORY_LABEL_DE } from "./de-content-maps";
@@ -42,14 +43,18 @@ export const CATEGORIES_CACHE_TAG = "categories";
 // zabrania użycia dynamic data sources (cookies/headers) wewnątrz `unstable_cache`.
 // Kategorie są danymi publicznymi (RLS: public read), więc bypass RLS przez
 // admin client jest tu bezpieczny.
+//
+// Błąd bazy RZUCA (nie [] — patrz cache-fallback.ts): 2026-10-06 zapisane []
+// dało sklep bez kategorii przy zdrowej bazie.
 const fetchCategoriesData = unstable_cache(
   async (): Promise<CategoryNode[]> => {
     const supabase = await createAdminClient();
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("categories")
       .select("*")
       .order("sort_order", { ascending: true });
+    if (error) throw error;
 
     return ((data ?? []) as Array<{
       id: string;
@@ -76,8 +81,11 @@ const fetchCategoriesData = unstable_cache(
 );
 
 // React `cache()` deduplikuje wywołania w tym samym renderze — kilka komponentów
-// pobiera tę samą strukturę bez wielokrotnego trafienia DB.
-const getData = cache(fetchCategoriesData);
+// pobiera tę samą strukturę bez wielokrotnego trafienia DB. Błąd bazy → pusta
+// lista tylko dla tego żądania.
+const getData = cache(
+  (): Promise<CategoryNode[]> => withFallback("categories", fetchCategoriesData, [])
+);
 
 // ============================================================
 // Public API (async)
@@ -93,7 +101,19 @@ const getData = cache(fetchCategoriesData);
 export async function getCategories(
   locale: Locale = DEFAULT_LOCALE
 ): Promise<CategoryDef[]> {
-  const nodes = await getData();
+  return visibleCategories(await getData(), locale);
+}
+
+// Jak getCategories, ale błąd bazy RZUCA zamiast oddać pustą listę. Dla
+// feed.xml: feed jest prerenderowany i bez kategorii poszedłby do Merchant
+// Center i Pinteresta bez google_product_category.
+export async function getCategoriesOrThrow(
+  locale: Locale = DEFAULT_LOCALE
+): Promise<CategoryDef[]> {
+  return visibleCategories(await fetchCategoriesData(), locale);
+}
+
+function visibleCategories(nodes: CategoryNode[], locale: Locale): CategoryDef[] {
   const visible = effectiveActive(nodes);
   return nodes.filter((c) => visible.has(c.slug)).map((c) => deCat(c, locale));
 }

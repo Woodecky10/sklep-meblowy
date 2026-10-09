@@ -7,6 +7,7 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
+import { withFallback } from "./cache-fallback";
 import { localizeProduct, localizeBundle } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Bundle, BundleWithComponents, Product } from "./types";
@@ -25,19 +26,23 @@ const ID_ONLY_COLUMNS = "id";
 const fetchAllBundles = unstable_cache(
   async (): Promise<BundleRow[]> => {
     const supabase = await createAdminClient();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("bundles")
       .select("*, bundle_items(product_id, position)")
       // Kolejność admina (migracja 83); remis → nowsze pierwsze, jak przed nią.
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false });
+    // Rzuca zamiast [] — patrz cache-fallback.ts.
+    if (error) throw error;
     return (data ?? []) as BundleRow[];
   },
   ["bundles-all"],
   { tags: [BUNDLES_CACHE_TAG], revalidate: 300 }
 );
 
-const getAllBundlesRaw = cache(fetchAllBundles);
+const getAllBundlesRaw = cache(
+  (): Promise<BundleRow[]> => withFallback("bundles", fetchAllBundles, [])
+);
 
 // Dociąga aktywne produkty-składniki i odfiltrowuje niekompletne zestawy.
 // `columns` zawęża wiersz produktu (patrz TILE_COMPONENT_COLUMNS) — wynik jest

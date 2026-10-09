@@ -5,6 +5,7 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
+import { withFallback } from "./cache-fallback";
 import type { Locale } from "./i18n";
 
 export const SITE_TEXT_KEYS = ["topbar_slogan", "footer_tagline", "home_about"] as const;
@@ -48,9 +49,10 @@ const fetchSiteTexts = unstable_cache(
     const { data, error } = await supabase
       .from("site_texts")
       .select("key, value, value_de");
-    if (error || !data) return {};
+    // Rzuca zamiast {} — patrz cache-fallback.ts.
+    if (error) throw error;
     const map: SiteTextsMap = {};
-    for (const row of data as { key: string; value: string | null; value_de: string | null }[]) {
+    for (const row of (data ?? []) as { key: string; value: string | null; value_de: string | null }[]) {
       map[row.key] = { value: row.value, value_de: row.value_de };
     }
     return map;
@@ -59,7 +61,9 @@ const fetchSiteTexts = unstable_cache(
   { tags: [SITE_TEXTS_CACHE_TAG], revalidate: 60 }
 );
 
-export const getSiteTexts = cache(fetchSiteTexts);
+export const getSiteTexts = cache(
+  (): Promise<SiteTextsMap> => withFallback("site-texts", fetchSiteTexts, {})
+);
 
 // Admin: świeży odczyt bez cache (formularz musi widzieć zapis po refresh).
 export async function getAllSiteTexts(): Promise<SiteTextsMap> {

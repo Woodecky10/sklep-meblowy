@@ -6,6 +6,7 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
+import { withFallback } from "./cache-fallback";
 import type { Locale } from "./i18n";
 import { pl } from "./dictionaries/pl";
 import { de } from "./dictionaries/de";
@@ -71,14 +72,18 @@ const fetchTrustItems = unstable_cache(
       .from("trust_items")
       .select("id, icon, label, label_de, subline, subline_de, sort_order, active")
       .order("sort_order", { ascending: true });
-    if (error || !data) return null;
+    // Rzuca zamiast null — patrz cache-fallback.ts.
+    if (error) throw error;
+    if (!data) return null;
     return data as TrustItemRow[];
   },
   ["trust-items"],
   { tags: [TRUST_ITEMS_CACHE_TAG], revalidate: 60 }
 );
 
-export const getTrustItems = cache(fetchTrustItems);
+export const getTrustItems = cache(
+  (): Promise<TrustItemRow[] | null> => withFallback("trust-items", fetchTrustItems, null)
+);
 
 // Admin: świeży odczyt bez cache.
 export async function getAllTrustItems(): Promise<TrustItemRow[]> {

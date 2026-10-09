@@ -1,6 +1,7 @@
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createClient as createBareAnonClient } from "@supabase/supabase-js";
 import { createClient, createAdminClient } from "./supabase/server";
+import { withFallback } from "./cache-fallback";
 import { getAllCategories } from "./categories";
 import { resolveCategoryFilter, expandCrossSellTargets } from "./category-tree";
 import {
@@ -599,12 +600,30 @@ export function invalidateFacetsCache(): void {
 // CZYSTYM klientem anon (RLS widzi dokładnie to co gość: tylko is_active —
 // przy okazji facety przestają zawierać dane produktów ukrytych, gdy ogląda
 // je zalogowany admin).
+type FacetSourceRow = {
+  variants: Product["variants"];
+  features: unknown;
+  dimensions: Product["dimensions"];
+};
+
+type FacetSource = {
+  optionGroups: OptionFacetGroup[];
+  featureGroups: FeatureFacetGroup[];
+  dimensionBounds: DimensionBounds;
+};
+
+// Facety opcji wariantów (filterable=true), parametrów produktu (features)
+// i granice wymiarów — z tych samych wierszy (jeden skan, ten sam cache).
+function facetsFromRows(rows: FacetSourceRow[]): FacetSource {
+  return {
+    optionGroups: collectOptionFacets(rows),
+    featureGroups: collectFeatureFacets(rows),
+    dimensionBounds: collectDimensionBounds(rows),
+  };
+}
+
 const getFacetSource = unstable_cache(
-  async (): Promise<{
-    optionGroups: OptionFacetGroup[];
-    featureGroups: FeatureFacetGroup[];
-    dimensionBounds: DimensionBounds;
-  }> => {
+  async (): Promise<FacetSource> => {
     const anon = createBareAnonClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -612,23 +631,13 @@ const getFacetSource = unstable_cache(
     // Bez .limit() — świadomie (katalog ~dziesiątki produktów). Przy dużym
     // wzroście katalogu PostgREST utnie wiersze i facety po cichu zgubią
     // produkty — wtedy zdenormalizować rodziny do kolumny.
-    const { data: sourceData } = await anon
+    const { data: sourceData, error } = await anon
       .from("products")
       .select("variants, features, dimensions");
+    // Rzuca zamiast pustych facetów — patrz cache-fallback.ts.
+    if (error) throw error;
 
-    const rows = (sourceData ?? []) as {
-      variants: Product["variants"];
-      features: unknown;
-      dimensions: Product["dimensions"];
-    }[];
-
-    // Facety opcji wariantów (filterable=true), parametrów produktu (features)
-    // i granice wymiarów — z tych samych wierszy (jeden skan, ten sam cache).
-    const optionGroups = collectOptionFacets(rows);
-    const featureGroups = collectFeatureFacets(rows);
-    const dimensionBounds = collectDimensionBounds(rows);
-
-    return { optionGroups, featureGroups, dimensionBounds };
+    return facetsFromRows((sourceData ?? []) as FacetSourceRow[]);
   },
   ["facet-source-v3"],
   { tags: [FACETS_CACHE_TAG], revalidate: 300 }
@@ -638,8 +647,13 @@ const getFacetSource = unstable_cache(
 // lokalizacja/sortowanie per request (tania, czysta localizeOptionFacets).
 // Decyzja historyczna: nie ograniczamy facets do bieżącego search/category
 // (pełna paleta zawsze; pusta lista po kliknięciu jest akceptowana).
+// Błąd bazy → /sklep bez filtrów tylko dla tego żądania.
 export async function getFilterFacets(locale: Locale = DEFAULT_LOCALE) {
-  const { optionGroups, featureGroups, dimensionBounds } = await getFacetSource();
+  const { optionGroups, featureGroups, dimensionBounds } = await withFallback(
+    "facets",
+    getFacetSource,
+    facetsFromRows([])
+  );
   return {
     options: localizeOptionFacets(optionGroups, locale),
     dimensions: dimensionBounds,

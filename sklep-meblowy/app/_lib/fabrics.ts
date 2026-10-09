@@ -3,20 +3,24 @@
 import { cache } from "react";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { createAdminClient } from "./supabase/server";
+import { withFallback } from "./cache-fallback";
 import { buildFabricDeMap, buildFabricImageMap, buildFabricMetaMap, type FabricValueMeta } from "./variants";
 import { buildFabricPropertyDefs, type FabricPropertyDef } from "./fabric-properties";
 import type { Fabric, FabricPriceGroup } from "./types";
 
 export const FABRICS_CACHE_TAG = "fabrics";
 
+// Błąd bazy RZUCA (nie [] — patrz cache-fallback.ts): 2026-10-09 zapisane []
+// dało /tkaniny bez ani jednej tkaniny przy zdrowej bazie.
 const fetchAllFabrics = unstable_cache(
   async (): Promise<Fabric[]> => {
     const supabase = await createAdminClient();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("fabrics")
       .select("*")
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true });
+    if (error) throw error;
     return (data ?? []) as Fabric[];
   },
   ["fabrics-all"],
@@ -24,7 +28,9 @@ const fetchAllFabrics = unstable_cache(
 );
 
 // Lista wszystkich tkanin (cache per request + unstable_cache z tagiem).
-export const getAllFabrics = cache(fetchAllFabrics);
+export const getAllFabrics = cache(
+  (): Promise<Fabric[]> => withFallback("fabrics", fetchAllFabrics, [])
+);
 
 // Mapa PL→DE do renderu wartości wariantu „Tkanina" na /de.
 export async function getFabricDeMap(): Promise<Record<string, string>> {
@@ -45,10 +51,11 @@ export const FABRIC_GROUPS_CACHE_TAG = "fabric-groups";
 const fetchFabricPriceGroups = unstable_cache(
   async (): Promise<FabricPriceGroup[]> => {
     const supabase = await createAdminClient();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("fabric_groups")
       .select("*")
       .order("sort_order", { ascending: true });
+    if (error) throw error;
     return (data ?? []) as FabricPriceGroup[];
   },
   ["fabric-groups-all"],
@@ -56,7 +63,10 @@ const fetchFabricPriceGroups = unstable_cache(
 );
 
 // Grupy cenowe tkanin (Standard/Premium/Premium High), rosnąco po sort_order.
-export const getFabricPriceGroups = cache(fetchFabricPriceGroups);
+export const getFabricPriceGroups = cache(
+  (): Promise<FabricPriceGroup[]> =>
+    withFallback("fabric-groups", fetchFabricPriceGroups, [])
+);
 
 export function invalidateFabricGroupsCache(): void {
   revalidateTag(FABRIC_GROUPS_CACHE_TAG, "max");
@@ -67,21 +77,23 @@ export const FABRIC_PROPERTY_DEFS_CACHE_TAG = "fabric-property-defs";
 const fetchFabricPropertyDefs = unstable_cache(
   async (): Promise<FabricPropertyDef[]> => {
     const supabase = await createAdminClient();
-    // Błąd (np. brak tabeli przed migracją) → pusta lista: karta produktu ma
-    // wyrenderować się bez pigułek, a nie wysypać.
     const { data, error } = await supabase
       .from("fabric_property_defs")
       .select("code, label, label_de, icon, sort_order")
       .order("sort_order", { ascending: true });
-    if (error) return [];
+    if (error) throw error;
     return buildFabricPropertyDefs(data);
   },
   ["fabric-property-defs-all"],
   { tags: [FABRIC_PROPERTY_DEFS_CACHE_TAG], revalidate: 300 }
 );
 
-// Słownik cech tkanin (migracja 64), rosnąco po sort_order.
-export const getFabricPropertyDefs = cache(fetchFabricPropertyDefs);
+// Słownik cech tkanin (migracja 64), rosnąco po sort_order. Błąd → pusta lista
+// dla tego żądania: karta produktu ma wyrenderować się bez pigułek, a nie wysypać.
+export const getFabricPropertyDefs = cache(
+  (): Promise<FabricPropertyDef[]> =>
+    withFallback("fabric-property-defs", fetchFabricPropertyDefs, [])
+);
 
 export function invalidateFabricPropertyDefsCache(): void {
   revalidateTag(FABRIC_PROPERTY_DEFS_CACHE_TAG, "max");
