@@ -47,10 +47,13 @@ const getAllBundlesRaw = cache(
 // Dociąga aktywne produkty-składniki i odfiltrowuje niekompletne zestawy.
 // `columns` zawęża wiersz produktu (patrz TILE_COMPONENT_COLUMNS) — wynik jest
 // wtedy Product tylko nominalnie; konsument ma czytać wyłącznie to, o co prosił.
+// `strict`: błąd zapytania o składniki RZUCA zamiast dać „zero kompletnych
+// zestawów" — tylko dla sitemapy (ISR); strony zostają przy pustym wyniku.
 async function buildWithComponents(
   rows: BundleRow[],
   locale: Locale,
-  columns: string = "*"
+  columns: string = "*",
+  strict = false
 ): Promise<BundleWithComponents[]> {
   if (rows.length === 0) return [];
   const productIds = Array.from(
@@ -58,11 +61,12 @@ async function buildWithComponents(
   );
   if (productIds.length === 0) return [];
   const supabase = await createAdminClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("products")
     .select(columns)
     .in("id", productIds)
     .eq("is_active", true);
+  if (error && strict) throw error;
   const byId = new Map(
     ((data ?? []) as unknown as Product[]).map((p) => [p.id, localizeProduct(p, locale)])
   );
@@ -120,11 +124,12 @@ export async function getVisibleBundleTiles(
   return buildBundleTiles(built);
 }
 
-// Slugi widocznych zestawów — do sitemapy.
+// Slugi widocznych zestawów — do sitemapy. Błąd bazy RZUCA (sitemap.xml jest
+// ISR, patrz isBuildPhase w cache-fallback.ts), stąd fetchAllBundles bez zapasu.
 export async function getActiveBundleSlugs(): Promise<string[]> {
-  const all = await getAllBundlesRaw();
+  const all = await fetchAllBundles();
   const active = all.filter((b) => b.is_active);
-  const built = await buildWithComponents(active, DEFAULT_LOCALE, ID_ONLY_COLUMNS);
+  const built = await buildWithComponents(active, DEFAULT_LOCALE, ID_ONLY_COLUMNS, true);
   return built.map((b) => b.slug);
 }
 

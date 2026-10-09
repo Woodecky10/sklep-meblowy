@@ -1,16 +1,18 @@
 import type { MetadataRoute } from "next";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { COMPANY } from "@/app/_lib/company";
-import { getCategories } from "@/app/_lib/categories";
-import { getAllCollections } from "@/app/_lib/collections";
+import { getCategoriesOrThrow } from "@/app/_lib/categories";
+import { getAllCollectionsOrThrow } from "@/app/_lib/collections";
+import { isBuildPhase } from "@/app/_lib/cache-fallback";
 import { sitemapAlternates } from "@/app/_lib/sitemap-i18n";
 import { DE_ENABLED } from "@/app/_lib/i18n";
 import { getPagesForSitemap } from "@/app/_lib/pages-server";
 import { getActiveBundleSlugs } from "@/app/_lib/bundles-server";
 
-// Sitemap dla Google. Renderowany przy każdym żądaniu (no caching) —
-// na razie OK przy małej liczbie produktów. Jeśli kiedyś będzie 10k+
-// produktów, można dodać revalidate albo cache.
+// Sitemap dla Google. Trasa ISR: prerenderowana przy buildzie i odświeżana co
+// 300 s (najkrótszy revalidate z zależności — .next/prerender-manifest.json),
+// a NIE renderowana przy każdym żądaniu, jak twierdził ten komentarz wcześniej.
+// Dlatego każdy odczyt niżej przy błędzie bazy RZUCA — patrz catch na dole.
 //
 // SKIPujemy: /admin/* (zablokowane w robots.txt), /konto/*, /checkout/*,
 // /koszyk, /ulubione, /logowanie, /rejestracja, /reset-hasla. Te strony
@@ -57,15 +59,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/prywatnosc`,  lastModified: now, changeFrequency: "yearly",  priority: 0.3 },
   ];
 
-  // Dynamiczne wpisy wymagają Supabase. Gdy baza jest niedostępna (build bez
-  // env, chwilowa awaria), degradujemy do tras statycznych zamiast wywalać
-  // cały build/deploy — Google dostanie minimum, kolejny render uzupełni.
+  // Dynamiczne wpisy wymagają Supabase. Gdy baza jest niedostępna: przy buildzie
+  // (build bez env, chwilowa awaria) degradujemy do tras statycznych zamiast
+  // wywalać cały deploy; w działającym sklepie rzucamy — Next zostawia wtedy
+  // ostatnią pełną sitemapę zamiast zapisać okrojoną na 300 s.
   try {
     // Każdy WIDOCZNY węzeł drzewa jako filtr /sklep?kategoria=X. Listing węzła
     // jest nadzbiorem listingów jego dzieci — to zwykły układ kategorii
     // w sklepie, kanonikale są rozłączne per węzeł. Ukryte gałęzie nie wchodzą
-    // (getCategories filtruje efektywną widoczność).
-    const categories = await getCategories();
+    // (getCategoriesOrThrow filtruje efektywną widoczność).
+    const categories = await getCategoriesOrThrow();
     const categoryRoutes: MetadataRoute.Sitemap = categories.map((c) => ({
       url: `${BASE}/sklep?kategoria=${c.slug}`,
       lastModified: now,
@@ -74,7 +77,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }));
 
     // Wszystkie kolekcje jako filtry /sklep?kolekcja=X
-    const collections = await getAllCollections();
+    const collections = await getAllCollectionsOrThrow();
     const collectionRoutes: MetadataRoute.Sitemap = collections.map((c) => ({
       url: `${BASE}/sklep?kolekcja=${c.slug}`,
       lastModified: new Date(c.updated_at),
@@ -86,11 +89,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // rzuca kontrolny DynamicServerError) + jawny filtr is_active=true
     // odtwarzający publiczną politykę RLS: sitemap nie indeksuje ukrytych.
     const supabase = await createAdminClient();
-    const { data: products } = await supabase
+    const { data: products, error: productsError } = await supabase
       .from("products")
       .select("id, created_at, needs_translation")
       .eq("is_active", true)
       .order("created_at", { ascending: false });
+    if (productsError) throw productsError;
 
     // Per produkt: wpis PL zawsze; wpis DE TYLKO gdy produkt przetłumaczony
     // (`needs_translation === false`). Oba wpisy noszą tę samą mapę alternates
@@ -188,9 +192,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     // Tkaniny (spec 2026-07-21): strona /tkaniny/[slug]. DE tylko gdy name_de
     // uzupełnione (opis i tak fallbackuje do PL — nie indeksujemy pół-polskich).
-    const { data: fabricRows } = await supabase
+    const { data: fabricRows, error: fabricsError } = await supabase
       .from("fabrics")
       .select("slug, name_de, created_at");
+    if (fabricsError) throw fabricsError;
     const fabricRoutes: MetadataRoute.Sitemap = (fabricRows ?? []).flatMap((f) => {
       const fabric = f as { slug: string; name_de: string | null; created_at: string };
       const plPath = `/tkaniny/${fabric.slug}`;
@@ -220,7 +225,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ) {
       throw err;
     }
-    console.error("[sitemap] dane z Supabase niedostępne — zwracam trasy statyczne:", err);
+    console.error("[sitemap] dane z Supabase niedostępne:", err);
+    // W działającym sklepie okrojona sitemapa zapisałaby się w cache ISR
+    // zamiast ostatniej pełnej (patrz isBuildPhase w cache-fallback.ts).
+    if (!isBuildPhase()) throw err;
     return staticRoutes;
   }
 }

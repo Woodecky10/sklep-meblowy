@@ -70,8 +70,10 @@ export async function getPagesForSitemap(): Promise<
     .from("pages")
     .select("slug, updated_at, title_de")
     .eq("published", true);
-  if (error || !data) return [];
-  return data as { slug: string; updated_at: string; title_de: string | null }[];
+  // Rzuca: sitemap.xml jest ISR i pusta lista zapisałaby się w niej jako
+  // sitemapa bez podstron (patrz isBuildPhase w cache-fallback.ts).
+  if (error) throw error;
+  return (data ?? []) as { slug: string; updated_at: string; title_de: string | null }[];
 }
 
 export function invalidatePagesCache(): void {

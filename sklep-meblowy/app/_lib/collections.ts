@@ -47,6 +47,11 @@ export const getAllCollections = cache(
   (): Promise<Collection[]> => withFallback("collections", fetchAllCollections, [])
 );
 
+// Jak getAllCollections, ale błąd bazy RZUCA — dla sitemap.xml (trasa ISR).
+export function getAllCollectionsOrThrow(): Promise<Collection[]> {
+  return fetchAllCollections();
+}
+
 // ============================================================
 // Pobierz pojedynczą kolekcję po slug lub id
 // ============================================================

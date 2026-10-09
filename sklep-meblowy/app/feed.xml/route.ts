@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { getCategoriesOrThrow } from "@/app/_lib/categories";
+import { isBuildPhase } from "@/app/_lib/cache-fallback";
 import { productPlainText, type ProductTextSource } from "@/app/_lib/product-text";
 import { buildProductFeedXml, selectFeedItems, type FeedProduct } from "@/app/_lib/product-feed";
 import { resolveGpc } from "@/app/_lib/gpc";
@@ -46,13 +47,15 @@ export async function GET() {
   ]);
 
   if (error || !categoriesRead.ok) {
-    // Lepiej oddać 503 niż pusty albo okrojony feed: Merchant Center przy
-    // pustym pliku dezaktywuje WSZYSTKIE oferty, a przy błędzie pobrania
-    // zachowuje poprzednie.
-    console.error(
-      "[feed.xml] błąd pobierania danych z Supabase:",
-      error ?? (categoriesRead.ok ? null : categoriesRead.err)
-    );
+    // Nigdy pusty ani okrojony feed: Merchant Center przy pustym pliku
+    // dezaktywuje WSZYSTKIE oferty, a przy błędzie pobrania zachowuje poprzednie.
+    const cause = error ?? (categoriesRead.ok ? null : categoriesRead.err);
+    console.error("[feed.xml] błąd pobierania danych z Supabase:", cause);
+    // W działającym sklepie rzucamy: zwrócone 503 zapisałoby się w cache ISR
+    // zamiast ostatniego dobrego feedu (patrz isBuildPhase w cache-fallback.ts).
+    if (!isBuildPhase()) {
+      throw new Error("[feed.xml] Supabase niedostępny — zostaje poprzedni feed", { cause });
+    }
     return new Response("Feed niedostępny — błąd pobierania danych.", {
       status: 503,
       headers: { "Content-Type": "text/plain; charset=utf-8" },
