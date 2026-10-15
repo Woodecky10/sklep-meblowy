@@ -91,6 +91,13 @@ describe("extraCategoriesFromForm", () => {
     expect(extraCategoriesFromForm(fd, "fotele", TREE)).toBeUndefined();
   });
 
+  it("puste drzewo (odczyt kategorii padł) → undefined, nawet ze znacznikiem i wartością", () => {
+    const fd = new FormData();
+    fd.append(EXTRA_CATEGORIES_PRESENT_FIELD, "1");
+    fd.append(EXTRA_CATEGORIES_FIELD, "szybka-dostawa");
+    expect(extraCategoriesFromForm(fd, "fotele", [])).toBeUndefined();
+  });
+
   it("znacznik bez zaznaczonych → [] (admin odznaczył wszystko)", () => {
     const fd = new FormData();
     fd.append(EXTRA_CATEGORIES_PRESENT_FIELD, "1");

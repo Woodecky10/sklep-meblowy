@@ -64,5 +64,8 @@ export function extraCategoriesFromForm(
   nodes: CategoryNode[]
 ): string[] | undefined {
   if (formData.get(EXTRA_CATEGORIES_PRESENT_FIELD) !== "1") return undefined;
+  // Pusty zbiór kategorii = odczyt kategorii padł (withFallback dał []), nie
+  // „sklep bez kategorii" — z pustego drzewa nigdy nie czyścimy kolumny.
+  if (nodes.length === 0) return undefined;
   return normalizeExtraCategories(formData.getAll(EXTRA_CATEGORIES_FIELD), mainCategory, nodes);
 }
