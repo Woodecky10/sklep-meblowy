@@ -1121,16 +1121,34 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 (uzupełniane w trakcie — jedyny trwały nośnik stanu, `.superpowers/sdd/` jest gitignorowany)
 
-- [ ] Task 1 — migracja 84 (plik; zastosowanie na produkcji czeka na zgodę właściciela)
-- [ ] Task 2 — filtr listingu i bloku produktów
-- [ ] Task 3 — pole w edytorze, zapis, duplikowanie, e2e bez zapisu
-- [ ] Task 4 — liczniki w `/admin/kategorie`
-- [ ] Task 5 — build, recenzja, wdrożenie, próba na żywo
+- [x] Task 1 — plik `f07252b`, recenzja czysta. **Migracja 84 na produkcji 2026-10-15** (Management API, bo MCP dawał 401; wpis `schema_migrations` `20261015111817 / 84_product_extra_categories` dodany ręcznie). Kolumna, 3 triggery i indeks GIN obecne. Triggery: nieznany slug odrzucony; blok `DO` z wycofaniem → `rename={tmp-test-84b} delete={}`, po nim 0 kategorii testowych i 0 produktów z dodatkowymi. PostgREST (anon): `narozniki-u` 3 = 3; dwa `or=` → AND (fraza spoza kategorii 0, pasująca 3); wiele slugów w klamrach: „salon" (4) 35 = 35, „meble" (23) 393 = 393.
+- [x] Task 2 — `cb31b57`, recenzja czysta
+- [x] Task 3 — `a05b39d..e756a6d`; runda poprawek 1/5 (puste drzewo kategorii nie czyści kolumny)
+- [x] Task 4 — `051c8ac`, recenzja czysta
+- [ ] Task 5 — kroki 1–3 WYKONANE (2016 testów, lint 0 błędów, build OK; lokalnie = produkcja: `narozniki-u` 3 = 3, `&q=szar` 2 = 2, „Szybka dostawa" 200); krok 4 (recenzja całej gałęzi, Opus) WYKONANY — „With fixes", jedyna poprawka kodu `b82fb6f` (spacja w liczniku). Kroki 5–6 (PR, merge, próba na żywo) OTWARTE — czekają na zgodę właściciela.
 
 **Rozstrzygnięcia (z dziennika wykonania):**
 
 - (z planowania) Spec umieszcza `categoryMatchFilter` w `app/_lib/category-tree.ts`; plan trzyma całą logikę kategorii dodatkowych (filtr, normalizacja, odczyt formularza, liczniki) w jednym module `app/_lib/extra-categories.ts`, a `subtreeProductCounts` zastępuje `productCountsByNode`.
+- Kroki produkcyjne (Task 1 kroki 3–6, Task 5 kroki 5–6) wykonuje wyłącznie kontroler, za zgodą właściciela; podagenci nie dotykają produkcji.
+- Task 3: `extraCategoriesFromForm` zwraca `undefined` przy pustym drzewie kategorii (odstępstwo od tekstu planu, z recenzji): `getAllCategories()` przy błędzie bazy daje `[]` (`withFallback`), a wtedy zapis po cichu czyściłby kategorie dodatkowe produktu.
+- Task 3: e2e pola uruchomiony przed migracją — edytor czyta `?? []` i test nic nie zapisuje.
+- Task 4: komentarz „zastępują subtreeProductCounts" przeredagowany na „dawny licznik poddrzewa", bo krok 7 tego samego taska wymaga pustego `grep subtreeProductCounts`.
+- Recenzja całej gałęzi, uwaga „Important" (kontrole objęły tylko liść, nie listę slugów w klamrach) zamknięta pomiarem na produkcji, bez zmiany kodu.
+- Funkcje triggerów bez `set search_path` (ostrzeżenia advisora) — zostają, jak w migracji 68; migracja już zastosowana.
+
+**Wycofanie (rollback):** najpierw revert kodu (wdrożenie), DOPIERO potem w SQL: `drop trigger` ×3, `drop function` ×3, `drop index idx_products_extra_categories`, `alter table products drop column extra_categories`. Usunięcie kolumny przy działającym kodzie wywraca listingi kategorii.
 
 **Otwarte:**
 
+- [ ] Task 5 krok 5: push (konto `Woodecky10`), PR, merge = wdrożenie — za zgodą właściciela.
+- [ ] Task 5 krok 6: próba na żywo z „Szybką dostawą".
+- [ ] Token Supabase z 2026-10-15 trafił do historii rozmowy — unieważnić po wdrożeniu i wygenerować nowy prosto do `.mcp.json`.
+
 **Odroczone (follow-upy):**
+
+- Okno usuwania kategorii nie mówi, że odepnie ją od produktów, w których jest dodatkowa; komunikat blokady usunięcia liczy tylko produkty z kategorią główną, a licznik w wierszu — także dodatkowe.
+- Cross-sell ustawiony na kategorię z samymi dopiętymi produktami (np. „Szybka dostawa") nic nie znajdzie — cross-sell działa na kategorii głównej (spec).
+- Lista produktów w panelu nie filtruje po kategorii dodatkowej.
+- Literał zerowego UUID zdublowany (`NO_MATCH_FILTER` i `.eq("id", …)` w `getProducts`).
+- Slug niezgodny z `^[a-z0-9]+(?:-[a-z0-9]+)*$` (możliwy tylko ręcznym SQL) po cichu wypada z filtra — bez ostrzeżenia w logach.
