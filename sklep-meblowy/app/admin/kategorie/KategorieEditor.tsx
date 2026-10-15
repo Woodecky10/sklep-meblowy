@@ -360,7 +360,7 @@ function TreeRow({
               slug: <code>{node.slug}</code> · {c.own}{" "}
               {c.own === 1 ? "własny produkt" : "własnych produktów"}
               {c.own !== c.ownMain && ` (w tym ${c.own - c.ownMain} jako dodatkowa)`}
-              {c.subtree !== c.own &&` · ${c.subtree} w poddrzewie`}
+              {c.subtree !== c.own && ` · ${c.subtree} w poddrzewie`}
             </p>
           </div>
 
