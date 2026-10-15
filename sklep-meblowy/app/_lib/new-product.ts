@@ -112,6 +112,9 @@ export type DuplicateSource = {
   sale_to: string | null;
   promo_badge: string | null;
   category: string;
+  // Kategorie dodatkowe (migracja 84). Opcjonalne: wiersz z `select("*")`
+  // sprzed migracji nie ma tej kolumny.
+  extra_categories?: string[] | null;
   images: string[];
   stock: number;
   color: string | null;
@@ -142,8 +145,9 @@ export type DuplicateSource = {
 // Payload INSERTa duplikatu. Bez id/created_at — zostają defaulty DB.
 export type DuplicateProductPayload = Omit<
   DuplicateSource,
-  "size_group" | "size_label" | "omnibus_price" | "sale_price" | "sale_price_planned" | "sale_from" | "sale_to" | "promo_badge"
+  "size_group" | "size_label" | "omnibus_price" | "sale_price" | "sale_price_planned" | "sale_from" | "sale_to" | "promo_badge" | "extra_categories"
 > & {
+  extra_categories: string[];
   is_active: boolean;
   deactivation_source: "manual";
   size_group: null;
@@ -179,6 +183,7 @@ export function buildDuplicatePayload(
     sale_to: null,
     promo_badge: null,
     category: source.category,
+    extra_categories: [...(source.extra_categories ?? [])],
     images: [...source.images],
     stock: source.stock,
     color: source.color,

@@ -91,6 +91,7 @@ const dupSource: DuplicateSource = {
   sale_to: "2026-08-31",
   promo_badge: "Wyprzedaż",
   category: "lozka-tapicerowane",
+  extra_categories: ["szybka-dostawa"],
   images: ["https://x/1.jpg", "https://x/2.jpg"],
   stock: 5,
   color: "beżowy",
@@ -178,6 +179,17 @@ describe("buildDuplicatePayload", () => {
     const p = buildDuplicatePayload(dupSource);
     expect(p.size_group).toBeNull();
     expect(p.size_label).toBeNull();
+  });
+
+  it("kopiuje kategorie dodatkowe jako nową tablicę", () => {
+    const p = buildDuplicatePayload(dupSource);
+    expect(p.extra_categories).toEqual(["szybka-dostawa"]);
+    expect(p.extra_categories).not.toBe(dupSource.extra_categories);
+  });
+
+  it("wiersz bez kolumny extra_categories (sprzed migracji 84) → pusta lista", () => {
+    const bezKolumny: DuplicateSource = { ...dupSource, extra_categories: undefined };
+    expect(buildDuplicatePayload(bezKolumny).extra_categories).toEqual([]);
   });
 
   it("nie ustawia id ani created_at (zostawia defaulty DB)", () => {

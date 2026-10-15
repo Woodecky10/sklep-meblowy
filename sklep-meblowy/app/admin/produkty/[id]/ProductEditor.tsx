@@ -16,6 +16,7 @@ import DescriptionSectionsEditor from "./DescriptionSectionsEditor";
 import DescriptionFieldEditor from "./DescriptionFieldEditor";
 import TranslationEditor, { type ProductDeFields } from "./TranslationEditor";
 import SizeGroupEditor from "./SizeGroupEditor";
+import ExtraCategoriesField from "./ExtraCategoriesField";
 import ImagePickerModal from "./ImagePickerModal";
 import type { SizeGroupMember } from "@/app/_lib/products";
 import { MAX_FEATURES } from "@/app/_lib/product-features";
@@ -67,6 +68,10 @@ export default function ProductEditor({
   // Napis wstążki na żywo — ostrzeżenie o Omnibusie ma się pokazać przed
   // zapisem, nie po. Seed z zapisanej wartości.
   const [badgeDraft, setBadgeDraft] = useState(product.promo_badge ?? "");
+  // Bieżąca kategoria główna — pole „Dodatkowe kategorie" wyłącza ją na
+  // liście od razu, bez zapisu. Select zostaje niekontrolowany (defaultValue,
+  // patrz komentarz przy formularzu), tylko śledzimy jego zmiany.
+  const [mainCategory, setMainCategory] = useState(product.category);
   const promoStatus = saleStatus(
     {
       id: product.id,
@@ -407,7 +412,13 @@ export default function ProductEditor({
           </div>
 
           <Field label="Kategoria" required>
-            <select name="category" defaultValue={product.category} required className={inputClass}>
+            <select
+              name="category"
+              defaultValue={product.category}
+              required
+              className={inputClass}
+              onChange={(e) => setMainCategory(e.target.value)}
+            >
               {categoryGroups.map((g) => (
                 <optgroup key={g.label} label={g.label}>
                   {g.options.map((o) => (
@@ -431,6 +442,12 @@ export default function ProductEditor({
               className={inputClass}
             />
           </Field>
+
+          <ExtraCategoriesField
+            groups={categoryGroups}
+            initial={product.extra_categories ?? []}
+            mainCategory={mainCategory}
+          />
 
           <Field label="Kolor (do filtra)">
             <input name="color" defaultValue={product.color ?? ""} maxLength={100} className={inputClass} />

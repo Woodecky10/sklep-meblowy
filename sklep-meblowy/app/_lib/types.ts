@@ -108,6 +108,11 @@ export type Product = {
   description: string;
   price: number;
   category: Category;
+  // Kategorie DODATKOWE (migracja 84): produkt pojawia się też na ich
+  // listach. Wszystko, co potrzebuje jednej kategorii (okruszki, feed,
+  // podobne, cross-sell), bierze `category`. Opcjonalne i nullable, bo
+  // `select("*")` na bazie bez kolumny daje undefined — czytaj `?? []`.
+  extra_categories?: Category[] | null;
   images: string[];
   stock: number;
   color: string | null;
