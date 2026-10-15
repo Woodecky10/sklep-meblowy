@@ -8,6 +8,7 @@ import { localizeProduct } from "./localize";
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 import type { Product } from "./types";
 import type { LocalizedProductsContent } from "./blocks";
+import { categoryMatchFilter } from "./extra-categories";
 
 export async function getBlockProducts(
   content: LocalizedProductsContent,
@@ -51,7 +52,9 @@ export async function getBlockProducts(
   const { data } = await supabase
     .from("products")
     .select("*")
-    .eq("category", content.category_slug)
+    // Dokładny węzeł jak dotąd (bez poddrzewa), ale także produkty, które
+    // mają go jako kategorię dodatkową.
+    .or(categoryMatchFilter([content.category_slug]))
     .order("created_at", { ascending: false })
     .limit(content.limit);
   return ((data ?? []) as Product[]).map((p) => localizeProduct(p, locale));
