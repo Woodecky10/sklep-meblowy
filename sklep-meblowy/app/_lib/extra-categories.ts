@@ -7,7 +7,7 @@
 // Czysty moduł — bez importów serwerowych, bezpieczny także dla komponentów
 // klienckich (stałe nazw pól formularza).
 
-import { flattenForSelect, type CategoryNode } from "./category-tree";
+import { descendantSlugs, flattenForSelect, type CategoryNode } from "./category-tree";
 
 // Slugi kategorii: małe litery ASCII, cyfry, pojedyncze myślniki (wszystkie
 // na produkcji 2026-10-15 tak wyglądają). Tylko takie wolno wkleić do składni
@@ -68,4 +68,46 @@ export function extraCategoriesFromForm(
   // „sklep bez kategorii" — z pustego drzewa nigdy nie czyścimy kolumny.
   if (nodes.length === 0) return undefined;
   return normalizeExtraCategories(formData.getAll(EXTRA_CATEGORIES_FIELD), mainCategory, nodes);
+}
+
+export type ProductCategoryRow = {
+  category: string;
+  // undefined, gdy wiersz przyszedł z bazy bez kolumny (przed migracją 84).
+  extra_categories?: readonly string[] | null;
+};
+
+export type NodeProductCounts = {
+  // Produkty z węzłem jako kategorią główną LUB dodatkową.
+  own: number;
+  // Produkty z którąkolwiek kategorią (główną lub dodatkową) w poddrzewie —
+  // każdy raz, nawet gdy ma dwie kategorie w tej samej gałęzi.
+  subtree: number;
+  // Tylko kategoria główna — do ostrzeżenia o kategorii Google, bo feed
+  // bierze google_product_category wyłącznie z głównej.
+  ownMain: number;
+};
+
+// Liczniki dla /admin/kategorie (zastępują dawny licznik poddrzewa).
+export function productCountsByNode(
+  nodes: CategoryNode[],
+  products: readonly ProductCategoryRow[]
+): Map<string, NodeProductCounts> {
+  const rows = products.map((p) => ({
+    main: p.category,
+    all: [p.category, ...(p.extra_categories ?? [])],
+  }));
+  const result = new Map<string, NodeProductCounts>();
+  for (const n of nodes) {
+    const subtreeSlugs = new Set(descendantSlugs(nodes, n.slug));
+    let own = 0;
+    let subtree = 0;
+    let ownMain = 0;
+    for (const r of rows) {
+      if (r.all.includes(n.slug)) own++;
+      if (r.all.some((s) => subtreeSlugs.has(s))) subtree++;
+      if (r.main === n.slug) ownMain++;
+    }
+    result.set(n.slug, { own, subtree, ownMain });
+  }
+  return result;
 }

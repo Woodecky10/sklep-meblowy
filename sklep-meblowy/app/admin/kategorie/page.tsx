@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/app/_lib/admin";
 import { getAllCategories, type CategoryDef } from "@/app/_lib/categories";
-import { subtreeProductCounts } from "@/app/_lib/category-tree";
+import { productCountsByNode, type ProductCategoryRow } from "@/app/_lib/extra-categories";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import KategorieEditor from "./KategorieEditor";
 
@@ -9,28 +9,24 @@ export const metadata = { title: "Kategorie" };
 export default async function AdminKategoriePage() {
   await requireAdmin();
 
-  const [nodes, ownCounts] = await Promise.all([
+  const [nodes, products] = await Promise.all([
     getAllCategories(),
-    getProductCountsByCategorySlug(),
+    getProductCategoryRows(),
   ]);
 
-  // Liczniki własne i z poddrzewa liczy czysty moduł — panel dostaje gotowe
-  // pary, żeby nie powtarzać tej arytmetyki w komponencie klienckim.
-  const counts = Object.fromEntries(subtreeProductCounts(nodes, ownCounts));
+  // Liczniki (własne, poddrzewo, tylko główna) liczy czysty moduł — panel
+  // dostaje gotowe wartości, żeby nie powtarzać tej arytmetyki w komponencie
+  // klienckim.
+  const counts = Object.fromEntries(productCountsByNode(nodes, products));
 
   return <KategorieEditor nodes={nodes} counts={counts} />;
 }
 
-// Dla każdej kategorii (slug) — ile produktów ma ją przypisaną BEZPOŚREDNIO.
-async function getProductCountsByCategorySlug(): Promise<Record<string, number>> {
+// Kategoria główna i dodatkowe każdego produktu.
+async function getProductCategoryRows(): Promise<ProductCategoryRow[]> {
   const supabase = await createAdminClient();
-  const { data } = await supabase.from("products").select("category");
-  const rows = (data ?? []) as { category: string }[];
-  const counts: Record<string, number> = {};
-  for (const r of rows) {
-    counts[r.category] = (counts[r.category] ?? 0) + 1;
-  }
-  return counts;
+  const { data } = await supabase.from("products").select("category, extra_categories");
+  return (data ?? []) as ProductCategoryRow[];
 }
 
 export type { CategoryDef };

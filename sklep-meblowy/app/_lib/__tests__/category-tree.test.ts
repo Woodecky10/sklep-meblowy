@@ -8,7 +8,6 @@ import {
   flattenForSelect,
   allowedParents,
   resolveCategoryFilter,
-  subtreeProductCounts,
   reorderSiblings,
   expandCrossSellTargets,
   type CategoryNode,
@@ -346,21 +345,6 @@ describe("resolveCategoryFilter", () => {
       slug: "nie-ma",
       slugs: [],
     });
-  });
-});
-
-describe("subtreeProductCounts", () => {
-  it("liczy własne i z poddrzewa", () => {
-    const counts = subtreeProductCounts(TREE, {
-      "naroznik-modulowy": 3,
-      "naroznik-l": 7,
-      "sofa-2": 8,
-      meble: 1,
-    });
-    expect(counts.get("naroznik-modulowy")).toEqual({ own: 3, subtree: 3 });
-    expect(counts.get("narozniki")).toEqual({ own: 0, subtree: 10 });
-    expect(counts.get("meble")).toEqual({ own: 1, subtree: 19 });
-    expect(counts.get("inspiracje")).toEqual({ own: 0, subtree: 0 });
   });
 });
 

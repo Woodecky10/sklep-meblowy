@@ -6,6 +6,7 @@ import {
   extraCategoriesFromForm,
   EXTRA_CATEGORIES_FIELD,
   EXTRA_CATEGORIES_PRESENT_FIELD,
+  productCountsByNode,
 } from "@/app/_lib/extra-categories";
 import type { CategoryNode } from "@/app/_lib/category-tree";
 
@@ -110,5 +111,36 @@ describe("extraCategoriesFromForm", () => {
     fd.append(EXTRA_CATEGORIES_FIELD, "szybka-dostawa");
     fd.append(EXTRA_CATEGORIES_FIELD, "fotele");
     expect(extraCategoriesFromForm(fd, "fotele", TREE)).toEqual(["szybka-dostawa"]);
+  });
+});
+
+describe("productCountsByNode", () => {
+  const PRODUCTS = [
+    { category: "naroznik-l" }, // wiersz bez kolumny (sprzed migracji 84)
+    { category: "naroznik-l", extra_categories: ["szybka-dostawa"] },
+    { category: "fotele", extra_categories: ["szybka-dostawa", "narozniki"] },
+    // główna i dodatkowa w tej samej gałęzi — w poddrzewie liczony raz
+    { category: "narozniki", extra_categories: ["naroznik-l"] },
+  ];
+  const counts = productCountsByNode(TREE, PRODUCTS);
+
+  it("własne = główna LUB dodatkowa; ownMain = tylko główna", () => {
+    expect(counts.get("naroznik-l")).toEqual({ own: 3, subtree: 3, ownMain: 2 });
+    expect(counts.get("fotele")).toEqual({ own: 1, subtree: 1, ownMain: 1 });
+  });
+
+  it("poddrzewo liczy produkt raz, nawet z dwiema kategoriami w gałęzi", () => {
+    expect(counts.get("narozniki")).toEqual({ own: 2, subtree: 4, ownMain: 1 });
+    expect(counts.get("meble")).toEqual({ own: 0, subtree: 4, ownMain: 0 });
+  });
+
+  it("kategoria z samymi dopiętymi produktami ma ownMain = 0 (bez alarmu Google)", () => {
+    expect(counts.get("szybka-dostawa")).toEqual({ own: 2, subtree: 2, ownMain: 0 });
+  });
+
+  it("extra_categories: null to brak dodatkowych", () => {
+    const c = productCountsByNode(TREE, [{ category: "fotele", extra_categories: null }]);
+    expect(c.get("fotele")).toEqual({ own: 1, subtree: 1, ownMain: 1 });
+    expect(c.get("szybka-dostawa")).toEqual({ own: 0, subtree: 0, ownMain: 0 });
   });
 });
