@@ -291,23 +291,6 @@ export function resolveCategoryFilter(
   return { slug: raw, slugs: descendantSlugs(nodes, raw) };
 }
 
-// Liczniki dla panelu: własne produkty i produkty z całego poddrzewa. Sam
-// licznik poddrzewa ukrywałby fakt, że rodzic nie ma nic swojego.
-export function subtreeProductCounts(
-  nodes: CategoryNode[],
-  ownCounts: Record<string, number>
-): Map<string, { own: number; subtree: number }> {
-  const result = new Map<string, { own: number; subtree: number }>();
-  for (const n of nodes) {
-    const subtree = descendantSlugs(nodes, n.slug).reduce(
-      (sum, slug) => sum + (ownCounts[slug] ?? 0),
-      0
-    );
-    result.set(n.slug, { own: ownCounts[n.slug] ?? 0, subtree });
-  }
-  return result;
-}
-
 // Przesunięcie węzła wśród RODZEŃSTWA — czysta logika za przeciąganiem w panelu.
 // Rodzeństwo liczymy TU (parent_id === parentId, `null` porównywane z `null`,
 // więc najwyższy poziom to węzły BEZ rodzica, nie "wszystkie węzły"), po

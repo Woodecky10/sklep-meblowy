@@ -22,6 +22,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 // Czysty moduł (bez server-only), więc wolno go importować z "use client".
 import { warnsAboutMissingGpc } from "@/app/_lib/gpc";
+import type { NodeProductCounts } from "@/app/_lib/extra-categories";
 // Czyste helpery — z category-tree, NIE z categories.ts: ten drugi ciągnie
 // next/cache, więc import stąd ("use client") wysypałby build.
 import {
@@ -39,7 +40,7 @@ import {
   type ActionResult,
 } from "./actions";
 
-type Counts = Record<string, { own: number; subtree: number }>;
+type Counts = Record<string, NodeProductCounts>;
 
 export default function KategorieEditor({
   nodes,
@@ -303,13 +304,16 @@ function TreeRow({
     marginLeft: node.depth * 24,
   };
 
-  const c = counts[node.slug] ?? { own: 0, subtree: 0 };
+  const c = counts[node.slug] ?? { own: 0, subtree: 0, ownMain: 0 };
 
   // Produkty tej kategorii wychodzą do katalogu (Google/Pinterest) bez pola
   // `google_product_category`. Ostrzeżenie stoi TUTAJ, a nie tylko w logach
   // serwera, bo to właścicielka zakłada kategorie — a dowiadywała się
   // o problemie dopiero z panelu katalogu, dobę później.
-  const bezKategoriiGoogle = warnsAboutMissingGpc(allCategories, node.slug, c.own);
+  // Tylko produkty z tą kategorią jako GŁÓWNĄ: feed bierze kategorię Google
+  // z głównej, więc „Szybka dostawa" z samymi dopiętymi produktami nie może
+  // wywoływać alarmu.
+  const bezKategoriiGoogle = warnsAboutMissingGpc(allCategories, node.slug, c.ownMain);
 
   return (
     <div>
@@ -355,6 +359,7 @@ function TreeRow({
             <p className="text-xs text-[var(--muted)]">
               slug: <code>{node.slug}</code> · {c.own}{" "}
               {c.own === 1 ? "własny produkt" : "własnych produktów"}
+              {c.own !== c.ownMain && ` (w tym ${c.own - c.ownMain} jako dodatkowa)`}
               {c.subtree !== c.own && ` · ${c.subtree} w poddrzewie`}
             </p>
           </div>

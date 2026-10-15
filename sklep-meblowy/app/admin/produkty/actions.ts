@@ -5,6 +5,8 @@ import { randomUUID } from "node:crypto";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
 import { invalidateFacetsCache } from "@/app/_lib/products";
+import { getAllCategories } from "@/app/_lib/categories";
+import { extraCategoriesFromForm } from "@/app/_lib/extra-categories";
 import { validateImageUpload } from "@/app/_lib/image-upload";
 import {
   buildNewProductPayload,
@@ -168,6 +170,15 @@ export async function updateProductBasics(
   const category = sanitize(formData.get("category"), 100);
   if (!category) return { ok: false, error: "Kategoria jest wymagana" };
 
+  // Kategorie dodatkowe (spec 2026-10-15). undefined = formularz bez tego
+  // pola → kolumny nie ruszamy; [] = admin odznaczył wszystko. Normalizacja
+  // wyrzuca nieznane slugi i kategorię główną.
+  const extraCategories = extraCategoriesFromForm(
+    formData,
+    category,
+    await getAllCategories()
+  );
+
   // dimensions: pola width/depth/height jako osobne inputy
   const width = parseNumber(formData.get("dim_width"));
   const depth = parseNumber(formData.get("dim_depth"));
@@ -205,6 +216,7 @@ export async function updateProductBasics(
     // formularza nadpisuje całą tablicę (spójnie z resztą pól sekcji).
     features: parseFeatureRows(formData.get("features_json")),
   };
+  if (extraCategories !== undefined) updates.extra_categories = extraCategories;
 
   const { error } = await supabase
     .from("products")

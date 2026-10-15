@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from "./supabase/server";
 import { withFallback } from "./cache-fallback";
 import { getAllCategories } from "./categories";
 import { resolveCategoryFilter, expandCrossSellTargets } from "./category-tree";
+import { categoryMatchFilter } from "./extra-categories";
 import {
   searchKeyTokenGroups,
   rankByNameMatch,
@@ -183,7 +184,9 @@ export async function getProducts(
       // Nieznany slug → pusty listing, nie „wszystkie produkty".
       query = query.eq("id", "00000000-0000-0000-0000-000000000000");
     } else {
-      query = query.in("category", categoryFilter.slugs);
+      // Kategoria główna z poddrzewa LUB któraś z dodatkowych z poddrzewa
+      // (spec 2026-10-15 — produkt w kilku kategoriach).
+      query = query.or(categoryMatchFilter(categoryFilter.slugs));
     }
   }
 
