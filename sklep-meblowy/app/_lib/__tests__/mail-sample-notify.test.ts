@@ -166,6 +166,22 @@ describe("notifyCustomerSampleSent", () => {
 
     const payload = sendMailMock.mock.calls[0][0] as { html: string };
     expect(payload.html).not.toContain("Numer nadania");
-    expect(payload.html).toContain("nie ma numeru do śledzenia");
+    expect(payload.html).toContain("zostały wysłane");
+  });
+
+  it("treść właścicielki: powitanie, kontakt z danych firmy, podpis z linkiem do sklepu", async () => {
+    getSampleOrderByIdMock.mockResolvedValue({ ...ORDER, status: "sent" });
+
+    await notifyCustomerSampleSent(ORDER.id);
+
+    const payload = sendMailMock.mock.calls[0][0] as { html: string };
+    expect(payload.html).toContain("Dzień dobry");
+    expect(payload.html).toContain("Zespół Mollien");
+    // Kontakt z COMPANY, nie wpisany w szablon — zmiana adresu w jednym miejscu.
+    expect(payload.html).toContain("mailto:mollien.julia@gmail.com");
+    expect(payload.html).toContain("tel:+48570818226");
+    expect(payload.html).toContain('href="https://sklep.test"');
+    // Lista próbek zostaje — klient ma wiedzieć, co jest w kopercie.
+    expect(payload.html).toContain("Riviera");
   });
 });

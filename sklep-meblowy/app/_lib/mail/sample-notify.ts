@@ -137,7 +137,7 @@ export async function notifyCustomerSampleSent(orderId: string): Promise<void> {
         order,
         items: order.items ?? [],
         branding,
-        shopUrl: `${baseUrl()}/sklep`,
+        siteUrl: baseUrl(),
       })
     );
     await sendMail({ to, subject: "Twoje próbki są w drodze", html });

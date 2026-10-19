@@ -140,7 +140,7 @@ const sampleOrderFree = {
 const sampleItemsFree = sampleItems.slice(0, 3);
 
 const SAMPLE_ORDER_URL = "https://www.mollien.pl/probki/sukces?zamowienie=" + sampleOrder.id;
-const SAMPLE_SHOP_URL = "https://www.mollien.pl/sklep";
+const SAMPLE_SITE_URL = "https://www.mollien.pl";
 
 // ── Opinie klientów ──────────────────────────────────────────────────────
 // Task 8: AdminNewReview / notifyAdminNewReview — mail do właścicielki po
@@ -357,7 +357,7 @@ const cases = [
       order: { ...sampleOrder, status: "sent", tracking: "00259007730000123456" },
       items: sampleItems,
       branding,
-      shopUrl: SAMPLE_SHOP_URL,
+      siteUrl: SAMPLE_SITE_URL,
     }),
   },
   {
@@ -368,7 +368,7 @@ const cases = [
       order: { ...sampleOrder, status: "sent", tracking: "" },
       items: sampleItems,
       branding,
-      shopUrl: SAMPLE_SHOP_URL,
+      siteUrl: SAMPLE_SITE_URL,
     }),
   },
   {
