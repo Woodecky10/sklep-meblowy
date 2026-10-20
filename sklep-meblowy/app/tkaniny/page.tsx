@@ -64,7 +64,7 @@ export default async function TkaninyPage() {
           href="/probki"
           className="inline-block mt-6 px-8 py-3.5 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
         >
-          Zamów próbki tkanin →
+          {t.fabrics.orderSamplesCta}
         </Link>
       </div>
 

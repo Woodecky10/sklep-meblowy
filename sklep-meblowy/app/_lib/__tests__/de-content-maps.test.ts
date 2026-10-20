@@ -53,9 +53,10 @@ describe("badge — zamknięta lista z tłumaczeniem DE", () => {
 // cechy (key/value) i warianty (option/value) NIE mają kolumn _de — polegają
 // WYŁĄCZNIE na mapach poniżej. Dodając produkt/wariant z nową tłumaczalną
 // wartością PL → dopisz ją do mapy w de-content-maps.ts ORAZ do snapshotu tutaj.
-// Brak → na /de przeciekłby polski. Kody/wymiary/nazwy własne (MANILA 01,
-// 180x200, SISI) celowo NIE wchodzą — przechodzą bez tłumaczenia (mapDe zwraca je
-// bez zmian). Snapshot łapie też usunięcie wpisu z mapy (regresja → czerwony test).
+// Brak → na /de przeciekłby polski. Kody i wymiary (MANILA 01, 180x200,
+// „Monolith 15 + Solar 01") celowo NIE wchodzą — przechodzą bez tłumaczenia
+// (mapDe zwraca je bez zmian, pilnuje tego osobny test niżej).
+// Snapshot łapie też usunięcie wpisu z mapy (regresja → czerwony test).
 
 // Integralność: żadne tłumaczenie w żadnej mapie nie jest puste/whitespace.
 const ALL_MAPS: Record<string, Record<string, string>> = {
@@ -101,21 +102,44 @@ const DB_DELIVERY_TIMES = [
 ];
 const DB_WARRANTIES = ["10 lat", "2 lat", "2 lata", "3 lata", "5 lat"];
 const DB_FEATURE_KEYS = [
+  "Funkcja rozkładania",
   "Głębokość mebla",
+  "Głębokość osadzenia materaca",
+  "Głębokość siedziska",
+  "Grubość boczka",
+  "Grubość boku",
   "Kolekcja",
   "Kolor",
   "Kolor obicia",
+  "Materac wbudowany",
   "Model",
   "Powierzchnia spania",
   "Powłoka",
+  // Obie pisownie („Łóżka"/„łóżka") realnie występują w panelu.
   "Rodzaj Łóżka",
+  "Rodzaj łóżka",
+  "Ruchome zagłówki",
   "Styl",
   "System Boxspring",
+  "Szerokość boczka",
+  "Szerokość dwójki",
   "Szerokość mebla",
+  "Szerokość otomany",
+  "Szerokość siedziska",
   "Tkanina",
+  "Typ",
   "Waga produktu z opakowaniem jednostkowym",
+  "Wysokość boczka",
+  "Wysokość boku",
+  "Wysokość klapy",
+  "Wysokość materaca",
   "Wysokość mebla",
+  "Wysokość poduszki",
+  "Wysokość siedziska",
+  "Wysokość siedziska od ziemi",
+  "Wysokość skrzyni",
   "Wysokość zagłowia",
+  "Zagłówki regulowane",
 ];
 const DB_FEATURE_VALUES = [
   "tapicerowane",
@@ -125,37 +149,78 @@ const DB_FEATURE_VALUES = [
   "Tak",
   "Nie",
   "Brązowy",
+  "Pojedyncze",
+  "Rozkładany",
+  // Nazwy własne modeli z katalogu — DE identyczne jak PL, ale świadomie w mapie.
+  "Marbella",
+  "SISI",
+  "Vegas",
 ];
 const DB_VARIANT_OPTIONS = [
   "Kolor",
+  "Kolor nóg",
+  "Kolor nóżek",
+  "Pianka",
+  "PIANKA",
   "POWIERZCHNIA SPANIA",
   "ROZMIAR",
   "STELAŻ",
+  "Stelaż",
   "STRONA",
   "STRONA MEBLA",
   "Strona",
   "TKANINA",
+  "Topper",
   "Wariant",
 ];
 const DB_VARIANT_VALUES = [
+  "Bez toppera",
   "Beżowy",
+  "Buk",
+  "Chromowane",
   "Ciemnoszary",
+  "Czarne",
+  "Czarny",
   "DREWNIANY",
+  "Drewniany",
+  "Drewniany- bez pojemnika na pościel",
+  "Drewniany- brak pojemnika na pościel",
   "Granatowy",
   "Kremowy",
   "LEWOSTRONNY",
   "Lewa",
   "Lewostronny",
   "METALOWY",
+  "Metalowy",
+  "Metalowy- z pojemnikiem na pościel",
+  "Naturalne",
+  "Pianka HR",
+  "Pianka HR (+200zł)",
+  "Pianka T30",
   "PRAWOSTRONNY",
   "Prawa",
   "Prawostronny",
+  // Literówki z panelu („Srebre"/„Srebry") są realnymi wartościami w DB.
+  "Srebre",
+  "Srebrny",
+  "Srebry",
   "Szary",
   "Terrakota",
+  "Z topperem",
+  "Złote",
+  "Złoty",
   "biały",
   "brązowy",
   "jasnobrązowy",
   "jasnoszary",
+];
+
+// Kody tkanin z katalogu — NIE należą do mapy, mają przejść bez tłumaczenia.
+const DB_FABRIC_CODES = [
+  "Monolith 15 + Solar 01",
+  "Monolith 79 + Solar 01",
+  "Monolith 84 + Solar 99",
+  "Monolith 95 + Solar 01",
 ];
 
 describe("de-content-maps — pokrycie pól produktu (brak kolumn _de)", () => {
@@ -206,5 +271,25 @@ describe("mapDe", () => {
   it("przepuszcza null/undefined", () => {
     expect(mapDe(VARIANT_OPTION_DE, null)).toBeNull();
     expect(mapDe(VARIANT_OPTION_DE, undefined)).toBeUndefined();
+  });
+
+  // Kody tkanin to nie treść do tłumaczenia — mają wyjść bajt w bajt.
+  it("kody tkanin z katalogu przechodzą bez zmian", () => {
+    for (const code of DB_FABRIC_CODES) {
+      expect(mapDe(VARIANT_VALUE_DE, code)).toBe(code);
+    }
+  });
+
+  // Utwardzenie: wartości z DB/panelu mogą nazywać się jak pola prototypu Object.
+  // Bez `hasOwnProperty` `map["constructor"]` zwróciłoby funkcję → render na /de
+  // dostałby coś, co nie jest stringiem (a spread takiej wartości potrafi rzucić).
+  it("nazwy z prototypu Object zwracają wejście jako string, nie funkcję", () => {
+    for (const key of ["constructor", "__proto__", "toString", "hasOwnProperty"]) {
+      for (const map of Object.values(ALL_MAPS)) {
+        const out = mapDe(map, key);
+        expect(typeof out).toBe("string");
+        expect(out).toBe(key);
+      }
+    }
   });
 });

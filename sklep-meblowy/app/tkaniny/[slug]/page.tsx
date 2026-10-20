@@ -168,7 +168,7 @@ export default async function TkaninaPage({ params }: Props) {
               href={`/probki?tkanina=${encodeURIComponent(fabric.slug)}`}
               className="px-6 py-3 bg-[var(--color-navy)] text-white font-sans font-semibold text-xs uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors"
             >
-              Zamów próbkę tej tkaniny →
+              {t.fabrics.orderThisSampleCta}
             </Link>
           </div>
           <FabricSwatchGrid
