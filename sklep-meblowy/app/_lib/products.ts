@@ -12,6 +12,11 @@ import {
 } from "./search-filter";
 import { applyTypoCorrection } from "./search-correction";
 import { getCatalogVocabulary } from "./search-vocabulary-server";
+import {
+  collectionIdsForGroups,
+  priorityCollectionIds,
+} from "./search-collections";
+import { getAllCollections } from "./collections";
 import { sizeLabelOf } from "./size-groups";
 import { FACETS_CACHE_TAG } from "./cache-tags";
 import { localizeProduct } from "./localize";
@@ -217,13 +222,21 @@ export async function getProducts(
   // od kolejności), a alternatywy wewnątrz grupy ORowane (słowo może wystąpić
   // w którejkolwiek postaci). Składnia siedzi w applyTokenGroup: grupa
   // jednoelementowa to zwykłe .ilike(), grupa z synonimami .or().
+  //
+  // Do każdej grupy dochodzi alternatywa po NAZWIE KOLEKCJI
+  // (search-collections.ts): produkt, który ma słowo frazy tylko w nazwie
+  // swojej kolekcji, też się znajdzie. Lista kolekcji z cache (300 s);
+  // getAllCollections przy błędzie bazy oddaje [] z logiem (withFallback), więc
+  // wyszukiwanie wtedy działa jak przed tą zmianą, zamiast wywalić /sklep.
   const searchGroups = searchKeyTokenGroups(search ?? "");
   const searchActive = searchGroups.length > 0;
+  const collections = searchActive ? await getAllCollections() : [];
   if (searchActive) {
     const keyCol = locale === "de" ? "search_key_fold_de" : "search_key_fold";
-    for (const group of searchGroups) {
-      query = applyTokenGroup(query, keyCol, group);
-    }
+    const collectionIds = collectionIdsForGroups(searchGroups, collections, locale);
+    searchGroups.forEach((group, i) => {
+      query = applyTokenGroup(query, keyCol, group, collectionIds[i]);
+    });
   }
   // Aktywne wyszukiwanie zmienia tryb paginacji: ranking (nazwa > opis)
   // wymaga całego zestawu dopasowań naraz, więc paginujemy w JS (patrz niżej).
@@ -311,6 +324,9 @@ export async function getProducts(
   if (searchActive) {
     const { data, error } = await query;
     if (error) throw error;
+    // Kolekcje trafione NAZWĄ (forma złożona, bez stemu) idą na szczyt —
+    // decyzja właściciela 2026-10-29, patrz search-collections.ts.
+    const priority = priorityCollectionIds(search!, collections, locale);
     const ranked = rankByNameMatch(
       (data ?? []) as Product[],
       search!,
@@ -319,7 +335,8 @@ export async function getProducts(
       (p) =>
         locale === "de"
           ? (p as { name_de?: string | null }).name_de ?? ""
-          : p.name
+          : p.name,
+      (p) => p.collection_id !== null && priority.has(p.collection_id)
     );
     const start = (safePage - 1) * safeLimit;
     const found = {

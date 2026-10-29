@@ -7,6 +7,11 @@ import {
 } from "@/app/_lib/search-filter";
 import { applyTypoCorrection } from "@/app/_lib/search-correction";
 import { getCatalogVocabulary } from "@/app/_lib/search-vocabulary-server";
+import {
+  collectionIdsForGroups,
+  priorityCollectionIds,
+} from "@/app/_lib/search-collections";
+import { getAllCollections } from "@/app/_lib/collections";
 import { pickLocalized, isLocale, DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
 import { getCategories } from "@/app/_lib/categories";
 import {
@@ -67,6 +72,7 @@ type SuggestRow = {
   price: number;
   images: string[] | null;
   category: string;
+  collection_id: string | null;
 };
 
 // GET /api/search/suggest?q=<term> → top 6 produktów (id, name, price, pierwsze
@@ -128,18 +134,27 @@ export async function GET(request: NextRequest) {
   // Grupy są ANDowane między sobą (każde słowo frazy musi wystąpić), a
   // alternatywy wewnątrz grupy ORowane (w którejkolwiek postaci). Brak grup
   // (sama interpunkcja) → brak podpowiedzi.
+  //
+  // Nazwa KOLEKCJI (search-collections.ts): do każdej grupy dochodzi
+  // alternatywa `collection_id.in.(…)`, a kolekcja trafiona nazwą awansuje
+  // swoje produkty na szczyt. Liczone WEWNĄTRZ runSuggest, bo przy ponowieniu
+  // fraza jest inna. Lista kolekcji z cache (300 s), a getAllCollections przy
+  // błędzie bazy oddaje [] z logiem (withFallback) — rozwijka wtedy działa jak
+  // przed tą zmianą, a nie pada.
   async function runSuggest(phrase: string): Promise<SuggestRow[] | null> {
     const groups = searchKeyTokenGroups(phrase);
     if (groups.length === 0) return [];
 
+    const collections = await getAllCollections();
+    const collectionIds = collectionIdsForGroups(groups, collections, locale);
     let query = supabase
       .from("products")
-      .select("id, name, name_de, price, images, category")
+      .select("id, name, name_de, price, images, category, collection_id")
       .order("created_at", { ascending: false })
       .limit(SUGGEST_CANDIDATES);
-    for (const group of groups) {
-      query = applyTokenGroup(query, keyCol, group);
-    }
+    groups.forEach((group, i) => {
+      query = applyTokenGroup(query, keyCol, group, collectionIds[i]);
+    });
     const { data, error } = await query;
     if (error) return null;
 
@@ -148,10 +163,12 @@ export async function GET(request: NextRequest) {
     // zostaje jako rozstrzygnięcie remisów wewnątrz każdej grupy. Rankujemy po
     // TEJ SAMEJ frazie, którą poszedł filtr — przy ponowieniu jest to fraza
     // poprawiona, bo inaczej ranking wymagałby czego innego niż zapytanie.
+    const priority = priorityCollectionIds(phrase, collections, locale);
     return rankByNameMatch(
       (data ?? []) as SuggestRow[],
       phrase,
-      (row) => (locale === "de" ? row.name_de ?? "" : row.name)
+      (row) => (locale === "de" ? row.name_de ?? "" : row.name),
+      (row) => row.collection_id !== null && priority.has(row.collection_id)
     ).slice(0, SUGGEST_LIMIT);
   }
 
