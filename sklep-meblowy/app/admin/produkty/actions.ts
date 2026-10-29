@@ -26,6 +26,11 @@ import {
   searchKeyTokenGroups,
   applyTokenGroup,
 } from "@/app/_lib/search-filter";
+import {
+  buildCollectionSearchIndex,
+  collectionIdsForGroups,
+} from "@/app/_lib/search-collections";
+import { getAllCollections } from "@/app/_lib/collections";
 import { normalizeDeliveryTime, normalizeWarranty } from "@/app/_lib/spec-format";
 import { parseFeatureRows } from "@/app/_lib/product-features";
 import { normalizeVariantInfoInput } from "@/app/_lib/variant-info";
@@ -783,10 +788,14 @@ export async function searchProductsForSizeGroup(
   // .ilike() alternatywę .or(): „kanapa" szuka „kanap" LUB „sof". Grupy dalej
   // są ANDowane, więc każde słowo frazy musi wystąpić w którejkolwiek postaci.
   // Ten sam helper co storefront i rozwijka — panel i klient widzą ten sam
-  // katalog (poza `active`, które admin client świadomie pomija).
-  for (const group of groups) {
-    q = applyTokenGroup(q, "search_key_fold", group);
-  }
+  // katalog (poza `active`, które admin client świadomie pomija). Dotyczy to
+  // też nazwy KOLEKCJI (search-collections.ts): admin szukający „nube" ma
+  // dostać produkty kolekcji Nube tak samo jak klient.
+  const index = buildCollectionSearchIndex(await getAllCollections(), "pl");
+  const collectionIds = collectionIdsForGroups(groups, index);
+  groups.forEach((group, i) => {
+    q = applyTokenGroup(q, "search_key_fold", group, collectionIds[i]);
+  });
   const { data, error } = await q.limit(10);
   if (error) return { ok: false, error: error.message };
   return { ok: true, data: { results: data ?? [] } };

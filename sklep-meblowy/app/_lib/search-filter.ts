@@ -101,10 +101,18 @@ export function searchTokens(raw: string): string[] {
 // Kolejność wewnątrz każdego poziomu jest zachowana (stabilna), więc sort z DB
 // (alfabetyczny/cena/nowość) rozstrzyga remisy. Fraza pusta po sanityzacji →
 // wejście bez zmian.
+//
+// `isPriority` (opcjonalne): wiersze, dla których zwraca true, idą PRZED
+// wszystkimi trzema poziomami — zachowując między sobą kolejność z poziomów.
+// Decyzja właściciela 2026-10-29: fraza trafiająca w NAZWĘ KOLEKCJI ma dać
+// produkty tej kolekcji na szczycie (search-collections.ts liczy, które to
+// kolekcje; wołający podaje tu tylko predykat po collection_id). Bez predykatu
+// kolejność jest bit w bit jak dotąd.
 export function rankByNameMatch<T>(
   rows: T[],
   raw: string,
-  getName: (row: T) => string | null | undefined
+  getName: (row: T) => string | null | undefined,
+  isPriority?: (row: T) => boolean
 ): T[] {
   const forms = searchKeyTokenForms(raw);
   if (forms.length === 0) return rows;
@@ -128,7 +136,14 @@ export function rankByNameMatch<T>(
       stemHits.push(row);
     }
   }
-  return [...exactHits, ...stemHits, ...rest];
+  const leveled = [...exactHits, ...stemHits, ...rest];
+  if (!isPriority) return leveled;
+  // Stabilny podział w JEDNYM przejściu (predykat raz na wiersz): awansowane
+  // w kolejności poziomów, potem reszta w swojej.
+  const promoted: T[] = [];
+  const others: T[] = [];
+  for (const row of leveled) (isPriority(row) ? promoted : others).push(row);
+  return [...promoted, ...others];
 }
 
 // Granica słowa dla poziomu 1 rankingu: każdy ciąg znaków spoza liter i cyfr.
@@ -139,14 +154,15 @@ const WORD_BOUNDARY = /[^\p{L}\p{N}]+/gu;
 // Klucz nazwy z ZACHOWANYMI granicami słów: złożone znaki, małe litery, jedna
 // spacja między słowami i spacja na obu końcach, żeby „ fado" dało się szukać
 // jako początek słowa także na początku nazwy: „ sofa 2 osobowa aurea ".
-function wordKey(name: string): string {
+// Eksport dla search-collections.ts (nazwy kolekcji liczone tą samą regułą).
+export function wordKey(name: string): string {
   return ` ${foldDiacritics(name).replace(WORD_BOUNDARY, " ").trim()} `;
 }
 
 // Czy token (już złożony przez foldDiacritics) jest początkiem któregoś słowa
 // nazwy. Token pusty po normalizacji (sam myślnik) nie jest początkiem niczego —
 // bez tego warunku `includes(" ")` dałoby prawdę dla każdej nazwy.
-function startsWordIn(nameKey: string, fold: string): boolean {
+export function startsWordIn(nameKey: string, fold: string): boolean {
   const token = fold.replace(WORD_BOUNDARY, " ").trim();
   return token !== "" && nameKey.includes(` ${token}`);
 }
@@ -246,8 +262,9 @@ export type SearchTokenForms = { fold: string; stem: string };
 // czyli „sofa" — dla poziomu 1 rankingu to i tak najostrzejszy sensowny
 // wariant, bo drugi token dodałby wymóg, który jest tym samym słowem.
 //
-// Ta funkcja służy WYŁĄCZNIE rankingowi (rankByNameMatch). Trzy miejsca
-// budujące filtr do bazy wołają searchKeyTokens i mają tak zostać.
+// Ta funkcja służy rankingowi (rankByNameMatch) i awansowi kolekcji
+// (search-collections.ts: priorityCollectionIds) — NIE filtrowi do bazy: trzy
+// miejsca budujące filtr wołają searchKeyTokens i mają tak zostać.
 export function searchKeyTokenForms(raw: string): SearchTokenForms[] {
   const forms: SearchTokenForms[] = [];
   const seen = new Set<string>();
@@ -327,20 +344,36 @@ export function searchKeyTokenGroups(raw: string): string[][] {
 // czyli dosłowny procent) — i tego NIKT nie zmierzył. Gwiazdkę odsiewa się
 // więc WYCINANIEM w sanitizeSearchTerm, nie escapowaniem; escapeIlike i tak by
 // tu nie pomógł, a globalnie ruszany być nie musi.
+//
+// `collectionIds` (opcjonalne): id kolekcji, których NAZWA trafia tę grupę
+// (search-collections.ts). Dochodzą jako JESZCZE JEDNA alternatywa w grupie —
+// `collection_id.in.(…)` — więc produkt mający słowo frazy tylko w nazwie
+// swojej kolekcji też się znajdzie, a AND między grupami zostaje. Kształt id
+// jest pilnowany TUTAJ (UUID), bo `.or()` to składnia PostgREST: przecinek czy
+// nawias w „id" rozbiłby filtr, a id przychodzi z bazy, nie od klienta — ale
+// składnię chroni ten jeden helper, nie trzej wołający.
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function applyTokenGroup<Q extends {
   ilike: (col: string, pattern: string) => Q;
   or: (filters: string) => Q;
-}>(query: Q, keyCol: string, group: string[]): Q {
+}>(
+  query: Q,
+  keyCol: string,
+  group: string[],
+  collectionIds: readonly string[] = []
+): Q {
+  const ids = collectionIds.filter((id) => UUID_SHAPE.test(id));
   // Pusta grupa → zapytanie bez zmian, zamiast `.or("")`. Trzej konsumenci tu
   // nie trafią (synonymsFor zwraca zawsze co najmniej sam rdzeń), ale helper
   // jest eksportowany i generyczny, a `.or("")` wysłałoby do PostgREST pusty
   // warunek: zniekształcony filtr, którego nikt nie chciał, i to bez śladu
   // w logach. Skoro grupa nie stawia żadnego wymagania, niech to będzie widać.
-  if (group.length === 0) return query;
-  if (group.length === 1) {
+  if (group.length === 0 && ids.length === 0) return query;
+  if (group.length === 1 && ids.length === 0) {
     return query.ilike(keyCol, `%${escapeIlike(group[0])}%`);
   }
-  return query.or(
-    group.map((alt) => `${keyCol}.ilike.*${escapeIlike(alt)}*`).join(",")
-  );
+  const alternatives = group.map((alt) => `${keyCol}.ilike.*${escapeIlike(alt)}*`);
+  if (ids.length > 0) alternatives.push(`collection_id.in.(${ids.join(",")})`);
+  return query.or(alternatives.join(","));
 }

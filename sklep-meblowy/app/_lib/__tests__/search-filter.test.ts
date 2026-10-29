@@ -635,4 +635,69 @@ describe("applyTokenGroup — warunek dla grupy alternatyw", () => {
     expect(q.calls.or).toEqual([]);
     expect(q.calls.ilike).toEqual([]);
   });
+
+  it("kolekcje trafione nazwą dochodzą jako alternatywa `collection_id.in.(…)`", () => {
+    // Produkt, który ma frazę TYLKO w nazwie swojej kolekcji, ma się znaleźć —
+    // więc alternatywa po kolekcji jest ORowana wewnątrz grupy, obok rdzenia.
+    const q = stubQuery();
+    applyTokenGroup(q, "search_key_fold", ["fad"], [
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+    ]);
+    expect(q.calls.or).toEqual([
+      "search_key_fold.ilike.*fad*,collection_id.in.(11111111-1111-4111-8111-111111111111,22222222-2222-4222-8222-222222222222)",
+    ]);
+    expect(q.calls.ilike).toEqual([]);
+  });
+
+  it("pusta lista kolekcji → dokładnie dzisiejsza składnia (.ilike dla jednej alternatywy)", () => {
+    const q = stubQuery();
+    applyTokenGroup(q, "search_key_fold", ["fad"], []);
+    expect(q.calls.ilike).toEqual([["search_key_fold", "%fad%"]]);
+    expect(q.calls.or).toEqual([]);
+  });
+
+  it("id spoza kształtu UUID są odrzucane — nic obcego nie wchodzi do składni .or()", () => {
+    // Id pochodzą z naszej bazy, ale .or() to składnia PostgREST: przecinek
+    // albo nawias w „id" rozbiłyby filtr. Kształt pilnowany tu, nie u wołających.
+    const q = stubQuery();
+    applyTokenGroup(q, "search_key_fold", ["fad"], [
+      "11111111-1111-4111-8111-111111111111",
+      "x),price.gt.0,(",
+    ]);
+    expect(q.calls.or).toEqual([
+      "search_key_fold.ilike.*fad*,collection_id.in.(11111111-1111-4111-8111-111111111111)",
+    ]);
+  });
+});
+
+describe("rankByNameMatch — awans kolekcji trafionej nazwą (isPriority)", () => {
+  const get = (r: { name: string }) => r.name;
+
+  it("wiersze z isPriority idą przed wszystkimi poziomami, w kolejności poziomów", () => {
+    // Decyzja właściciela 2026-10-29: „jeśli jest nazwa kolekcji, to
+    // priorytetowo". Wiersze awansowane zachowują między sobą kolejność
+    // z poziomów 1→2→3, reszta jak dotąd.
+    const rows = [
+      { name: "Sofa Soren z pojemnikiem", coll: "fado" }, // awans, tylko z opisu (poziom 3)
+      { name: "Sofa Fado rozkładana", coll: "fado" }, // awans, poziom 1
+      { name: "Narożnik Fado L", coll: "inna" }, // poziom 1, bez awansu
+      { name: "Fotel Fadio", coll: "fado" }, // awans, poziom 2 (rdzeń „fad")
+    ];
+    const ranked = rankByNameMatch(rows, "fado", get, (r) => r.coll === "fado");
+    expect(ranked.map((r) => r.name)).toEqual([
+      "Sofa Fado rozkładana",
+      "Fotel Fadio",
+      "Sofa Soren z pojemnikiem",
+      "Narożnik Fado L",
+    ]);
+  });
+
+  it("bez isPriority kolejność jest bit w bit jak dotąd", () => {
+    const rows = [{ name: "Sofa Soren" }, { name: "Sofa Fado" }];
+    expect(rankByNameMatch(rows, "fado", get)).toEqual([
+      { name: "Sofa Fado" },
+      { name: "Sofa Soren" },
+    ]);
+  });
 });
