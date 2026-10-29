@@ -8,7 +8,9 @@ import {
 import { applyTypoCorrection } from "@/app/_lib/search-correction";
 import { getCatalogVocabulary } from "@/app/_lib/search-vocabulary-server";
 import {
+  buildCollectionSearchIndex,
   collectionIdsForGroups,
+  collectionNameOf,
   priorityCollectionIds,
 } from "@/app/_lib/search-collections";
 import { getAllCollections } from "@/app/_lib/collections";
@@ -145,8 +147,8 @@ export async function GET(request: NextRequest) {
     const groups = searchKeyTokenGroups(phrase);
     if (groups.length === 0) return [];
 
-    const collections = await getAllCollections();
-    const collectionIds = collectionIdsForGroups(groups, collections, locale);
+    const index = buildCollectionSearchIndex(await getAllCollections(), locale);
+    const collectionIds = collectionIdsForGroups(groups, index);
     let query = supabase
       .from("products")
       .select("id, name, name_de, price, images, category, collection_id")
@@ -163,11 +165,14 @@ export async function GET(request: NextRequest) {
     // zostaje jako rozstrzygnięcie remisów wewnątrz każdej grupy. Rankujemy po
     // TEJ SAMEJ frazie, którą poszedł filtr — przy ponowieniu jest to fraza
     // poprawiona, bo inaczej ranking wymagałby czego innego niż zapytanie.
-    const priority = priorityCollectionIds(phrase, collections, locale);
+    // Nazwa własna kolekcji doklejona do klucza rankingu — produkt znaleziony
+    // tylko przez kolekcję ma być na poziomie 2, nie 3 (search-collections.ts).
+    const priority = priorityCollectionIds(phrase, index);
     return rankByNameMatch(
       (data ?? []) as SuggestRow[],
       phrase,
-      (row) => (locale === "de" ? row.name_de ?? "" : row.name),
+      (row) =>
+        `${locale === "de" ? row.name_de ?? "" : row.name} ${collectionNameOf(index, row.collection_id)}`,
       (row) => row.collection_id !== null && priority.has(row.collection_id)
     ).slice(0, SUGGEST_LIMIT);
   }

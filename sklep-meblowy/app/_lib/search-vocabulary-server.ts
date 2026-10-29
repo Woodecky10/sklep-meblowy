@@ -10,6 +10,7 @@ import {
   buildCatalogVocabulary,
   vocabularyExtraWordsFor,
 } from "./search-vocabulary";
+import { collectionOwnName } from "./search-collections";
 
 export { SEARCH_VOCABULARY_CACHE_TAG };
 
@@ -56,13 +57,37 @@ const fetchVocabularySource = unstable_cache(
       .map((row) => (row as Record<string, string | null>)[column] ?? "")
       .filter((name) => name.trim() !== "");
 
+    // Nazwy WŁASNE kolekcji („Fado", nie „Kolekcja Fado") dochodzą jako kolejne
+    // „nazwy": odkąd wyszukiwarka szuka po nazwie kolekcji
+    // (search-collections.ts), literówka w niej musi mieć na co zostać
+    // poprawiona — także dla kolekcji, której nazwy nie ma w żadnej nazwie
+    // produktu. Każda kolekcja liczy się raz (waga +1), jak jeden produkt.
+    // DE: label_de, a przy braku polska etykieta — spójnie z searchLabel tam.
+    const collectionsColumn = locale === "de" ? "label_de" : "label";
+    const collections = await anon.from("collections").select("label, label_de");
+    if (collections.error) throw collections.error;
+    const collectionNames = (collections.data ?? [])
+      .map((row) => {
+        const r = row as { label: string | null; label_de: string | null };
+        return (collectionsColumn === "label_de" && r.label_de) || r.label || "";
+      })
+      .filter((label) => label.trim() !== "")
+      .map(collectionOwnName);
+
     // Słowa ze słowników ręcznych dokłada się TYLKO po polsku — patrz
     // vocabularyExtraWordsFor(). Po niemiecku byłoby to 33 polskie rdzenie na
     // 71 słów (46%) i korekta odsyłałaby niemieckie frazy na polskie rdzenie,
     // których zapytanie po search_key_fold_de nie ma jak trafić.
-    return [...buildCatalogVocabulary(names, vocabularyExtraWordsFor(locale))];
+    return [
+      ...buildCatalogVocabulary(
+        [...names, ...collectionNames],
+        vocabularyExtraWordsFor(locale)
+      ),
+    ];
   },
-  ["search-vocabulary-v1"],
+  // v2: słownik obejmuje nazwy kolekcji — nowy klucz, żeby po deployu nie
+  // serwować przez 300 s starego kształtu danych.
+  ["search-vocabulary-v2"],
   {
     // DWA TAGI, świadomie — i dlatego NIE MA nowych wywołań w akcjach admina.
     // invalidateFacetsCache() jest wołane w 15 miejscach (app/admin/produkty/

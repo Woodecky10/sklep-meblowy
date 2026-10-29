@@ -13,7 +13,9 @@ import {
 import { applyTypoCorrection } from "./search-correction";
 import { getCatalogVocabulary } from "./search-vocabulary-server";
 import {
+  buildCollectionSearchIndex,
   collectionIdsForGroups,
+  collectionNameOf,
   priorityCollectionIds,
 } from "./search-collections";
 import { getAllCollections } from "./collections";
@@ -230,10 +232,13 @@ export async function getProducts(
   // wyszukiwanie wtedy działa jak przed tą zmianą, zamiast wywalić /sklep.
   const searchGroups = searchKeyTokenGroups(search ?? "");
   const searchActive = searchGroups.length > 0;
-  const collections = searchActive ? await getAllCollections() : [];
+  const index = buildCollectionSearchIndex(
+    searchActive ? await getAllCollections() : [],
+    locale
+  );
   if (searchActive) {
     const keyCol = locale === "de" ? "search_key_fold_de" : "search_key_fold";
-    const collectionIds = collectionIdsForGroups(searchGroups, collections, locale);
+    const collectionIds = collectionIdsForGroups(searchGroups, index);
     searchGroups.forEach((group, i) => {
       query = applyTokenGroup(query, keyCol, group, collectionIds[i]);
     });
@@ -326,16 +331,20 @@ export async function getProducts(
     if (error) throw error;
     // Kolekcje trafione NAZWĄ (forma złożona, bez stemu) idą na szczyt —
     // decyzja właściciela 2026-10-29, patrz search-collections.ts.
-    const priority = priorityCollectionIds(search!, collections, locale);
+    const priority = priorityCollectionIds(search!, index);
     const ranked = rankByNameMatch(
       (data ?? []) as Product[],
       search!,
       // DE dopasowuje name_de bez fallbacku do PL — spójnie z filtrem wyżej,
-      // który przy locale „de" pyta o kolumnę search_key_fold_de.
+      // który przy locale „de" pyta o kolumnę search_key_fold_de. Nazwa własna
+      // kolekcji doklejona do klucza: produkt znaleziony tylko przez kolekcję
+      // ma być na poziomie 2, nie 3 (patrz search-collections.ts).
       (p) =>
-        locale === "de"
-          ? (p as { name_de?: string | null }).name_de ?? ""
-          : p.name,
+        `${
+          locale === "de"
+            ? (p as { name_de?: string | null }).name_de ?? ""
+            : p.name
+        } ${collectionNameOf(index, p.collection_id)}`,
       (p) => p.collection_id !== null && priority.has(p.collection_id)
     );
     const start = (safePage - 1) * safeLimit;

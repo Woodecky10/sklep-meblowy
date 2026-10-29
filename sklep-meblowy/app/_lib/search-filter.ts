@@ -138,8 +138,12 @@ export function rankByNameMatch<T>(
   }
   const leveled = [...exactHits, ...stemHits, ...rest];
   if (!isPriority) return leveled;
-  // Stabilny podział: awansowane w kolejności poziomów, potem reszta w swojej.
-  return [...leveled.filter(isPriority), ...leveled.filter((row) => !isPriority(row))];
+  // Stabilny podział w JEDNYM przejściu (predykat raz na wiersz): awansowane
+  // w kolejności poziomów, potem reszta w swojej.
+  const promoted: T[] = [];
+  const others: T[] = [];
+  for (const row of leveled) (isPriority(row) ? promoted : others).push(row);
+  return [...promoted, ...others];
 }
 
 // Granica słowa dla poziomu 1 rankingu: każdy ciąg znaków spoza liter i cyfr.
@@ -258,8 +262,9 @@ export type SearchTokenForms = { fold: string; stem: string };
 // czyli „sofa" — dla poziomu 1 rankingu to i tak najostrzejszy sensowny
 // wariant, bo drugi token dodałby wymóg, który jest tym samym słowem.
 //
-// Ta funkcja służy WYŁĄCZNIE rankingowi (rankByNameMatch). Trzy miejsca
-// budujące filtr do bazy wołają searchKeyTokens i mają tak zostać.
+// Ta funkcja służy rankingowi (rankByNameMatch) i awansowi kolekcji
+// (search-collections.ts: priorityCollectionIds) — NIE filtrowi do bazy: trzy
+// miejsca budujące filtr wołają searchKeyTokens i mają tak zostać.
 export function searchKeyTokenForms(raw: string): SearchTokenForms[] {
   const forms: SearchTokenForms[] = [];
   const seen = new Set<string>();
