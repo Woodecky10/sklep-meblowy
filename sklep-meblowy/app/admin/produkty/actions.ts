@@ -5,6 +5,11 @@ import { randomUUID } from "node:crypto";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
 import { invalidateFacetsCache } from "@/app/_lib/products";
+import {
+  appendSortOrder,
+  collectionChange,
+  collectionIdFromForm,
+} from "@/app/_lib/product-collection";
 import { getAllCategories } from "@/app/_lib/categories";
 import { extraCategoriesFromForm } from "@/app/_lib/extra-categories";
 import { validateImageUpload } from "@/app/_lib/image-upload";
@@ -30,7 +35,7 @@ import {
   buildCollectionSearchIndex,
   collectionIdsForGroups,
 } from "@/app/_lib/search-collections";
-import { getAllCollections } from "@/app/_lib/collections";
+import { getAllCollections, invalidateCollectionsCache } from "@/app/_lib/collections";
 import { normalizeDeliveryTime, normalizeWarranty } from "@/app/_lib/spec-format";
 import { parseFeatureRows } from "@/app/_lib/product-features";
 import { normalizeVariantInfoInput } from "@/app/_lib/variant-info";
@@ -143,6 +148,73 @@ export async function deleteProductImage(url: string): Promise<ActionResult> {
 // Zapisuje pola spoza variants/images: nazwa, opis, cena, kategoria,
 // stock, color, material, dimensions, weight, construction, delivery_time, warranty.
 // Globalna galeria (images) i variants — osobne actions niżej.
+// ============================================================
+// Kolekcja z karty produktu (2026-10-29)
+// ============================================================
+// Decyzja (assign / unassign / nic) jest czysta — product-collection.ts. Tu
+// tylko odczyt bieżącego przypisania i ostatniej pozycji w docelowej kolekcji:
+// produkt przypisany z karty idzie NA KONIEC, kolejność admin układa dalej
+// przeciąganiem w /admin/kolekcje (reorder_collection_products, migracja 75).
+type CollectionUpdates =
+  | { ok: true; changed: boolean; updates: Record<string, unknown> }
+  | { ok: false; error: string };
+
+async function collectionUpdatesFor(
+  supabase: Awaited<ReturnType<typeof createAdminClient>>,
+  productId: string,
+  next: string | null | undefined
+): Promise<CollectionUpdates> {
+  if (next === undefined) return { ok: true, changed: false, updates: {} };
+  const current = await supabase
+    .from("products")
+    .select("collection_id")
+    .eq("id", productId)
+    .maybeSingle();
+  if (current.error) return { ok: false, error: `Odczyt kolekcji: ${current.error.message}` };
+  const change = collectionChange(
+    (current.data as { collection_id: string | null } | null)?.collection_id ?? null,
+    next
+  );
+  if (change.kind === "none") return { ok: true, changed: false, updates: {} };
+  if (change.kind === "unassign") {
+    return { ok: true, changed: true, updates: { collection_id: null, collection_sort_order: 0 } };
+  }
+  const sortOrder = await nextCollectionSortOrder(supabase, change.collectionId);
+  if (!sortOrder.ok) return sortOrder;
+  return {
+    ok: true,
+    changed: true,
+    updates: { collection_id: change.collectionId, collection_sort_order: sortOrder.value },
+  };
+}
+
+async function nextCollectionSortOrder(
+  supabase: Awaited<ReturnType<typeof createAdminClient>>,
+  collectionId: string
+): Promise<{ ok: true; value: number } | { ok: false; error: string }> {
+  const last = await supabase
+    .from("products")
+    .select("collection_sort_order")
+    .eq("collection_id", collectionId)
+    .order("collection_sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (last.error) {
+    return { ok: false, error: `Odczyt kolejności kolekcji: ${last.error.message}` };
+  }
+  const max = (last.data as { collection_sort_order: number } | null)?.collection_sort_order ?? null;
+  return { ok: true, value: appendSortOrder(max) };
+}
+
+// To samo, co setCollectionProducts w kolekcje/actions.ts: cache kolekcji
+// (slider, lista, „Pełna kolekcja”), strona główna (mozaika kafelka) i lista
+// w panelu Kolekcje.
+function revalidateAfterCollectionChange(): void {
+  invalidateCollectionsCache();
+  revalidatePath("/");
+  revalidatePath("/admin/kolekcje");
+}
+
 export async function updateProductBasics(
   formData: FormData
 ): Promise<ActionResult> {
@@ -184,6 +256,11 @@ export async function updateProductBasics(
     await getAllCategories()
   );
 
+  // Kolekcja (2026-10-29): przypisanie z karty produktu. undefined = formularz
+  // bez pola albo pusta lista kolekcji → kolumn nie ruszamy; null = „— brak —”.
+  const collectionField = collectionIdFromForm(formData, await getAllCollections());
+  if (!collectionField.ok) return { ok: false, error: collectionField.error };
+
   // dimensions: pola width/depth/height jako osobne inputy
   const width = parseNumber(formData.get("dim_width"));
   const depth = parseNumber(formData.get("dim_depth"));
@@ -222,6 +299,9 @@ export async function updateProductBasics(
     features: parseFeatureRows(formData.get("features_json")),
   };
   if (extraCategories !== undefined) updates.extra_categories = extraCategories;
+  const collectionUpdates = await collectionUpdatesFor(supabase, id, collectionField.value);
+  if (!collectionUpdates.ok) return { ok: false, error: collectionUpdates.error };
+  Object.assign(updates, collectionUpdates.updates);
 
   const { error } = await supabase
     .from("products")
@@ -240,6 +320,7 @@ export async function updateProductBasics(
   revalidatePath(`/produkt/${id}`);
   invalidateFacetsCache();
   revalidatePath("/sklep");
+  if (collectionUpdates.changed) revalidateAfterCollectionChange();
   return { ok: true, message: "Zapisano podstawowe dane" };
 }
 
@@ -653,17 +734,28 @@ export async function createProduct(
 ): Promise<{ ok: true; productId: string } | { ok: false; error: string }> {
   await requireAdmin();
 
+  const collectionField = collectionIdFromForm(formData, await getAllCollections());
+  if (!collectionField.ok) return { ok: false, error: collectionField.error };
+  const collectionId = collectionField.value ?? null;
   const built = buildNewProductPayload({
     name: formData.get("name"),
     price: formData.get("price"),
     category: formData.get("category"),
+    collectionId,
   });
   if (!built.ok) return { ok: false, error: built.error };
 
   const supabase = await createAdminClient();
+  // Nowy produkt w kolekcji ląduje na jej końcu (patrz collectionUpdatesFor).
+  let payload: Record<string, unknown> = built.payload;
+  if (collectionId) {
+    const sortOrder = await nextCollectionSortOrder(supabase, collectionId);
+    if (!sortOrder.ok) return { ok: false, error: sortOrder.error };
+    payload = { ...built.payload, collection_sort_order: sortOrder.value };
+  }
   const { data, error } = await supabase
     .from("products")
-    .insert(built.payload as never)
+    .insert(payload as never)
     .select("id")
     .single();
 
@@ -678,6 +770,7 @@ export async function createProduct(
   revalidatePath("/admin/produkty");
   invalidateFacetsCache();
   revalidatePath("/sklep");
+  if (collectionId) revalidateAfterCollectionChange();
   return { ok: true, productId: (data as { id: string }).id };
 }
 

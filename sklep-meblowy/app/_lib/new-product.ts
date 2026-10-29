@@ -32,7 +32,7 @@ export type NewProductPayload = {
   construction: null;
   delivery_time: string;
   warranty: string;
-  collection_id: null;
+  collection_id: string | null;
   is_active: boolean;
   needs_translation: boolean;
   sale_price: null;
@@ -43,6 +43,9 @@ export function buildNewProductPayload(input: {
   name: unknown;
   price: unknown;
   category: unknown;
+  // Id kolekcji ZWALIDOWANE wcześniej przez collectionIdFromForm
+  // (product-collection.ts); brak/null = produkt poza kolekcją.
+  collectionId?: string | null;
 }): { ok: true; payload: NewProductPayload } | { ok: false; error: string } {
   const name = typeof input.name === "string" ? input.name.trim() : "";
   if (!name) return { ok: false, error: "Podaj nazwę produktu" };
@@ -88,7 +91,7 @@ export function buildNewProductPayload(input: {
       construction: null,
       delivery_time: DEFAULT_DELIVERY_TIME,
       warranty: DEFAULT_WARRANTY,
-      collection_id: null,
+      collection_id: input.collectionId ?? null,
       is_active: true,
       needs_translation: true,
       sale_price: null,

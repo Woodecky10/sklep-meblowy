@@ -17,6 +17,11 @@ import DescriptionFieldEditor from "./DescriptionFieldEditor";
 import TranslationEditor, { type ProductDeFields } from "./TranslationEditor";
 import SizeGroupEditor from "./SizeGroupEditor";
 import ExtraCategoriesField from "./ExtraCategoriesField";
+import {
+  COLLECTION_FIELD,
+  COLLECTION_PRESENT_FIELD,
+  type CollectionOption,
+} from "@/app/_lib/product-collection";
 import ImagePickerModal from "./ImagePickerModal";
 import type { SizeGroupMember } from "@/app/_lib/products";
 import { MAX_FEATURES } from "@/app/_lib/product-features";
@@ -27,6 +32,7 @@ import { looksLikeDiscountClaim } from "@/app/_lib/pricing";
 export default function ProductEditor({
   product,
   categoryGroups,
+  collections,
   de,
   sizeGroupMembers,
   fabrics,
@@ -39,6 +45,9 @@ export default function ProductEditor({
 }: {
   product: Product;
   categoryGroups: SelectGroup[];
+  // Kolekcje do pola „Kolekcja” (id + etykieta). [] = brak kolekcji albo błąd
+  // odczytu — wtedy pole tylko informuje, a zapis nie rusza przypisania.
+  collections: CollectionOption[];
   de: ProductDeFields;
   sizeGroupMembers: SizeGroupMember[];
   fabrics: Fabric[];
@@ -448,6 +457,39 @@ export default function ProductEditor({
             initial={product.extra_categories ?? []}
             mainCategory={mainCategory}
           />
+
+          {/* Kolekcja (2026-10-29): druga droga obok /admin/kolekcje. Znacznik
+              obecności + select — akcja bez znacznika nie rusza kolumny. */}
+          <Field
+            label="Kolekcja"
+            hint="Produkt przypisany tutaj trafia na koniec kolekcji. Kolejność ułożysz przeciąganiem w Kolekcje."
+          >
+            {collections.length === 0 ? (
+              <span className="block text-sm text-[var(--muted)]">
+                Brak kolekcji — dodaj ją w{" "}
+                <Link href="/admin/kolekcje" className="text-[var(--color-gold)] hover:underline">
+                  Kolekcje
+                </Link>
+                .
+              </span>
+            ) : (
+              <>
+                <input type="hidden" name={COLLECTION_PRESENT_FIELD} value="1" />
+                <select
+                  name={COLLECTION_FIELD}
+                  defaultValue={product.collection_id ?? ""}
+                  className={inputClass}
+                >
+                  <option value="">— brak —</option>
+                  {collections.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+          </Field>
 
           <Field label="Kolor (do filtra)">
             <input name="color" defaultValue={product.color ?? ""} maxLength={100} className={inputClass} />

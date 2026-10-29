@@ -26,6 +26,16 @@ describe("buildNewProductPayload", () => {
     }
   });
 
+  it("kolekcja: id z pola „Kolekcja” trafia do collection_id, brak pola → null", () => {
+    const id = "11111111-1111-4111-8111-111111111111";
+    const withId = buildNewProductPayload({ ...valid, collectionId: id });
+    expect(withId.ok && withId.payload.collection_id).toBe(id);
+    const explicitNull = buildNewProductPayload({ ...valid, collectionId: null });
+    expect(explicitNull.ok && explicitNull.payload.collection_id).toBeNull();
+    const absent = buildNewProductPayload(valid);
+    expect(absent.ok && absent.payload.collection_id).toBeNull();
+  });
+
   it("normalizuje przecinek w cenie", () => {
     const r = buildNewProductPayload({ ...valid, price: "1999,50" });
     expect(r.ok && r.payload.price).toBe(1999.5);

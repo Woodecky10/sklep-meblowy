@@ -6,10 +6,15 @@ import Link from "next/link";
 import { Card, Field, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
 import { createProduct } from "../actions";
 import type { SelectGroup } from "@/app/_lib/category-tree";
+import {
+  COLLECTION_FIELD,
+  COLLECTION_PRESENT_FIELD,
+  type CollectionOption,
+} from "@/app/_lib/product-collection";
 
-type Props = { groups: SelectGroup[] };
+type Props = { groups: SelectGroup[]; collections: CollectionOption[] };
 
-export default function NewProductForm({ groups }: Props) {
+export default function NewProductForm({ groups, collections }: Props) {
   const router = useRouter();
   const [toast, setToast] = useState<Toast>(null);
   const [isPending, startTransition] = useTransition();
@@ -94,6 +99,24 @@ export default function NewProductForm({ groups }: Props) {
               ))}
             </select>
           </Field>
+          {/* Kolekcja (2026-10-29): produkt od razu w kolekcji, bez wycieczki
+              do /admin/kolekcje. Bez kolekcji w sklepie pola nie ma wcale. */}
+          {collections.length > 0 && (
+            <Field
+              label="Kolekcja (opcjonalnie)"
+              hint="Produkt od razu trafi na koniec tej kolekcji. Kolejność ułożysz przeciąganiem w Kolekcje."
+            >
+              <input type="hidden" name={COLLECTION_PRESENT_FIELD} value="1" />
+              <select name={COLLECTION_FIELD} defaultValue="" className={inputCls}>
+                <option value="">— brak —</option>
+                {collections.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
           <button
             type="submit"
             disabled={isPending}
