@@ -23,6 +23,7 @@ import { useVariantInfo } from "@/app/_lib/variant-info-context";
 import { variantInfoKey, variantInfoText } from "@/app/_lib/variant-info";
 import ValueInfoTip from "./ValueInfoTip";
 import FabricPropertyBadges from "./FabricPropertyBadges";
+import { colorsLabel } from "@/app/_lib/fabric-labels";
 
 type Props = {
   variants: ProductVariants;
@@ -246,6 +247,14 @@ const SWATCH_LIMIT = 5;
 // per tkanina z linkiem „szczegóły" do /tkaniny/[slug]; wartości spoza
 // katalogu → karta „Pozostałe".
 //
+// W otwartej karcie KAŻDA TKANINA jest zwinięta (decyzja właściciela
+// 2026-10-29): wiersz = nazwa + pastylka „N kolorów" z podglądem trzech
+// pierwszych próbek + cechy; siatka kolorów dopiero po kliknięciu w wiersz.
+// Pomiar na Amica U przy szerokości iPhone'a: grupa Standard to było 151
+// kółek i 5400 px przewijania do ostatniej tkaniny, po zmianie 700 px.
+// Od razu otwarta jest tylko tkanina bieżącego wyboru, żeby wybrany kolor
+// nie znikał z oczu; kilka tkanin może być otwartych naraz, jak grupy.
+//
 // Wyjątek: gdy ŻADNA wartość nie jest w katalogu tkanin (brak grup cenowych),
 // grupowanie nic nie wnosi — zostaje dawny widok kompaktowy: pierwsze
 // SWATCH_LIMIT próbek + „Zobacz więcej (+N)".
@@ -274,6 +283,9 @@ function FabricSwatchGroup({
   const t = getDictionary(locale);
   const [expanded, setExpanded] = useState(false);
   const [openGroups, setOpenGroups] = useState<Set<string> | null>(null);
+  // Które TKANINY (rodziny) mają rozwinięte próbki kolorów. null = stan
+  // startowy: otwarta tylko tkanina bieżącego wyboru (patrz openF niżej).
+  const [openFabrics, setOpenFabrics] = useState<Set<string> | null>(null);
 
   // Czy jakakolwiek wartość jest tkaniną z katalogu (ma grupę cenową)?
   // Tak → karty grup od razu; nie → widok kompaktowy z „Zobacz więcej".
@@ -403,6 +415,15 @@ function FabricSwatchGroup({
   const open =
     openGroups ?? (hasCatalogGroups ? new Set<string>() : new Set([currentGroup ?? ordered[0]?.code]));
 
+  const currentFabric = current ? meta[current]?.fabricName ?? current : null;
+  const openF = openFabrics ?? new Set<string>(currentFabric ? [currentFabric] : []);
+  function toggleFabric(name: string) {
+    const next = new Set(openF);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    setOpenFabrics(next);
+  }
+
   function toggleGroup(code: string) {
     const next = new Set(open);
     if (next.has(code)) next.delete(code);
@@ -437,30 +458,74 @@ function FabricSwatchGroup({
               <span className="text-[var(--muted)]">{isOpen ? "▾" : "▸"}</span>
             </button>
             {isOpen && (
-              <div className="p-4 flex flex-col gap-5 border-t border-[var(--border)]">
-                {[...g.fabrics.entries()].map(([fabricName, entry]) => (
-                  <div key={fabricName}>
-                    {/* flex-wrap: nazwa rodziny + „szczegóły" + dymek + do trzech
-                        pigułek nie mieszczą się w jednym wierszu na telefonie,
-                        a karta grupy ma overflow-hidden (przycięłaby treść). */}
-                    <p className="text-xs font-sans text-[var(--muted)] mb-2 flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-[var(--fg)]">{fabricName}</span>
-                      {entry.slug && (
-                        <Link
-                          href={localizeHref(`/tkaniny/${entry.slug}`, locale)}
-                          className="text-[var(--color-gold)] underline underline-offset-2 hover:no-underline"
+              <div className="p-4 flex flex-col gap-3 border-t border-[var(--border)]">
+                {[...g.fabrics.entries()].map(([fabricName, entry]) => {
+                  const fabricOpen = openF.has(fabricName);
+                  const n = entry.values.length;
+                  return (
+                    <div
+                      key={fabricName}
+                      className="border-b border-[var(--border)] pb-3 last:border-0 last:pb-0"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleFabric(fabricName)}
+                        aria-expanded={fabricOpen}
+                        className="w-full flex items-center gap-2 py-1 text-left font-sans group"
+                      >
+                        <span className="text-sm font-semibold text-[var(--fg)]">{fabricName}</span>
+                        {/* Pastylka-przycisk: podgląd 3 pierwszych kolorów + liczba +
+                            strzałka. Po otwarciu wypełniona złotem, bez podglądu
+                            (pełna siatka jest tuż pod spodem). */}
+                        <span
+                          className={`ml-auto inline-flex items-center gap-1.5 py-1 rounded-full border text-xs font-semibold whitespace-nowrap transition-colors ${
+                            fabricOpen
+                              ? "px-3 border-[var(--color-gold)] bg-[var(--color-gold)] text-[var(--color-navy)]"
+                              : "pl-1.5 pr-3 border-[var(--color-gold)] text-[var(--color-gold-text)] group-hover:bg-[var(--color-gold)]/10"
+                          }`}
                         >
-                          {t.fabrics.detailsLink}
-                        </Link>
+                          {!fabricOpen && (
+                            <span className="flex -space-x-1.5">
+                              {entry.values.slice(0, 3).map((v) =>
+                                images[v] ? (
+                                  <span
+                                    key={v}
+                                    className="relative w-5 h-5 rounded-full overflow-hidden ring-2 ring-[var(--card-bg)]"
+                                  >
+                                    <Image src={images[v]} alt="" fill sizes="20px" className="object-cover" />
+                                  </span>
+                                ) : null
+                              )}
+                            </span>
+                          )}
+                          <span className={fabricOpen ? "" : "pl-0.5"}>
+                            {n} {colorsLabel(n, t)}
+                          </span>
+                          <span aria-hidden="true">{fabricOpen ? "▴" : "▾"}</span>
+                        </span>
+                      </button>
+                      {(entry.slug || entry.shortInfo || entry.properties.length > 0) && (
+                      <p className="text-xs font-sans text-[var(--muted)] mt-1 flex flex-wrap items-center gap-2">
+                        {entry.slug && (
+                          <Link
+                            href={localizeHref(`/tkaniny/${entry.slug}`, locale)}
+                            className="text-[var(--color-gold)] underline underline-offset-2 hover:no-underline"
+                          >
+                            {t.fabrics.detailsLink}
+                          </Link>
+                        )}
+                        {entry.shortInfo && <ValueInfoTip text={entry.shortInfo} />}
+                        <FabricPropertyBadges defs={entry.properties} locale={locale} />
+                      </p>
                       )}
-                      {entry.shortInfo && <ValueInfoTip text={entry.shortInfo} />}
-                      <FabricPropertyBadges defs={entry.properties} locale={locale} />
-                    </p>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                      {entry.values.map(swatch)}
+                      {fabricOpen && (
+                        <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                          {entry.values.map(swatch)}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
