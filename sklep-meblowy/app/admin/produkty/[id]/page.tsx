@@ -8,6 +8,7 @@ import {
   getVariantImageSuggestionsAdmin,
 } from "@/app/_lib/products";
 import { getAllCategories } from "@/app/_lib/categories";
+import { getAllCollections } from "@/app/_lib/collections";
 import { flattenForSelect } from "@/app/_lib/category-tree";
 import { getAllFabrics, getFabricPriceGroups } from "@/app/_lib/fabrics";
 import { getVariantInfoMap } from "@/app/_lib/variant-info-data";
@@ -48,6 +49,7 @@ export default async function AdminProductEditPage({
     variantInfo,
     featureSuggestions,
     variantImageGroups,
+    collections,
   ] = await Promise.all([
     getProduct(id),
     getAllCategories(),
@@ -57,6 +59,7 @@ export default async function AdminProductEditPage({
     getVariantInfoMap(),
     getFeatureSuggestionsAdmin(),
     getVariantImageSuggestionsAdmin(),
+    getAllCollections(),
   ]);
   if (!product) notFound();
 
@@ -102,6 +105,7 @@ export default async function AdminProductEditPage({
       <ProductEditor
       product={product}
       categoryGroups={flattenForSelect(categories)}
+      collections={collections.map((c) => ({ id: c.id, label: c.label }))}
       de={de}
       sizeGroupMembers={sizeGroupMembers}
       fabrics={fabrics}
