@@ -256,6 +256,63 @@ describe("rankByNameMatch — dokładne trafienie bije rdzeń (POSO / pościel)"
   });
 });
 
+describe("rankByNameMatch — dokładne trafienie to POCZĄTEK SŁOWA nazwy", () => {
+  const get = (r: { name: string }) => r.name;
+
+  it("fado nie awansuje nazwy, w której słowo powstaje ze sklejenia „sofa do”", () => {
+    // Zgłoszenie 2026-10-29: klient wpisał „fado" (kolekcja Fado), a rozwijka
+    // pokazała same „…sofa do salonu". Klucz bez spacji to „sofadosalonu",
+    // który ZAWIERA „fado" — 17 nowszych sof było dokładnym trafieniem na
+    // równi z 3 produktami Fado i wygrywało datą dodania.
+    const rows = [
+      { name: "Sofa modułowa Nora Maxi – duża sofa do salonu" },
+      { name: "Sofa modułowa Lova 2-osobowa – nowoczesna sofa do salonu" },
+      { name: "Narożnik Fado L – nowoczesny narożnik w kształcie L" },
+      { name: "Sofa Fado – rozkładana sofa 3-osobowa z funkcją spania" },
+    ];
+    expect(rankByNameMatch(rows, "fado", get).map((r) => r.name)).toEqual([
+      "Narożnik Fado L – nowoczesny narożnik w kształcie L",
+      "Sofa Fado – rozkładana sofa 3-osobowa z funkcją spania",
+      "Sofa modułowa Nora Maxi – duża sofa do salonu",
+      "Sofa modułowa Lova 2-osobowa – nowoczesna sofa do salonu",
+    ]);
+  });
+
+  it("fraza wpisywana po literze (fad) jest dokładna jako początek słowa", () => {
+    // Rozwijka odpytuje przy każdej literze. „fad" to prefiks słowa „Fado",
+    // a nie prefiks żadnego ze słów „sofa do salonu" — ma wygrać od razu, nie
+    // dopiero po wpisaniu całej nazwy.
+    const rows = [
+      { name: "Sofa modułowa Nora Maxi – duża sofa do salonu" },
+      { name: "Sofa Fado – rozkładana sofa 3-osobowa" },
+    ];
+    expect(rankByNameMatch(rows, "fad", get)[0]).toEqual({
+      name: "Sofa Fado – rozkładana sofa 3-osobowa",
+    });
+  });
+
+  it("granicą słowa jest każdy znak spoza liter i cyfr, nie tylko spacja", () => {
+    // „osobowa" w „2-osobowa" zaczyna słowo po myślniku, a token z myślnikiem
+    // („2-osobowa") ma trafiać dokładnie w „2-osobowa" w nazwie — oba są dziś
+    // na poziomie 1 i mają tam zostać. Pierwszy wiersz każdej pary to trafienie
+    // tylko rdzeniem („osobow"), więc bez poziomu 1 wygrywałby kolejnością.
+    expect(
+      rankByNameMatch(
+        [{ name: "Fotel jednoosobowy Rio" }, { name: "Sofa 2-osobowa Aurea" }],
+        "osobowa",
+        get
+      )[0]
+    ).toEqual({ name: "Sofa 2-osobowa Aurea" });
+    expect(
+      rankByNameMatch(
+        [{ name: "Narożnik 2-osobowy Vegas" }, { name: "Sofa 2-osobowa Aurea" }],
+        "2-osobowa",
+        get
+      )[0]
+    ).toEqual({ name: "Sofa 2-osobowa Aurea" });
+  });
+});
+
 describe("rankByNameMatch — trafienie po synonimie", () => {
   const nazwy = (rows: { name: string }[]) => rows.map((r) => r.name);
   const pobierz = (r: { name: string }) => r.name;

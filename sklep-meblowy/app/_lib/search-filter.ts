@@ -37,10 +37,34 @@ export function searchTokens(raw: string): string[] {
 
 // Ranking wyników wyszukiwania — TRZY poziomy trafności:
 //
-//   1. nazwa zawiera każdy token w formie ZŁOŻONEJ, ale NIEzestemowanej
-//      (dokładne trafienie, modulo wielkość liter, ogonki i spacje),
+//   1. każdy token frazy w formie ZŁOŻONEJ, ale NIEzestemowanej, jest
+//      POCZĄTKIEM któregoś SŁOWA nazwy (dokładne trafienie, modulo wielkość
+//      liter i ogonki — ale z poszanowaniem granic słów, patrz niżej),
 //   2. nazwa zawiera każdy token co najmniej RDZENIEM po stemie,
 //   3. reszta — dopasowanie wyłącznie przez opis.
+//
+// ⚠️ Poziom 1 NIE patrzy na sklejony klucz (bez spacji), tylko na słowa.
+// Kolumna search_key_fold skleja nazwę i opis bez spacji, więc „sofa do
+// salonu" to w kluczu „sofadosalonu" — a ten ZAWIERA całe słowo „fado".
+// Zgłoszenie 2026-10-29: klient wpisał „fado" (kolekcja Fado) i rozwijka
+// pokazała same „…sofa do salonu". Pomiar na produkcji: rdzeń „fad" daje 20
+// pozycji, z czego 3 to produkty Fado i 17 to sofy z „sofa do salonu"
+// w NAZWIE; przy kluczu sklejonym wszystkie 20 były trafieniem dokładnym,
+// remis rozstrzygała data dodania, a 13 sof jest nowszych niż najnowsze Fado
+// — rozwijka (6 slotów) nie pokazywała Fado wcale. Na /sklep ratował je tylko
+// przypadek sortowania alfabetycznego („Narożnik" przed „Sofa modułowa").
+// Ta sama klasa artefaktu co „laraz" („Lara z materacem") opisane
+// w app/api/search/suggest/route.ts.
+//
+// „Początek słowa", nie „całe słowo", bo rozwijka odpytuje przy każdej
+// wpisanej literze: „fad" ma już wygrywać z „sofa do", a nie dopiero „fado".
+// Granicą słowa jest KAŻDY znak spoza liter i cyfr (spacja, myślnik, pauza,
+// „|", „×"), a token frazy jest dzielony tą samą regułą — „osobowa" trafia
+// w „2-osobowa", a token „2-osobowa" też (jako dwa słowa z rzędu).
+//
+// Poziom 2 bez zmian: patrzy na klucz sklejony jak kolumna, więc recall jest
+// bit w bit ten sam, co w bazie. Fraza sklejona przez klienta („noramaxi")
+// trafia dziś na poziom 2 zamiast 1 — nadal jest znajdowana.
 //
 // Wyszukiwarka szuka po name+description (kolumna search_key_fold), więc np.
 // „materac" łapie też łóżka kontynentalne (boxspring z materacem w opisie) —
@@ -88,19 +112,43 @@ export function rankByNameMatch<T>(
   const stemHits: T[] = [];
   const rest: T[] = [];
   for (const row of rows) {
+    const name = getName(row) ?? "";
     // Klucz nazwy budowany DOKŁADNIE jak kolumna search_key_fold w bazie:
     // złożone znaki, małe litery, bez spacji. Tokeny są już złożone, więc
-    // żadnego toLowerCase() na nich nie potrzeba.
-    const key = foldDiacritics(getName(row) ?? "").replace(/\s+/g, "");
+    // żadnego toLowerCase() na nich nie potrzeba. Służy poziomowi 2.
+    const key = foldDiacritics(name).replace(/\s+/g, "");
     if (!forms.every((f) => synonymsFor(f.stem).some((alt) => key.includes(alt)))) {
       rest.push(row);
-    } else if (forms.every((f) => key.includes(f.fold))) {
+      continue;
+    }
+    const words = wordKey(name);
+    if (forms.every((f) => startsWordIn(words, f.fold))) {
       exactHits.push(row);
     } else {
       stemHits.push(row);
     }
   }
   return [...exactHits, ...stemHits, ...rest];
+}
+
+// Granica słowa dla poziomu 1 rankingu: każdy ciąg znaków spoza liter i cyfr.
+// Ta sama reguła dla nazwy i dla tokenu frazy — inaczej token z myślnikiem
+// („2-osobowa") nigdy nie trafiłby w nazwę podzieloną na „2" i „osobowa".
+const WORD_BOUNDARY = /[^\p{L}\p{N}]+/gu;
+
+// Klucz nazwy z ZACHOWANYMI granicami słów: złożone znaki, małe litery, jedna
+// spacja między słowami i spacja na obu końcach, żeby „ fado" dało się szukać
+// jako początek słowa także na początku nazwy: „ sofa 2 osobowa aurea ".
+function wordKey(name: string): string {
+  return ` ${foldDiacritics(name).replace(WORD_BOUNDARY, " ").trim()} `;
+}
+
+// Czy token (już złożony przez foldDiacritics) jest początkiem któregoś słowa
+// nazwy. Token pusty po normalizacji (sam myślnik) nie jest początkiem niczego —
+// bez tego warunku `includes(" ")` dałoby prawdę dla każdej nazwy.
+function startsWordIn(nameKey: string, fold: string): boolean {
+  const token = fold.replace(WORD_BOUNDARY, " ").trim();
+  return token !== "" && nameKey.includes(` ${token}`);
 }
 
 // Składanie znaków diakrytycznych na ASCII: 12 znaków w mapie + ß→ss.
