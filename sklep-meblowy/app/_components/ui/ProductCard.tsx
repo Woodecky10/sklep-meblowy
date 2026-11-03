@@ -5,8 +5,9 @@ import { DEFAULT_LOCALE, type Locale } from "@/app/_lib/i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { formatMoney } from "@/app/_lib/money";
 import { effectivePrice, isOnSale, ribbonText } from "@/app/_lib/pricing";
+import { toQuickAddProduct } from "@/app/_lib/quick-add";
 
-import AddToCartButton from "./AddToCartButton";
+import QuickAddButton from "./QuickAddButton";
 import PromoRibbon from "./PromoRibbon";
 import StarRating from "./StarRating";
 import WishlistButton from "./WishlistButton";
@@ -111,7 +112,9 @@ export default function ProductCard({
             {formatMoney(product.price, locale, rate)}
           </p>
         )}
-        <AddToCartButton product={product} compact />
+        {/* Wąskie dane, nie cały produkt — wszystko podane tu jedzie do
+            przeglądarki w payloadzie strony. Patrz app/_lib/quick-add.ts. */}
+        <QuickAddButton item={toQuickAddProduct(product)} />
       </div>
     </div>
   );
