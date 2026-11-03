@@ -37,6 +37,42 @@ export default function ImageGallery({
     setActive(0);
   }
 
+  // Taśma zdjęć (przewijanie z przyciąganiem). Na telefonie klient przesuwa ją
+  // palcem, a kropki i licznik pokazują pozycję; na komputerze przesuwają ją
+  // miniatury. Jedna taśma dla obu szerokości, NIE dwie wersje chowane CSS-em —
+  // ukryte <img priority> i tak by się pobierało i telefon ściągałby zdjęcie
+  // główne dwa razy (decyzja 2026-11-03: karta produktu na telefonie ma
+  // zdjęcie, nazwę i cenę na pierwszym ekranie, bez rzędu miniatur).
+  const trackRef = useRef<HTMLDivElement>(null);
+  // Zdjęcie montujemy dopiero, gdy klient do niego dochodzi (+ jedno zapasowe
+  // dalej) — reszta galerii nie zabiera łącza zdjęciu głównemu przy wejściu.
+  const [reach, setReach] = useState(1);
+  if (active + 1 > reach) setReach(active + 1);
+  // `active` zmieniony PRZEWINIĘCIEM nie może z powrotem przewijać taśmy —
+  // efekt niżej szarpałby palcem w trakcie szybkiego przesunięcia.
+  const activeFromScroll = useRef(false);
+
+  function onTrackScroll(e: React.UIEvent<HTMLDivElement>) {
+    const el = e.currentTarget;
+    const i = Math.round(el.scrollLeft / el.clientWidth);
+    if (i !== active && i >= 0 && i < list.length) {
+      activeFromScroll.current = true;
+      setActive(i);
+    }
+  }
+
+  // Miniatura, strzałka w powiększeniu albo nowy zestaw zdjęć (wariant) →
+  // taśma dojeżdża do aktywnego zdjęcia.
+  useEffect(() => {
+    if (activeFromScroll.current) {
+      activeFromScroll.current = false;
+      return;
+    }
+    const el = trackRef.current;
+    if (!el || Math.round(el.scrollLeft / el.clientWidth) === active) return;
+    el.scrollTo({ left: active * el.clientWidth, behavior: "instant" });
+  }, [active, imagesKey]);
+
   // Stan zoomu w lightboxie:
   // - zoomed: czy 2x czy 1x
   // - origin: transform-origin (gdzie w obrazku jest "centrum" zoomu)
@@ -175,25 +211,69 @@ export default function ImageGallery({
 
   return (
     <>
-      <div className="flex flex-col gap-4">
-        <button
-          type="button"
-          onClick={() => setLightbox(true)}
-          aria-label={t.a11y.zoomImage}
-          className="relative aspect-[4/3] bg-stone-100 dark:bg-stone-800 rounded-3xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-[var(--color-gold)]/40 transition-all"
-        >
-          <Image
-            src={list[active]}
-            alt={name}
-            fill
-            priority
-            sizes="(max-width: 768px) 100vw, 50vw"
-            className="object-cover"
-          />
+      <div data-testid="product-gallery" className="flex flex-col gap-4">
+        <div className="relative bg-stone-100 dark:bg-stone-800 rounded-3xl overflow-hidden hover:ring-2 hover:ring-[var(--color-gold)]/40 transition-all">
+          <div
+            ref={trackRef}
+            data-testid="gallery-track"
+            onScroll={onTrackScroll}
+            className="flex overflow-x-auto snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {list.map((src, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => {
+                  setActive(i);
+                  setLightbox(true);
+                }}
+                aria-label={t.a11y.zoomImage}
+                className="relative w-full shrink-0 snap-start aspect-[4/3] cursor-pointer"
+              >
+                {i <= reach && (
+                  <Image
+                    src={src}
+                    alt={i === 0 ? name : `${name} ${i + 1}`}
+                    fill
+                    priority={i === 0}
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    className="object-cover"
+                  />
+                )}
+              </button>
+            ))}
+          </div>
           {ribbon && <PromoRibbon text={ribbon} size="hero" decorative />}
-        </button>
+          {/* Telefon: pozycja w galerii zamiast rzędu miniatur. */}
+          {list.length > 1 && (
+            <>
+              <span
+                data-testid="gallery-counter"
+                aria-hidden
+                className="md:hidden pointer-events-none absolute top-3 right-3 px-2 py-0.5 rounded-full bg-black/45 text-white text-[11px] font-sans font-semibold"
+              >
+                {active + 1} / {list.length}
+              </span>
+              {list.length <= 10 && (
+                <div
+                  aria-hidden
+                  className="md:hidden pointer-events-none absolute inset-x-0 bottom-3 flex justify-center gap-1.5"
+                >
+                  {list.map((_, i) => (
+                    <span
+                      key={i}
+                      className={`h-1.5 rounded-full shadow-[0_0_2px_rgba(0,0,0,0.35)] transition-all ${
+                        i === active ? "w-4 bg-white" : "w-1.5 bg-white/60"
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
         {list.length > 1 && (
-          <div className="flex gap-3">
+          <div className="hidden md:flex gap-3">
             {list.map((src, i) => (
               <button
                 key={i}

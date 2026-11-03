@@ -36,6 +36,13 @@ import LocalizedLink from "./LocalizedLink";
 // Lewa kolumna jest sticky (lg:top-40, jak konfigurator na /zestaw/[slug]) —
 // przy dłuższej prawej kolumnie galeria podąża za scrollem i pod nią nie
 // widać pustej przestrzeni.
+//
+// Poniżej lg (jedna kolumna — telefon, tablet) kolejność jest INNA: galeria,
+// nazwa z ceną i przyciski, dopiero potem specyfikacja. Decyzja właściciela
+// 2026-11-03: na telefonie zdjęcie, nazwa i cena mają być na pierwszym ekranie,
+// a tabela specyfikacji spychała je o ~700 px w dół. Lewa kolumna ma tam
+// `contents`, więc jej dzieci stają się pozycjami siatki i układają je `order-*`
+// — bez renderowania specyfikacji dwa razy. Strażnik: e2e/karta-produktu-mobile.
 export default function ProductMainSection({
   product,
   categoryLabel,
@@ -75,16 +82,18 @@ export default function ProductMainSection({
     });
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-16">
-      <div className="flex flex-col gap-8 lg:sticky lg:top-40 lg:self-start">
-        <ImageGallery
-          images={images}
-          name={product.name}
-          ribbon={ribbonText(product, t.product.saleBadge)}
-        />
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-16 mb-16">
+      <div className="contents lg:flex lg:flex-col lg:gap-8 lg:sticky lg:top-40 lg:self-start">
+        <div className="order-1 lg:order-none">
+          <ImageGallery
+            images={images}
+            name={product.name}
+            ribbon={ribbonText(product, t.product.saleBadge)}
+          />
+        </div>
 
         {specifications.length > 0 && (
-          <div>
+          <div className="order-3 lg:order-none mt-6 lg:mt-0">
             <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-2">
               {t.product.specificationEyebrow}
             </p>
@@ -110,12 +119,14 @@ export default function ProductMainSection({
         )}
       </div>
 
-      <div className="flex flex-col gap-8">
+      <div className="order-2 lg:order-none flex flex-col gap-8">
         <div>
-          <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-3">
+          <p className="font-sans text-xs uppercase tracking-[0.3em] text-[var(--color-gold-text)] mb-1 md:mb-3">
             {categoryLabel ?? product.category}
           </p>
-          <h1 className="font-display text-4xl font-bold text-[var(--fg)] leading-tight mb-4">
+          {/* Na telefonie mniejsza nazwa: przy 36 px długie nazwy (5 linii)
+              same zjadały pół ekranu i cena spadała pod jego krawędź. */}
+          <h1 className="font-display text-2xl md:text-4xl font-bold text-[var(--fg)] leading-tight mb-2 md:mb-4">
             {product.name}
           </h1>
 
@@ -133,7 +144,7 @@ export default function ProductMainSection({
           )}
 
           {onSale ? (
-            <div className="flex flex-col gap-1">
+            <div data-testid="product-price" className="flex flex-col gap-1">
               <div className="flex items-baseline gap-3 flex-wrap">
                 <span className="font-sans text-3xl font-bold text-[var(--fg)]">
                   {formatMoney(effective, locale, rate)}
@@ -152,7 +163,7 @@ export default function ProductMainSection({
               )}
             </div>
           ) : (
-            <p className="font-sans text-3xl font-bold text-[var(--fg)]">
+            <p data-testid="product-price" className="font-sans text-3xl font-bold text-[var(--fg)]">
               {formatMoney(regularPrice, locale, rate)}
             </p>
           )}

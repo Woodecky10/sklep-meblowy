@@ -302,7 +302,9 @@ export default async function ProduktPage({ params }: Props) {
     });
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-16">
+    // Na telefonie mały odstęp od nagłówka — każdy piksel nad zdjęciem spycha
+    // nazwę i cenę pod krawędź ekranu (patrz ProductMainSection).
+    <div className="max-w-7xl mx-auto px-6 pt-4 pb-16 md:py-16">
       {/* Meta + GA4: cena ta sama co w JSON-LD (po przecenie), żeby wartość
           zdarzenia zgadzała się z tym, co widzi klient i co czyta Google.
           Nazwa też ta sama co w JSON-LD i w feedzie — inaczej raport GA4
@@ -325,20 +327,24 @@ export default async function ProduktPage({ params }: Props) {
         />
       )}
 
-      {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-xs font-sans text-[var(--muted)] mb-12 uppercase tracking-widest">
-        <LocalizedLink href="/" className="hover:text-[var(--color-gold)] transition-colors">{t.product.breadcrumbHome}</LocalizedLink>
-        <span>/</span>
-        <LocalizedLink href="/sklep" className="hover:text-[var(--color-gold)] transition-colors">{t.product.breadcrumbShop}</LocalizedLink>
-        <span>/</span>
+      {/* Breadcrumb. Na telefonie tylko „‹ kategoria" w jednej linii — pełna
+          ścieżka z nazwą produktu łamała się tam na 4–6 linii i spychała
+          zdjęcie, nazwę i cenę pod ekran. Dane okruszków dla Google
+          (breadcrumbJsonLd wyżej) są pełne niezależnie od szerokości. */}
+      <nav className="flex items-center gap-2 text-xs font-sans text-[var(--muted)] mb-3 md:mb-12 uppercase tracking-widest">
+        <LocalizedLink href="/" className="hidden md:inline hover:text-[var(--color-gold)] transition-colors">{t.product.breadcrumbHome}</LocalizedLink>
+        <span className="hidden md:inline">/</span>
+        <LocalizedLink href="/sklep" className="hidden md:inline hover:text-[var(--color-gold)] transition-colors">{t.product.breadcrumbShop}</LocalizedLink>
+        <span className="hidden md:inline">/</span>
         <LocalizedLink
           href={`/sklep?kategoria=${product.category}`}
           className="hover:text-[var(--color-gold)] transition-colors"
         >
+          <span aria-hidden className="md:hidden mr-2">‹</span>
           {categoryLabel ?? product.category}
         </LocalizedLink>
-        <span>/</span>
-        <span className="text-[var(--fg)] normal-case tracking-normal">{product.name}</span>
+        <span className="hidden md:inline">/</span>
+        <span className="hidden md:inline text-[var(--fg)] normal-case tracking-normal">{product.name}</span>
       </nav>
 
       {/* Główna sekcja — galeria + akcje + specyfikacja w lewej kolumnie.
