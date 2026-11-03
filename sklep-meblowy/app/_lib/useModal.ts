@@ -69,7 +69,11 @@ export function useModal<E extends HTMLElement = HTMLElement>(
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
-      previouslyFocused?.focus?.();
+      // preventScroll: zwykłe focus() przewija do elementu. Galeria karty
+      // produktu to przewijana taśma — powrót fokusu na slajd, który otworzył
+      // powiększenie, cofał ją z oglądanego zdjęcia na tamto (2026-11-03).
+      // Tło było zablokowane, więc pozycja strony i tak się nie zmieniła.
+      previouslyFocused?.focus?.({ preventScroll: true });
     };
   }, [active, containerRef, trapFocus]);
 }

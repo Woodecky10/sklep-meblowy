@@ -24,11 +24,13 @@ test.describe("wstążka promocji", () => {
   });
 
   test("jest na głównym zdjęciu, ale nie w lightboxie", async ({ page }) => {
-    const hero = page.getByRole("button", { name: "Powiększ zdjęcie" }).first();
-    // Wstążka siedzi WEWNĄTRZ klikalnego kontenera zdjęcia (to on ją przycina).
-    await expect(hero.getByText("Promocja", { exact: true })).toBeVisible();
+    // Wstążka siedzi w ramce galerii (to ona ją przycina), nad przewijaną
+    // taśmą zdjęć — zostaje na miejscu przy każdym zdjęciu (2026-11-03:
+    // galeria przewijana palcem; wcześniej siedziała w jedynym przycisku zdjęcia).
+    const gallery = page.getByTestId("product-gallery");
+    await expect(gallery.getByText("Promocja", { exact: true })).toBeVisible();
 
-    await hero.click();
+    await gallery.getByRole("button", { name: "Powiększ zdjęcie" }).first().click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText("Promocja", { exact: true })).toHaveCount(0);
