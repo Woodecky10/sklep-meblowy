@@ -19,6 +19,8 @@ import {
   FABRIC_OPTION_NAME,
 } from "@/app/_lib/variants";
 import { groupFabricsByCategory, groupSelectionState } from "@/app/_lib/fabric-groups";
+import { commonPrice, groupValuesByFabric, setPriceForValues } from "@/app/_lib/fabric-value-groups";
+import { pluralPl } from "@/app/_lib/fabric-labels";
 import { filterBySearch } from "@/app/_lib/search-normalize";
 import {
   applyCornerSideSelection,
@@ -81,6 +83,12 @@ export default function VariantsEditor({
     [variants, initial]
   );
 
+  // Nazwa grupy cenowej (Standard/Premium/…) do plakietki przy tkaninie.
+  const groupNameById = useMemo(
+    () => Object.fromEntries(fabricGroups.map((g) => [g.id, g.name])),
+    [fabricGroups]
+  );
+
   // ============================================================
   // Mutacje stanu — opcje
   // ============================================================
@@ -133,18 +141,21 @@ export default function VariantsEditor({
     setVariants({ ...variants, options: nextOptions });
   }
 
-  function removeValue(optIdx: number, value: string) {
+  // Usuwa wartości (jedną albo całą tkaninę naraz) razem z ich dopłatami i zdjęciami.
+  function removeValues(optIdx: number, values: string[]) {
     if (!variants) return;
+    const gone = new Set(values);
     const nextOptions = variants.options.map((o, i) => {
       if (i !== optIdx) return o;
-      // Usuń też ewentualną dopłatę i zdjęcia tej wartości.
       const nextPrices = { ...(o.value_prices ?? {}) };
-      delete nextPrices[value];
       const nextImages = { ...(o.value_images ?? {}) };
-      delete nextImages[value];
+      for (const v of values) {
+        delete nextPrices[v];
+        delete nextImages[v];
+      }
       return {
         ...o,
-        values: o.values.filter((v) => v !== value),
+        values: o.values.filter((v) => !gone.has(v)),
         value_prices: Object.keys(nextPrices).length > 0 ? nextPrices : undefined,
         value_images: Object.keys(nextImages).length > 0 ? nextImages : undefined,
       };
@@ -152,19 +163,13 @@ export default function VariantsEditor({
     setVariants({ ...variants, options: nextOptions });
   }
 
-  // Ustaw dopłatę dla wartości opcji (puste/0 usuwa wpis).
-  function setValuePrice(optIdx: number, value: string, price: number | null) {
+  // Ustaw dopłatę wartościom opcji — jednej albo wszystkim kolorom tkaniny
+  // (puste/0 usuwa wpis).
+  function setValuesPrice(optIdx: number, values: string[], price: number | null) {
     if (!variants) return;
-    const nextOptions = variants.options.map((o, i) => {
-      if (i !== optIdx) return o;
-      const nextPrices = { ...(o.value_prices ?? {}) };
-      if (price === null || price === 0) delete nextPrices[value];
-      else nextPrices[value] = price;
-      return {
-        ...o,
-        value_prices: Object.keys(nextPrices).length > 0 ? nextPrices : undefined,
-      };
-    });
+    const nextOptions = variants.options.map((o, i) =>
+      i === optIdx ? { ...o, value_prices: setPriceForValues(o.value_prices, values, price) } : o
+    );
     setVariants({ ...variants, options: nextOptions });
   }
 
@@ -427,8 +432,12 @@ export default function VariantsEditor({
             option={opt}
             onNameChange={(name) => setOptionName(i, name)}
             onAddValue={(v) => addValue(i, v)}
-            onRemoveValue={(v) => removeValue(i, v)}
-            onSetValuePrice={(v, p) => setValuePrice(i, v, p)}
+            onRemoveValues={(vs) => removeValues(i, vs)}
+            onSetValuesPrice={(vs, p) => setValuesPrice(i, vs, p)}
+            fabricCatalog={
+              opt.name === FABRIC_OPTION_NAME ? { fabrics, groupNameById } : undefined
+            }
+            onOpenFabricPicker={() => setFabricPickerOpen(true)}
             onRemoveOption={() => removeOption(i)}
             onToggleFilterable={(v) => setOptionFilterable(i, v)}
             onAddValueImages={(v, urls) => addValueImages(i, v, urls)}
@@ -505,12 +514,19 @@ export default function VariantsEditor({
 // Sub-komponenty
 // ============================================================
 
+// Katalog tkanin dla opcji „Tkanina" — gdy podany, wartości są grupowane per
+// tkanina (jedna zwinięta linia, kolory po rozwinięciu), a pole wpisywania
+// dowolnego tekstu zastępuje przycisk katalogu (decyzja właściciela 2026-11-04:
+// tkaniny tylko z katalogu — wpisywanie ręczne tworzyło sieroty typu
+// „Velvet Velvet 17"). Dane w bazie bez zmian: wartości dalej „Nazwa Kolor".
+type FabricCatalog = { fabrics: Fabric[]; groupNameById: Record<string, string> };
+
 function OptionRow({
   option,
   onNameChange,
   onAddValue,
-  onRemoveValue,
-  onSetValuePrice,
+  onRemoveValues,
+  onSetValuesPrice,
   onRemoveOption,
   onToggleFilterable,
   onAddValueImages,
@@ -518,13 +534,15 @@ function OptionRow({
   onSetValueInfo,
   infoFor,
   imageGroups,
+  fabricCatalog,
+  onOpenFabricPicker,
   onToast,
 }: {
   option: ProductOption;
   onNameChange: (name: string) => void;
   onAddValue: (v: string) => void;
-  onRemoveValue: (v: string) => void;
-  onSetValuePrice: (value: string, price: number | null) => void;
+  onRemoveValues: (values: string[]) => void;
+  onSetValuesPrice: (values: string[], price: number | null) => void;
   onRemoveOption: () => void;
   onToggleFilterable: (v: boolean) => void;
   onAddValueImages: (value: string, urls: string[]) => void;
@@ -532,11 +550,149 @@ function OptionRow({
   onSetValueInfo: (value: string, info: string, infoDe: string) => void;
   infoFor: (value: string) => VariantInfoEntry | undefined;
   imageGroups: VariantImageGroup[];
+  fabricCatalog?: FabricCatalog;
+  onOpenFabricPicker: () => void;
   onToast: (t: Toast) => void;
 }) {
   const [newValue, setNewValue] = useState("");
   const [imagesFor, setImagesFor] = useState<string | null>(null);
   const [infoForVal, setInfoForVal] = useState<string | null>(null);
+  // Rozwinięte tkaniny (po nazwie z katalogu) — domyślnie wszystkie zwinięte.
+  const [openFabrics, setOpenFabrics] = useState<Set<string>>(() => new Set());
+  const confirm = useConfirm();
+
+  const fabricView = fabricCatalog
+    ? groupValuesByFabric(option.values, fabricCatalog.fabrics)
+    : null;
+
+  function toggleFabric(name: string) {
+    setOpenFabrics((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  async function removeFabric(name: string, values: string[]) {
+    const label = `${values.length} ${pluralPl(values.length, "kolor", "kolory", "kolorów")}`;
+    if (!(await confirm({ message: `Usunąć tkaninę ${name} (${label}) z tego produktu?`, danger: true }))) return;
+    if (imagesFor && values.includes(imagesFor)) setImagesFor(null);
+    if (infoForVal && values.includes(infoForVal)) setInfoForVal(null);
+    onRemoveValues(values);
+  }
+
+  // Jeden wiersz wartości: 📷, ℹ, dopłata, usuń + panele pod spodem. `label` to
+  // tekst w wierszu — w tkaninie sam kolor („2071"), poza nią pełna wartość.
+  function renderValue(v: string, label: string) {
+    const imgCount = option.value_images?.[v]?.length ?? 0;
+    return (
+      <div key={v} className="flex flex-col gap-1.5">
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 sm:gap-x-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-lg px-2 sm:px-3 py-1.5">
+          <span className="flex-1 min-w-[2.5rem] text-sm truncate">{label}</span>
+          {/* Przyciski jako jedna grupa — na wąskim ekranie przechodzą razem pod etykietę. */}
+          <div className="flex items-center gap-1.5 sm:gap-2 ml-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => setImagesFor(imagesFor === v ? null : v)}
+              aria-expanded={imagesFor === v}
+              aria-label={`Zdjęcia wartości ${v} (${imgCount})`}
+              title="Zdjęcia tej wartości"
+              className={`shrink-0 px-2 py-1 text-[11px] font-sans rounded-full border transition-colors ${
+                imagesFor === v || imgCount > 0
+                  ? "border-[var(--color-gold)] text-[var(--color-gold-text)]"
+                  : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold-text)]"
+              }`}
+            >
+              📷{imgCount > 0 ? ` ${imgCount}` : ""}
+            </button>
+            <button
+              type="button"
+              onClick={() => setInfoForVal(infoForVal === v ? null : v)}
+              aria-expanded={infoForVal === v}
+              aria-label={`Informacja o wariancie ${v}`}
+              title="Krótka informacja (tooltip u klienta)"
+              className={`shrink-0 px-2 py-1 text-[11px] font-sans rounded-full border transition-colors ${
+                infoForVal === v || infoFor(v)
+                  ? "border-[var(--color-gold)] text-[var(--color-gold-text)]"
+                  : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold-text)]"
+              }`}
+            >
+              ℹ{infoFor(v) ? " •" : ""}
+            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="text-xs text-[var(--muted)]">+</span>
+              <input
+                type="number"
+                step="0.01"
+                inputMode="decimal"
+                value={option.value_prices?.[v] ?? ""}
+                onChange={(e) =>
+                  onSetValuesPrice([v], e.target.value === "" ? null : Number(e.target.value))
+                }
+                placeholder="0"
+                aria-label={`Dopłata za ${v} (zł)`}
+                className="w-16 sm:w-20 px-2 py-1 bg-[var(--bg)] border border-[var(--border)] rounded text-sm text-right focus:border-[var(--color-gold)] focus:outline-none"
+              />
+              <span className="text-xs text-[var(--muted)]">zł</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (imagesFor === v) setImagesFor(null);
+                onRemoveValues([v]);
+              }}
+              aria-label={`Usuń ${v}`}
+              className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-100 dark:hover:bg-red-950 text-red-600 shrink-0"
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        {imagesFor === v && (
+          <ValueImagesPanel
+            value={v}
+            urls={option.value_images?.[v] ?? []}
+            groups={imageGroups}
+            optionName={option.name}
+            onAdd={(urls) => onAddValueImages(v, urls)}
+            onRemove={(url) => onRemoveValueImage(v, url)}
+            onToast={onToast}
+          />
+        )}
+        {infoForVal === v && (
+          <div className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--card-bg)] p-3">
+            <label className="text-[11px] uppercase tracking-widest text-[var(--muted)]">
+              Info PL (tooltip, maks. 200 zn.) — zapis globalny dla „{option.name}: {v}&rdquo;
+            </label>
+            <textarea
+              maxLength={200}
+              value={infoFor(v)?.info ?? ""}
+              onChange={(e) => onSetValueInfo(v, e.target.value, infoFor(v)?.info_de ?? "")}
+              placeholder="np. Miękki welur, łatwy w czyszczeniu"
+              className={`${inputClass} min-h-[3rem]`}
+            />
+            <label className="text-[11px] uppercase tracking-widest text-[var(--muted)]">
+              Info DE (opcjonalnie)
+            </label>
+            <textarea
+              maxLength={200}
+              value={infoFor(v)?.info_de ?? ""}
+              onChange={(e) => onSetValueInfo(v, infoFor(v)?.info ?? "", e.target.value)}
+              placeholder="z. B. Weicher Cord, pflegeleicht"
+              className={`${inputClass} min-h-[3rem]`}
+            />
+            <p className="text-[11px] text-[var(--muted)]">
+              Uwaga: edycja zmienia info wszędzie, gdzie występuje ta para (opcja + wartość).
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl p-4 flex flex-col gap-3">
       <div className="flex items-center gap-3">
@@ -576,145 +732,188 @@ function OptionRow({
           Wartości
         </span>
         <p className="text-[11px] text-[var(--muted)] -mt-1">
-          Pole „+zł” to dopłata do ceny bazowej za wybór tej wartości (np. Premium
-          +200). Dopłaty wybranych wartości sumują się. Puste = bez dopłaty.
+          {fabricView
+            ? "Dopłatę ustawiasz przy całej tkaninie (zmienia wszystkie jej kolory). Rozwiń tkaninę, żeby zmienić pojedynczy kolor, dodać zdjęcia (📷) albo informację (ℹ)."
+            : "Pole „+zł” to dopłata do ceny bazowej za wybór tej wartości (np. Premium +200). Dopłaty wybranych wartości sumują się. Puste = bez dopłaty."}
         </p>
         <div className="flex flex-col gap-1.5">
           {option.values.length === 0 && (
-            <span className="text-xs text-[var(--muted)] italic">Brak wartości — dodaj poniżej.</span>
+            <span className="text-xs text-[var(--muted)] italic">
+              {fabricView ? "Brak tkanin — dodaj z katalogu poniżej." : "Brak wartości — dodaj poniżej."}
+            </span>
           )}
-          {option.values.map((v) => {
-            const imgCount = option.value_images?.[v]?.length ?? 0;
-            return (
-              <div key={v} className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-lg px-3 py-1.5">
-                  <span className="flex-1 text-sm truncate">{v}</span>
+          {fabricView ? (
+            <>
+              {fabricView.groups.length > 0 && (
+                <div className="flex items-center justify-between gap-3 text-xs text-[var(--muted)]">
+                  <span>
+                    <b className="text-[var(--fg)]">
+                      {fabricView.groups.length}{" "}
+                      {pluralPl(fabricView.groups.length, "tkanina", "tkaniny", "tkanin")} z katalogu
+                    </b>
+                    {" · "}
+                    {option.values.length - fabricView.orphans.length}{" "}
+                    {pluralPl(option.values.length - fabricView.orphans.length, "kolor", "kolory", "kolorów")}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => setImagesFor(imagesFor === v ? null : v)}
-                    aria-expanded={imagesFor === v}
-                    aria-label={`Zdjęcia wartości ${v} (${imgCount})`}
-                    title="Zdjęcia tej wartości"
-                    className={`shrink-0 px-2 py-1 text-[11px] font-sans rounded-full border transition-colors ${
-                      imagesFor === v || imgCount > 0
-                        ? "border-[var(--color-gold)] text-[var(--color-gold-text)]"
-                        : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold-text)]"
-                    }`}
+                    onClick={() =>
+                      setOpenFabrics(
+                        openFabrics.size === fabricView.groups.length
+                          ? new Set()
+                          : new Set(fabricView.groups.map((g) => g.fabric.name))
+                      )
+                    }
+                    className="underline text-[var(--color-gold-text)] hover:text-[var(--fg)]"
                   >
-                    📷{imgCount > 0 ? ` ${imgCount}` : ""}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setInfoForVal(infoForVal === v ? null : v)}
-                    aria-expanded={infoForVal === v}
-                    aria-label={`Informacja o wariancie ${v}`}
-                    title="Krótka informacja (tooltip u klienta)"
-                    className={`shrink-0 px-2 py-1 text-[11px] font-sans rounded-full border transition-colors ${
-                      infoForVal === v || infoFor(v)
-                        ? "border-[var(--color-gold)] text-[var(--color-gold-text)]"
-                        : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold-text)]"
-                    }`}
-                  >
-                    ℹ{infoFor(v) ? " •" : ""}
-                  </button>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-xs text-[var(--muted)]">+</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      inputMode="decimal"
-                      value={option.value_prices?.[v] ?? ""}
-                      onChange={(e) =>
-                        onSetValuePrice(v, e.target.value === "" ? null : Number(e.target.value))
-                      }
-                      placeholder="0"
-                      aria-label={`Dopłata za ${v} (zł)`}
-                      className="w-20 px-2 py-1 bg-[var(--bg)] border border-[var(--border)] rounded text-sm text-right focus:border-[var(--color-gold)] focus:outline-none"
-                    />
-                    <span className="text-xs text-[var(--muted)]">zł</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (imagesFor === v) setImagesFor(null);
-                      onRemoveValue(v);
-                    }}
-                    aria-label={`Usuń ${v}`}
-                    className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-100 dark:hover:bg-red-950 text-red-600 shrink-0"
-                  >
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                      <path d="M18 6 6 18M6 6l12 12" />
-                    </svg>
+                    {openFabrics.size === fabricView.groups.length ? "Zwiń wszystkie" : "Rozwiń wszystkie"}
                   </button>
                 </div>
-                {imagesFor === v && (
-                  <ValueImagesPanel
-                    value={v}
-                    urls={option.value_images?.[v] ?? []}
-                    groups={imageGroups}
-                    optionName={option.name}
-                    onAdd={(urls) => onAddValueImages(v, urls)}
-                    onRemove={(url) => onRemoveValueImage(v, url)}
-                    onToast={onToast}
-                  />
-                )}
-                {infoForVal === v && (
-                  <div className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--card-bg)] p-3">
-                    <label className="text-[11px] uppercase tracking-widest text-[var(--muted)]">
-                      Info PL (tooltip, maks. 200 zn.) — zapis globalny dla „{option.name}: {v}&rdquo;
-                    </label>
-                    <textarea
-                      maxLength={200}
-                      value={infoFor(v)?.info ?? ""}
-                      onChange={(e) => onSetValueInfo(v, e.target.value, infoFor(v)?.info_de ?? "")}
-                      placeholder="np. Miękki welur, łatwy w czyszczeniu"
-                      className={`${inputClass} min-h-[3rem]`}
-                    />
-                    <label className="text-[11px] uppercase tracking-widest text-[var(--muted)]">
-                      Info DE (opcjonalnie)
-                    </label>
-                    <textarea
-                      maxLength={200}
-                      value={infoFor(v)?.info_de ?? ""}
-                      onChange={(e) => onSetValueInfo(v, infoFor(v)?.info ?? "", e.target.value)}
-                      placeholder="z. B. Weicher Cord, pflegeleicht"
-                      className={`${inputClass} min-h-[3rem]`}
-                    />
-                    <p className="text-[11px] text-[var(--muted)]">
-                      Uwaga: edycja zmienia info wszędzie, gdzie występuje ta para (opcja + wartość).
-                    </p>
+              )}
+              {fabricView.groups.map(({ fabric, items }) => {
+                const name = fabric.name;
+                const values = items.map((it) => it.value);
+                const open = openFabrics.has(name);
+                const price = commonPrice(values, option.value_prices);
+                const withImages = values.filter((v) => (option.value_images?.[v]?.length ?? 0) > 0).length;
+                const groupName = fabricCatalog?.groupNameById[fabric.group_id];
+                return (
+                  <div key={name} className="flex flex-col" data-testid="fabric-value-group">
+                    <div
+                      className={`flex items-center gap-2 bg-[var(--card-bg)] border px-3 py-1.5 ${
+                        open ? "border-[var(--color-gold)] rounded-t-lg" : "border-[var(--border)] rounded-lg"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleFabric(name)}
+                        aria-expanded={open}
+                        className="flex-1 min-w-0 flex items-center gap-2 flex-wrap text-left"
+                      >
+                        {/* Strzałka + nazwa razem, plakietka i licznik bez łamania —
+                            na wąskim ekranie zawijają się całe do kolejnej linii. */}
+                        <span className="flex items-center gap-2 whitespace-nowrap">
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            aria-hidden
+                            className={`shrink-0 text-[var(--muted)] transition-transform ${open ? "rotate-90" : ""}`}
+                          >
+                            <path d="m9 6 6 6-6 6" />
+                          </svg>
+                          <span className="text-sm font-semibold text-[var(--fg)]">{name}</span>
+                        </span>
+                        {groupName && (
+                          <span className="whitespace-nowrap px-2 py-0.5 text-[10px] font-sans font-semibold uppercase tracking-wider rounded-full border border-[var(--color-gold)] text-[var(--color-gold-text)]">
+                            {groupName}
+                          </span>
+                        )}
+                        <span className="whitespace-nowrap text-xs text-[var(--muted)]">
+                          {items.length} {pluralPl(items.length, "kolor", "kolory", "kolorów")}
+                        </span>
+                      </button>
+                      {withImages > 0 && (
+                        <span
+                          title="Kolory z własnymi zdjęciami"
+                          className="shrink-0 px-2 py-1 text-[11px] font-sans rounded-full border border-[var(--color-gold)] text-[var(--color-gold-text)]"
+                        >
+                          📷 {withImages}
+                        </span>
+                      )}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-xs text-[var(--muted)]">+</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          inputMode="decimal"
+                          value={price ? price : ""}
+                          onChange={(e) =>
+                            onSetValuesPrice(values, e.target.value === "" ? null : Number(e.target.value))
+                          }
+                          placeholder={price === null ? "różne" : "0"}
+                          aria-label={`Dopłata za tkaninę ${name} (zł)`}
+                          className="w-20 px-2 py-1 bg-[var(--bg)] border border-[var(--border)] rounded text-sm text-right focus:border-[var(--color-gold)] focus:outline-none"
+                        />
+                        <span className="text-xs text-[var(--muted)]">zł</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeFabric(name, values)}
+                        aria-label={`Usuń tkaninę ${name}`}
+                        className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-100 dark:hover:bg-red-950 text-red-600 shrink-0"
+                      >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                          <path d="M18 6 6 18M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    {open && (
+                      <div className="flex flex-col gap-1.5 border border-t-0 border-[var(--color-gold)] rounded-b-lg p-2 sm:pl-6">
+                        {items.map((it) => renderValue(it.value, it.color || it.value))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+              {fabricView.orphans.length > 0 && (
+                <div className="flex flex-col gap-1.5 mt-1">
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Spoza katalogu ({fabricView.orphans.length}) — tych wartości nie ma w zakładce
+                    „Tkaniny” (literówka albo usunięty kolor). Usuń je albo dodaj tkaninę do katalogu.
+                  </p>
+                  {fabricView.orphans.map((v) => renderValue(v, v))}
+                </div>
+              )}
+            </>
+          ) : (
+            option.values.map((v) => renderValue(v, v))
+          )}
         </div>
-        <div className="flex gap-2">
-          <input
-            value={newValue}
-            onChange={(e) => setNewValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
+        {fabricView ? (
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              type="button"
+              onClick={onOpenFabricPicker}
+              className="px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
+            >
+              + Dodaj tkaninę z katalogu
+            </button>
+            <span className="text-[11px] text-[var(--muted)]">
+              Tkaniny tylko z katalogu — nazwa i kolory zawsze zgodne z zakładką „Tkaniny”.
+            </span>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <input
+              value={newValue}
+              onChange={(e) => setNewValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  onAddValue(newValue);
+                  setNewValue("");
+                }
+              }}
+              placeholder="np. Beżowy"
+              maxLength={50}
+              className={`${inputClass} flex-1`}
+            />
+            <button
+              type="button"
+              onClick={() => {
                 onAddValue(newValue);
                 setNewValue("");
-              }
-            }}
-            placeholder="np. Beżowy"
-            maxLength={50}
-            className={`${inputClass} flex-1`}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              onAddValue(newValue);
-              setNewValue("");
-            }}
-            className="px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
-          >
-            + Dodaj wartość
-          </button>
-        </div>
+              }}
+              className="px-4 py-2 text-xs font-sans uppercase tracking-widest border border-[var(--color-gold)] text-[var(--color-gold)] rounded-full hover:bg-[var(--color-gold)] hover:text-[var(--bg)] transition-colors"
+            >
+              + Dodaj wartość
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

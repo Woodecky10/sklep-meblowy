@@ -8,7 +8,7 @@ type Dict = ReturnType<typeof getDictionary>;
 // Wydzielone z app/tkaniny/page.tsx (2026-07-30): funkcja siedziała tam jako
 // lokalna i nieprzetestowana. Czysta funkcja bez Reacta → da się przetestować
 // vitestem, którego projekt używa do wszystkiego w _lib.
-function pluralPl(n: number, one: string, few: string, many: string): string {
+export function pluralPl(n: number, one: string, few: string, many: string): string {
   if (n === 1) return one;
   const d10 = n % 10;
   const d100 = n % 100;
