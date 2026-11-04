@@ -46,7 +46,7 @@ export default async function ZestawPage({
       <h1 className="font-display text-4xl font-bold text-[var(--fg)] mb-4">{bundle.name}</h1>
       {bundle.description && (
         <div
-          className="rich-text text-[var(--muted)] mb-10 max-w-2xl"
+          className="rich-text text-[var(--muted)] mb-10"
           dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(bundle.description) }}
         />
       )}
