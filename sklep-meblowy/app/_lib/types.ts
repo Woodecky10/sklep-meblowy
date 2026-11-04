@@ -194,6 +194,10 @@ export type Bundle = {
   // wyżej; przy remisie nowsze pierwsze (bundle-order.ts). Steruje sliderem na
   // home, listą /zestawy i wyborem 3 zestawów do boxu na karcie produktu.
   sort_order: number;
+  // Własne zdjęcie na kafelek zestawu (migracja 85). Puste = mozaika ze zdjęć
+  // składników. Opcjonalne w typie: przed migracją `select("*")` nie zwraca
+  // kolumny wcale (undefined, nie null).
+  image_url?: string | null;
   created_at: string;
 };
 

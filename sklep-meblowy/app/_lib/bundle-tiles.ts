@@ -30,7 +30,8 @@ export type BundleTile = {
   // Zlokalizowany zestaw BEZ składników — kafelek pokazuje nazwę i linkuje
   // do /zestaw/[slug]; pełne produkty potrzebuje dopiero konfigurator.
   bundle: Bundle;
-  // Pierwsze zdjęcie każdego składnika, w kolejności składu, bez powtórzeń,
+  // Własne zdjęcie zestawu (jedno), a gdy go brak — mozaika:
+  // pierwsze zdjęcie każdego składnika, w kolejności składu, bez powtórzeń,
   // najwyżej MAX_THUMBNAILS. Dedupe PRZED obcięciem — ten sam URL potrafi
   // się powtórzyć między produktami (patrz collection-tiles.ts).
   thumbnails: string[];
@@ -40,9 +41,7 @@ export type BundleTile = {
   pricing: { base: number; discounted: number; savings: number };
 };
 
-export function buildBundleTile(b: BundleTileSource): BundleTile {
-  const { components, ...bundle } = b;
-
+function mosaicThumbnails(components: BundleTileComponent[]): string[] {
   const thumbnails: string[] = [];
   for (const p of components) {
     const first = p.images?.[0];
@@ -50,6 +49,15 @@ export function buildBundleTile(b: BundleTileSource): BundleTile {
     thumbnails.push(first);
     if (thumbnails.length === MAX_THUMBNAILS) break;
   }
+  return thumbnails;
+}
+
+export function buildBundleTile(b: BundleTileSource): BundleTile {
+  const { components, ...bundle } = b;
+
+  // Własne zdjęcie zestawu (migracja 85) wygrywa z mozaiką: jedno zdjęcie
+  // wypełnia cały kafelek (mosaicTileClass(1, 0) = col-span-2 row-span-2).
+  const thumbnails = bundle.image_url ? [bundle.image_url] : mosaicThumbnails(components);
 
   // Number() to pas bezpieczeństwa (jak w BundleOffer): typ mówi number, ale
   // wiersz idzie przez rzutowanie z zapytania — gdyby numeric przyszedł jako

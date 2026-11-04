@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import {
   DndContext,
@@ -28,7 +28,13 @@ import { effectivePrice } from "@/app/_lib/pricing";
 import { computeBundleDiscount, type BundleDiscountType } from "@/app/_lib/bundles";
 import { byBundleSortOrder } from "@/app/_lib/bundle-order";
 import { formatPrice } from "@/app/_lib/format";
+import { compressIfNeeded } from "@/app/_lib/image-compress";
 import { createBundle, saveBundle, deleteBundle, reorderBundles } from "./actions";
+
+// Formaty, które przyjmie serwer (validateImageUpload). Sprawdzamy już w
+// przeglądarce, żeby HEIC z iPhone'a dał jasny komunikat od razu, a nie
+// dopiero po kliknięciu „Zapisz".
+const BUNDLE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 
 // Minimalny kształt produktu do pickera (lista może mieć setki pozycji —
 // page.tsx nie ciągnie pełnych wierszy). Eksport stąd, NIE z page.tsx.
@@ -275,6 +281,44 @@ function BundleForm({
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
 
+  // Własne zdjęcie zestawu (migracja 85). Plik trzymamy w stanie i dokładamy
+  // do FormData przy zapisie — input nie ma `name`, żeby nie poleciał
+  // oryginał sprzed kompresji.
+  const [imagePreview, setImagePreview] = useState<string | null>(bundle?.image_url ?? null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [removeImage, setRemoveImage] = useState(false);
+  const [compressing, setCompressing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function onImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    setCompressing(true);
+    try {
+      const ready = await compressIfNeeded(file);
+      if (!BUNDLE_IMAGE_TYPES.includes(ready.type)) {
+        setError("Tego formatu nie da się wgrać (np. HEIC z iPhone'a). Zapisz zdjęcie jako JPG lub PNG.");
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+      setImageFile(ready);
+      setImagePreview(URL.createObjectURL(ready));
+      setRemoveImage(false);
+    } finally {
+      setCompressing(false);
+    }
+  }
+
+  function clearImage() {
+    setImageFile(null);
+    setImagePreview(null);
+    // Usunięcie z bazy tylko, gdy zestaw MA zapisane zdjęcie — samo cofnięcie
+    // świeżo wybranego pliku niczego nie kasuje.
+    setRemoveImage(!!bundle?.image_url);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
 
   // Wyszukiwarka jak w /admin/produkty — filtr kliencki po znormalizowanym tekście.
@@ -302,6 +346,8 @@ function BundleForm({
 
   function submit(formData: FormData) {
     setError(null);
+    if (imageFile) formData.set("image", imageFile, imageFile.name);
+    else if (removeImage) formData.set("remove_image", "1");
     startTransition(async () => {
       const action = bundle ? saveBundle : createBundle;
       const res = await action(formData, selectedIds);
@@ -330,6 +376,64 @@ function BundleForm({
         <Field label="Opis (DE)" hint="Puste → na /de pokaże się opis PL." className="md:col-span-2" composite>
           <input type="hidden" name="description_de" value={descriptionDe} />
           <RichTextEditor value={descriptionDe} onChange={setDescriptionDe} ariaLabel="Opis zestawu (DE)" />
+        </Field>
+        <Field
+          label="Zdjęcie zestawu"
+          hint="Opcjonalne. Pokaże się na kafelku zestawu (strona główna, lista /zestawy) zamiast mozaiki ze zdjęć mebli. Najlepiej poziome — kafelek ma proporcje 4:3, tak jak podgląd obok."
+          className="md:col-span-2"
+          composite
+        >
+          <div className="flex flex-col sm:flex-row gap-4 items-start">
+            {/* Ten sam kadr co kafelek w sklepie (aspect-[4/3], object-cover). */}
+            <div className="relative w-full sm:w-64 aspect-[4/3] shrink-0 rounded-xl overflow-hidden bg-stone-100 dark:bg-stone-800 border border-[var(--border)] flex items-center justify-center">
+              {imagePreview ? (
+                <Image
+                  src={imagePreview}
+                  alt="Podgląd zdjęcia zestawu"
+                  fill
+                  sizes="256px"
+                  unoptimized
+                  className="object-cover"
+                />
+              ) : (
+                <span className="text-xs text-[var(--muted)] text-center px-4">
+                  Brak — na kafelku mozaika ze zdjęć mebli
+                </span>
+              )}
+            </div>
+            <div className="flex flex-col gap-2 min-w-0">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={BUNDLE_IMAGE_TYPES.join(",")}
+                onChange={onImageChange}
+                aria-label="Wybierz zdjęcie zestawu"
+                className="w-full text-sm text-[var(--fg)] file:mr-3 file:px-4 file:py-2 file:rounded-full file:border file:border-[var(--border)] file:bg-[var(--card-bg)] file:text-[var(--fg)] file:text-xs file:font-sans file:uppercase file:tracking-widest file:cursor-pointer hover:file:border-[var(--color-gold)]"
+              />
+              {compressing && (
+                <p className="text-xs text-[var(--color-gold)]">Przygotowuję zdjęcie…</p>
+              )}
+              {imagePreview && !compressing && (
+                <button
+                  type="button"
+                  onClick={clearImage}
+                  className="self-start px-3 py-1.5 text-xs font-sans uppercase tracking-widest border border-[var(--border)] text-[var(--muted)] rounded-full hover:border-red-300 hover:text-red-600 transition-colors"
+                >
+                  Usuń zdjęcie
+                </button>
+              )}
+              {imageFile && (
+                <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                  Nowe zdjęcie zapisze się po kliknięciu „{bundle ? "Zapisz zestaw" : "Utwórz zestaw"}”.
+                </p>
+              )}
+              {removeImage && (
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  Zdjęcie zniknie po kliknięciu „Zapisz zestaw” — kafelek wróci do mozaiki.
+                </p>
+              )}
+            </div>
+          </div>
         </Field>
         {!bundle && (
           <Field label="Adres (slug)" hint="Zostaw puste żeby wygenerować z nazwy.">
@@ -461,7 +565,7 @@ function BundleForm({
       <div className="flex items-center gap-2 pt-2">
         <button
           type="submit"
-          disabled={pending || selectedIds.length < 2}
+          disabled={pending || compressing || selectedIds.length < 2}
           className="px-5 py-2.5 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50"
         >
           {pending ? "Zapisuję..." : bundle ? "Zapisz zestaw" : "Utwórz zestaw"}

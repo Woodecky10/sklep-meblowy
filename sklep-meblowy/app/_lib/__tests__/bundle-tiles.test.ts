@@ -56,6 +56,23 @@ describe("buildBundleTiles", () => {
     expect(tile.componentCount).toBe(2);
   });
 
+  it("własne zdjęcie zestawu (migracja 85) zastępuje mozaikę", () => {
+    const [tile] = buildBundleTiles([
+      bundle([product("fotel"), product("sofa")], { image_url: "https://x/zestawy/montes.jpg" }),
+    ]);
+    expect(tile.thumbnails).toEqual(["https://x/zestawy/montes.jpg"]);
+    expect(tile.componentCount).toBe(2);
+  });
+
+  it("puste własne zdjęcie (null, \"\", brak kolumny przed migracją) = mozaika", () => {
+    for (const image_url of [null, "", undefined]) {
+      const [tile] = buildBundleTiles([
+        bundle([product("fotel"), product("sofa")], { image_url }),
+      ]);
+      expect(tile.thumbnails).toEqual(["fotel.jpg", "sofa.jpg"]);
+    }
+  });
+
   it("powtórzone zdjęcia odpadają PRZED obcięciem do 4", () => {
     const [tile] = buildBundleTiles([
       bundle([

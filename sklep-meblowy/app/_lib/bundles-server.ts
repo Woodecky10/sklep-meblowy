@@ -110,8 +110,8 @@ export async function getBundleBySlug(
 }
 
 // Kafelki WSZYSTKICH widocznych zestawów — lista /zestawy i sekcja na stronie
-// głównej (ta pierwsze HOME_BUNDLES_VISIBLE). Kolejność: najnowsze pierwsze
-// (order z fetchAllBundles) — zestaw nie ma własnej kolejności ani zdjęcia.
+// głównej (slider). Kolejność z fetchAllBundles (sort_order z panelu, migracja
+// 83); własne zdjęcie zestawu (migracja 85) rozstrzyga buildBundleTile.
 export async function getVisibleBundleTiles(
   locale: Locale = DEFAULT_LOCALE
 ): Promise<BundleTile[]> {
