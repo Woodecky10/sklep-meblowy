@@ -1,11 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { randomUUID } from "node:crypto";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
 import { invalidateBundlesCache } from "@/app/_lib/bundles-server";
 import { sanitizeRichHtml } from "@/app/_lib/product-html";
 import { validateReorderIds } from "@/app/_lib/bundle-order";
+import { validateImageUpload } from "@/app/_lib/image-upload";
+import {
+  BUNDLE_IMAGE_BUCKET,
+  BUNDLE_IMAGE_PREFIX,
+  bundleImageStoragePath,
+} from "@/app/_lib/bundle-image";
 
 export type ActionResult =
   | { ok: true; message?: string; data?: unknown }
@@ -74,6 +81,53 @@ function parseBundleForm(formData: FormData, productIds: string[]):
   };
 }
 
+// ============================================================
+// Własne zdjęcie zestawu (migracja 85)
+// ============================================================
+// Formularz wysyła `image` (plik już skompresowany w przeglądarce) albo
+// `remove_image=1`. Brak obu = zdjęcie bez zmian. Plik ląduje w buckecie
+// zdjęć produktów, folder zestawy/ (bundle-image.ts).
+async function uploadBundleImage(
+  formData: FormData
+): Promise<{ ok: true; url: string | null } | { ok: false; error: string }> {
+  const file = formData.get("image");
+  if (!(file instanceof File) || file.size === 0) return { ok: true, url: null };
+  // Allowlista formatów (raster) — SVG odrzucony (stored XSS), jak w kafelkach.
+  const valid = validateImageUpload(file);
+  if (!valid.ok) return { ok: false, error: valid.error };
+
+  const path = `${BUNDLE_IMAGE_PREFIX}${Date.now()}-${randomUUID()}.${valid.ext}`;
+  const supabase = await createAdminClient();
+  const { error } = await supabase.storage.from(BUNDLE_IMAGE_BUCKET).upload(path, valid.file, {
+    contentType: valid.contentType,
+    cacheControl: "31536000",
+    upsert: false,
+  });
+  if (error) return { ok: false, error: `Nie udało się wgrać zdjęcia: ${error.message}` };
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from(BUNDLE_IMAGE_BUCKET).getPublicUrl(path);
+  return { ok: true, url: publicUrl };
+}
+
+// Kasuje plik zestawu ze storage. Cudzych plików (zdjęcia produktów, adresy
+// zewnętrzne) nie rusza — bundleImageStoragePath zwraca dla nich null. Błąd
+// kasowania tylko zostawia sierotę w storage, zapisu nie psuje.
+async function deleteBundleImageFile(url: string | null | undefined): Promise<void> {
+  const path = bundleImageStoragePath(url);
+  if (!path) return;
+  const supabase = await createAdminClient();
+  await supabase.storage.from(BUNDLE_IMAGE_BUCKET).remove([path]);
+}
+
+// Obecny adres zdjęcia prosto z bazy (nie z formularza — klient mógłby podać
+// cudzy). Przed migracją 85 kolumny nie ma: zapytanie daje błąd → null.
+async function currentBundleImage(id: string): Promise<string | null> {
+  const supabase = await createAdminClient();
+  const { data } = await supabase.from("bundles").select("image_url").eq("id", id).maybeSingle();
+  return (data as { image_url?: string | null } | null)?.image_url ?? null;
+}
+
 function invalidateAll() {
   invalidateBundlesCache();
   // Boxy zestawów siedzą na kartach produktów i stronach /zestaw/* — pełny
@@ -93,6 +147,9 @@ export async function createBundle(
   const slugInput = sanitize(formData.get("slug"), 80);
   const slug = slugInput ? toSlug(slugInput) : toSlug(parsed.name);
   if (!slug) return { ok: false, error: "Nie udało się wygenerować adresu (slug)" };
+
+  const upload = await uploadBundleImage(formData);
+  if (!upload.ok) return upload;
 
   const supabase = await createAdminClient();
   // Nowy zestaw na KONIEC listy (migracja 83) — jak createCollection.
@@ -115,11 +172,15 @@ export async function createBundle(
       discount_type: parsed.discountType,
       discount_value: parsed.discountValue,
       is_active: parsed.isActive,
+      // Klucz tylko przy wgranym zdjęciu — insert bez zdjęcia działa też
+      // przed migracją 85.
+      ...(upload.url ? { image_url: upload.url } : {}),
     } as never)
     .select("id")
     .single();
 
   if (error) {
+    await deleteBundleImageFile(upload.url);
     if (error.code === "23505")
       return { ok: false, error: `Zestaw o adresie "${slug}" już istnieje` };
     return { ok: false, error: error.message };
@@ -155,6 +216,10 @@ export async function saveBundle(
   const parsed = parseBundleForm(formData, productIds);
   if (!parsed.ok) return parsed;
 
+  const upload = await uploadBundleImage(formData);
+  if (!upload.ok) return upload;
+  const removeImage = formData.get("remove_image") === "1";
+
   const supabase = await createAdminClient();
   const { error } = await supabase.rpc("save_bundle", {
     p_id: id,
@@ -167,7 +232,26 @@ export async function saveBundle(
     p_is_active: parsed.isActive,
     p_product_ids: productIds,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    await deleteBundleImageFile(upload.url);
+    return { ok: false, error: error.message };
+  }
+
+  // Zdjęcie osobnym UPDATE-em (save_bundle z migracji 55 go nie zna). Stary
+  // plik kasujemy dopiero PO udanym zapisie nowego adresu.
+  if (upload.url || removeImage) {
+    const previous = await currentBundleImage(id);
+    const { error: imgErr } = await supabase
+      .from("bundles")
+      .update({ image_url: upload.url } as never)
+      .eq("id", id);
+    if (imgErr) {
+      await deleteBundleImageFile(upload.url);
+      invalidateAll();
+      return { ok: false, error: `Zestaw zapisany, ale zdjęcie nie: ${imgErr.message}` };
+    }
+    if (previous && previous !== upload.url) await deleteBundleImageFile(previous);
+  }
 
   invalidateAll();
   return { ok: true, message: "Zestaw zapisany" };
@@ -178,9 +262,11 @@ export async function deleteBundle(formData: FormData): Promise<ActionResult> {
   const id = sanitize(formData.get("id"));
   if (!id) return { ok: false, error: "Brak id" };
 
+  const image = await currentBundleImage(id);
   const supabase = await createAdminClient();
   const { error } = await supabase.from("bundles").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
+  await deleteBundleImageFile(image);
 
   invalidateAll();
   return { ok: true, message: "Zestaw usunięty" };
