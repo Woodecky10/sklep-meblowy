@@ -5,8 +5,10 @@
 // koszyka jedną akcją (ADD_BUNDLE). Reużywany przez modal na karcie produktu
 // (Task 8) i stronę /zestaw/[slug] (Task 9).
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { localizeHref } from "@/app/_lib/i18n";
 import type { BundleWithComponents } from "@/app/_lib/types";
 import { useCart, type CartItem } from "@/app/_context/CartContext";
 import {
@@ -35,7 +37,11 @@ export default function BundleConfigurator({
   const locale = useClientLocale();
   const rate = useEurRate();
   const t = getDictionary(locale);
-  const { addBundle } = useCart();
+  const { addBundle, dismissNotification } = useCart();
+  const router = useRouter();
+  // `navigating` blokuje drugi klik w trakcie przejścia na /koszyk — inaczej
+  // podwójne kliknięcie „Kup teraz" dodałoby zestaw 2 razy (jak AddToCartButton).
+  const [navigating, startTransition] = useTransition();
 
   const [selections, setSelections] = useState<Record<string, Record<string, string>>>(
     () => {
@@ -64,8 +70,10 @@ export default function BundleConfigurator({
     Number(bundle.discount_value)
   );
 
-  function handleAdd() {
-    if (!allComplete) return;
+  // buyNow = „Kup teraz" (właściciel 2026-11-04): to samo dodanie całego
+  // zestawu, a potem od razu /koszyk — jak przycisk na karcie produktu.
+  function handleAdd(buyNow = false) {
+    if (!allComplete || navigating) return;
     const unitKey = bundleUnitKey(
       bundle.id,
       bundle.components.map((p) => ({
@@ -90,6 +98,11 @@ export default function BundleConfigurator({
       },
     }));
     addBundle(items);
+    if (buyNow) {
+      // Bez dymka „Dodano do koszyka" — klient za chwilę widzi cały koszyk.
+      dismissNotification();
+      startTransition(() => router.push(localizeHref("/koszyk", locale)));
+    }
     onAdded?.();
   }
 
@@ -135,14 +148,25 @@ export default function BundleConfigurator({
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={handleAdd}
-        disabled={!allComplete}
-        className="w-full py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {allComplete ? t.bundle.addToCart : t.bundle.chooseOptions}
-      </button>
+      <div className="flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={() => handleAdd()}
+          disabled={!allComplete || navigating}
+          className="w-full py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {allComplete ? t.bundle.addToCart : t.bundle.chooseOptions}
+        </button>
+        {/* Wygląd 1:1 z „Kup teraz" na karcie produktu (AddToCartButton). */}
+        <button
+          type="button"
+          onClick={() => handleAdd(true)}
+          disabled={!allComplete || navigating}
+          className="w-full py-4 border border-[var(--color-navy)] text-[var(--color-navy)] dark:border-[var(--color-gold)] dark:text-[var(--color-gold)] font-sans font-semibold text-sm uppercase tracking-widest rounded-full enabled:hover:bg-[var(--color-navy)] enabled:hover:text-white dark:enabled:hover:bg-[var(--color-gold)] dark:enabled:hover:text-[var(--color-navy)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {t.product.buyNow}
+        </button>
+      </div>
     </div>
   );
 }
