@@ -13,7 +13,6 @@ import { CollapsibleSection, Field, inputClass, type Toast } from "./_shared";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import {
   applyFabricSelection,
-  buildGroupSurchargeMap,
   expandFabrics,
   fabricValueBelongsTo,
   FABRIC_OPTION_NAME,
@@ -40,6 +39,7 @@ export default function VariantsEditor({
   categorySlug,
   fabrics,
   fabricGroups,
+  groupSurcharges,
   initialVariantInfo,
   variantImageGroups,
   onToast,
@@ -49,6 +49,8 @@ export default function VariantsEditor({
   categorySlug: string;
   fabrics: Fabric[];
   fabricGroups: FabricPriceGroup[];
+  // Dopłaty za tkaniny dla TEGO produktu (id grupy → zł); grupy służą tylko do nazw.
+  groupSurcharges: Record<string, number>;
   initialVariantInfo: Record<string, VariantInfoEntry>;
   // Zdjęcia wartości opcji z innych produktów — do wybieraka w panelu 📷.
   variantImageGroups: VariantImageGroup[];
@@ -219,7 +221,7 @@ export default function VariantsEditor({
     const base = variants ?? { options: [] };
     const { values, valuePrices } = expandFabrics(
       selectedFabrics.map((f) => ({ name: f.name, colors: f.colors ?? [], price: f.price ?? 0, group_id: f.group_id })),
-      buildGroupSurchargeMap(fabricGroups)
+      groupSurcharges
     );
     // Zachowaj doplaty istniejacych wartosci-sierot (spoza katalogu).
     const currentVP =
@@ -497,7 +499,7 @@ export default function VariantsEditor({
       {fabricPickerOpen && (
         <FabricPicker
           fabrics={fabrics}
-          priceGroups={fabricGroups}
+          groupSurcharges={groupSurcharges}
           initiallySelectedValues={
             variants?.options.find((o) => o.name === FABRIC_OPTION_NAME)?.values ?? []
           }
@@ -921,21 +923,20 @@ function OptionRow({
 
 function FabricPicker({
   fabrics,
-  priceGroups,
+  groupSurcharges,
   initiallySelectedValues,
   onApply,
   onCancel,
 }: {
   fabrics: Fabric[];
-  // Grupy cenowe (Standard/Premium/…) — INNY byt niż lokalne `groups` (grupowanie
-  // po kategorii do sekcji pickera, z groupFabricsByCategory poniżej).
-  priceGroups: FabricPriceGroup[];
+  // Dopłaty grup cenowych dla tego produktu (id grupy → zł).
+  groupSurcharges: Record<string, number>;
   initiallySelectedValues: string[];
   onApply: (selectedFabrics: Fabric[], keptOrphanValues: string[]) => void;
   onCancel: () => void;
 }) {
   const toLite = (f: Fabric) => ({ name: f.name, colors: f.colors ?? [], price: f.price ?? 0, group_id: f.group_id });
-  const surchargeById = buildGroupSurchargeMap(priceGroups);
+  const surchargeById = groupSurcharges;
 
   const [selectedNames, setSelectedNames] = useState<string[]>(() =>
     fabrics

@@ -129,3 +129,37 @@ export function fabricSizeIdFromForm(
   if (id === "") return null;
   return sizes.some((s) => s.id === id) ? id : null;
 }
+
+// Pole rozmiaru na produkcie: znacznik fabric_size_present, fabric_size_id
+// ("" = z kategorii, id rozmiaru, "__own" = własne dopłaty) i
+// own_surcharge_<kod>. undefined = formularz bez znacznika (kolumn nie ruszamy).
+export function productFabricSizingFromForm(
+  formData: FormData,
+  groupCodes: string[],
+  sizes: { id: string }[]
+):
+  | { fabric_size_id: string | null; fabric_surcharges: FabricSurchargeByCode | null }
+  | { error: string }
+  | undefined {
+  if (!formData.has("fabric_size_present")) return undefined;
+
+  const raw = formData.get("fabric_size_id");
+  if (typeof raw === "string" && raw.trim() === "__own") {
+    const surcharges: FabricSurchargeByCode = {};
+    for (const code of groupCodes) {
+      const v = formData.get(`own_surcharge_${code}`);
+      const text = typeof v === "string" ? v.trim().replace(",", ".") : "";
+      if (text === "") {
+        surcharges[code] = 0;
+        continue;
+      }
+      const n = Number(text);
+      if (!Number.isFinite(n) || n < 0) return { error: "Dopłata musi być liczbą nieujemną" };
+      surcharges[code] = Math.round(n * 100) / 100;
+    }
+    return { fabric_size_id: null, fabric_surcharges: surcharges };
+  }
+
+  const id = fabricSizeIdFromForm(formData, "fabric_size_id", sizes) ?? null;
+  return { fabric_size_id: id, fabric_surcharges: null };
+}

@@ -12,6 +12,8 @@ import {
 } from "@/app/_lib/product-collection";
 import { getAllCategories } from "@/app/_lib/categories";
 import { extraCategoriesFromForm } from "@/app/_lib/extra-categories";
+import { productFabricSizingFromForm } from "@/app/_lib/fabric-sizes";
+import { recomputeFabricSurcharges } from "@/app/_lib/fabric-surcharge-recompute";
 import { validateImageUpload } from "@/app/_lib/image-upload";
 import {
   buildNewProductPayload,
@@ -275,6 +277,25 @@ export async function updateProductBasics(
   // przez sekcje w DescriptionSectionsEditor, nie przez to pole.
   const supabase = await createAdminClient();
 
+  // Rozmiar do dopłat za tkaninę (migracja 86). Kody grup i id rozmiarów
+  // czytamy z bazy tylko gdy formularz niesie znacznik; błąd odczytu przerywa
+  // zapis, żeby nie zapisać dopłat wg niepełnej listy.
+  let fabricSizing: ReturnType<typeof productFabricSizingFromForm>;
+  if (formData.has("fabric_size_present")) {
+    const [groupsRes, sizesRes] = await Promise.all([
+      supabase.from("fabric_groups").select("code"),
+      supabase.from("fabric_sizes").select("id"),
+    ]);
+    if (groupsRes.error) return { ok: false, error: groupsRes.error.message };
+    if (sizesRes.error) return { ok: false, error: sizesRes.error.message };
+    fabricSizing = productFabricSizingFromForm(
+      formData,
+      ((groupsRes.data ?? []) as { code: string }[]).map((g) => g.code),
+      (sizesRes.data ?? []) as { id: string }[]
+    );
+    if (fabricSizing && "error" in fabricSizing) return { ok: false, error: fabricSizing.error };
+  }
+
   const updates: Record<string, unknown> = {
     name,
     price,
@@ -299,6 +320,10 @@ export async function updateProductBasics(
     features: parseFeatureRows(formData.get("features_json")),
   };
   if (extraCategories !== undefined) updates.extra_categories = extraCategories;
+  if (fabricSizing && !("error" in fabricSizing)) {
+    updates.fabric_size_id = fabricSizing.fabric_size_id;
+    updates.fabric_surcharges = fabricSizing.fabric_surcharges;
+  }
   const collectionUpdates = await collectionUpdatesFor(supabase, id, collectionField.value);
   if (!collectionUpdates.ok) return { ok: false, error: collectionUpdates.error };
   Object.assign(updates, collectionUpdates.updates);
@@ -309,6 +334,10 @@ export async function updateProductBasics(
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
+
+  // Zmiana rozmiaru albo kategorii głównej zmienia obowiązujące dopłaty —
+  // przelicz zapisane dopłaty tkanin w wariantach produktu.
+  await recomputeFabricSurcharges({ productIds: [id] });
 
   await recordPriceHistory(id);
   // Promocja bez dat ma działać od razu, nie od najbliższego crona.
@@ -799,7 +828,14 @@ export async function duplicateProduct(
   if (fetchErr) return { ok: false, error: fetchErr.message };
   if (!source) return { ok: false, error: "Produkt nie istnieje" };
 
-  const payload = buildDuplicatePayload(source as unknown as DuplicateSource);
+  const sourceSizing = source as { fabric_size_id?: string | null; fabric_surcharges?: unknown };
+  const payload = {
+    ...buildDuplicatePayload(source as unknown as DuplicateSource),
+    // Kopia ma te same dopłaty za tkaninę co oryginał (select("*") bez
+    // migracji 86 da undefined, stąd ?? null).
+    fabric_size_id: sourceSizing.fabric_size_id ?? null,
+    fabric_surcharges: sourceSizing.fabric_surcharges ?? null,
+  };
 
   const { data: created, error: insertErr } = await supabase
     .from("products")

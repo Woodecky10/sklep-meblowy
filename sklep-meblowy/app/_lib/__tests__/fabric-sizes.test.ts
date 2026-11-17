@@ -3,6 +3,7 @@ import {
   effectiveGroupSurcharges,
   fabricSizeFromForm,
   fabricSizeIdFromForm,
+  productFabricSizingFromForm,
   needsFabricSize,
   parseSurchargeByCode,
   resolveFabricSizing,
@@ -104,4 +105,19 @@ describe("fabricSizeIdFromForm", () => {
     expect(fabricSizeIdFromForm(fd({ default_fabric_size_id: "s-fotel" }), "default_fabric_size_id", SIZES)).toBe("s-fotel");
     expect(fabricSizeIdFromForm(fd({ default_fabric_size_id: "s-nie-ma" }), "default_fabric_size_id", SIZES)).toBeNull();
   });
+});
+
+describe("productFabricSizingFromForm", () => {
+  it("bez znacznika → undefined", () => expect(productFabricSizingFromForm(new FormData(), CODES, SIZES)).toBeUndefined());
+  it("pusty wybór → rozmiar z kategorii", () =>
+    expect(productFabricSizingFromForm(fd({ fabric_size_present: "1", fabric_size_id: "" }), CODES, SIZES)).toEqual({ fabric_size_id: null, fabric_surcharges: null }));
+  it("wybrany rozmiar czyści własne dopłaty", () =>
+    expect(productFabricSizingFromForm(fd({ fabric_size_present: "1", fabric_size_id: "s-fotel", own_surcharge_premium: "50" }), CODES, SIZES)).toEqual({ fabric_size_id: "s-fotel", fabric_surcharges: null }));
+  it("nieznany rozmiar → null/null", () =>
+    expect(productFabricSizingFromForm(fd({ fabric_size_present: "1", fabric_size_id: "s-nie-ma" }), CODES, SIZES)).toEqual({ fabric_size_id: null, fabric_surcharges: null }));
+  it("własne dopłaty: wszystkie grupy, puste = 0", () =>
+    expect(productFabricSizingFromForm(fd({ fabric_size_present: "1", fabric_size_id: "__own", own_surcharge_premium: "120" }), CODES, SIZES))
+      .toEqual({ fabric_size_id: null, fabric_surcharges: { standard: 0, premium: 120, premium_high: 0 } }));
+  it("własne dopłaty z kwotą ujemną → błąd", () =>
+    expect(productFabricSizingFromForm(fd({ fabric_size_present: "1", fabric_size_id: "__own", own_surcharge_premium: "-1" }), CODES, SIZES)).toEqual({ error: "Dopłata musi być liczbą nieujemną" }));
 });
