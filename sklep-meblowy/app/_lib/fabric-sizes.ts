@@ -82,3 +82,36 @@ export function needsFabricSize(variants: ProductVariants | null, sizing: Fabric
   if (sizing.source !== "none") return false;
   return !!variants?.options.some((o) => o.name === FABRIC_OPTION_NAME);
 }
+
+// Parser formularza panelu rozmiarów: nazwa (trim, maks. 60 znaków), kolejność
+// i po jednej kwocie na grupę (pole surcharge_<kod>; puste = 0, przecinek ok).
+export function fabricSizeFromForm(
+  formData: FormData,
+  groupCodes: string[]
+):
+  | { ok: true; name: string; sort_order: number; surcharges: FabricSurchargeByCode }
+  | { ok: false; error: string } {
+  const rawName = formData.get("name");
+  const name = typeof rawName === "string" ? rawName.trim().slice(0, 60) : "";
+  if (!name) return { ok: false, error: "Nazwa rozmiaru jest wymagana" };
+
+  const rawSort = formData.get("sort_order");
+  const sortNum = typeof rawSort === "string" ? Number(rawSort) : NaN;
+  const sort_order = Number.isFinite(sortNum) ? Math.trunc(sortNum) : 0;
+
+  const surcharges: FabricSurchargeByCode = {};
+  for (const code of groupCodes) {
+    const raw = formData.get(`surcharge_${code}`);
+    const text = typeof raw === "string" ? raw.trim().replace(",", ".") : "";
+    if (text === "") {
+      surcharges[code] = 0;
+      continue;
+    }
+    const n = Number(text);
+    if (!Number.isFinite(n) || n < 0) {
+      return { ok: false, error: "Dopłata musi być liczbą nieujemną" };
+    }
+    surcharges[code] = Math.round(n * 100) / 100;
+  }
+  return { ok: true, name, sort_order, surcharges };
+}

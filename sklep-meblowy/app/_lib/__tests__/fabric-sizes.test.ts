@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   effectiveGroupSurcharges,
+  fabricSizeFromForm,
   needsFabricSize,
   parseSurchargeByCode,
   resolveFabricSizing,
@@ -75,4 +76,19 @@ describe("needsFabricSize", () => {
   });
   it("produkt ze źródłem nie potrzebuje", () =>
     expect(needsFabricSize(zTkanina, { source: "category", size: FOTEL, surcharges: FOTEL.surcharges })).toBe(false));
+});
+
+const fd = (o: Record<string, string>) => { const f = new FormData(); for (const [k, v] of Object.entries(o)) f.set(k, v); return f; };
+const CODES = ["standard", "premium", "premium_high"];
+
+describe("fabricSizeFromForm", () => {
+  it("czyta nazwę i kwoty wszystkich grup, przecinek jako separator", () =>
+    expect(fabricSizeFromForm(fd({ name: " Fotel ", sort_order: "2", surcharge_standard: "", surcharge_premium: "100", surcharge_premium_high: "160,50" }), CODES))
+      .toEqual({ ok: true, name: "Fotel", sort_order: 2, surcharges: { standard: 0, premium: 100, premium_high: 160.5 } }));
+  it("odrzuca pustą nazwę", () =>
+    expect(fabricSizeFromForm(fd({ name: "  " }), CODES)).toEqual({ ok: false, error: "Nazwa rozmiaru jest wymagana" }));
+  it("odrzuca kwotę ujemną i nieliczbową", () => {
+    expect(fabricSizeFromForm(fd({ name: "Fotel", surcharge_premium: "-5" }), CODES)).toEqual({ ok: false, error: "Dopłata musi być liczbą nieujemną" });
+    expect(fabricSizeFromForm(fd({ name: "Fotel", surcharge_premium: "abc" }), CODES)).toEqual({ ok: false, error: "Dopłata musi być liczbą nieujemną" });
+  });
 });
