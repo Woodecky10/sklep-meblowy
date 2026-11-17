@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getFabricBySlug, getFabricPriceGroups } from "@/app/_lib/fabrics";
 import { getFabricSizes } from "@/app/_lib/fabric-sizes-data";
+import { groupSurchargeLabel } from "@/app/_lib/fabric-sizes";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { pickLocalized, localizePath } from "@/app/_lib/i18n";
@@ -55,7 +56,9 @@ export default async function TkaninaPage({ params }: Props) {
   if (!fabric) notFound();
 
   const group = groups.find((g) => g.id === fabric.group_id);
-  const effective = (group?.surcharge ?? 0) + (fabric.price ?? 0);
+  // Kwota = dopłata grupy + korekta tkaniny; „zależy od mebla" tylko gdy któryś
+  // rozmiar wycenia tę grupę inaczej niż globalnie (groupSurchargeLabel).
+  const surchargeLabel = group ? groupSurchargeLabel(group, sizes, fabric.price ?? 0) : null;
   const description = pickLocalized(fabric.description ?? "", fabric.description_de, locale);
   const colors = (fabric.colors ?? []).map((c) => c.trim()).filter(Boolean);
 
@@ -135,14 +138,14 @@ export default async function TkaninaPage({ params }: Props) {
           {pickLocalized(fabric.name, fabric.name_de, locale)}
         </h1>
         <div className="flex items-center gap-3 flex-wrap text-sm font-sans">
-          {group && (
+          {group && surchargeLabel && (
             <span className="px-3 py-1 rounded-full border border-[var(--color-gold)] text-[var(--color-gold-text)] font-semibold">
               {pickLocalized(group.name, group.name_de, locale)}
               {" · "}
-              {effective > 0 && sizes.length > 0
+              {surchargeLabel.kind === "depends"
                 ? t.fabrics.surchargeDependsOnFurniture
-                : effective > 0
-                ? `+${formatMoney(effective, locale, rate)}`
+                : surchargeLabel.kind === "amount"
+                ? `+${formatMoney(surchargeLabel.amount, locale, rate)}`
                 : t.fabrics.groupNoSurcharge}
             </span>
           )}

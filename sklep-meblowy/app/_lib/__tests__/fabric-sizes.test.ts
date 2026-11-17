@@ -3,11 +3,12 @@ import {
   effectiveGroupSurcharges,
   fabricSizeFromForm,
   fabricSizeIdFromForm,
+  groupSurchargeLabel,
+  groupSurchargesByProduct,
   productFabricSizingFromForm,
   needsFabricSize,
   parseSurchargeByCode,
   resolveFabricSizing,
-  withGroupSurcharges,
   type FabricSize,
 } from "../fabric-sizes";
 
@@ -60,12 +61,49 @@ describe("effectiveGroupSurcharges", () => {
     expect(effectiveGroupSurcharges(GROUPS, { premium: 100 })).toEqual({ "g-std": 0, "g-pre": 100, "g-hi": 400 }));
 });
 
-describe("withGroupSurcharges", () => {
-  it("zwraca kopie z podmienioną dopłatą, bez mutacji wejścia", () => {
-    const out = withGroupSurcharges(GROUPS, { "g-pre": 100 });
-    expect(out.map((g) => g.surcharge)).toEqual([0, 100, 400]);
-    expect(GROUPS[1].surcharge).toBe(250);
+describe("groupSurchargesByProduct", () => {
+  const SOFA: FabricSize = { id: "s-sofa", name: "Sofa", sort_order: 1, created_at: "",
+    surcharges: { premium: 200 } };
+  const cats = [...CATS, { slug: "sofy", defaultFabricSizeId: "s-sofa" }];
+
+  it("dwa meble różnych rozmiarów → różne kwoty dla tego samego kodu grupy", () => {
+    const out = groupSurchargesByProduct(
+      [{ id: "fotel", category: "fotele" }, { id: "sofa", category: "sofy" }],
+      GROUPS, cats, [FOTEL, SOFA]
+    );
+    expect(out.fotel.premium).toBe(100);
+    expect(out.sofa.premium).toBe(200);
   });
+  it("grupa bez klucza w rozmiarze → globalna dopłata, kluczem jest kod grupy", () =>
+    expect(groupSurchargesByProduct([{ id: "sofa", category: "sofy" }], GROUPS, cats, [SOFA]))
+      .toEqual({ sofa: { standard: 0, premium: 200, premium_high: 400 } }));
+  it("produkt bez rozmiaru → globalne dopłaty grup", () =>
+    expect(groupSurchargesByProduct([{ id: "puf", category: "pufy" }], GROUPS, cats, [FOTEL, SOFA]))
+      .toEqual({ puf: { standard: 0, premium: 250, premium_high: 400 } }));
+  it("własne dopłaty produktu wygrywają z rozmiarem kategorii", () =>
+    expect(groupSurchargesByProduct(
+      [{ id: "fotel", category: "fotele", fabric_surcharges: { premium: 50 } }], GROUPS, cats, [FOTEL]
+    ).fotel.premium).toBe(50));
+});
+
+describe("groupSurchargeLabel", () => {
+  const STD = { code: "standard", surcharge: 0 };
+  const PRE = { code: "premium", surcharge: 250 };
+
+  it("rozmiar wycenia grupę inaczej niż globalnie → zależy od mebla", () =>
+    expect(groupSurchargeLabel(PRE, [FOTEL])).toEqual({ kind: "depends" }));
+  it("bez rozmiarów → kwota grupy", () =>
+    expect(groupSurchargeLabel(PRE, [])).toEqual({ kind: "amount", amount: 250 }));
+  it("grupa bez dopłaty i bez korekty → bez dopłaty", () =>
+    expect(groupSurchargeLabel(STD, [FOTEL])).toEqual({ kind: "none" }));
+  it("grupa 0 + korekta tkaniny > 0, rozmiary nie wyceniają grupy inaczej → kwota korekty, nie „zależy”", () =>
+    expect(groupSurchargeLabel(STD, [FOTEL, { surcharges: { premium: 100 } }], 20))
+      .toEqual({ kind: "amount", amount: 20 }));
+  it("rozmiar z dopłatą w grupie standard (globalnie 0) → zależy od mebla, nie „bez dopłaty”", () =>
+    expect(groupSurchargeLabel(STD, [{ surcharges: { standard: 50 } }])).toEqual({ kind: "depends" }));
+  it("rozmiar równy globalnej dopłacie albo bez klucza grupy → nie zależy", () =>
+    expect(groupSurchargeLabel(PRE, [{ surcharges: { premium: 250 } }, { surcharges: {} }], 10))
+      .toEqual({ kind: "amount", amount: 260 }));
 });
 
 describe("needsFabricSize", () => {

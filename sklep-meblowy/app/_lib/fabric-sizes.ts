@@ -69,12 +69,45 @@ export function effectiveGroupSurcharges(
   return out;
 }
 
-// Kopie grup z podmienioną dopłatą (bez mutacji wejścia).
-export function withGroupSurcharges<G extends { id: string; surcharge: number }>(
-  groups: G[],
-  byGroupId: Record<string, number>
-): G[] {
-  return groups.map((g) => (g.id in byGroupId ? { ...g, surcharge: byGroupId[g.id] } : { ...g }));
+// Dopłaty grup KLUCZOWANE KODEM grupy dla każdego produktu (id produktu → kod
+// grupy → zł). Karta produktu podaje je selektorowi tkanin, żeby nagłówek grupy
+// pokazywał kwotę mebla, który akurat renderuje (produkt główny i każdy
+// składnik zestawu w modalu „Kup w zestawie"). Produkt bez źródła = globalne.
+export function groupSurchargesByProduct(
+  products: { id: string; category: string; fabric_size_id?: string | null; fabric_surcharges?: unknown }[],
+  groups: { code: string; surcharge: number }[],
+  categories: { slug: string; defaultFabricSizeId?: string | null }[],
+  sizes: FabricSize[]
+): Record<string, Record<string, number>> {
+  // effectiveGroupSurcharges kluczuje wynik polem id — podajemy kod jako id.
+  const byCode = groups.map((g) => ({ id: g.code, code: g.code, surcharge: g.surcharge }));
+  const out: Record<string, Record<string, number>> = {};
+  for (const p of products) {
+    out[p.id] = effectiveGroupSurcharges(byCode, resolveFabricSizing(p, categories, sizes).surcharges);
+  }
+  return out;
+}
+
+export type GroupSurchargeLabel =
+  | { kind: "depends" }
+  | { kind: "amount"; amount: number }
+  | { kind: "none" };
+
+// Napis kwoty grupy na /tkaniny i /tkaniny/[slug]. „Zależy od mebla" tylko gdy
+// któryś rozmiar wycenia tę grupę inaczej niż jej globalna dopłata; inaczej
+// kwota (dopłata grupy + korekta tkaniny), a przy zerze „bez dopłaty".
+export function groupSurchargeLabel(
+  group: { code: string; surcharge: number },
+  sizes: { surcharges: FabricSurchargeByCode }[],
+  correction = 0
+): GroupSurchargeLabel {
+  const depends = sizes.some((s) => {
+    const v = s.surcharges[group.code];
+    return typeof v === "number" && v !== group.surcharge;
+  });
+  if (depends) return { kind: "depends" };
+  const amount = Math.round((group.surcharge + correction) * 100) / 100;
+  return amount > 0 ? { kind: "amount", amount } : { kind: "none" };
 }
 
 // Produkt z opcją „Tkanina" bez żadnego źródła dopłat wymaga wyboru rozmiaru.
