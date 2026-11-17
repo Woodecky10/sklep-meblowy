@@ -30,6 +30,13 @@ test("edytor produktu ma pole „Rozmiar do dopłat za tkaninę” z opcją „Z
 
 test("bez rozmiarów kwoty grup na karcie produktu = kwoty grup z /tkaniny", async ({ page }) => {
   await page.goto("/tkaniny");
+  // Gdy rozmiary są w użyciu, karta produktu ma pokazywać kwoty SWOJEGO
+  // rozmiaru, a /tkaniny napis zamiast kwoty — równość z /tkaniny przestaje
+  // obowiązywać. Test sprawdza tylko stan sprzed rozmiarów.
+  test.skip(
+    (await page.getByText("dopłata zależy od mebla").count()) > 0,
+    "rozmiary do dopłat są w użyciu — /tkaniny nie pokazuje już kwot globalnych"
+  );
   const expected = new Map<string, string>();
   const sections = page.locator("section").filter({ has: page.locator("h2") });
   for (const section of await sections.all()) {
