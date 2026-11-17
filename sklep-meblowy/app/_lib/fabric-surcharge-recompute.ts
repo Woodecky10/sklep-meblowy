@@ -52,9 +52,11 @@ export function planFabricSurchargeUpdates(input: {
 // tkaniny/grupy/rozmiaru — bez diffowania co się zmieniło (tanio i zawsze
 // poprawnie; skala sklepu: setki produktów). Czyta bazę wprost, nie przez
 // cache — bywa wołana tuż po zapisie. Błąd któregokolwiek odczytu = brak zapisu.
+// ok: false = błąd odczytu albo nieudany zapis choć jednego produktu — wołający
+// mówi wtedy adminowi, że wiersz zapisał, ale dopłat nie przeliczył.
 export async function recomputeFabricSurcharges(
   opts?: { productIds?: string[] }
-): Promise<{ updated: number }> {
+): Promise<{ updated: number; ok: boolean }> {
   const supabase = await createAdminClient();
 
   let productsQuery = supabase
@@ -82,7 +84,7 @@ export async function recomputeFabricSurcharges(
       `[recomputeFabricSurcharges] odczyt ${failed[0]} nie powiódł się:`,
       (failed[1] as { message?: string }).message
     );
-    return { updated: 0 };
+    return { updated: 0, ok: false };
   }
 
   const sizes = ((sizesRes.data ?? []) as FabricSize[]).map((s) => ({
@@ -106,8 +108,20 @@ export async function recomputeFabricSurcharges(
     invalidateFacetsCache();
     revalidatePath("/sklep");
   }
-  return { updated };
+  return { updated, ok: updated === changed.length };
 }
+
+// Komunikat dla admina, gdy zapis wiersza przeszedł, a przeliczenie dopłat nie
+// (recomputeFabricSurcharges zwróciło ok: false). Ponowny zapis tkaniny, grupy
+// albo rozmiaru przelicza wszystko od nowa, więc wystarczy spróbować jeszcze raz.
+export const RECOMPUTE_FAILED_RETRY =
+  "Zapisano, ale nie udało się przeliczyć dopłat w produktach. Spróbuj zapisać ponownie.";
+
+// Wariant dla kategorii i produktu: tam przeliczenie idzie tylko przy faktycznej
+// zmianie rozmiaru/kategorii, więc ponowny zapis bez zmian go nie powtórzy.
+// Pełne przeliczenie robi zapis grupy cenowej w panelu Tkaniny.
+export const RECOMPUTE_FAILED_SAVE_GROUP =
+  "Zapisano, ale nie udało się przeliczyć dopłat w produktach. Żeby je przeliczyć, zapisz bez zmian dowolną grupę cenową w panelu Tkaniny.";
 
 // Zapis wsadowy variants z ograniczoną współbieżnością. Błąd per produkt jest
 // logowany i pomijany (licznik liczy tylko udane) — częściowy fail nie wywala

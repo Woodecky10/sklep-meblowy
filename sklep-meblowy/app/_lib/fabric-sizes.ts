@@ -116,8 +116,28 @@ export function needsFabricSize(variants: ProductVariants | null, sizing: Fabric
   return !!variants?.options.some((o) => o.name === FABRIC_OPTION_NAME);
 }
 
+// Kwoty grup z pól `<prefix><kod>`. Puste albo brakujące pole POMIJA grupę —
+// wtedy obowiązuje jej globalna dopłata (nigdy ciche 0; wpisane „0" zostaje 0).
+// Przecinek jako separator dziesiętny; ujemna/nieliczbowa kwota = błąd.
+function surchargesFromForm(
+  formData: FormData,
+  prefix: string,
+  groupCodes: string[]
+): { ok: true; surcharges: FabricSurchargeByCode } | { ok: false; error: string } {
+  const surcharges: FabricSurchargeByCode = {};
+  for (const code of groupCodes) {
+    const raw = formData.get(`${prefix}${code}`);
+    const text = typeof raw === "string" ? raw.trim().replace(",", ".") : "";
+    if (text === "") continue;
+    const n = Number(text);
+    if (!Number.isFinite(n) || n < 0) return { ok: false, error: "Dopłata musi być liczbą nieujemną" };
+    surcharges[code] = Math.round(n * 100) / 100;
+  }
+  return { ok: true, surcharges };
+}
+
 // Parser formularza panelu rozmiarów: nazwa (trim, maks. 60 znaków), kolejność
-// i po jednej kwocie na grupę (pole surcharge_<kod>; puste = 0, przecinek ok).
+// i kwoty grup (pola surcharge_<kod>; puste = globalna dopłata grupy).
 export function fabricSizeFromForm(
   formData: FormData,
   groupCodes: string[]
@@ -132,21 +152,9 @@ export function fabricSizeFromForm(
   const sortNum = typeof rawSort === "string" ? Number(rawSort) : NaN;
   const sort_order = Number.isFinite(sortNum) ? Math.trunc(sortNum) : 0;
 
-  const surcharges: FabricSurchargeByCode = {};
-  for (const code of groupCodes) {
-    const raw = formData.get(`surcharge_${code}`);
-    const text = typeof raw === "string" ? raw.trim().replace(",", ".") : "";
-    if (text === "") {
-      surcharges[code] = 0;
-      continue;
-    }
-    const n = Number(text);
-    if (!Number.isFinite(n) || n < 0) {
-      return { ok: false, error: "Dopłata musi być liczbą nieujemną" };
-    }
-    surcharges[code] = Math.round(n * 100) / 100;
-  }
-  return { ok: true, name, sort_order, surcharges };
+  const parsed = surchargesFromForm(formData, "surcharge_", groupCodes);
+  if (!parsed.ok) return parsed;
+  return { ok: true, name, sort_order, surcharges: parsed.surcharges };
 }
 
 // Pole rozmiaru w formularzu: undefined = formularz bez pola (kolumny nie
@@ -166,6 +174,8 @@ export function fabricSizeIdFromForm(
 // Pole rozmiaru na produkcie: znacznik fabric_size_present, fabric_size_id
 // ("" = z kategorii, id rozmiaru, "__own" = własne dopłaty) i
 // own_surcharge_<kod>. undefined = formularz bez znacznika (kolumn nie ruszamy).
+// Własne dopłaty: puste/brakujące pole = globalna dopłata grupy; żadnej kwoty
+// = brak własnych dopłat (null), produkt wraca do rozmiaru z kategorii.
 export function productFabricSizingFromForm(
   formData: FormData,
   groupCodes: string[],
@@ -178,21 +188,42 @@ export function productFabricSizingFromForm(
 
   const raw = formData.get("fabric_size_id");
   if (typeof raw === "string" && raw.trim() === "__own") {
-    const surcharges: FabricSurchargeByCode = {};
-    for (const code of groupCodes) {
-      const v = formData.get(`own_surcharge_${code}`);
-      const text = typeof v === "string" ? v.trim().replace(",", ".") : "";
-      if (text === "") {
-        surcharges[code] = 0;
-        continue;
-      }
-      const n = Number(text);
-      if (!Number.isFinite(n) || n < 0) return { error: "Dopłata musi być liczbą nieujemną" };
-      surcharges[code] = Math.round(n * 100) / 100;
-    }
-    return { fabric_size_id: null, fabric_surcharges: surcharges };
+    const parsed = surchargesFromForm(formData, "own_surcharge_", groupCodes);
+    if (!parsed.ok) return { error: parsed.error };
+    const own = Object.keys(parsed.surcharges).length > 0 ? parsed.surcharges : null;
+    return { fabric_size_id: null, fabric_surcharges: own };
   }
 
   const id = fabricSizeIdFromForm(formData, "fabric_size_id", sizes) ?? null;
   return { fabric_size_id: id, fabric_surcharges: null };
+}
+
+// Opcje selecta rozmiaru: lista + bieżące id produktu/kategorii, gdy go na
+// liście nie ma (lista się nie wczytała albo jest nieaktualna). Bez tego select
+// wysłałby pierwszą opcję ("") i niezwiązany zapis po cichu wyczyściłby
+// rozmiar. Serwer i tak sprawdza id z bazą.
+export function sizeOptionsWithCurrent(
+  sizes: { id: string; name: string }[],
+  currentId: string | null | undefined,
+  missingLabel: string
+): { id: string; name: string }[] {
+  if (!currentId || sizes.some((s) => s.id === currentId)) return sizes;
+  return [...sizes, { id: currentId, name: missingLabel }];
+}
+
+// Czy zapis zmienia źródło dopłat produktu (kategoria główna, rozmiar, własne
+// dopłaty)? Tylko wtedy zapis podstawowych danych przelicza dopłaty — inaczej
+// niezwiązany zapis zmieniałby ceny produktów, których value_prices rozjechały
+// się z katalogiem. undefined (baza bez kolumny) = null; {} = brak dopłat.
+export function fabricSizingChanged(
+  before: { category: string; fabric_size_id?: string | null; fabric_surcharges?: unknown },
+  after: { category: string; fabric_size_id?: string | null; fabric_surcharges?: unknown }
+): boolean {
+  if (before.category !== after.category) return true;
+  if ((before.fabric_size_id ?? null) !== (after.fabric_size_id ?? null)) return true;
+  const a = parseSurchargeByCode(before.fabric_surcharges);
+  const b = parseSurchargeByCode(after.fabric_surcharges);
+  if (!a || !b) return a !== b;
+  const keys = Object.keys(a);
+  return keys.length !== Object.keys(b).length || keys.some((k) => a[k] !== b[k]);
 }

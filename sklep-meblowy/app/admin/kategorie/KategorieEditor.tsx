@@ -22,6 +22,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 // Czysty moduł (bez server-only), więc wolno go importować z "use client".
 import { warnsAboutMissingGpc } from "@/app/_lib/gpc";
+import { sizeOptionsWithCurrent } from "@/app/_lib/fabric-sizes";
 import type { NodeProductCounts } from "@/app/_lib/extra-categories";
 // Czyste helpery — z category-tree, NIE z categories.ts: ten drugi ciągnie
 // next/cache, więc import stąd ("use client") wysypałby build.
@@ -553,7 +554,13 @@ function CategoryForm({
             className={inputCls}
           >
             <option value="">— brak —</option>
-            {sizes.map((s) => (
+            {/* Zapisany rozmiar zostaje opcją nawet spoza listy (nieaktualna
+                lista) — inaczej select wysłałby „brak" i zapis go wyczyścił. */}
+            {sizeOptionsWithCurrent(
+              sizes,
+              initial?.defaultFabricSizeId,
+              "Obecny rozmiar (lista rozmiarów niedostępna)"
+            ).map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>

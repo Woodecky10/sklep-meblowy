@@ -5,8 +5,17 @@ import { createAdminClient } from "@/app/_lib/supabase/server";
 import { requireAdmin } from "@/app/_lib/admin";
 import { fabricSizeFromForm } from "@/app/_lib/fabric-sizes";
 import { invalidateFabricSizesCache } from "@/app/_lib/fabric-sizes-data";
-import { recomputeFabricSurcharges } from "@/app/_lib/fabric-surcharge-recompute";
+import {
+  RECOMPUTE_FAILED_RETRY,
+  recomputeFabricSurcharges,
+} from "@/app/_lib/fabric-surcharge-recompute";
 import type { ActionResult } from "./actions";
+
+// „w 1 produkcie", „w 2/5/0 produktach" — miejscownik liczby mnogiej jest
+// jeden dla wszystkich liczb poza 1.
+function inProducts(n: number): string {
+  return `w ${n} ${n === 1 ? "produkcie" : "produktach"}`;
+}
 
 // Kody grup cenowych (klucze map dopłat rozmiaru). Błąd odczytu = brak zapisu.
 async function readGroupCodes(
@@ -64,9 +73,10 @@ export async function updateFabricSize(formData: FormData): Promise<ActionResult
   if (error) return { ok: false, error: error.message };
 
   invalidateFabricSizesCache();
-  const { updated } = await recomputeFabricSurcharges();
+  const recompute = await recomputeFabricSurcharges();
   revalidatePath("/admin/tkaniny");
-  return { ok: true, message: `Zapisano rozmiar. Przeliczono dopłaty w ${updated} produktach.` };
+  if (!recompute.ok) return { ok: false, error: RECOMPUTE_FAILED_RETRY };
+  return { ok: true, message: `Zapisano rozmiar. Przeliczono dopłaty ${inProducts(recompute.updated)}.` };
 }
 
 export async function deleteFabricSize(formData: FormData): Promise<ActionResult> {
@@ -79,7 +89,16 @@ export async function deleteFabricSize(formData: FormData): Promise<ActionResult
   if (error) return { ok: false, error: error.message };
 
   invalidateFabricSizesCache();
-  const { updated } = await recomputeFabricSurcharges();
+  const recompute = await recomputeFabricSurcharges();
   revalidatePath("/admin/tkaniny");
-  return { ok: true, message: `Usunięto rozmiar. Przeliczono dopłaty w ${updated} produktach.` };
+  if (!recompute.ok) {
+    // Ponowne „Usuń" na nieistniejącym już wierszu nie zwraca błędu i
+    // przelicza dopłaty od nowa.
+    return {
+      ok: false,
+      error:
+        "Usunięto rozmiar, ale nie udało się przeliczyć dopłat w produktach. Kliknij „Usuń” jeszcze raz.",
+    };
+  }
+  return { ok: true, message: `Usunięto rozmiar. Przeliczono dopłaty ${inProducts(recompute.updated)}.` };
 }

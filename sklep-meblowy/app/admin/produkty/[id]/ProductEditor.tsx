@@ -28,6 +28,7 @@ import { MAX_FEATURES } from "@/app/_lib/product-features";
 import type { VariantImageGroup } from "@/app/_lib/variant-image-suggestions";
 import { saleStatus, type SaleStatus } from "@/app/_lib/sale-schedule";
 import { looksLikeDiscountClaim } from "@/app/_lib/pricing";
+import { sizeOptionsWithCurrent } from "@/app/_lib/fabric-sizes";
 
 export default function ProductEditor({
   product,
@@ -479,44 +480,59 @@ export default function ProductEditor({
           />
 
           {/* Rozmiar do dopłat za tkaninę: znacznik obecności — akcja bez
-              znacznika nie rusza kolumn. */}
-          <input type="hidden" name="fabric_size_present" value="1" />
-          <Field
-            label="Rozmiar do dopłat za tkaninę"
-            hint="Decyduje o wysokości dopłat za tkaniny. To nie jest rozmiar mebla pokazywany klientowi."
-          >
-            <select
-              name="fabric_size_id"
-              value={fabricSizeChoice}
-              onChange={(e) => setFabricSizeChoice(e.target.value)}
-              className={inputClass}
-            >
-              <option value="">
-                {categorySizeName
-                  ? `Z kategorii: ${categorySizeName}`
-                  : "Z kategorii: brak (dopłaty z grup cenowych)"}
-              </option>
-              {fabricSizes.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-              <option value="__own">Własne dopłaty…</option>
-            </select>
-          </Field>
-          {fabricSizeChoice === "__own" &&
-            fabricGroups.map((g) => (
-              <Field key={g.id} label={`Dopłata ${g.name} (zł)`}>
-                <input
-                  name={`own_surcharge_${g.code}`}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  defaultValue={product.fabric_surcharges?.[g.code] ?? ""}
+              znacznika nie rusza kolumn. Pusta lista grup cenowych = błąd
+              odczytu (grupy są zawsze trzy): bez pól „Własne dopłaty" zapis
+              wpisałby głupoty, więc wtedy pola i znacznika nie ma wcale. */}
+          {fabricGroups.length > 0 && (
+            <>
+              <input type="hidden" name="fabric_size_present" value="1" />
+              <Field
+                label="Rozmiar do dopłat za tkaninę"
+                hint="Decyduje o wysokości dopłat za tkaniny. To nie jest rozmiar mebla pokazywany klientowi."
+              >
+                <select
+                  name="fabric_size_id"
+                  value={fabricSizeChoice}
+                  onChange={(e) => setFabricSizeChoice(e.target.value)}
                   className={inputClass}
-                />
+                >
+                  <option value="">
+                    {categorySizeName
+                      ? `Z kategorii: ${categorySizeName}`
+                      : "Z kategorii: brak (dopłaty z grup cenowych)"}
+                  </option>
+                  {/* Bieżący rozmiar zostaje opcją nawet gdy lista rozmiarów się
+                      nie wczytała — inaczej select wysłałby "" i niezwiązany
+                      zapis wyczyściłby rozmiar. */}
+                  {sizeOptionsWithCurrent(
+                    fabricSizes,
+                    product.fabric_size_id,
+                    "Obecny rozmiar (lista rozmiarów niedostępna)"
+                  ).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                  <option value="__own">Własne dopłaty…</option>
+                </select>
               </Field>
-            ))}
+              {/* Puste pole = globalna dopłata grupy (nie 0); 0 trzeba wpisać. */}
+              {fabricSizeChoice === "__own" &&
+                fabricGroups.map((g) => (
+                  <Field key={g.id} label={`Dopłata ${g.name} (zł)`}>
+                    <input
+                      name={`own_surcharge_${g.code}`}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      defaultValue={product.fabric_surcharges?.[g.code] ?? ""}
+                      placeholder={`jak grupa: ${g.surcharge}`}
+                      className={inputClass}
+                    />
+                  </Field>
+                ))}
+            </>
+          )}
 
           {/* Kolekcja (2026-10-29): druga droga obok /admin/kolekcje. Znacznik
               obecności + select — akcja bez znacznika nie rusza kolumny. */}

@@ -3,12 +3,14 @@ import {
   effectiveGroupSurcharges,
   fabricSizeFromForm,
   fabricSizeIdFromForm,
+  fabricSizingChanged,
   groupSurchargeLabel,
   groupSurchargesByProduct,
   productFabricSizingFromForm,
   needsFabricSize,
   parseSurchargeByCode,
   resolveFabricSizing,
+  sizeOptionsWithCurrent,
   type FabricSize,
 } from "../fabric-sizes";
 
@@ -123,9 +125,12 @@ const CODES = ["standard", "premium", "premium_high"];
 const SIZES = [{ id: "s-fotel" }];
 
 describe("fabricSizeFromForm", () => {
-  it("czyta nazwę i kwoty wszystkich grup, przecinek jako separator", () =>
+  it("czyta nazwę i kwoty grup, przecinek jako separator; puste pole pomija grupę (= globalna dopłata)", () =>
     expect(fabricSizeFromForm(fd({ name: " Fotel ", sort_order: "2", surcharge_standard: "", surcharge_premium: "100", surcharge_premium_high: "160,50" }), CODES))
-      .toEqual({ ok: true, name: "Fotel", sort_order: 2, surcharges: { standard: 0, premium: 100, premium_high: 160.5 } }));
+      .toEqual({ ok: true, name: "Fotel", sort_order: 2, surcharges: { premium: 100, premium_high: 160.5 } }));
+  it("wpisane 0 zostaje 0; brak pola w formularzu pomija grupę", () =>
+    expect(fabricSizeFromForm(fd({ name: "Fotel", surcharge_standard: "0", surcharge_premium: " " }), CODES))
+      .toEqual({ ok: true, name: "Fotel", sort_order: 0, surcharges: { standard: 0 } }));
   it("odrzuca pustą nazwę", () =>
     expect(fabricSizeFromForm(fd({ name: "  " }), CODES)).toEqual({ ok: false, error: "Nazwa rozmiaru jest wymagana" }));
   it("odrzuca kwotę ujemną i nieliczbową", () => {
@@ -153,9 +158,53 @@ describe("productFabricSizingFromForm", () => {
     expect(productFabricSizingFromForm(fd({ fabric_size_present: "1", fabric_size_id: "s-fotel", own_surcharge_premium: "50" }), CODES, SIZES)).toEqual({ fabric_size_id: "s-fotel", fabric_surcharges: null }));
   it("nieznany rozmiar → null/null", () =>
     expect(productFabricSizingFromForm(fd({ fabric_size_present: "1", fabric_size_id: "s-nie-ma" }), CODES, SIZES)).toEqual({ fabric_size_id: null, fabric_surcharges: null }));
-  it("własne dopłaty: wszystkie grupy, puste = 0", () =>
-    expect(productFabricSizingFromForm(fd({ fabric_size_present: "1", fabric_size_id: "__own", own_surcharge_premium: "120" }), CODES, SIZES))
-      .toEqual({ fabric_size_id: null, fabric_surcharges: { standard: 0, premium: 120, premium_high: 0 } }));
+  it("własne dopłaty: puste i brakujące pola pomijają grupę (= globalna dopłata), nie 0", () =>
+    expect(productFabricSizingFromForm(fd({ fabric_size_present: "1", fabric_size_id: "__own", own_surcharge_standard: "", own_surcharge_premium: "120" }), CODES, SIZES))
+      .toEqual({ fabric_size_id: null, fabric_surcharges: { premium: 120 } }));
+  it("własne dopłaty: wpisane 0 zostaje 0", () =>
+    expect(productFabricSizingFromForm(fd({ fabric_size_present: "1", fabric_size_id: "__own", own_surcharge_standard: "0", own_surcharge_premium: "0,5" }), CODES, SIZES))
+      .toEqual({ fabric_size_id: null, fabric_surcharges: { standard: 0, premium: 0.5 } }));
+  it("własne dopłaty bez żadnej kwoty (puste albo brak pól) → brak własnych dopłat", () => {
+    expect(productFabricSizingFromForm(fd({ fabric_size_present: "1", fabric_size_id: "__own", own_surcharge_premium: "" }), CODES, SIZES))
+      .toEqual({ fabric_size_id: null, fabric_surcharges: null });
+    expect(productFabricSizingFromForm(fd({ fabric_size_present: "1", fabric_size_id: "__own" }), CODES, SIZES))
+      .toEqual({ fabric_size_id: null, fabric_surcharges: null });
+  });
   it("własne dopłaty z kwotą ujemną → błąd", () =>
     expect(productFabricSizingFromForm(fd({ fabric_size_present: "1", fabric_size_id: "__own", own_surcharge_premium: "-1" }), CODES, SIZES)).toEqual({ error: "Dopłata musi być liczbą nieujemną" }));
+});
+
+describe("sizeOptionsWithCurrent", () => {
+  const LIST = [{ id: "s-fotel", name: "Fotel" }];
+  it("bieżący rozmiar jest na liście → lista bez zmian", () =>
+    expect(sizeOptionsWithCurrent(LIST, "s-fotel", "Obecny")).toEqual(LIST));
+  it("brak bieżącego rozmiaru → lista bez zmian", () => {
+    expect(sizeOptionsWithCurrent(LIST, null, "Obecny")).toEqual(LIST);
+    expect(sizeOptionsWithCurrent(LIST, undefined, "Obecny")).toEqual(LIST);
+  });
+  it("bieżącego rozmiaru nie ma na liście (lista się nie wczytała) → dokłada go, żeby select go nie zgubił", () => {
+    expect(sizeOptionsWithCurrent(LIST, "s-inny", "Obecny")).toEqual([...LIST, { id: "s-inny", name: "Obecny" }]);
+    expect(sizeOptionsWithCurrent([], "s-inny", "Obecny")).toEqual([{ id: "s-inny", name: "Obecny" }]);
+  });
+});
+
+describe("fabricSizingChanged", () => {
+  const base = { category: "fotele", fabric_size_id: "s-fotel", fabric_surcharges: null };
+  it("te same wartości → bez zmiany", () =>
+    expect(fabricSizingChanged(base, { ...base })).toBe(false));
+  it("brak kolumn (undefined) = null", () =>
+    expect(fabricSizingChanged({ category: "fotele" }, { category: "fotele", fabric_size_id: null, fabric_surcharges: null })).toBe(false));
+  it("zmiana kategorii głównej albo rozmiaru → zmiana", () => {
+    expect(fabricSizingChanged(base, { ...base, category: "sofy" })).toBe(true);
+    expect(fabricSizingChanged(base, { ...base, fabric_size_id: null })).toBe(true);
+  });
+  it("własne dopłaty porównywane po wartościach, nie po kolejności kluczy", () => {
+    const a = { ...base, fabric_surcharges: { premium: 100, standard: 0 } };
+    expect(fabricSizingChanged(a, { ...base, fabric_surcharges: { standard: 0, premium: 100 } })).toBe(false);
+    expect(fabricSizingChanged(a, { ...base, fabric_surcharges: { standard: 0, premium: 120 } })).toBe(true);
+    expect(fabricSizingChanged(a, { ...base, fabric_surcharges: { premium: 100 } })).toBe(true);
+    expect(fabricSizingChanged(a, base)).toBe(true);
+  });
+  it("puste własne dopłaty ({}) = brak", () =>
+    expect(fabricSizingChanged({ ...base, fabric_surcharges: {} }, base)).toBe(false));
 });

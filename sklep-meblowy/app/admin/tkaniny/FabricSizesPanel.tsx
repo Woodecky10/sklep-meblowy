@@ -34,9 +34,10 @@ export default function FabricSizesPanel({
         Rozmiary mebli do dopłat za tkaninę
       </h2>
       <p className="text-xs text-[var(--muted)] mb-4">
-        Każdy rozmiar ma własną dopłatę za każdą grupę cenową. Produkt bierze
-        rozmiar ze swojej kategorii, chyba że ustawisz mu inny. Produkt bez
-        rozmiaru dopłaca według grup cenowych powyżej.
+        Każdy rozmiar ma własną dopłatę za każdą grupę cenową; puste pole =
+        dopłata grupy z panelu powyżej. Produkt bierze rozmiar ze swojej
+        kategorii, chyba że ustawisz mu inny. Produkt bez rozmiaru dopłaca
+        według grup cenowych powyżej.
       </p>
       <div className="flex flex-col gap-3">
         {sizes.map((s) => (
@@ -64,9 +65,13 @@ function SizeRow({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState(size?.name ?? "");
+  // Grupa bez kwoty w rozmiarze = puste pole (globalna dopłata grupy), nie 0.
   const [amounts, setAmounts] = useState<Record<string, string>>(() =>
     Object.fromEntries(
-      groups.map((g) => [g.code, size ? String(size.surcharges[g.code] ?? 0) : ""])
+      groups.map((g) => {
+        const v = size?.surcharges[g.code];
+        return [g.code, typeof v === "number" ? String(v) : ""];
+      })
     )
   );
 
@@ -124,17 +129,22 @@ function SizeRow({
 
   return (
     <div className="flex flex-col gap-3 bg-[var(--bg)] border border-[var(--border)] rounded-xl p-3">
-      <div className="grid grid-cols-1 md:grid-cols-[1fr_repeat(auto-fit,minmax(9rem,1fr))] gap-3 items-end">
+      {/* Nazwa + po kolumnie na każdą z trzech (stałych) grup cenowych.
+          auto-fit nie może stać obok ścieżki 1fr — przeglądarka odrzuca
+          wtedy całą regułę, stąd jawne kolumny. */}
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(10rem,2fr)_repeat(3,minmax(0,1fr))] gap-3 items-end">
         <Field label="Nazwa">
           <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className={inputCls} />
         </Field>
         {groups.map((g) => (
           <Field key={g.id} label={`Dopłata ${g.name} (zł)`}>
+            {/* Puste = globalna dopłata grupy (podpowiedź), 0 trzeba wpisać. */}
             <input
               type="number"
               step="0.01"
               min="0"
               value={amounts[g.code] ?? ""}
+              placeholder={`jak grupa: ${g.surcharge}`}
               onChange={(e) => setAmounts((a) => ({ ...a, [g.code]: e.target.value }))}
               className={inputCls}
             />

@@ -12,8 +12,11 @@ import {
 } from "@/app/_lib/product-collection";
 import { getAllCategories } from "@/app/_lib/categories";
 import { extraCategoriesFromForm } from "@/app/_lib/extra-categories";
-import { productFabricSizingFromForm } from "@/app/_lib/fabric-sizes";
-import { recomputeFabricSurcharges } from "@/app/_lib/fabric-surcharge-recompute";
+import { fabricSizingChanged, productFabricSizingFromForm } from "@/app/_lib/fabric-sizes";
+import {
+  RECOMPUTE_FAILED_SAVE_GROUP,
+  recomputeFabricSurcharges,
+} from "@/app/_lib/fabric-surcharge-recompute";
 import { validateImageUpload } from "@/app/_lib/image-upload";
 import {
   buildNewProductPayload,
@@ -295,6 +298,27 @@ export async function updateProductBasics(
     );
     if (fabricSizing && "error" in fabricSizing) return { ok: false, error: fabricSizing.error };
   }
+  const sizingUpdate = fabricSizing && !("error" in fabricSizing) ? fabricSizing : undefined;
+
+  // Stan sprzed zapisu: dopłaty przeliczamy TYLKO gdy zapis zmienia ich źródło
+  // (kategoria główna, rozmiar, własne dopłaty). Niezwiązany zapis nie może
+  // ruszać cen — ani ręcznych dopłat z edytora wariantów, ani produktów, których
+  // value_prices rozjechały się z katalogiem. select("*"): baza bez migracji 86
+  // nie ma kolumn (undefined = null), a zapis bez znacznika ich nie dotyka.
+  const beforeRes = await supabase.from("products").select("*").eq("id", id).maybeSingle();
+  if (beforeRes.error) return { ok: false, error: `Odczyt produktu: ${beforeRes.error.message}` };
+  const before = beforeRes.data as {
+    category: string;
+    fabric_size_id?: string | null;
+    fabric_surcharges?: unknown;
+  } | null;
+  const sizingChanged =
+    !!before &&
+    fabricSizingChanged(before, {
+      category,
+      fabric_size_id: sizingUpdate ? sizingUpdate.fabric_size_id : before.fabric_size_id,
+      fabric_surcharges: sizingUpdate ? sizingUpdate.fabric_surcharges : before.fabric_surcharges,
+    });
 
   const updates: Record<string, unknown> = {
     name,
@@ -320,9 +344,9 @@ export async function updateProductBasics(
     features: parseFeatureRows(formData.get("features_json")),
   };
   if (extraCategories !== undefined) updates.extra_categories = extraCategories;
-  if (fabricSizing && !("error" in fabricSizing)) {
-    updates.fabric_size_id = fabricSizing.fabric_size_id;
-    updates.fabric_surcharges = fabricSizing.fabric_surcharges;
+  if (sizingUpdate) {
+    updates.fabric_size_id = sizingUpdate.fabric_size_id;
+    updates.fabric_surcharges = sizingUpdate.fabric_surcharges;
   }
   const collectionUpdates = await collectionUpdatesFor(supabase, id, collectionField.value);
   if (!collectionUpdates.ok) return { ok: false, error: collectionUpdates.error };
@@ -335,9 +359,9 @@ export async function updateProductBasics(
 
   if (error) return { ok: false, error: error.message };
 
-  // Zmiana rozmiaru albo kategorii głównej zmienia obowiązujące dopłaty —
-  // przelicz zapisane dopłaty tkanin w wariantach produktu.
-  await recomputeFabricSurcharges({ productIds: [id] });
+  // Zmiana rozmiaru, własnych dopłat albo kategorii głównej zmienia obowiązujące
+  // dopłaty — przelicz zapisane dopłaty tkanin w wariantach produktu.
+  const recompute = sizingChanged ? await recomputeFabricSurcharges({ productIds: [id] }) : null;
 
   await recordPriceHistory(id);
   // Promocja bez dat ma działać od razu, nie od najbliższego crona.
@@ -350,6 +374,7 @@ export async function updateProductBasics(
   invalidateFacetsCache();
   revalidatePath("/sklep");
   if (collectionUpdates.changed) revalidateAfterCollectionChange();
+  if (recompute && !recompute.ok) return { ok: false, error: RECOMPUTE_FAILED_SAVE_GROUP };
   return { ok: true, message: "Zapisano podstawowe dane" };
 }
 

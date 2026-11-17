@@ -7,7 +7,10 @@ import { getAllCategories, invalidateCategoriesCache } from "@/app/_lib/categori
 import { allowedParents } from "@/app/_lib/category-tree";
 import { pluralForm } from "@/app/_lib/plural";
 import { fabricSizeIdFromForm } from "@/app/_lib/fabric-sizes";
-import { recomputeFabricSurcharges } from "@/app/_lib/fabric-surcharge-recompute";
+import {
+  RECOMPUTE_FAILED_SAVE_GROUP,
+  recomputeFabricSurcharges,
+} from "@/app/_lib/fabric-surcharge-recompute";
 
 // ============================================================
 // Wspólne typy odpowiedzi dla wszystkich akcji admin/kategorie
@@ -183,6 +186,19 @@ export async function updateCategory(formData: FormData): Promise<ActionResult> 
   const defaultSizeId = sizeRead.value;
 
   const supabase = await createAdminClient();
+
+  // Przeliczenie dopłat tylko przy FAKTYCZNEJ zmianie rozmiaru domyślnego —
+  // zapis samej nazwy czy kolejności nie może ruszać cen produktów.
+  // select("*"): baza bez migracji 86 nie ma kolumny (undefined = null).
+  let sizeChanged = false;
+  if (defaultSizeId !== undefined) {
+    const before = await supabase.from("categories").select("*").eq("id", id).maybeSingle();
+    if (before.error) return { ok: false, error: before.error.message };
+    const stored =
+      (before.data as { default_fabric_size_id?: string | null } | null)?.default_fabric_size_id ?? null;
+    sizeChanged = stored !== defaultSizeId;
+  }
+
   const { error } = await supabase
     .from("categories")
     .update({
@@ -206,8 +222,9 @@ export async function updateCategory(formData: FormData): Promise<ActionResult> 
 
   invalidateCategoriesCache();
   // Zmiana rozmiaru domyślnego zmienia dopłaty produktów tej kategorii.
-  if (defaultSizeId !== undefined) await recomputeFabricSurcharges();
+  const recompute = sizeChanged ? await recomputeFabricSurcharges() : null;
   revalidatePath("/admin/kategorie");
+  if (recompute && !recompute.ok) return { ok: false, error: RECOMPUTE_FAILED_SAVE_GROUP };
   return { ok: true, message: "Kategoria zaktualizowana" };
 }
 

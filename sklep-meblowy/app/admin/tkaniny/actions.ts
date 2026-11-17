@@ -18,6 +18,7 @@ import {
 } from "@/app/_lib/variants";
 import type { ProductVariants } from "@/app/_lib/types";
 import {
+  RECOMPUTE_FAILED_RETRY,
   recomputeFabricSurcharges,
   writeProductVariants,
 } from "@/app/_lib/fabric-surcharge-recompute";
@@ -247,11 +248,19 @@ export async function createFabric(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: error.message };
   }
 
-  await recomputeFabricSurcharges();
+  const recompute = await recomputeFabricSurcharges();
   invalidateFabricsCache();
   invalidateFacetsCache();
   revalidatePath("/admin/tkaniny");
   revalidatePath("/tkaniny");
+  if (!recompute.ok) {
+    // Formularz zostaje w trybie „nowa" — ponowne „Zapisz" dałoby duplikat
+    // nazwy, stąd droga przez listę (Edytuj → Zapisz przelicza od nowa).
+    return {
+      ok: false,
+      error: `Tkanina "${name}" dodana, ale nie udało się przeliczyć dopłat w produktach. Odśwież stronę i zapisz tę tkaninę ponownie.`,
+    };
+  }
   return { ok: true, message: `Tkanina "${name}" dodana`, data };
 }
 
@@ -329,11 +338,12 @@ export async function updateFabric(formData: FormData): Promise<ActionResult> {
     ? (await remapFabricOnProducts(poprzednia, { name, colors, price, group_id: groupId })).updated
     : 0;
 
-  await recomputeFabricSurcharges();
+  const recompute = await recomputeFabricSurcharges();
   invalidateFabricsCache();
   invalidateFacetsCache();
   revalidatePath("/admin/tkaniny");
   revalidatePath("/tkaniny");
+  if (!recompute.ok) return { ok: false, error: RECOMPUTE_FAILED_RETRY };
   return {
     ok: true,
     message:
@@ -404,12 +414,13 @@ export async function updateFabricGroup(formData: FormData): Promise<ActionResul
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
 
-  const { updated } = await recomputeFabricSurcharges();
+  const { updated, ok: recomputed } = await recomputeFabricSurcharges();
   invalidateFabricGroupsCache();
   invalidateFabricsCache();
   invalidateFacetsCache();
   revalidatePath("/admin/tkaniny");
   revalidatePath("/tkaniny");
+  if (!recomputed) return { ok: false, error: RECOMPUTE_FAILED_RETRY };
   return { ok: true, message: `Grupa zapisana — przeliczono ${updated} produkt(ów)` };
 }
 
