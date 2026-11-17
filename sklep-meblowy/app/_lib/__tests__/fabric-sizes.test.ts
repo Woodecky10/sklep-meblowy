@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   effectiveGroupSurcharges,
   fabricSizeFromForm,
+  fabricSizeIdFromForm,
   needsFabricSize,
   parseSurchargeByCode,
   resolveFabricSizing,
@@ -80,6 +81,7 @@ describe("needsFabricSize", () => {
 
 const fd = (o: Record<string, string>) => { const f = new FormData(); for (const [k, v] of Object.entries(o)) f.set(k, v); return f; };
 const CODES = ["standard", "premium", "premium_high"];
+const SIZES = [{ id: "s-fotel" }];
 
 describe("fabricSizeFromForm", () => {
   it("czyta nazwę i kwoty wszystkich grup, przecinek jako separator", () =>
@@ -90,5 +92,16 @@ describe("fabricSizeFromForm", () => {
   it("odrzuca kwotę ujemną i nieliczbową", () => {
     expect(fabricSizeFromForm(fd({ name: "Fotel", surcharge_premium: "-5" }), CODES)).toEqual({ ok: false, error: "Dopłata musi być liczbą nieujemną" });
     expect(fabricSizeFromForm(fd({ name: "Fotel", surcharge_premium: "abc" }), CODES)).toEqual({ ok: false, error: "Dopłata musi być liczbą nieujemną" });
+  });
+});
+
+describe("fabricSizeIdFromForm", () => {
+  it("brak pola → undefined (kolumny nie ruszamy)", () =>
+    expect(fabricSizeIdFromForm(new FormData(), "default_fabric_size_id", SIZES)).toBeUndefined());
+  it("pusta wartość → null", () =>
+    expect(fabricSizeIdFromForm(fd({ default_fabric_size_id: "" }), "default_fabric_size_id", SIZES)).toBeNull());
+  it("znane id przechodzi, nieznane → null", () => {
+    expect(fabricSizeIdFromForm(fd({ default_fabric_size_id: "s-fotel" }), "default_fabric_size_id", SIZES)).toBe("s-fotel");
+    expect(fabricSizeIdFromForm(fd({ default_fabric_size_id: "s-nie-ma" }), "default_fabric_size_id", SIZES)).toBeNull();
   });
 });

@@ -6,6 +6,8 @@ import { isAdmin, requireAdmin } from "@/app/_lib/admin";
 import { getAllCategories, invalidateCategoriesCache } from "@/app/_lib/categories";
 import { allowedParents } from "@/app/_lib/category-tree";
 import { pluralForm } from "@/app/_lib/plural";
+import { fabricSizeIdFromForm } from "@/app/_lib/fabric-sizes";
+import { recomputeFabricSurcharges } from "@/app/_lib/fabric-surcharge-recompute";
 
 // ============================================================
 // Wspólne typy odpowiedzi dla wszystkich akcji admin/kategorie
@@ -91,6 +93,23 @@ async function validateParent(
   return null;
 }
 
+const DEFAULT_SIZE_FIELD = "default_fabric_size_id";
+
+// Czyta rozmiary z bazy tylko wtedy, gdy formularz ma pole — formularz bez pola
+// zachowuje się jak dawniej i nie robi dodatkowego zapytania.
+async function readDefaultSizeId(
+  formData: FormData
+): Promise<{ ok: true; value: string | null | undefined } | { ok: false; error: string }> {
+  if (!formData.has(DEFAULT_SIZE_FIELD)) return { ok: true, value: undefined };
+  const supabase = await createAdminClient();
+  const { data, error } = await supabase.from("fabric_sizes").select("id");
+  if (error) return { ok: false, error: error.message };
+  return {
+    ok: true,
+    value: fabricSizeIdFromForm(formData, DEFAULT_SIZE_FIELD, (data ?? []) as { id: string }[]),
+  };
+}
+
 export async function createCategory(formData: FormData): Promise<ActionResult> {
   await requireAdmin();
   const label = sanitizeLabel(formData.get("label"));
@@ -108,6 +127,10 @@ export async function createCategory(formData: FormData): Promise<ActionResult> 
     .map((v) => String(v).trim())
     .filter((v) => v.length > 0);
 
+  const sizeRead = await readDefaultSizeId(formData);
+  if (!sizeRead.ok) return { ok: false, error: sizeRead.error };
+  const defaultSizeId = sizeRead.value;
+
   const supabase = await createAdminClient();
   const { error } = await supabase.from("categories").insert({
     slug,
@@ -116,6 +139,7 @@ export async function createCategory(formData: FormData): Promise<ActionResult> 
     parent_id: parentId,
     cross_sell_categories: crossSellCategories,
     sort_order: sortOrder,
+    ...(defaultSizeId !== undefined ? { default_fabric_size_id: defaultSizeId } : {}),
   } as never);
 
   if (error) {
@@ -154,6 +178,10 @@ export async function updateCategory(formData: FormData): Promise<ActionResult> 
     .map((v) => String(v).trim())
     .filter((v) => v.length > 0);
 
+  const sizeRead = await readDefaultSizeId(formData);
+  if (!sizeRead.ok) return { ok: false, error: sizeRead.error };
+  const defaultSizeId = sizeRead.value;
+
   const supabase = await createAdminClient();
   const { error } = await supabase
     .from("categories")
@@ -164,6 +192,7 @@ export async function updateCategory(formData: FormData): Promise<ActionResult> 
       cross_sell_categories: crossSellCategories,
       sort_order: sortOrder,
       active,
+      ...(defaultSizeId !== undefined ? { default_fabric_size_id: defaultSizeId } : {}),
     } as never)
     .eq("id", id);
 
@@ -176,6 +205,8 @@ export async function updateCategory(formData: FormData): Promise<ActionResult> 
   }
 
   invalidateCategoriesCache();
+  // Zmiana rozmiaru domyślnego zmienia dopłaty produktów tej kategorii.
+  if (defaultSizeId !== undefined) await recomputeFabricSurcharges();
   revalidatePath("/admin/kategorie");
   return { ok: true, message: "Kategoria zaktualizowana" };
 }

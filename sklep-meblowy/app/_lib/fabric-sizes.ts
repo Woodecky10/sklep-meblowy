@@ -115,3 +115,17 @@ export function fabricSizeFromForm(
   }
   return { ok: true, name, sort_order, surcharges };
 }
+
+// Pole rozmiaru w formularzu: undefined = formularz bez pola (kolumny nie
+// ruszamy), null = brak albo id, którego już nie ma na liście.
+export function fabricSizeIdFromForm(
+  formData: FormData,
+  field: string,
+  sizes: { id: string }[]
+): string | null | undefined {
+  if (!formData.has(field)) return undefined;
+  const raw = formData.get(field);
+  const id = typeof raw === "string" ? raw.trim() : "";
+  if (id === "") return null;
+  return sizes.some((s) => s.id === id) ? id : null;
+}

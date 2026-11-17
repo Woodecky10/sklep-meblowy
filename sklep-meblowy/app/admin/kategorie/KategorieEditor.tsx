@@ -41,13 +41,16 @@ import {
 } from "./actions";
 
 type Counts = Record<string, NodeProductCounts>;
+type SizeOption = { id: string; name: string };
 
 export default function KategorieEditor({
   nodes,
   counts,
+  sizes,
 }: {
   nodes: CategoryNode[];
   counts: Counts;
+  sizes: SizeOption[];
 }) {
   const [items, setItems] = useState<CategoryNode[]>(nodes);
   // Sync stanu z propów po router.refresh() (ten sam wzorzec co CollectionsEditor).
@@ -156,6 +159,7 @@ export default function KategorieEditor({
                 key={node.id}
                 node={node}
                 counts={counts}
+                sizes={sizes}
                 expanded={editingId === node.id}
                 onToggleExpand={() =>
                   setEditingId(editingId === node.id ? null : node.id)
@@ -185,6 +189,7 @@ export default function KategorieEditor({
                       parentId={node.id}
                       allParents={allowedParents(items, "")}
                       allCategories={items}
+                      sizes={sizes}
                       onCancel={() => setCreatingUnder(undefined)}
                       onSubmit={async (fd) => {
                         const res = await createCategory(fd);
@@ -240,6 +245,7 @@ export default function KategorieEditor({
             parentId={null}
             allParents={allowedParents(items, "")}
             allCategories={items}
+            sizes={sizes}
             onCancel={() => setCreatingUnder(undefined)}
             onSubmit={async (fd) => {
               const res = await createCategory(fd);
@@ -264,6 +270,7 @@ export default function KategorieEditor({
 function TreeRow({
   node,
   counts,
+  sizes,
   expanded,
   onToggleExpand,
   onEdit,
@@ -275,6 +282,7 @@ function TreeRow({
 }: {
   node: CategoryTreeNode;
   counts: Counts;
+  sizes: SizeOption[];
   expanded: boolean;
   onToggleExpand: () => void;
   onEdit: (fd: FormData) => Promise<void>;
@@ -403,6 +411,7 @@ function TreeRow({
               parentId={node.parent_id}
               allParents={allParents}
               allCategories={allCategories}
+              sizes={sizes}
               onCancel={onToggleExpand}
               onSubmit={onEdit}
             />
@@ -421,6 +430,7 @@ function CategoryForm({
   parentId,
   allParents,
   allCategories,
+  sizes,
   onCancel,
   onSubmit,
 }: {
@@ -429,6 +439,7 @@ function CategoryForm({
   parentId: string | null;
   allParents: { id: string; label: string; depth: number }[];
   allCategories: CategoryNode[];
+  sizes: SizeOption[];
   onCancel: () => void;
   onSubmit: (fd: FormData) => Promise<void>;
 }) {
@@ -529,6 +540,26 @@ function CategoryForm({
             </span>
           </span>
         </label>
+      )}
+
+      {sizes.length > 0 && (
+        <Field
+          label="Rozmiar do dopłat za tkaninę"
+          hint="Produkty z tą kategorią jako główną dostają dopłaty tego rozmiaru, jeśli nie mają własnego."
+        >
+          <select
+            name="default_fabric_size_id"
+            defaultValue={initial?.defaultFabricSizeId ?? ""}
+            className={inputCls}
+          >
+            <option value="">— brak —</option>
+            {sizes.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </Field>
       )}
 
       {candidates.length > 0 && (
