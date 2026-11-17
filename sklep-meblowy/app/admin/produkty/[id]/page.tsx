@@ -11,6 +11,8 @@ import { getAllCategories } from "@/app/_lib/categories";
 import { getAllCollections } from "@/app/_lib/collections";
 import { flattenForSelect } from "@/app/_lib/category-tree";
 import { getAllFabrics, getFabricPriceGroups } from "@/app/_lib/fabrics";
+import { getFabricSizes } from "@/app/_lib/fabric-sizes-data";
+import { effectiveGroupSurcharges, resolveFabricSizing } from "@/app/_lib/fabric-sizes";
 import { getVariantInfoMap } from "@/app/_lib/variant-info-data";
 import { sleepSizeOf } from "@/app/_lib/sleep-size";
 import { createAdminClient } from "@/app/_lib/supabase/server";
@@ -50,6 +52,7 @@ export default async function AdminProductEditPage({
     featureSuggestions,
     variantImageGroups,
     collections,
+    fabricSizes,
   ] = await Promise.all([
     getProduct(id),
     getAllCategories(),
@@ -60,8 +63,16 @@ export default async function AdminProductEditPage({
     getFeatureSuggestionsAdmin(),
     getVariantImageSuggestionsAdmin(),
     getAllCollections(),
+    getFabricSizes(),
   ]);
   if (!product) notFound();
+
+  // Dopłaty za tkaniny obowiązujące TEN produkt (własne → rozmiar produktu →
+  // rozmiar kategorii → globalne dopłaty grup), kluczowane id grupy.
+  const sizing = resolveFabricSizing(product, categories, fabricSizes);
+  const groupSurcharges = effectiveGroupSurcharges(fabricGroups, sizing.surcharges);
+  const categorySizeName =
+    resolveFabricSizing({ category: product.category }, categories, fabricSizes).size?.name ?? null;
 
   // Panel zawsze pokazuje bieżący produkt; gdy jest w grupie — całe rodzeństwo.
   const sizeGroupMembers = product.size_group
@@ -110,6 +121,9 @@ export default async function AdminProductEditPage({
       sizeGroupMembers={sizeGroupMembers}
       fabrics={fabrics}
       fabricGroups={fabricGroups}
+      groupSurcharges={groupSurcharges}
+      fabricSizes={fabricSizes.map((s) => ({ id: s.id, name: s.name }))}
+      categorySizeName={categorySizeName}
       variantInfo={variantInfo}
       featureKeySuggestions={featureSuggestions.keys}
       featureValueSuggestions={featureSuggestions.valuesByKey}

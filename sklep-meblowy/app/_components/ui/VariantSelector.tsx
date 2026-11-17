@@ -7,7 +7,12 @@ import type { Product, ProductVariants } from "@/app/_lib/types";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "@/app/_lib/de-content-maps";
 import { localizeHref, pickLocalized, type Locale } from "@/app/_lib/i18n";
-import { useFabricLabels, useFabricImages, useFabricMeta } from "@/app/_lib/fabric-context";
+import {
+  useFabricLabels,
+  useFabricImages,
+  useFabricMeta,
+  useProductGroupSurcharges,
+} from "@/app/_lib/fabric-context";
 import type { FabricPropertyDef } from "@/app/_lib/fabric-properties";
 import { FABRIC_OPTION_NAME, sortVariantValues, sortVariantOptions, optionHasValueImages } from "@/app/_lib/variants";
 import {
@@ -162,6 +167,7 @@ export default function VariantSelector({
             </p>
             {option.name === FABRIC_OPTION_NAME ? (
               <FabricSwatchGroup
+                productId={product?.id}
                 values={orderedValues}
                 current={current}
                 valuePrices={option.value_prices}
@@ -259,6 +265,7 @@ const SWATCH_LIMIT = 5;
 // grupowanie nic nie wnosi — zostaje dawny widok kompaktowy: pierwsze
 // SWATCH_LIMIT próbek + „Zobacz więcej (+N)".
 function FabricSwatchGroup({
+  productId,
   values,
   current,
   valuePrices,
@@ -269,6 +276,9 @@ function FabricSwatchGroup({
   rate,
   onPick,
 }: {
+  // Mebel, którego tkaniny renderujemy — klucz kwot grup wg rozmiaru do dopłat
+  // (ten sam selektor stoi przy każdym składniku zestawu w modalu).
+  productId: string | undefined;
   values: string[];
   current: string | undefined;
   valuePrices: Record<string, number> | undefined;
@@ -280,6 +290,8 @@ function FabricSwatchGroup({
   onPick: (v: string) => void;
 }) {
   const meta = useFabricMeta();
+  const surchargesByProduct = useProductGroupSurcharges();
+  const productSurcharges = productId ? surchargesByProduct[productId] : undefined;
   const t = getDictionary(locale);
   const [expanded, setExpanded] = useState(false);
   const [openGroups, setOpenGroups] = useState<Set<string> | null>(null);
@@ -381,7 +393,8 @@ function FabricSwatchGroup({
         ? {
             code,
             label: pickLocalized(m.groupName, m.groupNameDe, locale),
-            surcharge: m.groupSurcharge,
+            // Kwota grupy dla TEGO mebla (rozmiar do dopłat), inaczej globalna.
+            surcharge: productSurcharges?.[m.groupCode] ?? m.groupSurcharge,
             sort: m.groupSort,
             fabrics: new Map(),
           }

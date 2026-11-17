@@ -56,3 +56,25 @@ export function FabricMetaProvider({
 export function useFabricMeta(): Record<string, FabricValueMeta> {
   return useContext(FabricMetaContext);
 }
+
+// Dopłaty grup tkanin właściwe dla mebla (rozmiar do dopłat): id produktu →
+// kod grupy → zł. Seed na karcie produktu dla produktu głównego i składników
+// zestawów (groupSurchargesByProduct). Nagłówek grupy w selektorze bierze stąd
+// kwotę produktu, który renderuje; brak wpisu = globalna z useFabricMeta.
+const ProductGroupSurchargesContext = createContext<Record<string, Record<string, number>>>({});
+
+export function ProductGroupSurchargesProvider({
+  map,
+  children,
+}: {
+  map: Record<string, Record<string, number>>;
+  children: ReactNode;
+}) {
+  return (
+    <ProductGroupSurchargesContext.Provider value={map}>{children}</ProductGroupSurchargesContext.Provider>
+  );
+}
+
+export function useProductGroupSurcharges(): Record<string, Record<string, number>> {
+  return useContext(ProductGroupSurchargesContext);
+}

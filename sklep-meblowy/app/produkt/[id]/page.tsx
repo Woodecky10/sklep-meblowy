@@ -36,8 +36,14 @@ import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { buildSizeOptions } from "@/app/_lib/size-groups";
 import { effectivePrice } from "@/app/_lib/pricing";
-import { getFabricImageMap, getFabricMetaMap } from "@/app/_lib/fabrics";
-import { FabricImageProvider, FabricMetaProvider } from "@/app/_lib/fabric-context";
+import { getFabricImageMap, getFabricMetaMap, getFabricPriceGroups } from "@/app/_lib/fabrics";
+import { getFabricSizes } from "@/app/_lib/fabric-sizes-data";
+import { groupSurchargesByProduct } from "@/app/_lib/fabric-sizes";
+import {
+  FabricImageProvider,
+  FabricMetaProvider,
+  ProductGroupSurchargesProvider,
+} from "@/app/_lib/fabric-context";
 import { getVariantInfoMap } from "@/app/_lib/variant-info-data";
 import { VariantInfoProvider } from "@/app/_lib/variant-info-context";
 import { getBundlesForProduct } from "@/app/_lib/bundles-server";
@@ -101,7 +107,7 @@ export default async function ProduktPage({ params }: Props) {
   // bez rozmiaru (sofy, fotele) → cross-sell leci starą ścieżką.
   const sleepSize = sleepSizeOf(product);
 
-  const [sizeSiblings, related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell, wishlistIds, rate, bundles] =
+  const [sizeSiblings, related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell, wishlistIds, rate, bundles, fabricSizes, fabricGroups] =
     await Promise.all([
       // Selektor rozmiaru: rodzeństwo z tym samym size_group (osobne aukcje per rozmiar).
       product.size_group ? getSizeSiblings(product.size_group, locale) : Promise.resolve([]),
@@ -122,6 +128,9 @@ export default async function ProduktPage({ params }: Props) {
       getEurRate(),
       // Zestawy zawierające ten produkt — box „Kup w zestawie" na karcie.
       getBundlesForProduct(product.id, locale),
+      // Rozmiary do dopłat — dopłaty grup tkanin właściwe dla mebli na stronie.
+      getFabricSizes(),
+      getFabricPriceGroups(),
     ]);
   const sizeOptions = buildSizeOptions(sizeSiblings, product.id);
   // Mapa zdjęć próbek tkanin (wartość „Nazwa Numer" → URL) do próbek w selektorze.
@@ -129,6 +138,15 @@ export default async function ProduktPage({ params }: Props) {
   // Mapa wartość wariantu → metadane tkaniny (slug, grupa cenowa) — selektor
   // grupuje próbki w rozwijane karty grup + link „szczegóły" do /tkaniny/[slug].
   const fabricMetaMap = await getFabricMetaMap();
+  // Kwoty nagłówków grup tkanin właściwe dla KAŻDEGO mebla na stronie (rozmiar
+  // do dopłat): produkt główny i składniki zestawów z modalu „Kup w zestawie" —
+  // fotel w zestawie z sofą ma pokazać dopłatę fotela, nie sofy.
+  const productGroupSurcharges = groupSurchargesByProduct(
+    [product, ...bundles.flatMap((b) => b.components)],
+    fabricGroups,
+    allCategories,
+    fabricSizes
+  );
   // Mapa (opcja+wartość) → {info, info_de} — krótkie informacje o wariancie
   // (tooltip „i" przy wartości w selektorze).
   const variantInfoMap = await getVariantInfoMap();
@@ -352,16 +370,18 @@ export default async function ProduktPage({ params }: Props) {
           żeby wypełniała pustą przestrzeń pod galerią. */}
       <FabricImageProvider map={fabricImageMap}>
         <FabricMetaProvider map={fabricMetaMap}>
-          <VariantInfoProvider map={variantInfoMap}>
-            <ProductMainSection
-              product={product}
-              categoryLabel={categoryLabel ?? null}
-              rating={rating}
-              specifications={details}
-              sizeOptions={sizeOptions}
-              bundles={bundles}
-            />
-          </VariantInfoProvider>
+          <ProductGroupSurchargesProvider map={productGroupSurcharges}>
+            <VariantInfoProvider map={variantInfoMap}>
+              <ProductMainSection
+                product={product}
+                categoryLabel={categoryLabel ?? null}
+                rating={rating}
+                specifications={details}
+                sizeOptions={sizeOptions}
+                bundles={bundles}
+              />
+            </VariantInfoProvider>
+          </ProductGroupSurchargesProvider>
         </FabricMetaProvider>
       </FabricImageProvider>
 

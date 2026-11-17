@@ -21,6 +21,8 @@ export type AdminProductRow = {
   // Stan promocji: „Promocja" / „Zaplanowana" / „Wstążka" albo null.
   // „Wstążka" wyłapuje wyciek: ręczny napis nie ma terminu i sam nie zgaśnie.
   promoChip: string | null;
+  // Ma tkaniny, ale ani produkt, ani kategoria nie mają rozmiaru do dopłat.
+  needsFabricSize: boolean;
 };
 
 function productsWord(n: number): string {
@@ -109,6 +111,14 @@ export default function ProductsList({ products }: { products: AdminProductRow[]
                   {p.promoChip && (
                     <span className="ml-2 align-middle px-2 py-0.5 text-[10px] font-sans uppercase tracking-widest rounded bg-[var(--color-gold)]/20 text-[var(--color-gold-text)]">
                       {p.promoChip}
+                    </span>
+                  )}
+                  {p.needsFabricSize && (
+                    <span
+                      title="Ten produkt ma tkaniny, ale ani on, ani jego kategoria nie mają rozmiaru do dopłat. Dopłaty liczą się według grup cenowych."
+                      className="ml-2 align-middle inline-block px-2 py-0.5 rounded-full text-[10px] font-sans font-normal uppercase tracking-widest bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                    >
+                      bez rozmiaru
                     </span>
                   )}
                 </p>

@@ -28,6 +28,7 @@ import { MAX_FEATURES } from "@/app/_lib/product-features";
 import type { VariantImageGroup } from "@/app/_lib/variant-image-suggestions";
 import { saleStatus, type SaleStatus } from "@/app/_lib/sale-schedule";
 import { looksLikeDiscountClaim } from "@/app/_lib/pricing";
+import { sizeOptionsWithCurrent } from "@/app/_lib/fabric-sizes";
 
 export default function ProductEditor({
   product,
@@ -37,6 +38,9 @@ export default function ProductEditor({
   sizeGroupMembers,
   fabrics,
   fabricGroups,
+  groupSurcharges,
+  fabricSizes,
+  categorySizeName,
   variantInfo,
   featureKeySuggestions,
   featureValueSuggestions,
@@ -52,6 +56,9 @@ export default function ProductEditor({
   sizeGroupMembers: SizeGroupMember[];
   fabrics: Fabric[];
   fabricGroups: FabricPriceGroup[];
+  groupSurcharges: Record<string, number>;
+  fabricSizes: { id: string; name: string }[];
+  categorySizeName: string | null;
   variantInfo: Record<string, VariantInfoEntry>;
   // Podpowiedzi nazw parametrów — dropdown „+ Wybierz z listy".
   featureKeySuggestions: string[];
@@ -81,6 +88,12 @@ export default function ProductEditor({
   // liście od razu, bez zapisu. Select zostaje niekontrolowany (defaultValue,
   // patrz komentarz przy formularzu), tylko śledzimy jego zmiany.
   const [mainCategory, setMainCategory] = useState(product.category);
+  // Rozmiar do dopłat za tkaninę: "" = z kategorii, id rozmiaru, "__own" = własne.
+  const [fabricSizeChoice, setFabricSizeChoice] = useState<string>(() =>
+    product.fabric_surcharges && Object.keys(product.fabric_surcharges).length > 0
+      ? "__own"
+      : product.fabric_size_id ?? ""
+  );
   const promoStatus = saleStatus(
     {
       id: product.id,
@@ -224,6 +237,14 @@ export default function ProductEditor({
     else showToast({ type: "error", message: res.error });
   }
 
+  // Zapis podstawowych danych przelicza dopłaty tkanin w zapisanych wariantach
+  // (zmiana rozmiaru lub kategorii głównej) — odśwież, żeby edytor wariantów
+  // wystartował od nowa ze świeżym stanem zamiast nadpisać go starym.
+  function handleBasicsResult(res: ActionResult) {
+    handleResult(res);
+    if (res.ok) router.refresh();
+  }
+
   // ============================================================
   // Zdjęcia globalne — upload (multi + drag&drop), sortowanie, usuwanie
   // ============================================================
@@ -326,7 +347,7 @@ export default function ProductEditor({
           onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
-            startBasicsTransition(async () => handleResult(await updateProductBasics(fd)));
+            startBasicsTransition(async () => handleBasicsResult(await updateProductBasics(fd)));
           }}
           className="grid grid-cols-1 md:grid-cols-2 gap-4"
         >
@@ -457,6 +478,61 @@ export default function ProductEditor({
             initial={product.extra_categories ?? []}
             mainCategory={mainCategory}
           />
+
+          {/* Rozmiar do dopłat za tkaninę: znacznik obecności — akcja bez
+              znacznika nie rusza kolumn. Pusta lista grup cenowych = błąd
+              odczytu (grupy są zawsze trzy): bez pól „Własne dopłaty" zapis
+              wpisałby głupoty, więc wtedy pola i znacznika nie ma wcale. */}
+          {fabricGroups.length > 0 && (
+            <>
+              <input type="hidden" name="fabric_size_present" value="1" />
+              <Field
+                label="Rozmiar do dopłat za tkaninę"
+                hint="Decyduje o wysokości dopłat za tkaniny. To nie jest rozmiar mebla pokazywany klientowi."
+              >
+                <select
+                  name="fabric_size_id"
+                  value={fabricSizeChoice}
+                  onChange={(e) => setFabricSizeChoice(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">
+                    {categorySizeName
+                      ? `Z kategorii: ${categorySizeName}`
+                      : "Z kategorii: brak (dopłaty z grup cenowych)"}
+                  </option>
+                  {/* Bieżący rozmiar zostaje opcją nawet gdy lista rozmiarów się
+                      nie wczytała — inaczej select wysłałby "" i niezwiązany
+                      zapis wyczyściłby rozmiar. */}
+                  {sizeOptionsWithCurrent(
+                    fabricSizes,
+                    product.fabric_size_id,
+                    "Obecny rozmiar (lista rozmiarów niedostępna)"
+                  ).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                  <option value="__own">Własne dopłaty…</option>
+                </select>
+              </Field>
+              {/* Puste pole = globalna dopłata grupy (nie 0); 0 trzeba wpisać. */}
+              {fabricSizeChoice === "__own" &&
+                fabricGroups.map((g) => (
+                  <Field key={g.id} label={`Dopłata ${g.name} (zł)`}>
+                    <input
+                      name={`own_surcharge_${g.code}`}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      defaultValue={product.fabric_surcharges?.[g.code] ?? ""}
+                      placeholder={`jak grupa: ${g.surcharge}`}
+                      className={inputClass}
+                    />
+                  </Field>
+                ))}
+            </>
+          )}
 
           {/* Kolekcja (2026-10-29): druga droga obok /admin/kolekcje. Znacznik
               obecności + select — akcja bez znacznika nie rusza kolumny. */}
@@ -882,7 +958,7 @@ export default function ProductEditor({
       {/* ============================================================
           Sekcja: Warianty (pełny editor)
           ============================================================ */}
-      <VariantsEditor productId={product.id} initial={product.variants} categorySlug={product.category} fabrics={fabrics} fabricGroups={fabricGroups} initialVariantInfo={variantInfo} variantImageGroups={variantImageGroups} onToast={showToast} />
+      <VariantsEditor key={JSON.stringify(groupSurcharges)} productId={product.id} initial={product.variants} categorySlug={product.category} fabrics={fabrics} fabricGroups={fabricGroups} groupSurcharges={groupSurcharges} initialVariantInfo={variantInfo} variantImageGroups={variantImageGroups} onToast={showToast} />
 
       {/* ============================================================
           Sekcja: Pojedynczy opis (fallback gdy brak sekcji)

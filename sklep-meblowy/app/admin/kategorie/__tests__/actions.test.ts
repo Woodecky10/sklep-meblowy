@@ -28,7 +28,7 @@ function makeClient(cfg: { tables?: Record<string, Result[]> }): FakeClient {
         then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
           Promise.resolve(payload).then(resolve, reject),
       };
-      for (const method of ["select", "insert", "update", "delete", "eq", "single"]) {
+      for (const method of ["select", "insert", "update", "delete", "eq", "single", "maybeSingle"]) {
         builder[method] = (...args: unknown[]) => {
           client.ops.push({ table, op: method, args });
           return builder;
@@ -59,6 +59,14 @@ vi.mock("@/app/_lib/categories", () => ({
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+
+const recomputeMock = vi.hoisted(() =>
+  vi.fn(async (): Promise<{ updated: number; ok: boolean }> => ({ updated: 0, ok: true }))
+);
+vi.mock("@/app/_lib/fabric-surcharge-recompute", () => ({
+  recomputeFabricSurcharges: recomputeMock,
+  RECOMPUTE_FAILED_SAVE_GROUP: "RECOMPUTE_FAILED_SAVE_GROUP",
+}));
 
 import { createCategory, updateCategory } from "../actions";
 
@@ -201,5 +209,128 @@ describe("updateCategory — validateParent rozdziela dwa przypadki", () => {
     );
 
     expect(res).toEqual({ ok: false, error: PARENT_NOT_FOUND });
+  });
+});
+
+describe("rozmiar domyślny do dopłat za tkaninę", () => {
+  const updateOps = () =>
+    current.ops.filter((o) => o.table === "categories" && o.op === "update");
+  const insertOps = () =>
+    current.ops.filter((o) => o.table === "categories" && o.op === "insert");
+
+  it("formularz bez pola: brak odczytu fabric_sizes, brak klucza w update, brak przeliczenia", async () => {
+    current = makeClient({ tables: { categories: [{ error: null }] } });
+    const res = await updateCategory(formData({ id: "a", label: "Sofy" }));
+    expect(res.ok).toBe(true);
+    expect(current.ops.some((o) => o.table === "fabric_sizes")).toBe(false);
+    expect(JSON.stringify(updateOps()[0].args)).not.toContain("default_fabric_size_id");
+    expect(recomputeMock).not.toHaveBeenCalled();
+  });
+
+  // Kolejka „categories": najpierw odczyt bieżącego rozmiaru, potem update.
+  const stored = (id: string | null) => ({ data: { id: "a", default_fabric_size_id: id } });
+
+  it("update ze zmienionym id zapisuje je i przelicza dopłaty", async () => {
+    current = makeClient({
+      tables: {
+        fabric_sizes: [{ data: [{ id: "s-fotel" }] }],
+        categories: [stored(null), { error: null }],
+      },
+    });
+    const res = await updateCategory(
+      formData({ id: "a", label: "Sofy", default_fabric_size_id: "s-fotel" })
+    );
+    expect(res.ok).toBe(true);
+    expect(updateOps()[0].args[0]).toMatchObject({ default_fabric_size_id: "s-fotel" });
+    expect(recomputeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("update z pustą wartością zapisuje null i przelicza, gdy rozmiar był ustawiony", async () => {
+    current = makeClient({
+      tables: {
+        fabric_sizes: [{ data: [{ id: "s-fotel" }] }],
+        categories: [stored("s-fotel"), { error: null }],
+      },
+    });
+    await updateCategory(formData({ id: "a", label: "Sofy", default_fabric_size_id: "" }));
+    expect(updateOps()[0].args[0]).toMatchObject({ default_fabric_size_id: null });
+    expect(recomputeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rozmiar bez zmian (zapis samej nazwy) → bez przeliczenia", async () => {
+    current = makeClient({
+      tables: {
+        fabric_sizes: [{ data: [{ id: "s-fotel" }] }],
+        categories: [stored("s-fotel"), { error: null }],
+      },
+    });
+    const res = await updateCategory(
+      formData({ id: "a", label: "Sofy nowe", default_fabric_size_id: "s-fotel" })
+    );
+    expect(res.ok).toBe(true);
+    expect(updateOps()).toHaveLength(1);
+    expect(recomputeMock).not.toHaveBeenCalled();
+  });
+
+  it("baza bez kolumny (undefined) i puste pole → traktowane jak null, bez przeliczenia", async () => {
+    current = makeClient({
+      tables: {
+        fabric_sizes: [{ data: [] }],
+        categories: [{ data: { id: "a" } }, { error: null }],
+      },
+    });
+    await updateCategory(formData({ id: "a", label: "Sofy", default_fabric_size_id: "" }));
+    expect(recomputeMock).not.toHaveBeenCalled();
+  });
+
+  it("błąd odczytu bieżącego rozmiaru → błąd, bez zapisu i bez przeliczenia", async () => {
+    current = makeClient({
+      tables: {
+        fabric_sizes: [{ data: [{ id: "s-fotel" }] }],
+        categories: [{ error: { code: "XX", message: "read boom" } }],
+      },
+    });
+    const res = await updateCategory(
+      formData({ id: "a", label: "Sofy", default_fabric_size_id: "s-fotel" })
+    );
+    expect(res).toEqual({ ok: false, error: "read boom" });
+    expect(updateOps()).toHaveLength(0);
+    expect(recomputeMock).not.toHaveBeenCalled();
+  });
+
+  it("nieudane przeliczenie → komunikat, że zapisano, ale nie przeliczono", async () => {
+    recomputeMock.mockResolvedValueOnce({ updated: 0, ok: false });
+    current = makeClient({
+      tables: {
+        fabric_sizes: [{ data: [{ id: "s-fotel" }] }],
+        categories: [stored(null), { error: null }],
+      },
+    });
+    const res = await updateCategory(
+      formData({ id: "a", label: "Sofy", default_fabric_size_id: "s-fotel" })
+    );
+    expect(updateOps()).toHaveLength(1);
+    expect(res).toEqual({ ok: false, error: "RECOMPUTE_FAILED_SAVE_GROUP" });
+  });
+
+  it("błąd odczytu fabric_sizes → błąd, bez zapisu i bez przeliczenia", async () => {
+    current = makeClient({
+      tables: { fabric_sizes: [{ error: { code: "XX", message: "boom" } }] },
+    });
+    const res = await updateCategory(
+      formData({ id: "a", label: "Sofy", default_fabric_size_id: "s-fotel" })
+    );
+    expect(res).toEqual({ ok: false, error: "boom" });
+    expect(updateOps()).toHaveLength(0);
+    expect(recomputeMock).not.toHaveBeenCalled();
+  });
+
+  it("create ze znanym id wstawia je; nieznane id → null; bez przeliczenia", async () => {
+    current = makeClient({
+      tables: { fabric_sizes: [{ data: [{ id: "s-fotel" }] }], categories: [{ error: null }] },
+    });
+    await createCategory(formData({ label: "Komody", default_fabric_size_id: "s-nie-ma" }));
+    expect(insertOps()[0].args[0]).toMatchObject({ default_fabric_size_id: null });
+    expect(recomputeMock).not.toHaveBeenCalled();
   });
 });

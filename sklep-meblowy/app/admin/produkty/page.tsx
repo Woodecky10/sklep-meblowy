@@ -4,6 +4,12 @@ import { createClient } from "@/app/_lib/supabase/server";
 import type { Product } from "@/app/_lib/types";
 import { hasVariants, totalProductStock } from "@/app/_lib/variants";
 import { promoChipLabel, warsawToday } from "@/app/_lib/sale-schedule";
+import { getAllCategories } from "@/app/_lib/categories";
+import { getFabricSizes } from "@/app/_lib/fabric-sizes-data";
+import {
+  needsFabricSize as productNeedsFabricSize,
+  resolveFabricSizing,
+} from "@/app/_lib/fabric-sizes";
 import ProductsList, { type AdminProductRow } from "./ProductsList";
 
 export const metadata = { title: "Produkty" };
@@ -12,10 +18,11 @@ export default async function AdminProductsPage() {
   await requireAdmin();
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .order("name", { ascending: true });
+  const [{ data, error }, sizes, categories] = await Promise.all([
+    supabase.from("products").select("*").order("name", { ascending: true }),
+    getFabricSizes(),
+    getAllCategories(),
+  ]);
 
   // Projekcja dla client componentu — stock/warianty liczone serwerowo,
   // pełny JSON wariantów nie jedzie do przeglądarki.
@@ -41,6 +48,9 @@ export default async function AdminProductsPage() {
       },
       today
     ),
+    needsFabricSize:
+      sizes.length > 0 &&
+      productNeedsFabricSize(p.variants, resolveFabricSizing(p, categories, sizes)),
   }));
 
   return (

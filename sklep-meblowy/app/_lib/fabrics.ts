@@ -107,7 +107,9 @@ export async function getFabricBySlug(slug: string): Promise<Fabric | null> {
 }
 
 // Mapa wartość wariantu → metadane tkaniny (slug + grupa) — seed kontekstu
-// klienckiego na karcie produktu (FabricMetaProvider).
+// klienckiego na karcie produktu (FabricMetaProvider). Dopłaty grup są tu
+// GLOBALNE; kwotę właściwą dla mebla (rozmiar do dopłat) selektor bierze z
+// ProductGroupSurchargesProvider (fabric-context.tsx).
 export async function getFabricMetaMap(): Promise<Record<string, FabricValueMeta>> {
   const [fabrics, groups, defs] = await Promise.all([
     getAllFabrics(),

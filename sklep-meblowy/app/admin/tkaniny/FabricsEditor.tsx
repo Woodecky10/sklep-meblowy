@@ -11,8 +11,10 @@ import { filterBySearch } from "@/app/_lib/search-normalize";
 import { MAX_FEATURED_PRODUCTS } from "@/app/_lib/fabric-featured-products";
 import { useConfirm } from "@/app/_context/ConfirmContext";
 import FabricGroupsPanel from "./FabricGroupsPanel";
+import FabricSizesPanel from "./FabricSizesPanel";
 import FabricPropertiesPanel from "./FabricPropertiesPanel";
 import type { Fabric, FabricPriceGroup, FabricPropertyDefRow } from "@/app/_lib/types";
+import type { FabricSize } from "@/app/_lib/fabric-sizes";
 
 // Produkt w pickerze „Meble w tej tkaninie" (lista z page.tsx — tylko aktywne).
 export type FabricPickerProduct = { id: string; name: string; image: string | null };
@@ -20,11 +22,13 @@ export type FabricPickerProduct = { id: string; name: string; image: string | nu
 export default function FabricsEditor({
   initialFabrics,
   groups,
+  sizes,
   propertyDefs,
   pickerProducts,
 }: {
   initialFabrics: Fabric[];
   groups: FabricPriceGroup[];
+  sizes: FabricSize[];
   // null = słownika cech nie udało się pobrać (inna sytuacja niż pusta lista):
   // formularz tkaniny ostrzega i nie rusza zapisanych cech.
   propertyDefs: FabricPropertyDefRow[] | null;
@@ -91,6 +95,8 @@ export default function FabricsEditor({
       </div>
 
       <FabricGroupsPanel groups={groups} onResult={(res) => handleResult(res)} />
+
+      <FabricSizesPanel sizes={sizes} groups={groups} onResult={(res) => handleResult(res)} />
 
       <FabricPropertiesPanel
         defs={propertyDefs ?? []}

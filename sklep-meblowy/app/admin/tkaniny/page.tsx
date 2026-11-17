@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/app/_lib/admin";
 import { getAllFabrics, getFabricPriceGroups } from "@/app/_lib/fabrics";
+import { getFabricSizes } from "@/app/_lib/fabric-sizes-data";
 import { createAdminClient } from "@/app/_lib/supabase/server";
 import FabricsEditor, { type FabricPickerProduct } from "./FabricsEditor";
 import type { FabricPropertyDefRow } from "@/app/_lib/types";
@@ -12,11 +13,13 @@ export default async function AdminFabricsPage() {
   const [
     fabrics,
     groups,
+    sizes,
     { data: productRows },
     { data: propertyRows, error: propertyErr },
   ] = await Promise.all([
     getAllFabrics(),
     getFabricPriceGroups(),
+    getFabricSizes(),
     // Picker „Meble w tej tkaninie": aktywne produkty z miniaturą, po nazwie.
     supabase
       .from("products")
@@ -44,6 +47,7 @@ export default async function AdminFabricsPage() {
     <FabricsEditor
       initialFabrics={fabrics}
       groups={groups}
+      sizes={sizes}
       propertyDefs={propertyDefs}
       pickerProducts={pickerProducts}
     />
