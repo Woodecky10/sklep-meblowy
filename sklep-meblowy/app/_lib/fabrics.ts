@@ -7,6 +7,7 @@ import { withFallback } from "./cache-fallback";
 import { buildFabricDeMap, buildFabricImageMap, buildFabricMetaMap, type FabricValueMeta } from "./variants";
 import { buildFabricPropertyDefs, type FabricPropertyDef } from "./fabric-properties";
 import type { Fabric, FabricPriceGroup } from "./types";
+import { withGroupSurcharges } from "./fabric-sizes";
 
 export const FABRICS_CACHE_TAG = "fabrics";
 
@@ -108,11 +109,19 @@ export async function getFabricBySlug(slug: string): Promise<Fabric | null> {
 
 // Mapa wartość wariantu → metadane tkaniny (slug + grupa) — seed kontekstu
 // klienckiego na karcie produktu (FabricMetaProvider).
-export async function getFabricMetaMap(): Promise<Record<string, FabricValueMeta>> {
+// surchargeByGroupId (klucz = id grupy) podmienia dopłaty grup — dopłaty właściwe
+// dla konkretnego mebla (rozmiar do dopłat). Bez argumentu: globalne dopłaty.
+export async function getFabricMetaMap(
+  surchargeByGroupId?: Record<string, number>
+): Promise<Record<string, FabricValueMeta>> {
   const [fabrics, groups, defs] = await Promise.all([
     getAllFabrics(),
     getFabricPriceGroups(),
     getFabricPropertyDefs(),
   ]);
-  return buildFabricMetaMap(fabrics, groups, defs);
+  return buildFabricMetaMap(
+    fabrics,
+    surchargeByGroupId ? withGroupSurcharges(groups, surchargeByGroupId) : groups,
+    defs
+  );
 }

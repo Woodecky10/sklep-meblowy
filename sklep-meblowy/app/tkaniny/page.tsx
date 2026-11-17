@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getAllFabrics, getFabricPriceGroups } from "@/app/_lib/fabrics";
+import { getFabricSizes } from "@/app/_lib/fabric-sizes-data";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { pickLocalized, localizePath } from "@/app/_lib/i18n";
@@ -40,10 +41,11 @@ function fabricThumb(f: Fabric): string | undefined {
 export default async function TkaninyPage() {
   const locale = await getLocale();
   const t = getDictionary(locale);
-  const [fabrics, groups, rate] = await Promise.all([
+  const [fabrics, groups, rate, sizes] = await Promise.all([
     getAllFabrics(),
     getFabricPriceGroups(),
     getEurRate(),
+    getFabricSizes(),
   ]);
   const sections = groups
     .map((g) => ({ group: g, items: fabrics.filter((f) => f.group_id === g.id) }))
@@ -75,7 +77,9 @@ export default async function TkaninyPage() {
               {pickLocalized(group.name, group.name_de, locale)}
             </h2>
             <span className="text-sm font-sans text-[var(--color-gold-text)] font-semibold">
-              {group.surcharge > 0
+              {group.surcharge > 0 && sizes.length > 0
+                ? t.fabrics.surchargeDependsOnFurniture
+                : group.surcharge > 0
                 ? `+${formatMoney(group.surcharge, locale, rate)}`
                 : t.fabrics.groupNoSurcharge}
             </span>

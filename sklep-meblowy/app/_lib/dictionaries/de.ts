@@ -145,6 +145,7 @@ export const de: DeepPartial<PlShape> = {
     heading: "Stoffe",
     intro: "Entdecken Sie die Stoffe unserer Möbel — nach Preisgruppen geordnet. Klicken Sie auf einen Stoff, um Beschreibung und Farbmuster zu sehen.",
     groupNoSurcharge: "ohne Aufpreis",
+    surchargeDependsOnFurniture: "Aufpreis je nach Möbelstück",
     colorsOne: "Farbe",
     colorsFew: "Farben",
     colorsMany: "Farben",

@@ -141,6 +141,7 @@ export type PlShape = {
     heading: string;
     intro: string;
     groupNoSurcharge: string;
+    surchargeDependsOnFurniture: string;
     colorsOne: string;
     colorsFew: string;
     colorsMany: string;
@@ -597,6 +598,7 @@ export const pl = {
     heading: "Tkaniny",
     intro: "Poznaj tkaniny dostępne w naszych meblach — pogrupowane według grup cenowych. Kliknij tkaninę, aby zobaczyć opis i pełny wzornik kolorów.",
     groupNoSurcharge: "bez dopłaty",
+    surchargeDependsOnFurniture: "dopłata zależy od mebla",
     colorsOne: "kolor",
     colorsFew: "kolory",
     colorsMany: "kolorów",

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getFabricBySlug, getFabricPriceGroups } from "@/app/_lib/fabrics";
+import { getFabricSizes } from "@/app/_lib/fabric-sizes-data";
 import { getLocale } from "@/app/_lib/i18n-server";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { pickLocalized, localizePath } from "@/app/_lib/i18n";
@@ -45,10 +46,11 @@ export default async function TkaninaPage({ params }: Props) {
   const { slug } = await params;
   const locale = await getLocale();
   const t = getDictionary(locale);
-  const [fabric, groups, rate] = await Promise.all([
+  const [fabric, groups, rate, sizes] = await Promise.all([
     getFabricBySlug(slug),
     getFabricPriceGroups(),
     getEurRate(),
+    getFabricSizes(),
   ]);
   if (!fabric) notFound();
 
@@ -137,7 +139,11 @@ export default async function TkaninaPage({ params }: Props) {
             <span className="px-3 py-1 rounded-full border border-[var(--color-gold)] text-[var(--color-gold-text)] font-semibold">
               {pickLocalized(group.name, group.name_de, locale)}
               {" · "}
-              {effective > 0 ? `+${formatMoney(effective, locale, rate)}` : t.fabrics.groupNoSurcharge}
+              {effective > 0 && sizes.length > 0
+                ? t.fabrics.surchargeDependsOnFurniture
+                : effective > 0
+                ? `+${formatMoney(effective, locale, rate)}`
+                : t.fabrics.groupNoSurcharge}
             </span>
           )}
           {fabric.category && (

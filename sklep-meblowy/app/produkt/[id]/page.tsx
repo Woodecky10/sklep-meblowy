@@ -36,7 +36,9 @@ import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { buildSizeOptions } from "@/app/_lib/size-groups";
 import { effectivePrice } from "@/app/_lib/pricing";
-import { getFabricImageMap, getFabricMetaMap } from "@/app/_lib/fabrics";
+import { getFabricImageMap, getFabricMetaMap, getFabricPriceGroups } from "@/app/_lib/fabrics";
+import { getFabricSizes } from "@/app/_lib/fabric-sizes-data";
+import { effectiveGroupSurcharges, resolveFabricSizing } from "@/app/_lib/fabric-sizes";
 import { FabricImageProvider, FabricMetaProvider } from "@/app/_lib/fabric-context";
 import { getVariantInfoMap } from "@/app/_lib/variant-info-data";
 import { VariantInfoProvider } from "@/app/_lib/variant-info-context";
@@ -101,7 +103,7 @@ export default async function ProduktPage({ params }: Props) {
   // bez rozmiaru (sofy, fotele) → cross-sell leci starą ścieżką.
   const sleepSize = sleepSizeOf(product);
 
-  const [sizeSiblings, related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell, wishlistIds, rate, bundles] =
+  const [sizeSiblings, related, rating, reviews, reviewStatus, categoryLabel, allCategories, crossSell, wishlistIds, rate, bundles, fabricSizes, fabricGroups] =
     await Promise.all([
       // Selektor rozmiaru: rodzeństwo z tym samym size_group (osobne aukcje per rozmiar).
       product.size_group ? getSizeSiblings(product.size_group, locale) : Promise.resolve([]),
@@ -122,13 +124,21 @@ export default async function ProduktPage({ params }: Props) {
       getEurRate(),
       // Zestawy zawierające ten produkt — box „Kup w zestawie" na karcie.
       getBundlesForProduct(product.id, locale),
+      // Rozmiary do dopłat — dopłaty grup tkanin właściwe dla tego mebla.
+      getFabricSizes(),
+      getFabricPriceGroups(),
     ]);
   const sizeOptions = buildSizeOptions(sizeSiblings, product.id);
   // Mapa zdjęć próbek tkanin (wartość „Nazwa Numer" → URL) do próbek w selektorze.
   const fabricImageMap = await getFabricImageMap();
   // Mapa wartość wariantu → metadane tkaniny (slug, grupa cenowa) — selektor
   // grupuje próbki w rozwijane karty grup + link „szczegóły" do /tkaniny/[slug].
-  const fabricMetaMap = await getFabricMetaMap();
+  const fabricMetaMap = await getFabricMetaMap(
+    effectiveGroupSurcharges(
+      fabricGroups,
+      resolveFabricSizing(product, allCategories, fabricSizes).surcharges
+    )
+  );
   // Mapa (opcja+wartość) → {info, info_de} — krótkie informacje o wariancie
   // (tooltip „i" przy wartości w selektorze).
   const variantInfoMap = await getVariantInfoMap();
