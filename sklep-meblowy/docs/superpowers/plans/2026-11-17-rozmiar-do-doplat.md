@@ -690,7 +690,7 @@ Wymaga zapisu w żywej bazie, więc robi ją właściciel albo agent za jego zgo
 
 ## STAN WYKONANIA
 
-Stan na 2026-11-17. Gałąź `feat/rozmiar-do-doplat`, NIE wypchnięta, bez PR.
+Stan na 2026-11-17. **WDROŻONE NA PRODUKCJĘ** — PR #204, merge `0713219`, deployment Vercel `dpl_7b2njWcrmY5rSz8Nghvhii5SUYb1` (READY na www.mollien.pl).
 
 **Zrobione — Zadania 1–9 (z Zadania 9 tylko kroki 2–3) plus poprawki po recenzji całej gałęzi:**
 - `6e0d08e` docs: projekt i plan
@@ -709,13 +709,18 @@ Stan na 2026-11-17. Gałąź `feat/rozmiar-do-doplat`, NIE wypchnięta, bez PR.
 
 Weryfikacja po poprawkach: vitest 2166/2166, `tsc` czysto, lint 0 błędów (4 stare ostrzeżenia), build OK, Playwright `rozmiar-do-doplat` + `fabric-group-cards` 6/6 na lokalnym buildzie (bez zapisu).
 
-**Migracja 86 NIE jest zaaplikowana.** Trzeba ją zaaplikować PRZED mergem/wdrożeniem. Bez niej po wdrożeniu: zapis „Podstawowe dane" produktu i duplikowanie produktu padają, a każdy zapis tkaniny, grupy cenowej i rozmiaru kończy się komunikatem „nie udało się przeliczyć dopłat" — ceny w produktach przestają się aktualizować. Po migracji sprawdzić `list_tables` (auto-apply nie działa).
+**Zadanie 9 — zrobione w całości 2026-11-17:**
+- Krok 1: migrację 86 zaaplikował właściciel w SQL Editorze (tokeny MCP i powłoki dawały 401); sprawdzone odczytem PostgREST: kolumny `products.fabric_size_id`, `products.fabric_surcharges`, `categories.default_fabric_size_id` i tabela `fabric_sizes` istnieją. Polityki RLS i wpisu w `schema_migrations` nie dało się sprawdzić bez tokenu.
+- Krok 4: PR #204 zmergowany, wdrożenie READY; e2e tylko do odczytu na produkcji 6/6.
+- Krok 5: próba na żywo przez panel na Fotelu Montes z rozmiarem „TEST fotel" (Premium 260, Premium High 410, Standard puste): karta pokazała +260 / +410 zł, zmiana na 270 przeliczyła produkt, usunięcie rozmiaru przywróciło 250 / 400. Po próbie: 0 rozmiarów, 0 produktów z ceną różną od wzoru.
 
-**Niezrobione z Zadania 9:** krok 1 (migracja na produkcji), krok 4 (push jako Woodecky10, PR, merge = wdrożenie), krok 5 (próba na żywo z rozmiarem „TEST…" — zapis w żywej bazie, tylko właściciel albo za jego zgodą).
+**Fotel Vegas Buble — ręczne dopłaty przeniesione do „własnych dopłat":** przed próbą miał ręcznie obniżone ceny tkanin (Standard 0, Premium +100, Premium High +160 zamiast 250/400), których żadne pole w bazie nie chroniło — każde przeliczenie wszystkich produktów przywróciłoby 250/400. Ustawione jako własne dopłaty produktu (ceny bez zmian, sprawdzone). To przykład „fotelowych" kwot do listy rozmiarów.
+
+Próbny przebieg planera na produkcji (R11) wykonany przed próbą: 352 produkty z tkaninami, jedyna realna różnica cen to Vegas Buble; 178 kolejnych różni się wyłącznie kolejnością kluczy JSON (Postgres sortuje klucze `jsonb`), więc przeliczenie zapisuje je bez zmiany cen.
 
 **Rollback:** najpierw revert kodu; potem — jeśli rozmiary były już w użyciu — zapisać bez zmian dowolną grupę cenową w panelu Tkaniny (stary kod przeliczy wszystkie produkty z powrotem na kwoty globalne); dopiero na końcu cofnąć migrację.
 
-**Rozstrzygnięcia kontrolera (R1–R11):**
+**Rozstrzygnięcia kontrolera (R1–R14):**
 - R1: `CategoryNode.defaultFabricSizeId` opcjonalne (`?: string | null`), stare fixtury się kompilują.
 - R2: pomocniki testów (`GROUPS`, `FOTEL`, `CATS`, `fd`, `CODES`, `SIZES`) na poziomie modułu `fabric-sizes.test.ts`.
 - R3: `planFabricSurchargeUpdates` zostaje w `fabric-surcharge-recompute.ts`; test mockuje supabase/next/products.
@@ -727,7 +732,10 @@ Weryfikacja po poprawkach: vitest 2166/2166, `tsc` czysto, lint 0 błędów (4 s
 - R9: zapis podstawowych danych produktu / kategorii przelicza dopłaty tylko przy faktycznej zmianie kategorii, rozmiaru, własnych dopłat albo rozmiaru domyślnego.
 - R10: kwotę nagłówka grupy na karcie produktu daje jeden kontekst `id produktu → kod grupy → zł` (produkt i składniki zestawów); mapa metadanych tkanin jest globalna. `withGroupSurcharges` i argument `getFabricMetaMap` z Zadań 1 i 7 usunięte.
 - R10b: `/tkaniny` pisze „dopłata zależy od mebla" tylko gdy któryś rozmiar wycenia grupę inaczej niż globalnie; inaczej kwota (na stronie tkaniny + korekta) albo „bez dopłaty".
-- R11: próbny przebieg planera na danych produkcyjnych (bez zapisu) NIE wykonany — oferta dla właściciela; R9 i tak nie pozwala, by rozjechane ceny zmieniły się przy niezwiązanym zapisie.
+- R11: próbny przebieg planera na danych produkcyjnych (bez zapisu) — początkowo odłożony, wykonany przy wdrożeniu (wynik wyżej).
+- R12: komunikaty o nieudanym przeliczeniu różne per miejsce (opis niżej).
+- R13: zapis podstawowych danych produktu najpierw czyta wiersz produktu (potrzebne do R9); błąd odczytu przerywa zapis.
+- R14: `/tkaniny` nie uwzględnia własnych dopłat produktów — otwarty punkt.
 
 Komunikat po nieudanym przeliczeniu: przy tkaninie, grupie i rozmiarze „Spróbuj zapisać ponownie" (ponowny zapis przelicza wszystko). Przy produkcie i kategorii ponowny zapis bez zmian nie przelicza (R9), więc komunikat każe zapisać bez zmian dowolną grupę cenową. Przy nowej tkaninie — odświeżyć stronę i zapisać ją z listy (ponowne „Dodaj" dałoby duplikat nazwy).
 
@@ -738,5 +746,5 @@ Komunikat po nieudanym przeliczeniu: przy tkaninie, grupie i rozmiarze „Sprób
 - `/tkaniny` nie uwzględnia własnych dopłat produktów (R10b patrzy tylko na rozmiary).
 
 **Otwarte po stronie właściciela i osoby zarządzającej:**
-- lista rozmiarów i kwoty dopłat (wpisuje się w panelu po wdrożeniu),
+- lista rozmiarów i kwoty dopłat (panel Tkaniny → „Rozmiary mebli do dopłat za tkaninę"), potem rozmiar domyślny w kategoriach; Fotel Vegas Buble można przestawić z własnych dopłat na rozmiar fotela,
 - potwierdzenie trzech decyzji autora z projektu (napis na `/tkaniny`, warunek plakietki, usuwanie rozmiaru bez blokady).
