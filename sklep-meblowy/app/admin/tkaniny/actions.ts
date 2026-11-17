@@ -12,13 +12,15 @@ import { invalidateFacetsCache } from "@/app/_lib/products";
 import { sanitizeRichHtml } from "@/app/_lib/product-html";
 import { fabricSlug } from "@/app/_lib/fabric-slug";
 import {
-  buildGroupSurchargeMap,
-  rebuildFabricValuePrices,
   removeFabricFromVariants,
   remapFabricInVariants,
   type FabricLite,
 } from "@/app/_lib/variants";
 import type { ProductVariants } from "@/app/_lib/types";
+import {
+  recomputeFabricSurcharges,
+  writeProductVariants,
+} from "@/app/_lib/fabric-surcharge-recompute";
 import { parseFeaturedProductIds } from "@/app/_lib/fabric-featured-products";
 import {
   FABRIC_PROPERTY_LABEL_MAX,
@@ -129,82 +131,6 @@ const PROPERTIES_READ_ERROR =
 // „nie wiem", a nie „admin odznaczył wszystko".
 function propertiesSectionRendered(formData: FormData): boolean {
   return formData.get("properties_present") === "1";
-}
-
-// Ile zapisów produktów leci równolegle w jednej porcji. Zamienia setki
-// sekwencyjnych round-tripów na kilka równoległych porcji, zdejmując ryzyko
-// timeoutu funkcji serverless przy zmianie grupy dotykającej wielu produktów.
-const PRODUCT_WRITE_CONCURRENCY = 20;
-
-// Propagacja dopłat: przelicza value_prices opcji „Tkanina" we WSZYSTKICH
-// produktach wg aktualnego katalogu (grupa + korekta). Zapisuje tylko
-// faktycznie zmienione, w porcjach po PRODUCT_WRITE_CONCURRENCY równolegle.
-// Wołane po każdej zmianie tkaniny/grupy — bez diffowania co się zmieniło
-// (tanio i zawsze poprawnie; skala sklepu: setki produktów).
-async function recomputeFabricSurchargesOnProducts(): Promise<{ updated: number }> {
-  const supabase = await createAdminClient();
-  const [{ data: fabricRows }, { data: groupRows }, { data: productRows }] = await Promise.all([
-    supabase.from("fabrics").select("name, colors, price, group_id"),
-    supabase.from("fabric_groups").select("id, surcharge"),
-    supabase.from("products").select("id, variants").not("variants", "is", null),
-  ]);
-  const fabrics = (fabricRows ?? []) as FabricLite[];
-  const surcharges = buildGroupSurchargeMap(
-    (groupRows ?? []) as { id: string; surcharge: number }[]
-  );
-
-  // Faza 1 (czysta, bez I/O): policz produkty, które faktycznie się zmieniają.
-  const changed: { id: string; variants: ProductVariants }[] = [];
-  for (const row of productRows ?? []) {
-    const p = row as { id: string; variants: ProductVariants | null };
-    const res = rebuildFabricValuePrices(p.variants, fabrics, surcharges);
-    if (res && res.changed) changed.push({ id: p.id, variants: res.variants });
-  }
-
-  const updated = await writeProductVariants(changed, "recomputeFabricSurcharges");
-  if (updated > 0) {
-    invalidateFacetsCache();
-    revalidatePath("/sklep");
-  }
-  return { updated };
-}
-
-// Zapis wsadowy variants z ograniczoną współbieżnością. Błąd per produkt jest
-// logowany i pomijany (licznik liczy tylko udane) — częściowy fail nie wywala
-// całej akcji ani nie fałszuje liczby. Wspólne dla propagacji dopłat i dla
-// usuwania tkaniny z produktów.
-async function writeProductVariants(
-  changed: { id: string; variants: ProductVariants }[],
-  logTag: string
-): Promise<number> {
-  const supabase = await createAdminClient();
-  let updated = 0;
-  for (let i = 0; i < changed.length; i += PRODUCT_WRITE_CONCURRENCY) {
-    const batch = changed.slice(i, i + PRODUCT_WRITE_CONCURRENCY);
-    const results = await Promise.all(
-      batch.map(async (c) => {
-        try {
-          const { error } = await supabase
-            .from("products")
-            .update({ variants: c.variants } as never)
-            .eq("id", c.id);
-          if (error) {
-            console.error(`[${logTag}] update ${c.id}:`, error.message);
-            return false;
-          }
-          revalidatePath(`/produkt/${c.id}`);
-          return true;
-        } catch (e) {
-          // Sieciowy/nieoczekiwany błąd pojedynczego zapisu nie może wywalić
-          // całej porcji — logujemy i pomijamy (jak przy błędzie zapytania).
-          console.error(`[${logTag}] update ${c.id} threw:`, e);
-          return false;
-        }
-      })
-    );
-    updated += results.filter(Boolean).length;
-  }
-  return updated;
 }
 
 // Wycina usuwaną tkaninę z opcji „Tkanina" wszystkich produktów. Wołane PRZED
@@ -321,7 +247,7 @@ export async function createFabric(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: error.message };
   }
 
-  await recomputeFabricSurchargesOnProducts();
+  await recomputeFabricSurcharges();
   invalidateFabricsCache();
   invalidateFacetsCache();
   revalidatePath("/admin/tkaniny");
@@ -403,7 +329,7 @@ export async function updateFabric(formData: FormData): Promise<ActionResult> {
     ? (await remapFabricOnProducts(poprzednia, { name, colors, price, group_id: groupId })).updated
     : 0;
 
-  await recomputeFabricSurchargesOnProducts();
+  await recomputeFabricSurcharges();
   invalidateFabricsCache();
   invalidateFacetsCache();
   revalidatePath("/admin/tkaniny");
@@ -478,7 +404,7 @@ export async function updateFabricGroup(formData: FormData): Promise<ActionResul
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
 
-  const { updated } = await recomputeFabricSurchargesOnProducts();
+  const { updated } = await recomputeFabricSurcharges();
   invalidateFabricGroupsCache();
   invalidateFabricsCache();
   invalidateFacetsCache();
