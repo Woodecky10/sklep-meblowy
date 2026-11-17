@@ -143,6 +143,11 @@ export type Product = {
   // rodzeństwo z tym samym size_group. Pass-through PL/DE (brak kolumn _de).
   size_group: string | null;
   size_label: string | null;
+  // Rozmiar do dopłat za tkaninę (migracja 86): fabric_size_id wskazuje
+  // fabric_sizes, fabric_surcharges to własne dopłaty produktu kluczowane
+  // kodem grupy. Opcjonalne, bo select("*") na bazie bez kolumny daje undefined.
+  fabric_size_id?: string | null;
+  fabric_surcharges?: Record<string, number> | null;
   // Omnibus (migracja 36) — poziom produktu (dla produktów bez wariantów).
   sale_price: number | null;
   omnibus_price: number | null;

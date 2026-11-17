@@ -65,6 +65,7 @@ const fetchCategoriesData = unstable_cache(
       cross_sell_categories: string[] | null;
       sort_order: number;
       active: boolean;
+      default_fabric_size_id?: string | null;
     }>).map((c) => ({
       id: c.id,
       slug: c.slug,
@@ -74,6 +75,7 @@ const fetchCategoriesData = unstable_cache(
       crossSellCategories: c.cross_sell_categories ?? [],
       sort_order: c.sort_order,
       active: c.active,
+      defaultFabricSizeId: c.default_fabric_size_id ?? null,
     }));
   },
   ["categories-tree"],

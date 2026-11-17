@@ -21,6 +21,9 @@ export type CategoryNode = {
   sort_order: number;
   active: boolean;
   crossSellCategories: string[];
+  // Domyślny rozmiar do dopłat za tkaninę (migracja 86). Opcjonalne: fixtury
+  // testowe go nie podają, a select("*") na bazie bez kolumny daje undefined.
+  defaultFabricSizeId?: string | null;
 };
 
 export type CategoryTreeNode = CategoryNode & {

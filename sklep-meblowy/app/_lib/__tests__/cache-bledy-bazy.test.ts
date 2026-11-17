@@ -74,6 +74,7 @@ vi.mock("next/cache", () => ({
 }));
 
 import { getAllFabrics, getFabricPriceGroups, getFabricPropertyDefs } from "../fabrics";
+import { getFabricSizes } from "../fabric-sizes-data";
 import { getCategories } from "../categories";
 import { getAllCollections } from "../collections";
 import { getHomeBlocks, getPageBlocks } from "../blocks-server";
@@ -143,6 +144,13 @@ const przypadki: Przypadek[] = [
     tabele: { fabric_groups: [{ id: "g1", code: "standard", name: "Standard", surcharge: 0, sort_order: 0 }] },
     awaria: ["fabric_groups"],
     wywolaj: () => getFabricPriceGroups(),
+  },
+  {
+    nazwa: "rozmiary do dopłat za tkaninę",
+    zapas: [],
+    tabele: { fabric_sizes: [{ id: "s1", name: "Fotel", surcharges: { standard: 100 }, sort_order: 0, created_at: "2026-11-17" }] },
+    awaria: ["fabric_sizes"],
+    wywolaj: () => getFabricSizes(),
   },
   {
     nazwa: "cechy tkanin",
