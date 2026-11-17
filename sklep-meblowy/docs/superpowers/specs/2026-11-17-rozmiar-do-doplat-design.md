@@ -1,6 +1,6 @@
 # Rozmiar mebla do dopłat za tkaninę — projekt
 
-Data: 2026-11-17. Status: do akceptacji właściciela.
+Data: 2026-11-17. Status: zaakceptowany; trzy decyzje autora przyjęte bez wyraźnego potwierdzenia właściciela (do potwierdzenia).
 
 ## Po co
 
@@ -63,8 +63,11 @@ Grupa, której rozmiar nie wycenia (brak klucza), bierze globalną dopłatę gru
 
 ## Decyzje podjęte przez autora (do potwierdzenia)
 
-- Strony `/tkaniny` i `/tkaniny/[slug]`: gdy istnieje choć jeden rozmiar, zamiast kwoty
-  „+250 zł" pokazują napis „dopłata zależy od mebla". Bez rozmiarów zostaje kwota.
+- Strony `/tkaniny` i `/tkaniny/[slug]`: napis „dopłata zależy od mebla" zamiast kwoty
+  „+250 zł" pojawia się przy grupie tylko wtedy, gdy któryś rozmiar wycenia tę grupę inaczej
+  niż jej globalna dopłata. Inaczej zostaje kwota (na stronie tkaniny: dopłata grupy + korekta
+  tkaniny), a przy zerze „bez dopłaty". Własne dopłaty pojedynczych produktów tego napisu nie
+  zmieniają.
 - Plakietka „bez rozmiaru" na liście produktów pojawia się dopiero, gdy istnieje choć jeden
   rozmiar, i tylko przy produktach z opcją „Tkanina".
 - Usunięcie rozmiaru nie jest blokowane: produkty i kategorie wracają do kolejnego poziomu

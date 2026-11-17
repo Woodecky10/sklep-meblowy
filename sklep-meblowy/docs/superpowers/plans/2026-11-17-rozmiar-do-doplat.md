@@ -690,8 +690,53 @@ Wymaga zapisu w żywej bazie, więc robi ją właściciel albo agent za jego zgo
 
 ## STAN WYKONANIA
 
-Nic nie rozpoczęto. Projekt i plan czekają na akceptację właściciela.
+Stan na 2026-11-17. Gałąź `feat/rozmiar-do-doplat`, NIE wypchnięta, bez PR.
 
-Otwarte po stronie właściciela i osoby zarządzającej:
-- lista rozmiarów i kwoty dopłat (wpisuje się w panelu po wdrożeniu, nie blokuje kodu),
+**Zrobione — Zadania 1–9 (z Zadania 9 tylko kroki 2–3) plus poprawki po recenzji całej gałęzi:**
+- `6e0d08e` docs: projekt i plan
+- `2c30589` Zadanie 1 — rozstrzyganie dopłat wg rozmiaru mebla
+- `a0b5485` Zadanie 2 — tabela `fabric_sizes`, pola produktu i kategorii (migracja 86)
+- `1d13e0a` Zadanie 3 — przeliczanie dopłat per produkt we wspólnym module
+- `e6d19ac` Zadanie 4 — panel rozmiarów
+- `fedd2bd` Zadanie 5 — rozmiar domyślny kategorii
+- `b5384be` Zadanie 6 — rozmiar i własne dopłaty na produkcie
+- `8033031` Zadanie 7 — sklep: dopłata grupy właściwa dla mebla
+- `a0fef01` Zadanie 8 — plakietka „bez rozmiaru"
+- `97fd12e` Zadanie 9 kroki 2–3 — e2e tylko do odczytu
+- `a15c01c` poprawka: kwota grupy per mebel w modalu zestawu, napis na `/tkaniny`
+- `005bfff` poprawka: panel bez cichych zmian cen (listy, puste pola, przeliczanie tylko przy zmianie, zgłaszanie błędów przeliczenia)
+- `8076192` poprawka: e2e „bez rozmiarów" pomija się, gdy rozmiary są w użyciu
+
+Weryfikacja po poprawkach: vitest 2166/2166, `tsc` czysto, lint 0 błędów (4 stare ostrzeżenia), build OK, Playwright `rozmiar-do-doplat` + `fabric-group-cards` 6/6 na lokalnym buildzie (bez zapisu).
+
+**Migracja 86 NIE jest zaaplikowana.** Trzeba ją zaaplikować PRZED mergem/wdrożeniem. Bez niej po wdrożeniu: zapis „Podstawowe dane" produktu i duplikowanie produktu padają, a każdy zapis tkaniny, grupy cenowej i rozmiaru kończy się komunikatem „nie udało się przeliczyć dopłat" — ceny w produktach przestają się aktualizować. Po migracji sprawdzić `list_tables` (auto-apply nie działa).
+
+**Niezrobione z Zadania 9:** krok 1 (migracja na produkcji), krok 4 (push jako Woodecky10, PR, merge = wdrożenie), krok 5 (próba na żywo z rozmiarem „TEST…" — zapis w żywej bazie, tylko właściciel albo za jego zgodą).
+
+**Rollback:** najpierw revert kodu; potem — jeśli rozmiary były już w użyciu — zapisać bez zmian dowolną grupę cenową w panelu Tkaniny (stary kod przeliczy wszystkie produkty z powrotem na kwoty globalne); dopiero na końcu cofnąć migrację.
+
+**Rozstrzygnięcia kontrolera (R1–R11):**
+- R1: `CategoryNode.defaultFabricSizeId` opcjonalne (`?: string | null`), stare fixtury się kompilują.
+- R2: pomocniki testów (`GROUPS`, `FOTEL`, `CATS`, `fd`, `CODES`, `SIZES`) na poziomie modułu `fabric-sizes.test.ts`.
+- R3: `planFabricSurchargeUpdates` zostaje w `fabric-surcharge-recompute.ts`; test mockuje supabase/next/products.
+- R4: nieznane `fabric_size_id` (ani rozmiar, ani `__own`) → `{ fabric_size_id: null, fabric_surcharges: null }`.
+- R5: z Zadania 9 tylko kroki 2–3 lokalnie; kroki 1, 4, 5 dla właściciela.
+- R6: brak odpowiedzi właściciela na trzy decyzje autora potraktowano jako akceptację (do potwierdzenia).
+- R7: stopki commitów podają model, który faktycznie pisał kod.
+- R8: puste pole kwoty (rozmiar, własne dopłaty) = brak klucza = globalna dopłata grupy, nie 0; same puste własne dopłaty = brak własnych (`null`).
+- R9: zapis podstawowych danych produktu / kategorii przelicza dopłaty tylko przy faktycznej zmianie kategorii, rozmiaru, własnych dopłat albo rozmiaru domyślnego.
+- R10: kwotę nagłówka grupy na karcie produktu daje jeden kontekst `id produktu → kod grupy → zł` (produkt i składniki zestawów); mapa metadanych tkanin jest globalna. `withGroupSurcharges` i argument `getFabricMetaMap` z Zadań 1 i 7 usunięte.
+- R10b: `/tkaniny` pisze „dopłata zależy od mebla" tylko gdy któryś rozmiar wycenia grupę inaczej niż globalnie; inaczej kwota (na stronie tkaniny + korekta) albo „bez dopłaty".
+- R11: próbny przebieg planera na danych produkcyjnych (bez zapisu) NIE wykonany — oferta dla właściciela; R9 i tak nie pozwala, by rozjechane ceny zmieniły się przy niezwiązanym zapisie.
+
+Komunikat po nieudanym przeliczeniu: przy tkaninie, grupie i rozmiarze „Spróbuj zapisać ponownie" (ponowny zapis przelicza wszystko). Przy produkcie i kategorii ponowny zapis bez zmian nie przelicza (R9), więc komunikat każe zapisać bez zmian dowolną grupę cenową. Przy nowej tkaninie — odświeżyć stronę i zapisać ją z listy (ponowne „Dodaj" dałoby duplikat nazwy).
+
+**Otwarte drobiazgi (recenzja uznała, że mogą zostać):**
+- testy: brak testu ścieżki `__own` → „Z kategorii" i `duplicateProduct`; cienkie testy zaokrągleń parsera; e2e ma ciche pominięcia, `count()` tuż po `goto` i zaszyty UUID produktu;
+- panel: wpisane własne dopłaty giną po przełączeniu wyboru przed zapisem; update/delete nieistniejącego rozmiaru zgłasza sukces; surowe komunikaty błędów Supabase;
+- kod: luźne rzutowanie w `fabric-surcharge-recompute.ts`; `...row` w loaderze rozmiarów; nieidempotentna polityka w migracji (jak w 57); grupy ładowane dwa razy (z cache); zdublowany znacznik plakietki; zastany zignorowany błąd zapytania produktów na liście;
+- `/tkaniny` nie uwzględnia własnych dopłat produktów (R10b patrzy tylko na rozmiary).
+
+**Otwarte po stronie właściciela i osoby zarządzającej:**
+- lista rozmiarów i kwoty dopłat (wpisuje się w panelu po wdrożeniu),
 - potwierdzenie trzech decyzji autora z projektu (napis na `/tkaniny`, warunek plakietki, usuwanie rozmiaru bez blokady).
