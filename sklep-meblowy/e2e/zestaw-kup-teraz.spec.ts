@@ -48,10 +48,15 @@ test("zestaw — „Kup teraz” mówi, czego brakuje, potem cały zestaw w kosz
   if (await hint.count()) {
     await expect(hint).toContainText("Do wyboru:");
 
-    await buyNow.click();
+    // Odjeżdżamy na dół i klikamy z JS (bez auto-scrolla Playwrighta), żeby
+    // przewinięcie na pewno pochodziło z aplikacji.
+    await page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight, behavior: "instant" }));
+    const before = await page.evaluate(() => window.scrollY);
+    await buyNow.evaluate((b) => (b as HTMLButtonElement).click());
     await expect(page).toHaveURL(/\/zestaw\//);
     await expect(hint).toHaveAttribute("data-attempted", "true");
     await expect(hint).toContainText("Wybierz jeszcze:");
+    await expect.poll(() => page.evaluate(() => window.scrollY)).not.toBe(before);
     await expect(missing.first()).toBeInViewport();
   }
 

@@ -70,10 +70,13 @@ test("produkt z wariantami — „Kup teraz” mówi, czego brakuje, i działa p
   test.skip(!href, "brak produktu z wariantami na pierwszej stronie /sklep");
 
   await page.goto(href!);
-  const buyNow = page.getByRole("button", { name: "Kup teraz" });
+  // exact + first: karty produktów niżej na stronie (cross-sell, kolekcja,
+  // podobne) mają własne przyciski „Dodaj do koszyka"; główna sekcja jest
+  // w DOM pierwsza.
+  const buyNow = page.getByRole("button", { name: "Kup teraz", exact: true }).first();
   const hint = page.getByTestId("missing-options");
   const missing = page.locator('[data-missing="true"]');
-  const addBtn = page.getByRole("button", { name: "Dodaj do koszyka" });
+  const addBtn = page.getByRole("button", { name: "Dodaj do koszyka", exact: true }).first();
 
   // Od wejścia: przyciski aktywne, stały napis, szara podpowiedź, nic nie podświetlone.
   await expect(buyNow).toBeEnabled();
@@ -84,18 +87,26 @@ test("produkt z wariantami — „Kup teraz” mówi, czego brakuje, i działa p
   await expect(missing).toHaveCount(0);
 
   // Klik bez pełnego wyboru: zostajemy na karcie, komunikat i podświetlenie, nic w koszyku.
-  await buyNow.click();
+  // Najpierw odjeżdżamy na dół, a klik wykonujemy z JS (bez auto-scrolla
+  // Playwrighta) — inaczej test przeszedłby bez przewijania po stronie aplikacji.
+  await page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight, behavior: "instant" }));
+  const before1 = await page.evaluate(() => window.scrollY);
+  await buyNow.evaluate((b) => (b as HTMLButtonElement).click());
   await expect(page).toHaveURL(/\/produkt\//);
   await expect(hint).toHaveAttribute("data-attempted", "true");
   await expect(hint).toContainText("Wybierz jeszcze:");
+  await expect.poll(() => page.evaluate(() => window.scrollY)).not.toBe(before1);
   await expect(missing.first()).toBeInViewport();
   await page.waitForTimeout(500);
   await expect(page.getByText("Dodano do koszyka")).toHaveCount(0);
 
   // Drugi klik po odjechaniu na dół strony znów przewija do brakującej opcji.
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  await addBtn.click();
+  await page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight, behavior: "instant" }));
+  const before2 = await page.evaluate(() => window.scrollY);
+  await addBtn.evaluate((b) => (b as HTMLButtonElement).click());
+  await expect.poll(() => page.evaluate(() => window.scrollY)).not.toBe(before2);
   await expect(missing.first()).toBeInViewport();
+  await page.waitForTimeout(500);
   await expect(page.getByText("Dodano do koszyka")).toHaveCount(0);
 
   // Wybieramy po kolei pierwszą wartość w każdej grupie, która jeszcze
