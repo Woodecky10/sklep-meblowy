@@ -5,11 +5,12 @@ import { localizeHref } from "@/app/_lib/i18n";
 import { formatOrderAmount } from "@/app/_lib/money";
 import { buildPurchasePayload, type PurchasePayload } from "@/app/_lib/meta-pixel";
 import { buildGaPurchasePayload, type GaPurchasePayload } from "@/app/_lib/ga-ecommerce";
-import { shouldTrackPurchase } from "@/app/_lib/order-events";
+import { shouldTrackPurchase, shouldAwaitPayment } from "@/app/_lib/order-events";
 import PixelEventOnce from "@/app/_components/analytics/PixelEventOnce";
 import GaEventOnce from "@/app/_components/analytics/GaEventOnce";
 import { isCarryInLine } from "@/app/_lib/carry-in";
 import ClearCart from "./ClearCart";
+import AwaitPayment from "./AwaitPayment";
 import type { Metadata } from "next";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -69,6 +70,7 @@ export default async function SuccessPage({
   let orderCurrency: "pln" | "eur" = "pln";
   let isPaid = false;
   let isCod = false;
+  let awaitPayment = false;
   let purchase: PurchasePayload | null = null;
   let gaPurchase: GaPurchasePayload | null = null;
 
@@ -81,6 +83,7 @@ export default async function SuccessPage({
       email = order.guest_email; // null dla zalogowanych — wiersz się nie wyrenderuje
       isCod = order.payment_method === "cod";
       isPaid = order.status !== "pending";
+      awaitPayment = shouldAwaitPayment(order.status, order.payment_method);
 
       // Parametry zakupu dla Meta i GA4 liczy serwer, bo tylko on widzi pozycje
       // zamówienia. Warunek jest WĘŻSZY niż `isPaid` powyżej: ten steruje tylko
@@ -126,6 +129,7 @@ export default async function SuccessPage({
   return (
     <div className="max-w-2xl mx-auto px-6 py-24 text-center">
       <ClearCart />
+      {awaitPayment && <AwaitPayment />}
       {purchase && orderId && (
         <PixelEventOnce event="Purchase" payload={purchase} eventId={orderId} />
       )}
