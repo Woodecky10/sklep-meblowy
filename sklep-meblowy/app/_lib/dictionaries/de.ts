@@ -85,7 +85,7 @@ export const de: DeepPartial<PlShape> = {
     addToCart: "In den Warenkorb",
     buyNow: "Jetzt kaufen",
     selectVariant: "Variante wählen",
-    toChoosePrefix: "Zur Auswahl:",
+    toChoosePrefix: "Noch auszuwählen:",
     missingPrefix: "Bitte noch wählen:",
     cornerSideHint: "Seiten von vorne betrachtet",
     sizeLabel: "Größe",
