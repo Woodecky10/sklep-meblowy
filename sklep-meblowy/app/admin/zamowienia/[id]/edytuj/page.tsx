@@ -104,6 +104,7 @@ export default async function AdminEditOrderPage({ params }: { params: Promise<{
         address={order.shipping_address}
         bundleDiscount={Number(order.bundle_discount ?? 0)}
         promoDiscount={Number(order.promo_discount ?? 0)}
+        customerNote={order.customer_note}
         products={[...products.values()]}
         initialRows={rows}
       />

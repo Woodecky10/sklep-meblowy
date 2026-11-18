@@ -18,6 +18,15 @@ test("karta zamówienia → Edytuj zamówienie → formularz z danymi, suma się
   await expect(page.getByLabel("Imię i nazwisko")).not.toHaveValue("");
   await expect(page.getByLabel("Ulica i numer")).not.toHaveValue("");
 
+  // Pole uwag klienta jest ukryte na bazie bez migracji 87 — wtedy tylko adnotacja.
+  const noteField = page.locator('textarea[name="customer_note"]');
+  if ((await noteField.count()) > 0) {
+    await expect(noteField).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Uwagi do zamówienia (od klienta)" })).toBeVisible();
+  } else {
+    test.info().annotations.push({ type: "skip-note", description: "baza bez kolumny customer_note (migracja 87) — pole celowo ukryte" });
+  }
+
   const total = page.getByTestId("edit-order-total");
   const before = await total.innerText();
   const qty = page.getByLabel("Ilość").first();

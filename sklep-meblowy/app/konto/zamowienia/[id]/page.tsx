@@ -64,6 +64,7 @@ export default async function OrderDetailPage({
         shippingIndividual: "individuell festgelegt",
         total: "Gesamt",
         shippingAddress: "Lieferadresse",
+        customerNote: "Anmerkungen zur Bestellung",
         delivery: "Versand",
         carrier: "Spediteur",
         trackingNumber: "Sendungsnummer",
@@ -95,6 +96,7 @@ export default async function OrderDetailPage({
         shippingIndividual: "ustalana indywidualnie",
         total: "Razem",
         shippingAddress: "Adres dostawy",
+        customerNote: "Uwagi do zamówienia",
         delivery: "Dostawa",
         carrier: "Przewoźnik",
         trackingNumber: "Numer śledzenia",
@@ -338,6 +340,17 @@ export default async function OrderDetailPage({
             <br />
             {order.shipping_address.country}
           </address>
+        </div>
+      )}
+
+      {typeof order.customer_note === "string" && order.customer_note.trim() !== "" && (
+        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8">
+          <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-4">
+            {c.customerNote}
+          </h3>
+          <p className="text-sm text-[var(--fg)] leading-relaxed whitespace-pre-line [overflow-wrap:anywhere]">
+            {order.customer_note}
+          </p>
         </div>
       )}
 

@@ -16,6 +16,7 @@ import { groupCartBundles } from "@/app/_lib/bundles";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { isValidCodPhone } from "@/app/_lib/cod";
 import { CARRY_IN_PRICE } from "@/app/_lib/carry-in";
+import { CUSTOMER_NOTE_MAX } from "@/app/_lib/customer-note";
 import type { Address } from "@/app/_lib/types";
 
 export default function CheckoutForm({
@@ -75,6 +76,9 @@ export default function CheckoutForm({
         phoneCodNote: "Bei Nachnahme erforderlich — der Kurier braucht Ihre Nummer.",
         paymentMethod: "Zahlungsart",
         carryInHeading: "Hineintragen der Möbel",
+        noteHeading: "Anmerkungen zur Bestellung (optional)",
+        notePlaceholder: "z. B. bitte einen Tag vor der Lieferung anrufen, die Klingel funktioniert nicht",
+        noteChars: "Zeichen",
         carryInLabel: "Lieferung mit Hineintragen bis zur 4. Etage",
         carryInDesc: "Wir tragen die Möbel bis zur 4. Etage hinein, einmal pro Bestellung.",
         carryInLine: "Hineintragen der Möbel",
@@ -123,6 +127,9 @@ export default function CheckoutForm({
         phoneCodNote: "Wymagany przy pobraniu — kurier musi mieć kontakt.",
         paymentMethod: "Metoda płatności",
         carryInHeading: "Wniesienie mebli",
+        noteHeading: "Uwagi do zamówienia (opcjonalnie)",
+        notePlaceholder: "np. proszę o telefon dzień przed dostawą, domofon nie działa",
+        noteChars: "znaków",
         carryInLabel: "Dostawa z wniesieniem do 4. piętra",
         carryInDesc: "Wniesiemy meble do 4. piętra. Opłata raz za całe zamówienie.",
         carryInLine: "Wniesienie mebli",
@@ -151,6 +158,7 @@ export default function CheckoutForm({
   // Wymagana akceptacja regulaminu + polityki przed płatnością.
   // Wymóg art. 17 ustawy o prawach konsumenta + kryteria weryfikacji Przelewy24.
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [note, setNote] = useState("");
 
   // Dopiero po wczytaniu koszyka z localStorage — inaczej odświeżenie /checkout
   // widzi pusty koszyk i odsyła do /koszyk.
@@ -219,6 +227,7 @@ export default function CheckoutForm({
           locale: de ? "de" : "pl",
           paymentMethod,
           carryIn,
+          customerNote: note,
         }),
       });
 
@@ -366,6 +375,24 @@ export default function CheckoutForm({
               +{formatMoney(CARRY_IN_PRICE, locale, rate)}
             </span>
           </label>
+        </div>
+
+        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8">
+          <h2 id="customer-note-heading" className="font-display text-xl font-bold text-[var(--fg)] mb-6">
+            {c.noteHeading}
+          </h2>
+          <textarea
+            aria-labelledby="customer-note-heading"
+            rows={4}
+            maxLength={CUSTOMER_NOTE_MAX}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={c.notePlaceholder}
+            className="w-full px-4 py-3 bg-transparent border border-[var(--border)] rounded-xl text-[var(--fg)] focus:outline-none focus:border-[var(--color-gold)] transition-colors resize-y"
+          />
+          <p className="mt-2 text-xs text-[var(--muted)] text-right">
+            {note.length} / {CUSTOMER_NOTE_MAX} {c.noteChars}
+          </p>
         </div>
 
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8">

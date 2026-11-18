@@ -97,6 +97,18 @@ describe("updateOrder", () => {
     expect(afterTasks).toHaveLength(0);
   });
 
+  it("formularz bez customer_note (baza sprzed migracji 87) → patch bez klucza customer_note", async () => {
+    const res = await updateOrder(fd());
+    expect(res).toMatchObject({ ok: true });
+    expect(orderPatches[0]).not.toHaveProperty("customer_note");
+  });
+
+  it("customer_note w formularzu → patch z przyciętą uwagą", async () => {
+    const res = await updateOrder(fd({ customer_note: "  x  " }));
+    expect(res).toMatchObject({ ok: true });
+    expect(orderPatches[0]).toHaveProperty("customer_note", "x");
+  });
+
   it("zaznaczony mail → after(notifyOrderUpdated)", async () => {
     const res = await updateOrder(fd({ notify: "1" }));
     expect(res).toMatchObject({ ok: true });
