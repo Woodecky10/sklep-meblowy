@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Przed pisaniem kodu Next.js przeczytaj właściwy przewodnik w `node_modules/next/dist/docs/` (`AGENTS.md`).
-- Teksty: `Do wyboru:` (przed kliknięciem) i `Wybierz jeszcze:` (po kliknięciu); DE: `Zur Auswahl:` i `Bitte noch wählen:`. Nazwy opcji po przecinku i spacji.
+- Teksty: `Do wyboru:` (przed kliknięciem) i `Wybierz jeszcze:` (po kliknięciu); DE: `Noch auszuwählen:` i `Bitte noch wählen:`. Nazwy opcji po przecinku i spacji.
 - Napis przycisku nigdy nie zależy od kompletności wyboru. Przycisk jest `disabled` tylko w trakcie przejścia na `/koszyk` (`navigating`).
 - Słowo `wybierz` w nagłówku niewybranej opcji selektora zostaje (testy e2e na nim polegają).
 - `QuickAddButton` i klucz `product.selectVariant` zostają bez zmian.
@@ -26,7 +26,7 @@
 
 1. Drugie kliknięcie przycisku po odjechaniu w dół strony znów przewija do brakującej opcji (test e2e w Zadaniu 3).
 2. Produkt bez wariantów: brak podpowiedzi, przyciski działają jak dziś (istniejący test w `kup-teraz.spec.ts` zostaje zielony).
-3. Podwójne kliknięcie „Kup teraz" przy pełnym wyborze dodaje jedną sztukę (istniejący test zostaje zielony).
+3. Podwójne kliknięcie „Kup teraz”: chroni je istniejąca blokada `navigating` (ta zmiana jej nie rusza); testu na to nie było i nie dopisano go w tym planie (R4).
 4. Zestaw otwarty z karty produktu z już wybranymi opcjami tego produktu: komunikat wymienia tylko pozostałe meble; mebel bez wariantów nigdy się nie pojawia (test czysty w Zadaniu 1).
 5. Nazwa opcji w komunikacie = nagłówek w selektorze, także z nadpisaniem admina i na DE (test czysty w Zadaniu 1).
 
@@ -146,7 +146,7 @@ git commit -m "feat(warianty): lista brakujących opcji z nazwami wyświetlanymi
 
 ```ts
 // słownik
-product.toChoosePrefix: "Do wyboru:" / "Zur Auswahl:"
+product.toChoosePrefix: "Do wyboru:" / "Noch auszuwählen:"
 product.missingPrefix: "Wybierz jeszcze:" / "Bitte noch wählen:"
 
 // app/_components/ui/MissingOptionsHint.tsx ("use client")
@@ -343,4 +343,30 @@ git commit -m "feat(zestaw): przyciski zakupu mówią, w którym meblu brakuje w
 
 ## STAN WYKONANIA
 
-Nic nie rozpoczęto. Projekt zaakceptowany przez właściciela 2026-11-18 (makieta, wariant ze stałą podpowiedzią, razem z zestawami).
+Projekt zaakceptowany przez właściciela 2026-11-18 (makieta, wariant ze stałą podpowiedzią, razem z zestawami).
+
+**Zrobione** na gałęzi `feat/brakujacy-wybor-podpowiedz` (zadania 1–4 i poprawki końcowe po recenzji całej gałęzi):
+- `a73eb77` test(e2e): przewijanie sprawdzane klikiem z JS, jednoznaczne lokatory przycisków
+- `3ce19d9` fix(de): Noch auszuwählen zamiast Zur Auswahl w podpowiedzi brakujących opcji
+- `7fca033` fix(warianty): przewijanie do początku brakującej opcji, fokus i ponowne ogłoszenie komunikatu
+- `828de0e` test(zestaw): podpowiedź znika po wyborze, komentarz do pozycji kliknięcia
+- `55df83c` feat(zestaw): przyciski zakupu mówią, w którym meblu brakuje wyboru
+- `32444c0` feat(produkt): przyciski zakupu mówią, której opcji brakuje
+- `d657518` feat(warianty): komunikat brakujących opcji i podświetlenie w selektorze
+- `1b9b371` feat(warianty): lista brakujących opcji z nazwami wyświetlanymi
+- `ab4a44a` docs: projekt i plan podpowiedzi brakującego wyboru
+
+Zadanie 5, krok 1 (zrzuty ekranu): zrobione, w `.superpowers/sdd/2026-11-18-brakujacy-wybor-podpowiedz/shots/`. Kroki 2–3 (push, PR, merge, e2e na produkcji): czekają na właściciela.
+
+**Rozstrzygnięcia kontrolera**
+- R1: praca w miejscu na gałęzi (bez worktree).
+- R2: zrzuty (T5 krok 1) lecą; push/PR/merge = wdrożenie czeka na właściciela po obejrzeniu zrzutów.
+- R3: pozycja kliknięcia w pastylkę {x:8,y:8} zamiast środka (pastylka z „i” w środku).
+- R4: bez nowego testu podwójnego kliknięcia (blokada `navigating` bez zmian).
+- R5: pozycja kliknięcia zostaje, dodany jednolinijkowy komentarz.
+- R6: fala poprawek końcowych obejmuje I1, I2, M3, M4, M5, M7, M8 i sprawdzenie M6; hook M9 zostaje na później.
+- R7: DE `Noch auszuwählen:` zamiast `Zur Auswahl:` (bliżej „co jeszcze wybrać”; DE i tak zamrożone).
+
+**Otwarte**
+- Opcjonalny hook `useMissingAttempt()` (licznik prób + ref + efekt są zduplikowane w `ProductActions` i `BundleConfigurator`).
+- Nie sprawdzono na żywo na produkcji (krok 3 zadania 5).
