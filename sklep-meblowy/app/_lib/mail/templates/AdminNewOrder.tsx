@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { Hr, Text } from "@react-email/components";
 import { formatOrderAmount } from "../../money";
 import { formatVariantLabel } from "../../variants";
@@ -23,6 +24,7 @@ export function AdminNewOrder({
   const c = branding.colors;
   const cur = order.currency;
   const addr = order.shipping_address;
+  const customerNote = order.customer_note?.trim() ? order.customer_note : null;
   const rowStyle = { color: c.muted, fontSize: "13px", margin: "0 0 4px" };
 
   return (
@@ -42,6 +44,16 @@ export function AdminNewOrder({
       <Text style={rowStyle}>
         Adres: {addr?.street}, {addr?.postal_code} {addr?.city}
       </Text>
+      {customerNote && (
+        <Text style={rowStyle}>
+          {customerNote.split(/\r?\n/).map((line, i) => (
+            <Fragment key={i}>
+              {i > 0 && <br />}
+              {i === 0 ? `Uwagi do zamówienia: ${line}` : line}
+            </Fragment>
+          ))}
+        </Text>
+      )}
 
       <Hr style={{ borderColor: c.border, margin: "16px 0" }} />
 

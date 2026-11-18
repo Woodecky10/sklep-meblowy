@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { Hr, Row, Column, Section, Text } from "@react-email/components";
 import { formatOrderAmount } from "../../money";
 import { formatVariantLabel } from "../../variants";
@@ -26,6 +27,7 @@ const COPY = {
     // etykieta nie może twierdzić, że ta kwota jest zapłacona.
     totalUpdated: "Razem",
     address: "Adres dostawy",
+    customerNote: "Uwagi do zamówienia",
     cta: "Zobacz zamówienie",
     next: "Skontaktujemy się telefonicznie, aby ustalić termin dostawy.",
     nextUpdated: "W razie pytań odpowiedz na tę wiadomość.",
@@ -51,6 +53,7 @@ const COPY = {
     totalCod: "Bei Lieferung zu zahlen",
     totalUpdated: "Gesamt",
     address: "Lieferadresse",
+    customerNote: "Anmerkungen zur Bestellung",
     cta: "Bestellung ansehen",
     next: "Wir rufen Sie an, um den Liefertermin zu vereinbaren.",
     nextUpdated: "Bei Fragen antworten Sie einfach auf diese E-Mail.",
@@ -91,6 +94,7 @@ export function OrderConfirmation({
   const bundleDiscount = Number(order.bundle_discount ?? 0);
   const promoDiscount = Number(order.promo_discount ?? 0);
   const addr = order.shipping_address;
+  const customerNote = order.customer_note?.trim() ? order.customer_note : null;
 
   const rowStyle = { color: c.muted, fontSize: "13px", margin: "0 0 4px" };
   const labelStyle = {
@@ -207,6 +211,20 @@ export function OrderConfirmation({
         {addr?.fullname ? `${addr.fullname}, ` : ""}
         {addr?.street}, {addr?.postal_code} {addr?.city}
       </Text>
+
+      {customerNote && (
+        <>
+          <Text style={labelStyle}>{t.customerNote}</Text>
+          <Text style={{ color: c.fg, fontSize: "13px", lineHeight: "1.6", margin: "0 0 24px" }}>
+            {customerNote.split(/\r?\n/).map((line, i) => (
+              <Fragment key={i}>
+                {i > 0 && <br />}
+                {line}
+              </Fragment>
+            ))}
+          </Text>
+        </>
+      )}
 
       <Text style={{ color: c.muted, fontSize: "13px", lineHeight: "1.6", margin: "0 0 24px" }}>
         {kind === "updated" ? t.nextUpdated : t.next}
