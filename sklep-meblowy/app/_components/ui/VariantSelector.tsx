@@ -37,6 +37,9 @@ type Props = {
   onChange: (next: Record<string, string>) => void;
   // Opcjonalnie produkt — z niego bierzemy override-y nazw opcji/wartości.
   product?: Product;
+  // Po kliknięciu „Dodaj do koszyka" z niepełnym wyborem: czerwone ramki
+  // wokół opcji bez wartości.
+  highlightMissing?: boolean;
 };
 
 function getValueLabel(
@@ -103,6 +106,7 @@ export default function VariantSelector({
   selected,
   onChange,
   product,
+  highlightMissing,
 }: Props) {
   const locale = useClientLocale();
   const fabricMap = useFabricLabels();
@@ -131,6 +135,7 @@ export default function VariantSelector({
     <div className="flex flex-col gap-4">
       {orderedOptions.map((option) => {
         const current = selected[option.name];
+        const missing = !!highlightMissing && !current;
         const displayName = localizedOptionName(product, option.name, locale);
         // Kolejność wyświetlania A-Z (naturalnie, po etykiecie). Narożniki (Strona)
         // mają własne sortowanie semantyczne w CornerSideGroup (orderCornerSideValues),
@@ -143,14 +148,24 @@ export default function VariantSelector({
               locale
             );
         return (
-          <div key={option.name}>
+          <div
+            key={option.name}
+            data-variant-option={option.name}
+            {...(missing
+              ? {
+                  "data-missing": "true",
+                  className:
+                    "rounded-lg outline outline-2 outline-offset-4 outline-red-500/70",
+                }
+              : {})}
+          >
             <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
               {displayName}:{" "}
               <span className="text-[var(--fg)] normal-case tracking-normal font-semibold">
                 {current ? (
                   getValueLabel(product, option.name, current, locale, fabricMap)
                 ) : (
-                  <span className="text-[var(--muted)]">{locale === "de" ? "wählen" : "wybierz"}</span>
+                  <span className={missing ? "text-red-600 dark:text-red-400" : "text-[var(--muted)]"}>{locale === "de" ? "wählen" : "wybierz"}</span>
                 )}
               </span>{" "}
               {option.name === FABRIC_OPTION_NAME && current && (
