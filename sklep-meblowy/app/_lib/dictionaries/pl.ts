@@ -219,7 +219,6 @@ export type PlShape = {
     togetherLabel: string;
     bundleLabel: string;
     addToCart: string;
-    chooseOptions: string;
     cartGroupLabel: string;
     removeBundle: string;
     discountLine: string;
@@ -679,7 +678,6 @@ export const pl = {
     togetherLabel: "Razem osobno",
     bundleLabel: "W zestawie",
     addToCart: "Dodaj zestaw do koszyka",
-    chooseOptions: "Wybierz opcje dla każdego mebla",
     cartGroupLabel: "Zestaw",
     removeBundle: "Usuń zestaw",
     discountLine: "Rabat za zestaw",

@@ -224,7 +224,6 @@ export const de: DeepPartial<PlShape> = {
     togetherLabel: "Einzeln zusammen",
     bundleLabel: "Im Set",
     addToCart: "Set in den Warenkorb",
-    chooseOptions: "Wählen Sie Optionen für jedes Möbelstück",
     cartGroupLabel: "Set",
     removeBundle: "Set entfernen",
     discountLine: "Set-Rabatt",

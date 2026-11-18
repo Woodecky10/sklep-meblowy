@@ -5,19 +5,18 @@
 // koszyka jedną akcją (ADD_BUNDLE). Reużywany przez modal na karcie produktu
 // (Task 8) i stronę /zestaw/[slug] (Task 9).
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { localizeHref } from "@/app/_lib/i18n";
 import type { BundleWithComponents } from "@/app/_lib/types";
 import { useCart, type CartItem } from "@/app/_context/CartContext";
-import {
-  hasVariants,
-  isVariantSelectionComplete,
-  getVariantEffectivePrice,
-} from "@/app/_lib/variants";
+import { hasVariants, getVariantEffectivePrice } from "@/app/_lib/variants";
+import { missingBundleGroups } from "@/app/_lib/variant-missing";
+import { scrollToFirstMissing } from "@/app/_lib/scroll-to-missing";
 import { bundleUnitKey, computeBundleDiscount } from "@/app/_lib/bundles";
 import VariantSelector from "./VariantSelector";
+import MissingOptionsHint from "./MissingOptionsHint";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { formatMoney } from "@/app/_lib/money";
@@ -51,9 +50,17 @@ export default function BundleConfigurator({
     }
   );
 
-  const allComplete = bundle.components.every((p) =>
-    isVariantSelectionComplete(p, selections[p.id] ?? {})
-  );
+  const groups = missingBundleGroups(bundle.components, selections, locale);
+  const allComplete = groups.length === 0;
+  const hintId = useId();
+  // Każdy zablokowany klik zwiększa licznik, więc przewijanie odpala się też
+  // przy kolejnych próbach (a nie tylko przy pierwszej).
+  const [attemptTick, setAttemptTick] = useState(0);
+  const attempted = attemptTick > 0;
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (attemptTick > 0) scrollToFirstMissing(rootRef.current);
+  }, [attemptTick]);
 
   const base = useMemo(
     () =>
@@ -73,7 +80,11 @@ export default function BundleConfigurator({
   // buyNow = „Kup teraz" (właściciel 2026-11-04): to samo dodanie całego
   // zestawu, a potem od razu /koszyk — jak przycisk na karcie produktu.
   function handleAdd(buyNow = false) {
-    if (!allComplete || navigating) return;
+    if (navigating) return;
+    if (!allComplete) {
+      setAttemptTick((n) => n + 1);
+      return;
+    }
     const unitKey = bundleUnitKey(
       bundle.id,
       bundle.components.map((p) => ({
@@ -107,7 +118,7 @@ export default function BundleConfigurator({
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div ref={rootRef} className="flex flex-col gap-6">
       {bundle.components.map((p) => (
         <div key={p.id} className="flex flex-col gap-3 p-4 border border-[var(--border)] rounded-2xl">
           <div className="flex items-center gap-3">
@@ -127,6 +138,7 @@ export default function BundleConfigurator({
               product={p}
               variants={p.variants!}
               selected={selections[p.id] ?? {}}
+              highlightMissing={attempted}
               onChange={(next) => setSelections((prev) => ({ ...prev, [p.id]: next }))}
             />
           )}
@@ -149,19 +161,22 @@ export default function BundleConfigurator({
       </div>
 
       <div className="flex flex-col gap-3">
+        <MissingOptionsHint id={hintId} groups={groups} attempted={attempted} />
         <button
           type="button"
           onClick={() => handleAdd()}
-          disabled={!allComplete || navigating}
+          disabled={navigating}
+          aria-describedby={allComplete ? undefined : hintId}
           className="w-full py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {allComplete ? t.bundle.addToCart : t.bundle.chooseOptions}
+          {t.bundle.addToCart}
         </button>
         {/* Wygląd 1:1 z „Kup teraz" na karcie produktu (AddToCartButton). */}
         <button
           type="button"
           onClick={() => handleAdd(true)}
-          disabled={!allComplete || navigating}
+          disabled={navigating}
+          aria-describedby={allComplete ? undefined : hintId}
           className="w-full py-4 border border-[var(--color-navy)] text-[var(--color-navy)] dark:border-[var(--color-gold)] dark:text-[var(--color-gold)] font-sans font-semibold text-sm uppercase tracking-widest rounded-full enabled:hover:bg-[var(--color-navy)] enabled:hover:text-white dark:enabled:hover:bg-[var(--color-gold)] dark:enabled:hover:text-[var(--color-navy)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {t.product.buyNow}
