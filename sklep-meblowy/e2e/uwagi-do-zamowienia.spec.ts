@@ -48,6 +48,10 @@ test("checkout: pole uwag z licznikiem, między wniesieniem a płatnością", as
     [...document.querySelectorAll("h2")].map((h) => h.textContent?.trim())
   );
   const i = order.indexOf("Uwagi do zamówienia (opcjonalnie)");
-  expect(i).toBeGreaterThan(order.indexOf("Wniesienie mebli"));
-  expect(i).toBeLessThan(order.indexOf("Metoda płatności"));
+  const iWniesienie = order.indexOf("Wniesienie mebli");
+  const iPlatnosc = order.indexOf("Metoda płatności");
+  expect(iWniesienie).toBeGreaterThanOrEqual(0);
+  expect(iPlatnosc).toBeGreaterThanOrEqual(0);
+  expect(i).toBeGreaterThan(iWniesienie);
+  expect(i).toBeLessThan(iPlatnosc);
 });

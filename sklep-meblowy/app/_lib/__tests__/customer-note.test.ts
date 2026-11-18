@@ -14,6 +14,11 @@ describe("normalizeCustomerNote", () => {
     expect(normalizeCustomerNote(123)).toBeNull();
   });
   it("tnie do 1000 znaków", () => expect(normalizeCustomerNote("a".repeat(1500))).toHaveLength(1000));
+  it("cięcie w środku pary zastępczej nie zostawia osieroconego surogatu", () => {
+    const out = normalizeCustomerNote("a".repeat(999) + "\u{1F600}" + "b".repeat(50))!;
+    expect(out).toHaveLength(999);
+    expect(out).not.toMatch(/[\uD800-\uDBFF]$/);
+  });
 });
 
 describe("customerNoteInsert", () => {

@@ -476,7 +476,6 @@ export async function updateOrder(formData: FormData): Promise<ActionResult> {
       ...(emailEditable ? { guest_email: order.guest_email } : {}),
       bundle_discount: Number(order.bundle_discount ?? 0),
       promo_discount: Number(order.promo_discount ?? 0),
-      ...("customer_note" in input ? { customer_note: order.customer_note ?? null } : {}),
     },
     oldTotal: Number(order.total),
     currency: order.currency,
