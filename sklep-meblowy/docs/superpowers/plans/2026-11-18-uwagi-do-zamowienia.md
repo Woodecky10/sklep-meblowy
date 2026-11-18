@@ -288,6 +288,8 @@ git commit -m "feat(panel): poprawianie uwag klienta w edycji zamówienia"
 
 ## STAN WYKONANIA
 
+**WDROŻONE NA PRODUKCJĘ 2026-11-18** — migrację 87 wkleił właściciel w SQL Editorze (sprawdzone odczytem: `orders.customer_note` istnieje), potem PR #207, merge `eef4763`, deployment Vercel READY. e2e na produkcji 4/4 (`uwagi-do-zamowienia`, `wniesienie` ×2, `edycja-zamowienia` — pole uwag widoczne w edycji). Poniższy opis „przed migracją" jest historyczny. Nadal niesprawdzone na żywo: prawdziwe zamówienie z uwagą i oba maile. Po wdrożeniu podpowiedź uwag do PRODUKTU w koszyku zmieniona na „np. kolor jak na zdjęciu 2, nóżki ciemniejsze" (bez „telefonu przed dostawą" — to uwaga do całego zamówienia).
+
 Zadania 1–4 wykonane na gałęzi `feat/uwagi-do-zamowienia` (`git log --oneline fc43709..HEAD`):
 - 0a6fd96 feat(zamówienia): uwagi klienta do całego zamówienia — zapis
 - 039d1cd feat(checkout): pole uwag do zamówienia

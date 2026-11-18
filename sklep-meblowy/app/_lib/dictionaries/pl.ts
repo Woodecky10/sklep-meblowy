@@ -627,7 +627,7 @@ export const pl = {
     remove: "Usuń",
     addNotes: "+ Dodaj uwagi do tego produktu",
     notesLabel: "Uwagi do tego produktu",
-    notesPlaceholder: "np. róż jak na zdjęciu 2, proszę o telefon przed dostawą",
+    notesPlaceholder: "np. kolor jak na zdjęciu 2, nóżki ciemniejsze",
     notesCharsSuffix: "znaków",
     notesUnsaved: " · niezapisane",
     removeNotes: "Usuń uwagi",
