@@ -64,6 +64,7 @@ test("zestaw — „Kup teraz” mówi, czego brakuje, potem cały zestaw w kosz
     const group = pending.first().locator("xpath=..");
     const value = group.locator('[aria-pressed="false"]:visible').first();
     if ((await value.count()) > 0) {
+      // Środek wartości bywa przyciskiem „i" (info) — klikamy w róg, nie w środek.
       await value.click({ position: { x: 8, y: 8 } });
       continue;
     }
@@ -73,6 +74,7 @@ test("zestaw — „Kup teraz” mówi, czego brakuje, potem cały zestaw w kosz
   }
   test.skip((await pending.count()) > 0, "nie udało się wybrać wszystkich opcji zestawu");
 
+  await expect(hint).toHaveCount(0);
   await expect(buyNow).toBeEnabled();
   await buyNow.click();
   await expect(page).toHaveURL(/\/koszyk$/);
