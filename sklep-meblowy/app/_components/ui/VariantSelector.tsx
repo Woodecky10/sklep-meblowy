@@ -4,8 +4,9 @@ import { useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { Product, ProductVariants } from "@/app/_lib/types";
+import { localizedOptionName } from "@/app/_lib/variant-missing";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
-import { VARIANT_OPTION_DE, VARIANT_VALUE_DE, mapDe } from "@/app/_lib/de-content-maps";
+import { VARIANT_VALUE_DE, mapDe } from "@/app/_lib/de-content-maps";
 import { localizeHref, pickLocalized, type Locale } from "@/app/_lib/i18n";
 import {
   useFabricLabels,
@@ -36,13 +37,10 @@ type Props = {
   onChange: (next: Record<string, string>) => void;
   // Opcjonalnie produkt — z niego bierzemy override-y nazw opcji/wartości.
   product?: Product;
+  // Po kliknięciu „Dodaj do koszyka" z niepełnym wyborem: czerwone ramki
+  // wokół opcji bez wartości.
+  highlightMissing?: boolean;
 };
-
-// Override admina → potem (na DE) ręczna mapa tłumaczeń; kody/wymiary bez zmian.
-function getOptionName(p: Product | undefined, optionName: string, locale: Locale): string {
-  const raw = p?.variants?.overrides?.option_names?.[optionName] ?? optionName;
-  return locale === "de" ? mapDe(VARIANT_OPTION_DE, raw) ?? raw : raw;
-}
 
 function getValueLabel(
   p: Product | undefined,
@@ -108,6 +106,7 @@ export default function VariantSelector({
   selected,
   onChange,
   product,
+  highlightMissing,
 }: Props) {
   const locale = useClientLocale();
   const fabricMap = useFabricLabels();
@@ -128,7 +127,7 @@ export default function VariantSelector({
   // z sortowaniem wartości niżej. Nie mutuje propsa.
   const orderedOptions = sortVariantOptions(
     variants.options,
-    (name) => getOptionName(product, name, locale),
+    (name) => localizedOptionName(product, name, locale),
     locale
   );
 
@@ -136,7 +135,8 @@ export default function VariantSelector({
     <div className="flex flex-col gap-4">
       {orderedOptions.map((option) => {
         const current = selected[option.name];
-        const displayName = getOptionName(product, option.name, locale);
+        const missing = !!highlightMissing && !current;
+        const displayName = localizedOptionName(product, option.name, locale);
         // Kolejność wyświetlania A-Z (naturalnie, po etykiecie). Narożniki (Strona)
         // mają własne sortowanie semantyczne w CornerSideGroup (orderCornerSideValues),
         // więc dla nich zostawiamy surową kolejność.
@@ -148,14 +148,24 @@ export default function VariantSelector({
               locale
             );
         return (
-          <div key={option.name}>
+          <div
+            key={option.name}
+            data-variant-option={option.name}
+            {...(missing
+              ? {
+                  "data-missing": "true",
+                  className:
+                    "rounded-lg outline outline-2 outline-offset-4 outline-red-500/70 scroll-mt-4",
+                }
+              : {})}
+          >
             <p className="text-xs font-sans uppercase tracking-widest text-[var(--muted)] mb-2">
               {displayName}:{" "}
               <span className="text-[var(--fg)] normal-case tracking-normal font-semibold">
                 {current ? (
                   getValueLabel(product, option.name, current, locale, fabricMap)
                 ) : (
-                  <span className="text-[var(--muted)]">{locale === "de" ? "wählen" : "wybierz"}</span>
+                  <span className={missing ? "text-red-600 dark:text-red-400" : "text-[var(--muted)]"}>{locale === "de" ? "wählen" : "wybierz"}</span>
                 )}
               </span>{" "}
               {option.name === FABRIC_OPTION_NAME && current && (

@@ -83,6 +83,8 @@ export type PlShape = {
     addToCart: string;
     buyNow: string;
     selectVariant: string;
+    toChoosePrefix: string;
+    missingPrefix: string;
     cornerSideHint: string;
     sizeLabel: string;
     omnibusLabel: string;
@@ -217,7 +219,6 @@ export type PlShape = {
     togetherLabel: string;
     bundleLabel: string;
     addToCart: string;
-    chooseOptions: string;
     cartGroupLabel: string;
     removeBundle: string;
     discountLine: string;
@@ -537,6 +538,8 @@ export const pl = {
     addToCart: "Dodaj do koszyka",
     buyNow: "Kup teraz",
     selectVariant: "Wybierz wariant",
+    toChoosePrefix: "Do wyboru:",
+    missingPrefix: "Wybierz jeszcze:",
     cornerSideHint: "Strony pokazane patrząc od frontu",
     sizeLabel: "Rozmiar",
     omnibusLabel: "Najniższa cena z 30 dni przed obniżką",
@@ -675,7 +678,6 @@ export const pl = {
     togetherLabel: "Razem osobno",
     bundleLabel: "W zestawie",
     addToCart: "Dodaj zestaw do koszyka",
-    chooseOptions: "Wybierz opcje dla każdego mebla",
     cartGroupLabel: "Zestaw",
     removeBundle: "Usuń zestaw",
     discountLine: "Rabat za zestaw",

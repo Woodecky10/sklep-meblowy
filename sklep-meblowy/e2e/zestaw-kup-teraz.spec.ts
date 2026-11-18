@@ -1,9 +1,10 @@
 import { test, expect } from "@playwright/test";
 
 // „Kup teraz" w zestawie (właściciel 2026-11-04: „w zestawach też musi być kup
-// teraz"). Jak na karcie produktu (kup-teraz.spec.ts): zablokowany, dopóki
-// klient nie wybierze opcji WSZYSTKICH mebli zestawu; potem dodaje cały zestaw
-// i od razu przenosi na /koszyk, bez dymka „Dodano do koszyka".
+// teraz"). Przyciski są zawsze aktywne: klik przy niepełnym wyborze mówi,
+// w którym meblu czego brakuje, podświetla i przewija do tego miejsca; po
+// wyborze opcji WSZYSTKICH mebli dodaje cały zestaw i od razu przenosi na
+// /koszyk, bez dymka „Dodano do koszyka".
 //
 // Koszyk siedzi w localStorage — test nic nie zapisuje w bazie.
 
@@ -23,7 +24,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("zestaw — „Kup teraz” zablokowany do wyboru opcji, potem cały zestaw w koszyku", async ({
+test("zestaw — „Kup teraz” mówi, czego brakuje, potem cały zestaw w koszyku", async ({
   page,
 }) => {
   await page.goto("/zestawy");
@@ -39,17 +40,37 @@ test("zestaw — „Kup teraz” zablokowany do wyboru opcji, potem cały zestaw
   const buyNow = page.getByRole("button", { name: "Kup teraz" });
   await expect(buyNow).toBeVisible();
 
+  const hint = page.getByTestId("missing-options");
+  const missing = page.locator('[data-missing="true"]');
+  await expect(buyNow).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Dodaj zestaw do koszyka" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Wybierz opcje dla każdego mebla" })).toHaveCount(0);
+  if (await hint.count()) {
+    await expect(hint).toContainText("Do wyboru:");
+
+    // Odjeżdżamy na dół i klikamy z JS (bez auto-scrolla Playwrighta), żeby
+    // przewinięcie na pewno pochodziło z aplikacji.
+    await page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight, behavior: "instant" }));
+    const before = await page.evaluate(() => window.scrollY);
+    await buyNow.evaluate((b) => (b as HTMLButtonElement).click());
+    await expect(page).toHaveURL(/\/zestaw\//);
+    await expect(hint).toHaveAttribute("data-attempted", "true");
+    await expect(hint).toContainText("Wybierz jeszcze:");
+    await expect.poll(() => page.evaluate(() => window.scrollY)).not.toBe(before);
+    await expect(missing.first()).toBeInViewport();
+  }
+
   // Wybieramy po kolei pierwszą wartość w każdej grupie z „wybierz" (wszystkie
   // meble zestawu). Tkaniny bywają w zwiniętych grupach — wtedy rozwijamy.
   const pending = page.locator("p").filter({
     has: page.locator("span", { hasText: /^wybierz$/ }),
   });
   for (let i = 0; i < 40 && (await pending.count()) > 0; i++) {
-    await expect(buyNow).toBeDisabled();
     const group = pending.first().locator("xpath=..");
     const value = group.locator('[aria-pressed="false"]:visible').first();
     if ((await value.count()) > 0) {
-      await value.click();
+      // Środek wartości bywa przyciskiem „i" (info) — klikamy w róg, nie w środek.
+      await value.click({ position: { x: 8, y: 8 } });
       continue;
     }
     const expander = group.locator('button[aria-expanded="false"]:visible').first();
@@ -58,6 +79,7 @@ test("zestaw — „Kup teraz” zablokowany do wyboru opcji, potem cały zestaw
   }
   test.skip((await pending.count()) > 0, "nie udało się wybrać wszystkich opcji zestawu");
 
+  await expect(hint).toHaveCount(0);
   await expect(buyNow).toBeEnabled();
   await buyNow.click();
   await expect(page).toHaveURL(/\/koszyk$/);

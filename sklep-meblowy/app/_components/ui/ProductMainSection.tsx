@@ -176,7 +176,6 @@ export default function ProductMainSection({
           selected={selected}
           onChange={setSelected}
           addToCartLabel={t.product.addToCart}
-          selectVariantLabel={t.product.selectVariant}
           buyNowLabel={t.product.buyNow}
         />
 
