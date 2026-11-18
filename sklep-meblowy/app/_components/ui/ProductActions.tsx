@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { Product } from "@/app/_lib/types";
 import { useClientLocale } from "@/app/_lib/useClientLocale";
 import { missingVariantOptions } from "@/app/_lib/variant-missing";
-import { scrollToFirstMissing } from "@/app/_lib/scroll-to-missing";
+import { scrollToFirstMissing, focusFirstMissing } from "@/app/_lib/scroll-to-missing";
 import {
   hasVariants,
   getVariantEffectivePrice,
@@ -46,7 +46,10 @@ export default function ProductActions({
   const attempted = attemptTick > 0;
 
   useEffect(() => {
-    if (attemptTick > 0) scrollToFirstMissing(ref.current);
+    if (attemptTick > 0) {
+      scrollToFirstMissing(ref.current);
+      focusFirstMissing(ref.current);
+    }
   }, [attemptTick]);
 
   const buttonProps = {
@@ -71,6 +74,7 @@ export default function ProductActions({
       )}
 
       <MissingOptionsHint
+        key={attempted ? attemptTick : 0}
         id={hintId}
         groups={missing.length ? [{ labels: missing.map((m) => m.label) }] : []}
         attempted={attempted}

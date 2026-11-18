@@ -13,7 +13,7 @@ import type { BundleWithComponents } from "@/app/_lib/types";
 import { useCart, type CartItem } from "@/app/_context/CartContext";
 import { hasVariants, getVariantEffectivePrice } from "@/app/_lib/variants";
 import { missingBundleGroups } from "@/app/_lib/variant-missing";
-import { scrollToFirstMissing } from "@/app/_lib/scroll-to-missing";
+import { scrollToFirstMissing, focusFirstMissing } from "@/app/_lib/scroll-to-missing";
 import { bundleUnitKey, computeBundleDiscount } from "@/app/_lib/bundles";
 import VariantSelector from "./VariantSelector";
 import MissingOptionsHint from "./MissingOptionsHint";
@@ -59,7 +59,10 @@ export default function BundleConfigurator({
   const attempted = attemptTick > 0;
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (attemptTick > 0) scrollToFirstMissing(rootRef.current);
+    if (attemptTick > 0) {
+      scrollToFirstMissing(rootRef.current);
+      focusFirstMissing(rootRef.current);
+    }
   }, [attemptTick]);
 
   const base = useMemo(
@@ -161,7 +164,7 @@ export default function BundleConfigurator({
       </div>
 
       <div className="flex flex-col gap-3">
-        <MissingOptionsHint id={hintId} groups={groups} attempted={attempted} />
+        <MissingOptionsHint key={attempted ? attemptTick : 0} id={hintId} groups={groups} attempted={attempted} />
         <button
           type="button"
           onClick={() => handleAdd()}

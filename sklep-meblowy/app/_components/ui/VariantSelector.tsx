@@ -155,7 +155,7 @@ export default function VariantSelector({
               ? {
                   "data-missing": "true",
                   className:
-                    "rounded-lg outline outline-2 outline-offset-4 outline-red-500/70",
+                    "rounded-lg outline outline-2 outline-offset-4 outline-red-500/70 scroll-mt-4",
                 }
               : {})}
           >
