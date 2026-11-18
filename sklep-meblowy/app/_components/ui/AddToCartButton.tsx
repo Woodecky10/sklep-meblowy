@@ -18,10 +18,12 @@ type Props = {
   // Zlokalizowane etykiety pełnego przycisku (z ProductActions). Bez nich
   // bierzemy je ze słownika po locale klienta (useClientLocale).
   addToCartLabel?: string;
-  selectVariantLabel?: string;
-  // „Kup teraz": to samo dodanie, a potem od razu /koszyk. Etykieta bez
-  // podmiany na „Wybierz wariant" — tę podpowiedź pokazuje już przycisk
-  // „Dodaj do koszyka" tuż obok.
+  // Wołane zamiast dodania, gdy wybór jest niepełny (needsVariant) — parent
+  // pokazuje, czego brakuje. Przycisk nie jest wtedy zablokowany.
+  onMissingVariant?: () => void;
+  // aria-describedby: id podpowiedzi o brakujących opcjach.
+  describedById?: string;
+  // „Kup teraz": to samo dodanie, a potem od razu /koszyk.
   buyNow?: boolean;
   buyNowLabel?: string;
 };
@@ -38,7 +40,8 @@ export default function AddToCartButton({
   currentPrice,
   needsVariant,
   addToCartLabel,
-  selectVariantLabel,
+  onMissingVariant,
+  describedById,
   buyNow,
   buyNowLabel,
 }: Props) {
@@ -48,16 +51,19 @@ export default function AddToCartButton({
   const locale = useClientLocale();
   const t = getDictionary(locale);
   const addLabel = addToCartLabel ?? t.product.addToCart;
-  const variantLabel = selectVariantLabel ?? t.product.selectVariant;
 
   const hasSelection = selectedValues && Object.keys(selectedValues).length > 0;
   const price = currentPrice ?? effectivePrice(product.price, product.sale_price);
   // `navigating` blokuje drugi klik w trakcie przejścia na /koszyk — inaczej
   // podwójne kliknięcie „Kup teraz" dodałoby 2 sztuki.
-  const disabled = !!needsVariant || navigating;
+  const disabled = navigating;
 
   function handleAdd() {
     if (disabled) return;
+    if (needsVariant) {
+      onMissingVariant?.();
+      return;
+    }
     add({
       id: product.id,
       name: product.name,
@@ -82,6 +88,7 @@ export default function AddToCartButton({
       <button
         onClick={handleAdd}
         disabled={disabled}
+        aria-describedby={describedById}
         className="w-full py-4 border border-[var(--color-navy)] text-[var(--color-navy)] dark:border-[var(--color-gold)] dark:text-[var(--color-gold)] font-sans font-semibold text-sm uppercase tracking-widest rounded-full enabled:hover:bg-[var(--color-navy)] enabled:hover:text-white dark:enabled:hover:bg-[var(--color-gold)] dark:enabled:hover:text-[var(--color-navy)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {buyNowLabel ?? t.product.buyNow}
@@ -89,15 +96,14 @@ export default function AddToCartButton({
     );
   }
 
-  const label = needsVariant ? variantLabel : addLabel;
-
   return (
     <button
       onClick={handleAdd}
       disabled={disabled}
+      aria-describedby={describedById}
       className="w-full py-4 bg-[var(--color-navy)] text-white font-sans font-semibold text-sm uppercase tracking-widest rounded-full hover:bg-[var(--color-gold)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
     >
-      {label}
+      {addLabel}
     </button>
   );
 }
