@@ -280,7 +280,7 @@ git commit -m "feat(panel): poprawianie uwag klienta w edycji zamówienia"
 
 ### Task 5: Migracja na produkcji i wdrożenie
 
-- [ ] **Step 1:** Właściciel wkleja SQL migracji 87 w SQL Editorze (albo agent przez MCP/Management API, jeśli token działa) i dopisuje wpis `('20261118120000', '87_orders_customer_note')` do `supabase_migrations.schema_migrations`. Sprawdzenie odczytem: `products`… → `orders?select=id,customer_note&limit=1` kluczem service_role zwraca wiersz, nie `42703`.
+- [ ] **Step 1:** Właściciel wkleja SQL migracji 87 w SQL Editorze (albo agent przez MCP/Management API, jeśli token działa) i dopisuje wpis `('20261118120000', '87_orders_customer_note')` do `supabase_migrations.schema_migrations`. Sprawdzenie odczytem: `orders?select=id,customer_note&limit=1` kluczem service_role zwraca wiersz, nie `42703`.
 - [ ] **Step 2:** Push gałęzi jako Woodecky10, PR, `git log FETCH_HEAD..<gałąź>` puste, merge (= wdrożenie).
 - [ ] **Step 3:** Po wdrożeniu e2e `uwagi-do-zamowienia.spec.ts` i `wniesienie.spec.ts` na produkcji (bez wysyłania zamówienia).
 
