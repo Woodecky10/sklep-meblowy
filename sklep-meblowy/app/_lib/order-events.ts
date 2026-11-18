@@ -48,3 +48,25 @@ export function shouldTrackPurchase(
   if (paymentMethod === "cod") return true;
   return status !== "pending";
 }
+
+/**
+ * Czy strona podziękowania ma jeszcze czekać na rozstrzygnięcie płatności.
+ *
+ * Klient wraca z P24 (urlReturn) często ZANIM dojdzie notyfikacja, która
+ * przestawia status z „pending". Bez ponownego sprawdzenia strona nie wysłałaby
+ * zakupu do GA4 ani Meta nigdy — zamówienie opłacone, a w raportach go nie ma.
+ * Pobranie nie czeka na nic: liczy się od razu (patrz shouldTrackPurchase).
+ */
+export function shouldAwaitPayment(
+  status: "pending" | "paid" | "processing" | "shipped" | "delivered" | "cancelled",
+  paymentMethod: "online" | "cod"
+): boolean {
+  return paymentMethod === "online" && status === "pending";
+}
+
+// Odstępy kolejnych sprawdzeń statusu na stronie podziękowania. Gęsto na
+// początku (notyfikacja P24 zwykle przychodzi w kilka sekund), potem rzadziej;
+// razem 2 minuty i koniec — porzucona płatność nie może odpytywać bez końca.
+export const PAYMENT_RECHECK_DELAYS_MS = [
+  2000, 3000, 5000, 5000, 10000, 15000, 20000, 30000, 30000,
+] as const;
