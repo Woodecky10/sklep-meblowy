@@ -343,6 +343,8 @@ git commit -m "feat(zestaw): przyciski zakupu mówią, w którym meblu brakuje w
 
 ## STAN WYKONANIA
 
+**WDROŻONE NA PRODUKCJĘ 2026-11-18** — właściciel zaakceptował zrzuty, PR #206, merge `fc43709`, deployment Vercel READY; e2e na produkcji 6/6 (`kup-teraz`, `zestaw-kup-teraz`, `fabric-group-cards`). Zapisy niżej o „czeka na właściciela" są historyczne.
+
 Projekt zaakceptowany przez właściciela 2026-11-18 (makieta, wariant ze stałą podpowiedzią, razem z zestawami).
 
 **Zrobione** na gałęzi `feat/brakujacy-wybor-podpowiedz` (zadania 1–4 i poprawki końcowe po recenzji całej gałęzi):

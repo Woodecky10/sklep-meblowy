@@ -173,7 +173,7 @@ export const de: DeepPartial<PlShape> = {
     remove: "Entfernen",
     addNotes: "+ Anmerkung zu diesem Produkt hinzufügen",
     notesLabel: "Anmerkung zu diesem Produkt",
-    notesPlaceholder: "z. B. Rosa wie auf Bild 2, bitte vor der Lieferung anrufen",
+    notesPlaceholder: "z. B. Farbe wie auf Bild 2, dunklere Füße",
     notesCharsSuffix: "Zeichen",
     notesUnsaved: " · nicht gespeichert",
     removeNotes: "Anmerkung entfernen",
