@@ -3,6 +3,7 @@
 // Limity i parsowanie cen/ilości wspólne z „Dodaj zamówienie"
 // (app/_lib/external-order.ts).
 import type { Address } from "./types";
+import { normalizeCustomerNote } from "./customer-note";
 import type { OrderItemInput } from "./order-items";
 import { formatOrderAmount } from "./money";
 import {
@@ -43,6 +44,8 @@ export type OrderEditInput = {
   promo_discount: number;
   notify: boolean;
   fingerprint: string;
+  // undefined = formularz bez pola (baza bez migracji) — kolumny nie ruszamy.
+  customer_note?: string | null;
 };
 
 export type RawOrderEdit = {
@@ -59,6 +62,7 @@ export type RawOrderEdit = {
   promo_discount?: unknown;
   notify?: unknown;
   fingerprint?: unknown;
+  customer_note?: unknown;
 };
 
 type Result<T> = { ok: true; value: T } | { ok: false; error: string };
@@ -187,6 +191,9 @@ export function parseOrderEditInput(
       promo_discount,
       notify: raw.notify === "1",
       fingerprint,
+      ...(raw.customer_note !== undefined && raw.customer_note !== null
+        ? { customer_note: normalizeCustomerNote(raw.customer_note) }
+        : {}),
     },
   };
 }

@@ -207,3 +207,38 @@ describe("applyOrderEdit", () => {
     });
   });
 });
+
+describe("applyOrderEdit — uwagi klienta", () => {
+  const empty: OrderEditPlan = { inserts: [], updates: [], deletes: [] };
+
+  it("zmiana samej uwagi: zapis bez linii śladu w notatce admina", async () => {
+    const f = fakeStore([{ id: "a", price: 1000, quantity: 1 }]);
+    const res = await applyOrderEdit(f.store, {
+      orderId: "o1",
+      plan: empty,
+      fields: { ...fields, customer_note: "nowa" },
+      currentFields: { ...fields, customer_note: "stara" },
+      oldTotal: 900,
+      currency: "pln",
+      adminNote: "stara notatka",
+      now: at,
+    });
+    expect(res).toEqual({ ok: true, total: 900 });
+    expect(f.orderPatches[0]).toMatchObject({ customer_note: "nowa", admin_note: "stara notatka" });
+  });
+
+  it("ta sama uwaga i nic więcej: zapis bez zmian nie dopisuje śladu", async () => {
+    const f = fakeStore([{ id: "a", price: 1000, quantity: 1 }]);
+    await applyOrderEdit(f.store, {
+      orderId: "o1",
+      plan: empty,
+      fields: { ...fields, customer_note: "ta sama" },
+      currentFields: { ...fields, customer_note: "ta sama" },
+      oldTotal: 900,
+      currency: "pln",
+      adminNote: "stara notatka",
+      now: at,
+    });
+    expect(f.orderPatches[0]).toMatchObject({ customer_note: "ta sama", admin_note: "stara notatka" });
+  });
+});

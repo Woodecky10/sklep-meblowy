@@ -432,6 +432,7 @@ export async function updateOrder(formData: FormData): Promise<ActionResult> {
       promo_discount: formData.get("promo_discount"),
       notify: formData.get("notify"),
       fingerprint: formData.get("fingerprint"),
+      customer_note: formData.get("customer_note"),
     },
     { emailEditable, allowNoEmail }
   );
@@ -467,6 +468,7 @@ export async function updateOrder(formData: FormData): Promise<ActionResult> {
       ...(emailEditable ? { guest_email: input.email } : {}),
       bundle_discount: input.bundle_discount,
       promo_discount: input.promo_discount,
+      ...("customer_note" in input ? { customer_note: input.customer_note } : {}),
     },
     // Stan sprzed edycji — zapis bez żadnej zmiany nie dopisuje śladu do notatki.
     currentFields: {
@@ -474,6 +476,7 @@ export async function updateOrder(formData: FormData): Promise<ActionResult> {
       ...(emailEditable ? { guest_email: order.guest_email } : {}),
       bundle_discount: Number(order.bundle_discount ?? 0),
       promo_discount: Number(order.promo_discount ?? 0),
+      ...("customer_note" in input ? { customer_note: order.customer_note ?? null } : {}),
     },
     oldTotal: Number(order.total),
     currency: order.currency,

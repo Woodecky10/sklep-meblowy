@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Card, Field, ToastView, inputCls, type Toast } from "@/app/admin/_shared";
 import { parsePrice } from "@/app/_lib/external-order";
 import { COUNTRY_MAX_LENGTH } from "@/app/_lib/order-edit";
+import { CUSTOMER_NOTE_MAX } from "@/app/_lib/customer-note";
 import { formatOrderAmount } from "@/app/_lib/money";
 import type { Address } from "@/app/_lib/types";
 import { updateOrder } from "../../actions";
@@ -29,6 +30,7 @@ export default function EditOrderForm({
   address,
   bundleDiscount,
   promoDiscount,
+  customerNote,
   products,
   initialRows,
 }: {
@@ -44,6 +46,8 @@ export default function EditOrderForm({
   address: Address;
   bundleDiscount: number;
   promoDiscount: number;
+  // undefined = baza bez kolumny customer_note — pola nie pokazujemy.
+  customerNote?: string | null;
   products: EditorProduct[];
   initialRows: EditorRow[];
 }) {
@@ -224,6 +228,23 @@ export default function EditOrderForm({
           </Field>
         </div>
       </Card>
+
+      {customerNote !== undefined && (
+        <Card>
+          <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-4">
+            Uwagi do zamówienia (od klienta)
+          </h3>
+          <Field label="Treść uwagi">
+            <textarea
+              name="customer_note"
+              rows={3}
+              maxLength={CUSTOMER_NOTE_MAX}
+              defaultValue={customerNote ?? ""}
+              className={inputCls}
+            />
+          </Field>
+        </Card>
+      )}
 
       <Card>
         <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-4">Pozycje</h3>

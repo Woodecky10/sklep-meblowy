@@ -27,6 +27,9 @@ export type OrderEditFields = {
   guest_email?: string | null;
   bundle_discount: number;
   promo_discount: number;
+  // Uwaga klienta do całego zamówienia. Zmiana samej uwagi nie jest zmianą
+  // „sumy/pozycji", więc sameFields jej celowo nie porównuje (brak linii śladu).
+  customer_note?: string | null;
 };
 
 // Adres porównywany bez kolejności kluczy; puste wartości = brak klucza

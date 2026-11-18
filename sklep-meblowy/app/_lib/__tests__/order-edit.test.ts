@@ -401,3 +401,16 @@ describe("parseOrderEditInput — brak maila (zamówienie ręczne)", () => {
     expect(parseOrderEditInput(base({ email: "jan@" }), { emailEditable: true, allowNoEmail: true }).ok).toBe(false);
   });
 });
+
+describe("parseOrderEditInput — uwagi klienta", () => {
+  const parse = (over: Partial<RawOrderEdit>) => {
+    const res = parseOrderEditInput(base(over), { emailEditable: true });
+    if (!res.ok) throw new Error(res.error);
+    return res.value;
+  };
+  it("customer_note: normalizowane; brak pola → brak klucza", () => {
+    expect(parse({ customer_note: "  dzwonić  " }).customer_note).toBe("dzwonić");
+    expect(parse({ customer_note: "   " }).customer_note).toBeNull();
+    expect("customer_note" in parse({})).toBe(false);
+  });
+});
