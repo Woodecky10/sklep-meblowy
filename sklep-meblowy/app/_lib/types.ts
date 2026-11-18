@@ -325,6 +325,9 @@ export type Order = {
   // Panel admina (migracja 31)
   order_number: number;
   admin_note: string | null;
+  // Uwagi klienta do całego zamówienia (migracja 87). Opcjonalne: select("*")
+  // przed migracją nie zwraca kolumny, więc bywa undefined.
+  customer_note?: string | null;
   carrier: string | null;
   tracking_number: string | null;
   delivery_cost: number | null;

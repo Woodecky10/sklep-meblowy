@@ -11,6 +11,7 @@ import { convertToEur } from "@/app/_lib/money";
 import { DE_ENABLED } from "@/app/_lib/i18n";
 import { priceCheckoutItem } from "@/app/_lib/checkout-pricing";
 import { applyCarryIn, carryInRequested } from "@/app/_lib/carry-in";
+import { normalizeCustomerNote } from "@/app/_lib/customer-note";
 import {
   groupBundleUnits,
   verifyBundleGroup,
@@ -43,6 +44,8 @@ type CheckoutBody = {
   // Wniesienie mebli raz na zamówienie (spec, aktualizacja 2026-10-06).
   // Liczy się wyłącznie dokładne true — patrz applyCarryIn.
   carryIn?: boolean;
+  // Uwagi do całego zamówienia — normalizacja i limit po stronie serwera.
+  customerNote?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -365,6 +368,7 @@ export async function POST(request: NextRequest) {
       currency,
       fxRate: isDe ? rate : null,
       paymentMethod: isCod ? "cod" : "online",
+      customerNote: normalizeCustomerNote(body.customerNote),
     });
 
     const origin =

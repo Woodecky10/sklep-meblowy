@@ -1,5 +1,6 @@
 import { createAdminClient } from "./supabase/server";
 import { toOrderItemRows } from "./order-items";
+import { customerNoteInsert } from "./customer-note";
 import type { Address, Order, OrderItem, OrderStatus, PaymentMethod } from "./types";
 
 type CreateOrderInput = {
@@ -24,6 +25,7 @@ type CreateOrderInput = {
   currency: "pln" | "eur";
   fxRate: number | null;
   paymentMethod: PaymentMethod;
+  customerNote?: string | null;
 };
 
 export async function createOrder({
@@ -38,6 +40,7 @@ export async function createOrder({
   currency,
   fxRate,
   paymentMethod,
+  customerNote,
 }: CreateOrderInput) {
   // Service role — pomijamy RLS, walidacja jest w API route (ceny, stock, auth)
   const supabase = await createAdminClient();
@@ -52,6 +55,7 @@ export async function createOrder({
       promo_code_id: promoCodeId ?? null,
       promo_discount: promoDiscount ?? 0,
       ...(bundleDiscount ? { bundle_discount: bundleDiscount } : {}),
+      ...customerNoteInsert(customerNote ?? null),
       currency,
       fx_rate: fxRate,
       payment_method: paymentMethod,
