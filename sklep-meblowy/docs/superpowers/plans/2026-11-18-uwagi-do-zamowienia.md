@@ -134,7 +134,7 @@ await expect(page.getByText("16 / 1000 znaków")).toBeVisible();
 const order = await page.evaluate(() =>
   [...document.querySelectorAll("h2")].map((h) => h.textContent?.trim()));
 expect(order.indexOf("Uwagi do zamówienia (opcjonalnie)")).toBeGreaterThan(order.indexOf("Wniesienie mebli"));
-expect(order.indexOf("Uwagi do zamówienia (opcjonalnie)")).toBeLessThan(order.findIndex((t) => t?.startsWith("Płatność")));
+expect(order.indexOf("Uwagi do zamówienia (opcjonalnie)")).toBeLessThan(order.indexOf("Metoda płatności")); // rzeczywisty nagłówek (CheckoutForm.tsx:124), nie „Płatność…" — R3
 ```
 
 Jeśli nagłówek sekcji jest `<h2>`, a pole ma etykietę z tym samym tekstem, użyj `aria-labelledby` na textarea wskazującego nagłówek (jedna etykieta, bez powtarzania tekstu).
@@ -261,7 +261,7 @@ Run: `npx vitest run app/_lib/__tests__/order-edit.test.ts app/_lib/__tests__/or
 - [ ] **Step 2: Zaimplementuj**
 
 - Parser: `customer_note` w wyniku tylko gdy pole jest w formularzu (`raw.customer_note !== undefined`), przez `normalizeCustomerNote`.
-- `sameFields`: gdy `"customer_note" in next`, porównaj `(next.customer_note ?? null) !== (current.customer_note ?? null)` (wzorzec `guest_email`). Linia śladu nadal tylko przy zmianie pozycji lub sumy — zmiana samej uwagi zapisuje się bez śladu.
+- `sameFields`: NIE porównuje `customer_note` (R4). `sameFields` bramkuje wyłącznie linię śladu w notatce; `store.updateOrder({ ...args.fields })` zapisuje zawsze, więc zmiana samej uwagi zapisuje się bez śladu — zgodnie ze specyfikacją.
 - `updateOrder`: `customer_note: formData.get("customer_note")` do parsera; gdy wynik ma `customer_note`, dodaj go do `fields` i `currentFields` (`order.customer_note ?? null`).
 - Formularz: karta „Uwagi do zamówienia (od klienta)" z `<textarea name="customer_note" maxLength={1000}>` i `defaultValue` z zamówienia; pola nie renderuj, gdy `order.customer_note === undefined` (baza bez kolumny).
 
@@ -288,4 +288,24 @@ git commit -m "feat(panel): poprawianie uwag klienta w edycji zamówienia"
 
 ## STAN WYKONANIA
 
-Nic nie rozpoczęto. Projekt zatwierdzony przez właściciela 2026-11-18.
+Zadania 1–4 wykonane na gałęzi `feat/uwagi-do-zamowienia` (`git log --oneline fc43709..HEAD`):
+- 0a6fd96 feat(zamówienia): uwagi klienta do całego zamówienia — zapis
+- 039d1cd feat(checkout): pole uwag do zamówienia
+- cc0bfb5 feat(zamówienia): uwagi klienta w panelu, mailach i na koncie
+- 8ba4dde feat(panel): poprawianie uwag klienta w edycji zamówienia
+- potem poprawki po przeglądzie całej gałęzi (zawijanie długich tekstów, osierocony surogat, testy akcji, e2e, plan).
+
+Migracja 87 napisana, NIEZAAPLIKOWANA — musi być na bazie PRZED merge. Przed nią: zamówienia Z uwagą padają przy insercie, bez uwagi działają; formularz edycji ukrywa pole.
+
+Zadanie 5 (migracja na produkcji, push/PR/merge) czeka na właściciela.
+
+Rozstrzygnięcia:
+- R1: praca na miejscu na gałęzi feat/uwagi-do-zamowienia (norma repo).
+- R2: w Zadaniu 5 prosimy właściciela o wklejenie SQL migracji 87 (tokeny 401); po jego potwierdzeniu i sprawdzeniu odczytem push/PR/merge wg jego praktyki.
+- R3: e2e Zadania 2 porównuje kolejność z nagłówkiem „Metoda płatności", nie „Płatność…".
+- R4: `sameFields` tylko bramkuje linię śladu, `updateOrder` zapisuje zawsze — uwaga zapisuje się, zmiana samej uwagi nie zostawia śladu (zgodnie ze specyfikacją).
+- R5: fala poprawek: plan, zawijanie, surogat + test, testy akcji, usunięte nieużywane `currentFields.customer_note`, strażnik indeksów w e2e; ponowienie insertu i utwardzenie e2e odłożone.
+
+NIESPRAWDZONE NA ŻYWO: nie złożono prawdziwego zamówienia z uwagą, żaden z dwóch maili nie był widziany w prawdziwej skrzynce. Propozycja: jedno zamówienie za pobraniem z dwuliniową uwagą na adres jednorazowy (NIE ggpf), potem anulować.
+
+Otwarte follow-upy: utwardzić sprawdzenie pola w e2e edycji po migracji 87; licznik znaków nie jest zapowiadany czytnikom ekranu; opcjonalne ponowienie insertu bez klucza przy błędzie brakującej kolumny.
