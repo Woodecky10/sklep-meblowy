@@ -348,7 +348,7 @@ export default async function OrderDetailPage({
           <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-4">
             {c.customerNote}
           </h3>
-          <p className="text-sm text-[var(--fg)] leading-relaxed whitespace-pre-line">
+          <p className="text-sm text-[var(--fg)] leading-relaxed whitespace-pre-line [overflow-wrap:anywhere]">
             {order.customer_note}
           </p>
         </div>

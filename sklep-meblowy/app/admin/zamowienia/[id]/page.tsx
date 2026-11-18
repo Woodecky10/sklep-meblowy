@@ -281,7 +281,7 @@ export default async function AdminOrderDetailPage({
           {typeof order.customer_note === "string" && order.customer_note.trim() !== "" && (
             <Card>
               <h3 className="font-display text-lg font-bold text-[var(--fg)] mb-3">Uwagi do zamówienia</h3>
-              <p className="text-sm text-[var(--fg)] leading-relaxed whitespace-pre-line">
+              <p className="text-sm text-[var(--fg)] leading-relaxed whitespace-pre-line [overflow-wrap:anywhere]">
                 {order.customer_note}
               </p>
             </Card>
