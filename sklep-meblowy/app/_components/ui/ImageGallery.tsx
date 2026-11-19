@@ -244,6 +244,36 @@ export default function ImageGallery({
             ))}
           </div>
           {ribbon && <PromoRibbon text={ribbon} size="hero" decorative />}
+          {/* Komputer: strzałki przełączają zdjęcie bez otwierania powiększenia.
+              Na telefonie ich nie ma — tam zdjęcia przesuwa się palcem, a strzałki
+              zasłaniałyby mebel. Rodzeństwo taśmy, nie dzieci przycisku zdjęcia,
+              więc klik w strzałkę nie otwiera lightboxa. */}
+          {list.length > 1 && (
+            <>
+              <button
+                type="button"
+                data-testid="gallery-prev"
+                onClick={() => setActive((i) => (i - 1 + list.length) % list.length)}
+                aria-label={t.a11y.prevImage}
+                className="hidden md:flex absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 items-center justify-center rounded-full bg-white/85 hover:bg-white text-[var(--color-navy)] shadow-md transition-colors cursor-pointer"
+              >
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                data-testid="gallery-next"
+                onClick={() => setActive((i) => (i + 1) % list.length)}
+                aria-label={t.a11y.nextImage}
+                className="hidden md:flex absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 items-center justify-center rounded-full bg-white/85 hover:bg-white text-[var(--color-navy)] shadow-md transition-colors cursor-pointer"
+              >
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+            </>
+          )}
           {/* Telefon: pozycja w galerii zamiast rzędu miniatur. */}
           {list.length > 1 && (
             <>
