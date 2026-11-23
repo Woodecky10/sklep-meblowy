@@ -9,6 +9,15 @@ const PROGRESS_AXIS: OrderStatus[] = [
   "delivered",
 ];
 
+// Status, który zamówienie online dostaje po POTWIERDZONEJ wpłacie (notyfikacja
+// P24 → markOrderPaid). Decyzja właściciela 2026-11-23: opłacone zamówienie ma
+// być od razu „W realizacji", tak samo jak pobranie — osobny stan „Opłacone"
+// był dla obsługi tylko dodatkowym klikiem. Dowodem wpłaty zostaje
+// `payment_ref` / `payment_provider` na zamówieniu, nie status.
+// `paid` ZOSTAJE w typie i na liście: mają go starsze zamówienia i zamówienia
+// zewnętrzne wpisywane ręcznie („Opłacone (zewn.)").
+export const STATUS_AFTER_PAYMENT: OrderStatus = "processing";
+
 const TERMINAL: OrderStatus[] = ["delivered", "cancelled"];
 
 // Dozwolone RĘCZNE przejście statusu w panelu admina.

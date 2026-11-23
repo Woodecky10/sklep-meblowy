@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true });
   }
 
-  // Atomowy claim pending→paid (zwycięzca incrementuje promo).
+  // Atomowy claim pending→„W realizacji" (zwycięzca incrementuje promo).
   let claimedFirst = false;
   try {
     claimedFirst = await markOrderPaid(orderId, String(n.orderId));
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Maile (potwierdzenie do klienta + „Nowe zamówienie" do właścicielki) —
-  // wyłącznie dla zwycięzcy CAS-a pending→paid, więc ponowiona notyfikacja P24
+  // wyłącznie dla zwycięzcy CAS-a z pending, więc ponowiona notyfikacja P24
   // nie wyśle drugiego potwierdzenia. notifyOrderPlaced nigdy nie rzuca, więc
   // nieudany mail nie zamieni się w 500 i kolejne ponowienie.
   //

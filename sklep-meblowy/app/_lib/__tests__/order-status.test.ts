@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canTransition, nextStatuses, adminStatusLabel, ADMIN_STATUS_LABELS } from "@/app/_lib/order-status";
+import { canTransition, nextStatuses, adminStatusLabel, ADMIN_STATUS_LABELS, STATUS_AFTER_PAYMENT } from "@/app/_lib/order-status";
 
 describe("canTransition", () => {
   it("pozwala iść do przodu po osi paid→processing→shipped→delivered", () => {
@@ -95,5 +95,12 @@ describe("adminStatusLabel", () => {
   // sklepu dostałoby w panelu plakietkę „Opłacone (zewn.)".
   it("source undefined (kolumna jeszcze nie istnieje) → jak sklep, bez dopisku (zewn.)", () => {
     expect(adminStatusLabel("paid", undefined)).toEqual(ADMIN_STATUS_LABELS.paid);
+  });
+});
+
+describe("STATUS_AFTER_PAYMENT", () => {
+  it("opłacone online trafia od razu do realizacji, jak pobranie", () => {
+    expect(STATUS_AFTER_PAYMENT).toBe("processing");
+    expect(ADMIN_STATUS_LABELS[STATUS_AFTER_PAYMENT].label).toBe("W realizacji");
   });
 });
