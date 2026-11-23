@@ -7,9 +7,9 @@ import type { OrderStatus, PaymentMethod } from "../types";
 // - `processing` — ten status admin ustawia, żeby zabrać zamówienie do
 //   realizacji, czyli tym samym klikiem gasi licznik nowych zamówień
 //   (PR #100). Mail tutaj strzelałby do klienta przy każdym odhaczeniu.
-//   Dodatkowo createOrder nadaje `processing` zamówieniom COD od razu.
-// - `paid` — webhook ustawia go sekundy po zakupie; potwierdzenie zakupu
-//   JEST powiadomieniem o tym statusie.
+//   Dodatkowo createOrder nadaje `processing` zamówieniom COD od razu,
+//   a notyfikacja P24 — opłaconym online (STATUS_AFTER_PAYMENT).
+// - `paid` — dziś tylko zamówienia zewnętrzne i starsze opłacone online.
 // - `delivered` — przy meblach klient kwituje odbiór u kierowcy.
 //
 // Ta sama lista dla zamówień ZE SKLEPU i ZEWNĘTRZNYCH. Do 2026-09-09 zamówienia
@@ -41,8 +41,7 @@ export function shouldNotifyCustomer(status: OrderStatus): boolean {
 // „skontaktujemy się w sprawie zwrotu środków".
 //
 // Pobranie NIGDY nie jest tu "oplacone": createOrder nadaje COD status
-// "processing" od razu, a "paid" pisze wylacznie markOrderPaid, ktorego COD nie
-// dotyka — wiec sam warunek `previousStatus !== "pending"` bylby dla kazdego
+// "processing" od razu i nigdy nie przechodzi przez markOrderPaid — wiec sam warunek `previousStatus !== "pending"` bylby dla kazdego
 // COD prawdziwy i mail obiecywalby zwrot gotowki, ktorej sklep nie wzial.
 //
 // Znane, swiadomie zaakceptowane ograniczenie: admin moze przestawic

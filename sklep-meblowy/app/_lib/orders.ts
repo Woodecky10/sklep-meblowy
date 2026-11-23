@@ -1,6 +1,7 @@
 import { createAdminClient } from "./supabase/server";
 import { toOrderItemRows } from "./order-items";
 import { customerNoteInsert } from "./customer-note";
+import { STATUS_AFTER_PAYMENT } from "./order-status";
 import type { Address, Order, OrderItem, OrderStatus, PaymentMethod } from "./types";
 
 type CreateOrderInput = {
@@ -116,7 +117,7 @@ export async function markOrderPaid(
   paymentRef: string
 ): Promise<boolean> {
   const supabase = await createAdminClient();
-  // CAS: aktualizuj TYLKO przy przejściu pending→paid. Zwraca true, jeśli TO
+  // CAS: aktualizuj TYLKO przy wyjściu z pending (→ STATUS_AFTER_PAYMENT). Zwraca true, jeśli TO
   // wywołanie faktycznie przestawiło status — zwycięzca wyścigu duplikatów
   // notyfikacji P24. Caller używa tego do JEDNOKROTNEGO incrementu used_count.
   const { data, error } = await supabase
@@ -124,7 +125,7 @@ export async function markOrderPaid(
     .update({
       payment_ref: paymentRef,
       payment_provider: "p24",
-      status: "paid",
+      status: STATUS_AFTER_PAYMENT,
     } as never)
     .eq("id", orderId)
     .eq("status", "pending")
@@ -224,10 +225,11 @@ export async function getAdminOrders({
 }
 
 // Statusy, w których zamówienie czeka na PIERWSZE spojrzenie admina.
-// `paid` — zapłacone online (webhook przestawił z pending).
-// `processing` — tu wpada zamówienie za pobraniem: createOrder nadaje mu
-//   `processing` od razu, bo COD nie ma płatności do potwierdzenia. Bez tego
-//   statusu licznik przegapiłby WSZYSTKIE zamówienia COD.
+// `processing` — tu wpada KAŻDE nowe zamówienie ze sklepu: pobranie dostaje
+//   ten status przy utworzeniu, opłacone online — z notyfikacji P24
+//   (STATUS_AFTER_PAYMENT, od 2026-11-23).
+// `paid` — zamówienia zewnętrzne wpisane ręcznie oraz opłacone online sprzed
+//   tej zmiany.
 // Świadomie NIE ma `pending` — to porzucone checkouty, które nigdy nie doszły
 // do zapłaty; admin nie ma się nimi zajmować.
 const AWAITING_LOOK_STATUSES: OrderStatus[] = ["paid", "processing"];
