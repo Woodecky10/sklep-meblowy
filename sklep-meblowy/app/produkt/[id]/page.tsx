@@ -37,6 +37,7 @@ import { getDictionary } from "@/app/_lib/dictionaries";
 import { buildSizeOptions } from "@/app/_lib/size-groups";
 import { effectivePrice } from "@/app/_lib/pricing";
 import { hasChristmasGuaranteeNow } from "@/app/_lib/christmas-guarantee";
+import { pickByKeys, variantValuesOf, withoutLongText } from "@/app/_lib/page-payload";
 import { getFabricImageMap, getFabricMetaMap, getFabricPriceGroups } from "@/app/_lib/fabrics";
 import { getFabricSizes } from "@/app/_lib/fabric-sizes-data";
 import { groupSurchargesByProduct } from "@/app/_lib/fabric-sizes";
@@ -135,10 +136,14 @@ export default async function ProduktPage({ params }: Props) {
     ]);
   const sizeOptions = buildSizeOptions(sizeSiblings, product.id);
   // Mapa zdjęć próbek tkanin (wartość „Nazwa Numer" → URL) do próbek w selektorze.
-  const fabricImageMap = await getFabricImageMap();
+  // Obie mapy tkanin są GLOBALNE (wszystkie kolory z katalogu) — do przeglądarki
+  // idą tylko wpisy dla wartości, które faktycznie są na tej stronie: produktu
+  // i składników zestawów (patrz page-payload.ts — waga dokumentu).
+  const pageVariantValues = variantValuesOf([product, ...bundles.flatMap((b) => b.components)]);
+  const fabricImageMap = pickByKeys(await getFabricImageMap(), pageVariantValues);
   // Mapa wartość wariantu → metadane tkaniny (slug, grupa cenowa) — selektor
   // grupuje próbki w rozwijane karty grup + link „szczegóły" do /tkaniny/[slug].
-  const fabricMetaMap = await getFabricMetaMap();
+  const fabricMetaMap = pickByKeys(await getFabricMetaMap(), pageVariantValues);
   // Kwoty nagłówków grup tkanin właściwe dla KAŻDEGO mebla na stronie (rozmiar
   // do dopłat): produkt główny i składniki zestawów z modalu „Kup w zestawie" —
   // fotel w zestawie z sofą ma pokazać dopłatę fotela, nie sofy.
@@ -374,12 +379,12 @@ export default async function ProduktPage({ params }: Props) {
           <ProductGroupSurchargesProvider map={productGroupSurcharges}>
             <VariantInfoProvider map={variantInfoMap}>
               <ProductMainSection
-                product={product}
+                product={withoutLongText(product)}
                 categoryLabel={categoryLabel ?? null}
                 rating={rating}
                 specifications={details}
                 sizeOptions={sizeOptions}
-                bundles={bundles}
+                bundles={bundles.map((b) => ({ ...b, components: b.components.map(withoutLongText) }))}
                 christmasGuarantee={hasChristmasGuaranteeNow(product.promo_badge)}
               />
             </VariantInfoProvider>

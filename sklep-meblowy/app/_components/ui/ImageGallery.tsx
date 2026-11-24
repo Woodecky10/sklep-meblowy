@@ -235,7 +235,12 @@ export default function ImageGallery({
                     src={src}
                     alt={i === 0 ? name : `${name} ${i + 1}`}
                     fill
-                    priority={i === 0}
+                    // Pierwsze zdjęcie to największy element pierwszego ekranu (LCP).
+                    // Samo preload nie wystarcza: bez fetchPriority przeglądarka
+                    // pobierała je z NISKIM priorytetem, za czcionkami i skryptami
+                    // (zmierzone 2026-11-24). `priority` jest w Next 16 wycofane.
+                    preload={i === 0}
+                    fetchPriority={i === 0 ? "high" : undefined}
                     sizes="(max-width: 768px) 100vw, 50vw"
                     className="object-cover"
                   />
