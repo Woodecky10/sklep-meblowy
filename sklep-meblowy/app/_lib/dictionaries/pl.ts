@@ -89,6 +89,13 @@ export type PlShape = {
     sizeLabel: string;
     omnibusLabel: string;
     saleBadge: string;
+    christmasTitle: string;
+    christmasSubtitle: string;
+    christmasDays: string;
+    christmasDayOne: string;
+    christmasHours: string;
+    christmasMinutes: string;
+    christmasSeconds: string;
     outOfStock: string;
     recentlyViewedEyebrow: string;
     recentlyViewedHeading: string;
@@ -544,6 +551,13 @@ export const pl = {
     sizeLabel: "Rozmiar",
     omnibusLabel: "Najniższa cena z 30 dni przed obniżką",
     saleBadge: "Promocja",
+    christmasTitle: "Dostawa przed świętami",
+    christmasSubtitle: "Gwarancja przy zamówieniu do 30.11",
+    christmasDays: "dni",
+    christmasDayOne: "dzień",
+    christmasHours: "godz",
+    christmasMinutes: "min",
+    christmasSeconds: "sek",
     outOfStock: "Niedostępny",
     recentlyViewedEyebrow: "Dla Ciebie",
     recentlyViewedHeading: "Ostatnio oglądane",

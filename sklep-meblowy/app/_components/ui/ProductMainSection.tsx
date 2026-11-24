@@ -23,6 +23,7 @@ import StarRating from "./StarRating";
 import InquiryModal from "./InquiryModal";
 import BundleOffer from "./BundleOffer";
 import LocalizedLink from "./LocalizedLink";
+import ChristmasCountdown from "./ChristmasCountdown";
 
 // Client wrapper łączący galerię i akcje, żeby wybór wariantu mógł
 // jednocześnie zmieniać zdjęcia (galeria) i cenę / przycisk dodaj-do-koszyka
@@ -50,6 +51,7 @@ export default function ProductMainSection({
   specifications,
   sizeOptions,
   bundles,
+  christmasGuarantee,
 }: {
   product: Product;
   categoryLabel: string | null;
@@ -61,6 +63,10 @@ export default function ProductMainSection({
   // Zestawy zawierające ten produkt — box „Kup w zestawie" pod akcjami (above
   // the fold). Pusta lista = box się nie renderuje.
   bundles: BundleWithComponents[];
+  // Produkt objęty gwarancją dostawy przed świętami i termin jeszcze trwa —
+  // rozstrzyga serwer (hasChristmasGuarantee), żeby pasek był w HTML-u od
+  // pierwszej klatki i nie przesuwał treści po hydratacji.
+  christmasGuarantee: boolean;
 }) {
   const locale = useClientLocale();
   const rate = useEurRate();
@@ -167,6 +173,8 @@ export default function ProductMainSection({
               {formatMoney(regularPrice, locale, rate)}
             </p>
           )}
+
+          {christmasGuarantee && <ChristmasCountdown />}
         </div>
 
         <SizeSelector options={sizeOptions} />

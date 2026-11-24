@@ -80,6 +80,47 @@ body {
   animation: dropdown-in 150ms ease-out;
 }
 
+/* Pasek „Dostawa przed świętami" (ChristmasCountdown). Obie animacje ruszają
+   WYŁĄCZNIE transform i opacity — robi je kompozytor, bez przeliczania układu
+   i bez przemalowywania strony, więc nie psują wyniku PageSpeed (CLS, TBT). */
+.xmas-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 40%, rgba(201, 168, 76, 0.28) 50%, transparent 60%);
+  transform: translateX(-100%);
+  animation: xmas-sweep 5s ease-in-out infinite;
+}
+@keyframes xmas-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  22%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+.xmas-digit {
+  animation: xmas-tick 350ms ease-out;
+}
+@keyframes xmas-tick {
+  from {
+    opacity: 0;
+    transform: translateY(70%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .xmas-bar::after,
+  .xmas-digit {
+    animation: none;
+  }
+}
+
 /* Thin scrollbar dla horyzontalnego scrolla filtrów na mobile.
    WebKit + Firefox. */
 .scrollbar-thin {

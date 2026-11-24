@@ -36,6 +36,7 @@ import { alternatesFor } from "@/app/_lib/sitemap-i18n";
 import { getDictionary } from "@/app/_lib/dictionaries";
 import { buildSizeOptions } from "@/app/_lib/size-groups";
 import { effectivePrice } from "@/app/_lib/pricing";
+import { hasChristmasGuaranteeNow } from "@/app/_lib/christmas-guarantee";
 import { getFabricImageMap, getFabricMetaMap, getFabricPriceGroups } from "@/app/_lib/fabrics";
 import { getFabricSizes } from "@/app/_lib/fabric-sizes-data";
 import { groupSurchargesByProduct } from "@/app/_lib/fabric-sizes";
@@ -379,6 +380,7 @@ export default async function ProduktPage({ params }: Props) {
                 specifications={details}
                 sizeOptions={sizeOptions}
                 bundles={bundles}
+                christmasGuarantee={hasChristmasGuaranteeNow(product.promo_badge)}
               />
             </VariantInfoProvider>
           </ProductGroupSurchargesProvider>
