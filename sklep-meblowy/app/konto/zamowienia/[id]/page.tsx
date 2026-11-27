@@ -64,6 +64,7 @@ export default async function OrderDetailPage({
         shippingIndividual: "individuell festgelegt",
         total: "Gesamt",
         shippingAddress: "Lieferadresse",
+        phone: "Telefonnummer",
         customerNote: "Anmerkungen zur Bestellung",
         delivery: "Versand",
         carrier: "Spediteur",
@@ -96,6 +97,7 @@ export default async function OrderDetailPage({
         shippingIndividual: "ustalana indywidualnie",
         total: "Razem",
         shippingAddress: "Adres dostawy",
+        phone: "Telefon kontaktowy",
         customerNote: "Uwagi do zamówienia",
         delivery: "Dostawa",
         carrier: "Przewoźnik",
@@ -340,6 +342,12 @@ export default async function OrderDetailPage({
             <br />
             {order.shipping_address.country}
           </address>
+          {order.shipping_address.phone?.trim() && (
+            <p className="text-sm text-[var(--muted)] mt-3">
+              {c.phone}:{" "}
+              <span className="text-[var(--fg)]">{order.shipping_address.phone.trim()}</span>
+            </p>
+          )}
         </div>
       )}
 
