@@ -27,6 +27,7 @@ const COPY = {
     // etykieta nie może twierdzić, że ta kwota jest zapłacona.
     totalUpdated: "Razem",
     address: "Adres dostawy",
+    phone: "Telefon kontaktowy",
     customerNote: "Uwagi do zamówienia",
     cta: "Zobacz zamówienie",
     next: "Skontaktujemy się telefonicznie, aby ustalić termin dostawy.",
@@ -53,6 +54,7 @@ const COPY = {
     totalCod: "Bei Lieferung zu zahlen",
     totalUpdated: "Gesamt",
     address: "Lieferadresse",
+    phone: "Telefonnummer",
     customerNote: "Anmerkungen zur Bestellung",
     cta: "Bestellung ansehen",
     next: "Wir rufen Sie an, um den Liefertermin zu vereinbaren.",
@@ -94,6 +96,7 @@ export function OrderConfirmation({
   const bundleDiscount = Number(order.bundle_discount ?? 0);
   const promoDiscount = Number(order.promo_discount ?? 0);
   const addr = order.shipping_address;
+  const phone = addr?.phone?.trim() ? addr.phone.trim() : null;
   const customerNote = order.customer_note?.trim() ? order.customer_note : null;
 
   const rowStyle = { color: c.muted, fontSize: "13px", margin: "0 0 4px" };
@@ -211,6 +214,17 @@ export function OrderConfirmation({
         {addr?.fullname ? `${addr.fullname}, ` : ""}
         {addr?.street}, {addr?.postal_code} {addr?.city}
       </Text>
+
+      {/* Klient ma widzieć numer, pod który zadzwoni przewoźnik — inaczej nie
+          sprawdzi, czy podał swój. */}
+      {phone && (
+        <>
+          <Text style={labelStyle}>{t.phone}</Text>
+          <Text style={{ color: c.fg, fontSize: "13px", lineHeight: "1.6", margin: "0 0 24px" }}>
+            {phone}
+          </Text>
+        </>
+      )}
 
       {customerNote && (
         <>

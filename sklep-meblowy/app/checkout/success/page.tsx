@@ -44,6 +44,7 @@ export default async function SuccessPage({
         details: "Details",
         orderNumber: "Bestellnummer",
         email: "E-Mail",
+        phone: "Telefonnummer",
         amount: "Betrag",
         continue: "Weiter einkaufen",
       }
@@ -60,6 +61,7 @@ export default async function SuccessPage({
         details: "Szczegóły",
         orderNumber: "Numer zamówienia",
         email: "Email",
+        phone: "Telefon kontaktowy",
         amount: "Kwota",
         continue: "Kontynuuj zakupy",
       };
@@ -67,6 +69,7 @@ export default async function SuccessPage({
   let orderId: string | null = null;
   let total: number | null = null;
   let email: string | null = null;
+  let phone: string | null = null;
   let orderCurrency: "pln" | "eur" = "pln";
   let isPaid = false;
   let isCod = false;
@@ -81,6 +84,7 @@ export default async function SuccessPage({
       total = Number(order.total);
       orderCurrency = order.currency;
       email = order.guest_email; // null dla zalogowanych — wiersz się nie wyrenderuje
+      phone = order.shipping_address?.phone?.trim() || null;
       isCod = order.payment_method === "cod";
       isPaid = order.status !== "pending";
       awaitPayment = shouldAwaitPayment(order.status, order.payment_method);
@@ -176,6 +180,12 @@ export default async function SuccessPage({
               <div className="flex justify-between border-b border-[var(--border)] pb-3">
                 <dt className="text-[var(--muted)]">{c.email}</dt>
                 <dd className="text-[var(--fg)]">{email}</dd>
+              </div>
+            )}
+            {phone && (
+              <div className="flex justify-between border-b border-[var(--border)] pb-3">
+                <dt className="text-[var(--muted)]">{c.phone}</dt>
+                <dd className="text-[var(--fg)]">{phone}</dd>
               </div>
             )}
             {total !== null && (
